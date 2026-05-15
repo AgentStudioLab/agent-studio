@@ -1,0 +1,23 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "enables the default permissions",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "store:default",
+    {
+      "identifier": "shell:allow-spawn",
+      "allow": [
+        {
+          "name": "binaries/agent-studio-sidecar",
+          "sidecar": true,
+          "args": [
+            { "validator": "^--port=\\d+$" },
+            { "validator": "^--token=[A-Za-z0-9]+$" }
+          ]
+        }
+      ]
+    }
+  ]
+}
