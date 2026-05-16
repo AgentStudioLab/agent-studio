@@ -499,7 +499,7 @@ export const CodeBlockCopyButton = ({
 
   return (
     <Button
-      className={cn("shrink-0", className)}
+      className={cn("shrink-0 text-muted-foreground", className)}
       onClick={copyToClipboard}
       size="icon"
       variant="ghost"
