@@ -41,3 +41,4 @@ src-tauri/binaries/agent-studio-sidecar*
 # Bun build artifacts
 sidecar/dist
 
+.superpowers/
