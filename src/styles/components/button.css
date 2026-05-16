@@ -1,0 +1,12 @@
+/* ============================================================
+ * Components · Button
+ * ----------
+ * Skeleton placeholder. Populated when Button visuals are derived
+ * from Showcase / screenshots in later waves.
+ * ============================================================ */
+:root {
+    --button-bg-default: var(--brand-100);
+    --button-fg-default: var(--oncolor-100);
+    --button-bg-hover:   var(--brand-200);
+    --button-radius:     var(--radius-button);
+}

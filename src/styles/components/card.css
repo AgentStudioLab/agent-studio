@@ -1,0 +1,11 @@
+/* ============================================================
+ * Components · Card
+ * ----------
+ * Skeleton placeholder.
+ * ============================================================ */
+:root {
+    --card-bg:     var(--bg-200);
+    --card-fg:     var(--text-100);
+    --card-border: var(--border-300);
+    --card-radius: var(--radius-card);
+}

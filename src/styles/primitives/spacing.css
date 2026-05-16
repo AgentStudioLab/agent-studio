@@ -1,0 +1,9 @@
+/* ============================================================
+ * Primitives · Spacing
+ * ----------
+ * Tailwind v4 base unit. Utilities (p-1, gap-2 etc.) multiply this.
+ * Components should prefer semantic spacing names — see semantic/spacing.css.
+ * ============================================================ */
+:root {
+    --spacing: 0.25rem;  /* 4px base */
+}

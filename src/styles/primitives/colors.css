@@ -1,0 +1,73 @@
+/* ============================================================
+ * Primitives · Colors
+ * ----------
+ * Static color palette. HSL bare triples (use `hsl(var(--color-xxx))`).
+ * Naming: Tailwind-style <hue>-<step>. Step 50=lightest, 950=darkest.
+ * Do NOT reference any other token here — primitives must be self-contained.
+ * ============================================================ */
+:root {
+    /* ---- Absolute ---- */
+    --color-pure-white: 0 0% 100%;
+    --color-pure-black: 0 0% 0%;
+
+    /* ---- Stone (warm neutral) — Anthropic 灰色阶梯 ---- */
+    --color-stone-25:  60 6.7% 97.1%;
+    --color-stone-50:  48 33.3% 97.1%;
+    --color-stone-75:  53 28.6% 94.5%;
+    --color-stone-100: 48 25% 92.2%;
+    --color-stone-200: 50 20.7% 88.6%;
+    --color-stone-300: 51 16.5% 84.5%;
+    --color-stone-400: 50 9% 73.7%;
+    --color-stone-500: 48 4.8% 59.2%;
+    --color-stone-600: 51 3.1% 43.7%;
+    --color-stone-700: 48 3.4% 29.2%;
+    --color-stone-750: 60 2.5% 23.3%;
+    --color-stone-800: 60 2.1% 18.4%;
+    --color-stone-850: 60 2.7% 14.5%;
+    --color-stone-900: 30 3.3% 11.8%;
+    --color-stone-950: 60 2.6% 7.6%;
+
+    /* ---- Orange (brand) ---- */
+    --color-orange-500: 15 63.1% 59.6%;
+    --color-orange-600: 15 54.2% 51.2%;
+
+    /* ---- Blue (accent) ---- */
+    --color-blue-100: 210 72% 90%;
+    --color-blue-400: 210 65.5% 67.1%;
+    --color-blue-600: 210 70.9% 51.6%;
+    --color-blue-700: 210 73.7% 40.2%;
+    --color-blue-900: 210 55.9% 24.6%;
+
+    /* ---- Purple (accent-pro) ---- */
+    --color-purple-100: 251 33.3% 91.8%;
+    --color-purple-200: 251 84.6% 74.5%;
+    --color-purple-300: 251 61% 72.2%;
+    --color-purple-500: 251 40.2% 54.1%;
+    --color-purple-600: 251 40% 45.1%;
+    --color-purple-700: 251 34.2% 33.3%;
+    --color-purple-900: 250 25.3% 19.4%;
+
+    /* ---- Red (danger) ---- */
+    --color-red-50:  0 50% 95%;
+    --color-red-300: 0 98.4% 75.1%;
+    --color-red-500: 0 67% 59.6%;
+    --color-red-600: 0 56.2% 45.4%;
+    --color-red-700: 0 58.6% 34.1%;
+    --color-red-800: 0 46.5% 27.8%;
+
+    /* ---- Green (success) ---- */
+    --color-green-50:  86 45.1% 90%;
+    --color-green-500: 97 59.1% 46.1%;
+    --color-green-700: 97 75% 32.9%;
+    --color-green-800: 103 72.3% 26.9%;
+    --color-green-900: 125 100% 18%;
+    --color-green-950: 127 100% 13.9%;
+
+    /* ---- Amber (warning) ---- */
+    --color-amber-100: 38 65.9% 92%;
+    --color-amber-500: 40 71% 50%;
+    --color-amber-600: 39 93.4% 35.9%;
+    --color-amber-700: 39 88.8% 28%;
+    --color-amber-800: 45 91.8% 19%;
+    --color-amber-900: 45 94.8% 15.1%;
+}

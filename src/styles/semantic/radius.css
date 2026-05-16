@@ -1,0 +1,15 @@
+/* ============================================================
+ * Semantic · Border Radius
+ * ----------
+ * UI-purpose radius aliases. Components reference these by intent
+ * (--radius-button, --radius-card) rather than primitive sizes.
+ * ============================================================ */
+:root {
+    --radius-button:    var(--radius-md);
+    --radius-input:     var(--radius-md);
+    --radius-chip:      var(--radius-sm);
+    --radius-card:      var(--radius-lg);
+    --radius-modal:     var(--radius-xl);
+    --radius-thumbnail: var(--radius-sm);
+    --radius-pill:      var(--radius-full);
+}

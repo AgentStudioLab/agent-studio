@@ -1,0 +1,133 @@
+/* ============================================================
+ * Semantic · Colors
+ * ----------
+ * UI-purpose color names (bg/text/brand/accent/status/...).
+ * Light values on :root, dark overrides on :root[data-mode="dark"].
+ * Every value must reference a primitive — no raw HSL here.
+ * ============================================================ */
+:root {
+    /* Absolute (never change with mode) */
+    --always-white: var(--color-pure-white);
+    --always-black: var(--color-pure-black);
+
+    /* Surfaces */
+    --bg-000: var(--color-pure-white);
+    --bg-100: var(--color-stone-50);
+    --bg-200: var(--color-stone-75);
+    --bg-300: var(--color-stone-100);
+    --bg-400: var(--color-stone-200);
+    --bg-500: var(--color-stone-200);
+
+    /* Text */
+    --text-000: var(--color-stone-950);
+    --text-100: var(--color-stone-950);
+    --text-200: var(--color-stone-750);
+    --text-300: var(--color-stone-750);
+    --text-400: var(--color-stone-600);
+    --text-500: var(--color-stone-600);
+
+    /* Brand (orange terracotta) */
+    --brand-000: var(--color-orange-600);
+    --brand-100: var(--color-orange-600);
+    --brand-200: var(--color-orange-500);
+    --brand-900: var(--color-pure-black);
+    --accent-brand: var(--color-orange-500);
+
+    /* Accent (blue) */
+    --accent-000: var(--color-blue-700);
+    --accent-100: var(--color-blue-600);
+    --accent-200: var(--color-blue-600);
+    --accent-900: var(--color-blue-100);
+
+    /* Accent Pro (purple) */
+    --accent-pro-000: var(--color-purple-700);
+    --accent-pro-100: var(--color-purple-600);
+    --accent-pro-200: var(--color-purple-300);
+    --accent-pro-900: var(--color-purple-100);
+
+    /* Border (consumers usually apply alpha at point-of-use) */
+    --border-100: var(--color-stone-900);
+    --border-200: var(--color-stone-900);
+    --border-300: var(--color-stone-900);
+    --border-400: var(--color-stone-900);
+
+    /* Status */
+    --danger-000: var(--color-red-700);
+    --danger-100: var(--color-red-600);
+    --danger-200: var(--color-red-600);
+    --danger-900: var(--color-red-50);
+
+    --success-000: var(--color-green-900);
+    --success-100: var(--color-green-800);
+    --success-200: var(--color-green-800);
+    --success-900: var(--color-green-50);
+
+    --warning-000: var(--color-amber-800);
+    --warning-100: var(--color-amber-700);
+    --warning-200: var(--color-amber-700);
+    --warning-900: var(--color-amber-100);
+
+    /* Foreground on tinted surfaces (oncolor) */
+    --oncolor-100: var(--color-pure-white);
+    --oncolor-200: var(--color-stone-25);
+    --oncolor-300: var(--color-stone-25);
+
+    /* Pictogram (decorative surfaces) */
+    --pictogram-100: var(--color-stone-200);
+    --pictogram-200: var(--color-stone-300);
+    --pictogram-300: var(--color-pure-white);
+    --pictogram-400: var(--color-stone-50);
+}
+
+:root[data-mode="dark"] {
+    --bg-000: var(--color-stone-800);
+    --bg-100: var(--color-stone-850);
+    --bg-200: var(--color-stone-900);
+    --bg-300: var(--color-stone-950);
+    --bg-400: var(--color-pure-black);
+    --bg-500: var(--color-pure-black);
+
+    --text-000: var(--color-stone-50);
+    --text-100: var(--color-stone-50);
+    --text-200: var(--color-stone-400);
+    --text-300: var(--color-stone-400);
+    --text-400: var(--color-stone-500);
+    --text-500: var(--color-stone-500);
+
+    --brand-000: var(--color-orange-600);
+    --brand-100: var(--color-orange-500);
+    --brand-200: var(--color-orange-500);
+
+    --accent-000: var(--color-blue-400);
+    --accent-900: var(--color-blue-900);
+
+    --accent-pro-000: var(--color-purple-200);
+    --accent-pro-100: var(--color-purple-500);
+    --accent-pro-200: var(--color-purple-600);
+    --accent-pro-900: var(--color-purple-900);
+
+    --border-100: var(--color-stone-300);
+    --border-200: var(--color-stone-300);
+    --border-300: var(--color-stone-300);
+    --border-400: var(--color-stone-300);
+
+    --danger-000: var(--color-red-300);
+    --danger-100: var(--color-red-500);
+    --danger-200: var(--color-red-500);
+    --danger-900: var(--color-red-800);
+
+    --success-000: var(--color-green-500);
+    --success-100: var(--color-green-700);
+    --success-200: var(--color-green-700);
+    --success-900: var(--color-green-950);
+
+    --warning-000: var(--color-amber-500);
+    --warning-100: var(--color-amber-600);
+    --warning-200: var(--color-amber-600);
+    --warning-900: var(--color-amber-900);
+
+    --pictogram-100: var(--color-stone-700);
+    --pictogram-200: var(--color-stone-750);
+    --pictogram-300: var(--color-stone-800);
+    --pictogram-400: var(--color-stone-850);
+}

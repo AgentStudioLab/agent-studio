@@ -1,0 +1,40 @@
+/* ============================================================
+ * shadcn alias layer
+ * ----------
+ * Maps shadcn-standard token names (--background / --primary / --border
+ * / sidebar-* / ...) onto semantic Anthropic tokens.
+ * Because semantic colors switch under :root[data-mode="dark"], this
+ * alias layer automatically flips with mode — no nested overrides needed.
+ * ============================================================ */
+:root {
+    --background:           hsl(var(--bg-100));
+    --foreground:           hsl(var(--text-100));
+    --card:                 hsl(var(--bg-200));
+    --card-foreground:      hsl(var(--text-100));
+    --popover:              hsl(var(--bg-100));
+    --popover-foreground:   hsl(var(--text-100));
+    --primary:              hsl(var(--brand-100));
+    --primary-foreground:   hsl(var(--oncolor-100));
+    --secondary:            hsl(var(--bg-300));
+    --secondary-foreground: hsl(var(--text-100));
+    --muted:                hsl(var(--bg-200));
+    --muted-foreground:     hsl(var(--text-400));
+    --accent:               hsl(var(--accent-100));
+    --accent-foreground:    hsl(var(--oncolor-100));
+    --destructive:          hsl(var(--danger-100));
+    --border:               hsl(var(--border-300) / 0.15);
+    --input:                hsl(var(--border-300) / 0.15);
+    --ring:                 hsl(var(--brand-100));
+
+    /* Sidebar slot (PRD § 3.2 chrome) — alias to bg-200 family */
+    --sidebar:                       hsl(var(--bg-200));
+    --sidebar-foreground:            hsl(var(--text-100));
+    --sidebar-primary:               hsl(var(--brand-100));
+    --sidebar-primary-foreground:    hsl(var(--oncolor-100));
+    --sidebar-accent:                hsl(var(--bg-300));
+    --sidebar-accent-foreground:     hsl(var(--text-100));
+    --sidebar-border:                hsl(var(--border-300) / 0.15);
+    --sidebar-ring:                  hsl(var(--brand-100));
+
+    --radius: 0.5rem;
+}

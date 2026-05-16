@@ -1,0 +1,11 @@
+/* ============================================================
+ * Components · Input
+ * ----------
+ * Skeleton placeholder.
+ * ============================================================ */
+:root {
+    --input-bg:     var(--bg-100);
+    --input-fg:     var(--text-100);
+    --input-border: var(--border-300);
+    --input-radius: var(--radius-input);
+}

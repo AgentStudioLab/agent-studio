@@ -1,0 +1,77 @@
+/* ============================================================
+ * Globals
+ * ----------
+ * Entry point for the design system. Imports primitives → semantic →
+ * components → shadcn-alias, then applies base reset, scrollbar,
+ * focus ring, and dark-mode font-weight balancing.
+ * ============================================================ */
+
+/* Tier 1: primitives */
+@import "./primitives/colors.css";
+@import "./primitives/spacing.css";
+@import "./primitives/radius.css";
+@import "./primitives/typography.css";
+
+/* Tier 2: semantic */
+@import "./semantic/colors.css";
+@import "./semantic/spacing.css";
+@import "./semantic/radius.css";
+
+/* Tier 3: components (placeholders) */
+@import "./components/button.css";
+@import "./components/input.css";
+@import "./components/card.css";
+
+/* Bridge to shadcn / ai-elements naming */
+@import "./shadcn-alias.css";
+
+/* ---- Base reset ---- */
+html, body {
+    font-family: var(--font-family-sans);
+    color: hsl(var(--text-100));
+    background: hsl(var(--bg-100));
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+/* ---- Scrollbar (Firefox + WebKit) ---- */
+* {
+    scrollbar-color: hsl(var(--border-300) / 0.35) transparent;
+    scrollbar-width: thin;
+}
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb {
+    background: hsl(var(--border-300) / 0.35);
+    border-radius: var(--radius-sm);
+}
+::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--border-300) / 0.55);
+}
+::-webkit-scrollbar-track { background: transparent; }
+
+.u-hidden-scrollbar { scrollbar-width: none; }
+.u-hidden-scrollbar::-webkit-scrollbar { display: none; }
+
+/* ---- Focus ring ---- */
+:focus-visible {
+    outline: 2px solid hsl(var(--accent-100));
+    outline-offset: 2px;
+    border-radius: var(--radius-xs);
+}
+
+/* ---- Dark-mode font weight balancing (variable fonts only) ---- */
+:root[data-mode="dark"] .font-normal   { font-weight: 400; }
+:root[data-mode="dark"] .font-medium   { font-weight: 510; }
+:root[data-mode="dark"] .font-semibold { font-weight: 540; }
+:root[data-mode="dark"] b,
+:root[data-mode="dark"] strong,
+:root[data-mode="dark"] .font-bold {
+    font-weight: 530;
+}
+
+/* ---- Display font utilities ---- */
+.font-serif,
+.font-display {
+    font-family: var(--font-family-serif);
+}

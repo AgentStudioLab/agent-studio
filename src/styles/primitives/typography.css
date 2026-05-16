@@ -1,0 +1,58 @@
+/* ============================================================
+ * Primitives · Typography
+ * ----------
+ * Font families (with system fallback stacks), size scale with paired
+ * line-heights (Tailwind v4 syntax), and weight scale tuned for variable
+ * fonts (430/550/580 are non-standard mid-weights that read cleaner at
+ * low DPI than 400/500/600).
+ * ============================================================ */
+:root {
+    --font-family-sans:
+        "Inter", system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-family-serif:
+        "Source Serif 4", "Tiempos Text", Georgia, Cambria,
+        "Times New Roman", Times, serif;
+    --font-family-mono:
+        "JetBrains Mono", ui-monospace, "SF Mono", Monaco, "Cascadia Code",
+        "Roboto Mono", Menlo, Consolas, "Courier New", monospace;
+
+    /* Size scale with paired line-heights */
+    --font-size-xs:   0.75rem;
+    --font-size-xs--line-height:   calc(1 / 0.75);
+    --font-size-sm:   0.875rem;
+    --font-size-sm--line-height:   calc(1.25 / 0.875);
+    --font-size-base: 1rem;
+    --font-size-base--line-height: 1.5;
+    --font-size-lg:   1.125rem;
+    --font-size-lg--line-height:   calc(1.75 / 1.125);
+    --font-size-xl:   1.25rem;
+    --font-size-xl--line-height:   calc(1.75 / 1.25);
+    --font-size-2xl:  1.5rem;
+    --font-size-2xl--line-height:  calc(2 / 1.5);
+    --font-size-3xl:  1.875rem;
+    --font-size-3xl--line-height:  1.2;
+    --font-size-4xl:  2.25rem;
+    --font-size-4xl--line-height:  calc(2.5 / 2.25);
+    --font-size-5xl:  3rem;
+    --font-size-5xl--line-height:  1;
+
+    /* Weight scale (variable font friendly) */
+    --font-weight-thin:       100;
+    --font-weight-extralight: 200;
+    --font-weight-light:      300;
+    --font-weight-normal:     430;
+    --font-weight-medium:     550;
+    --font-weight-semibold:   580;
+    --font-weight-bold:       700;
+    --font-weight-extrabold:  800;
+    --font-weight-black:      900;
+
+    /* Tracking + line-height utilities */
+    --tracking-wide:   0.025em;
+    --tracking-wider:  0.05em;
+    --leading-tight:   1.25;
+    --leading-snug:    1.375;
+    --leading-normal:  1.5;
+    --leading-relaxed: 1.625;
+}

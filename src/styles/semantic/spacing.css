@@ -1,0 +1,15 @@
+/* ============================================================
+ * Semantic · Spacing
+ * ----------
+ * UI-purpose spacing aliases. Components prefer these names over raw
+ * `var(--spacing) * N` so a single edit re-flows the whole UI.
+ * ============================================================ */
+:root {
+    --spacing-inline-gap:        calc(var(--spacing) * 2);   /*  8px */
+    --spacing-component-padding: calc(var(--spacing) * 3);   /* 12px */
+    --spacing-stack-gap:         calc(var(--spacing) * 4);   /* 16px */
+    --spacing-section-gap:       calc(var(--spacing) * 6);   /* 24px */
+    --spacing-page-padding:      calc(var(--spacing) * 8);   /* 32px */
+    --spacing-sidebar-width:     calc(var(--spacing) * 65);  /* 260px */
+    --spacing-aside-width:       calc(var(--spacing) * 80);  /* 320px */
+}
