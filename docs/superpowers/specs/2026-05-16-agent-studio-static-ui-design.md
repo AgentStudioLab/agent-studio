@@ -44,56 +44,82 @@ src/features/              Layer 3 · Agent Studio 业务组件
 - **Layer 2** 走 `bunx --bun ai-elements@latest add`，目标目录 `src/components/ai-elements/`，**源码项目内**可改
 - **Layer 3** Agent Studio 特有的、非通用 chat 范畴的组件（Sidebar、ProjectCard、ScheduledCard、SettingsForm 等），不复用 Layer 2 时自己写
 
-### 2.2 设计系统迁移
+### 2.2 三层 Token 架构（W3C Design Tokens / Tokens Studio 模型）
 
-`anthropic-design-system` 是已交付的可移植系统，包含完整 token / typography / theme / hook / 防 FOUC 脚本。迁入路径：
+设计系统按工业级三层组织，提升维护性：
 
-| 来源 | 目标 |
-|--|--|
-| `_deliverables/anthropic-design-system/src/styles/tokens.css` | `src/styles/tokens.css` |
-| `…/typography.css` | `src/styles/typography.css` |
-| `…/theme.css` | `src/styles/theme.css` |
-| `…/globals.css` | merge 进 `src/index.css`（现有） |
-| `…/public/theme-init.js` | `public/theme-init.js` |
-| `…/src/hooks/useThemeMode.ts` | `src/lib/useThemeMode.ts` |
+```
+src/styles/
+├── primitives/                # 原始值层 · 静态调色板，不依赖任何 token
+│   ├── colors.css             #   --color-orange-500: 15 54.2% 51.2% （Tailwind 风格 hue + 阶梯）
+│   ├── spacing.css            #   --spacing: 0.25rem  （Tailwind v4 基准单位）
+│   ├── radius.css             #   --radius-sm/md/lg/xl/2xl/3xl/full
+│   └── typography.css         #   --font-family-sans/serif/mono + size + weight 阶梯
+├── semantic/                  # 语义层 · 引用 primitive；按 mode 切换
+│   ├── colors.css             #   --bg-100, --text-100, --brand-100 → var(--color-*)
+│   ├── spacing.css            #   --spacing-section-gap, --spacing-page-padding → calc(var(--spacing) * n)
+│   └── radius.css             #   --radius-button, --radius-card, --radius-pill → var(--radius-*)
+├── components/                # 组件层（可选骨架）· 引用 semantic
+│   ├── button.css             #   --button-bg-default: var(--brand-100)（占位）
+│   ├── input.css              #   占位
+│   └── card.css               #   占位
+├── shadcn-alias.css           # shadcn 标准命名 → 引用 semantic（让 shadcn/ai-elements 自动跟换 Anthropic 调色板）
+└── globals.css                # @import 全部分层 + reset + scrollbar + focus
+```
 
-`index.html` 增改：
-- `<html lang="zh-CN" data-theme="claude">`
-- `<head>` 第一个 script：`<script src="/theme-init.js"></script>`（防 FOUC，必须在所有样式表之前）
-- 加 Google Fonts link：Source Serif 4 + Inter + JetBrains Mono
+### 2.3 三层引用链 + 维护场景
 
-### 2.3 Token 双向别名（关键）
+```
+Primitive            Semantic              Component               shadcn alias
+─────────            ────────              ─────────               ────────────
+--color-orange-500   --brand-100           --button-bg-default     --primary
+   (raw HSL)       → var(orange-500)     → var(brand-100)        → hsl(var(brand-100))
+```
 
-ai-elements 用 shadcn 标准 token（`--foreground`, `--background`, `--primary`, `--muted-foreground`, …），Anthropic DS 用自有命名（`--text-100`, `--bg-100`, `--brand-100`, `--text-400`, …）。在 `src/index.css` 内加 alias 层，让 ai-elements 自动继承 Anthropic 调色板：
+**维护场景**：
+- 改 brand 橙色色相 → `primitives/colors.css` 改一行 → 所有 button / chip / pill / focus ring 全部跟换
+- 让 Button 用蓝色而非橙色 → `components/button.css` 一行；其他组件不动
+- 改 light/dark 配色 → `semantic/colors.css` 切 `:root[data-mode="dark"]` 块
+- 加新主题色（如 info 蓝）→ `primitives/colors.css` 新增 `--color-info-*` + `semantic/colors.css` 新增 `--info-100`
+
+### 2.4 主题维度：单轴 light/dark
+
+`data-theme="claude"` 这一层**不要**（Agent Studio 永远只有一个 brand 主题）。`<html>` 只有 `data-mode="light|dark"`：
+
+- `theme-init.js` 防 FOUC 写 `data-mode`
+- `useThemeMode` hook 运行时切换 `data-mode`
+- `semantic/colors.css` 用 `:root` 给 light 默认值、`:root[data-mode="dark"]` 覆写 dark
+- `index.html` 不挂 `data-theme`
+- Storybook decorator 不 wrap `data-theme`
+
+### 2.5 设计系统迁移（不再 1:1 拷贝）
+
+Anthropic DS 的 `tokens.css` / `typography.css` / `theme.css` 是单层 semantic + 多主题包装结构，**和我们三层架构不直接匹配**，所以是**重构式迁移**：
+- 提取所有 HSL 三元组 → `primitives/colors.css`（Tailwind 风格命名 stone / orange / blue / purple / red / green / amber）
+- 把 `--bg-100` / `--text-100` / `--brand-100` 等 → `semantic/colors.css`，每一个 alias 到 primitive
+- `theme.css` 里 spacing / radius / size 阶梯 → 拆到 primitives 对应文件
+- 主题切换 selector 从 `[data-theme="claude"][data-mode="dark"]` 改成 `:root[data-mode="dark"]`
+- `theme-init.js` / `useThemeMode.ts` 已经只写 `data-mode`，**1:1 拷贝**
+- shadcn token 别名独立成 `shadcn-alias.css`，不混入 semantic 层
+
+### 2.6 Token 双向别名（shadcn-alias.css）
+
+ai-elements / shadcn UI 用 shadcn 标准 token（`--foreground`, `--background`, `--primary`, `--muted-foreground`, …）。`src/styles/shadcn-alias.css` 单独一份，把 shadcn 名称指到 semantic：
 
 ```css
 :root {
-  /* shadcn 标准 → Anthropic 别名 */
-  --background: var(--bg-100);
-  --foreground: var(--text-100);
-  --card: var(--bg-200);
-  --card-foreground: var(--text-100);
-  --popover: var(--bg-100);
-  --popover-foreground: var(--text-100);
-  --primary: var(--brand-100);
-  --primary-foreground: var(--oncolor-100);
-  --secondary: var(--bg-300);
-  --secondary-foreground: var(--text-100);
-  --muted: var(--bg-200);
-  --muted-foreground: var(--text-400);
-  --accent: var(--accent-100);
-  --accent-foreground: var(--oncolor-100);
-  --destructive: var(--danger-100);
-  --destructive-foreground: var(--oncolor-100);
-  --border: var(--border-300);
-  --input: var(--border-300);
-  --ring: var(--brand-100);
+  --background: hsl(var(--bg-100));
+  --foreground: hsl(var(--text-100));
+  --primary: hsl(var(--brand-100));
+  --primary-foreground: hsl(var(--oncolor-100));
+  --border: hsl(var(--border-300) / 0.15);
+  /* 等等，full list 见 plan Task 2 */
 }
 ```
 
-dark 模式下 Anthropic token 自身已切换（由 `data-mode="dark"` 触发），shadcn alias 跟着切。
+`[data-mode="dark"]` 下 semantic 自身切换（在 `semantic/colors.css` 里），shadcn alias 因为 `hsl(var(--bg-100))` 是间接引用，自动跟切。
 
-### 2.4 视觉对齐（visual reconciliation）
+### 2.7 视觉对齐（visual reconciliation）
 
 ai-elements 默认样式偏 Vercel/shadcn 现代风（圆角 lg、shadow-sm、字号紧凑），跟 Anthropic 原型的克制审美不完全一致。每个 ai-elements 组件装完后**强制做一轮视觉对齐**：
 
@@ -106,7 +132,7 @@ ai-elements 默认样式偏 Vercel/shadcn 现代风（圆角 lg、shadow-sm、�
 
 **fallback 规则**：单个组件如改动超过 className 一半或动了 JSX 结构，放弃 ai-elements，在 `src/features/<feature>/` 重写一个轻量等价物。决策记在 commit message。
 
-### 2.5 视图路由
+### 2.8 视图路由
 
 - 用 `useState<ViewKey>` + Context 管理 currentView，不引入 React Router
 - ViewKey 类型：`"new-task" | "task" | "projects" | "project-detail" | "scheduled-list" | "scheduled-detail" | "customize" | "settings"`（8 个，新建任务 + 任务进行中合并为 task family 由内部状态再细分）
@@ -123,7 +149,7 @@ type AppShellContext = {
 };
 ```
 
-### 2.6 Mock 数据
+### 2.9 Mock 数据
 
 `src/lib/mock/` 下分：
 - `tasks.ts` · 任务（含 plan / chain steps / artifacts 完整 fixture）
@@ -135,7 +161,7 @@ type AppShellContext = {
 
 每个 mock 模块 export const 数组 + factory 函数（`makeMockTask(overrides?)`），stories 与 views 共用。
 
-### 2.7 Storybook 集成
+### 2.10 Storybook 集成
 
 - 装 `storybook@latest`、`@storybook/addon-themes`、`@storybook/addon-essentials`、`@storybook/react-vite`
 - 配置文件：`.storybook/main.ts` 和 `.storybook/preview.tsx`
@@ -154,9 +180,10 @@ type AppShellContext = {
 
 ### Wave 1 · DS + Storybook 基础（1 天）
 
-- [ ] 拷贝 DS 五个文件到 `src/styles/` / `src/lib/` / `public/`
-- [ ] `src/index.css` merge globals + 加 shadcn token alias 层
-- [ ] `index.html` 加 `data-theme="claude"` + theme-init.js + Google Fonts
+- [ ] 重构式迁移 DS 到三层 token 结构：`src/styles/{primitives,semantic,components}/`、`shadcn-alias.css`、`globals.css`（详见 plan Task 1）
+- [ ] 拷贝 `theme-init.js` 到 `public/`、`useThemeMode.ts` 到 `src/lib/`
+- [ ] `src/index.css` import 三层 + shadcn-alias，配置 Tailwind `@theme inline` + `@custom-variant dark`
+- [ ] `index.html` 加 theme-init.js + Google Fonts（**不**挂 `data-theme`，单 dimension 主题）
 - [ ] 装 Storybook 8 + addon-themes + addon-essentials
 - [ ] `.storybook/main.ts` / `.storybook/preview.tsx` 配好主题切换
 - [ ] 写一个 sanity story（`Button` 三种 variant × dark/light）验证 token + theme 通路
@@ -225,7 +252,11 @@ type AppShellContext = {
 
 **新增**：
 - `.storybook/main.ts`、`.storybook/preview.tsx`
-- `src/styles/{tokens,typography,theme}.css`
+- `src/styles/primitives/{colors,spacing,radius,typography}.css`
+- `src/styles/semantic/{colors,spacing,radius}.css`
+- `src/styles/components/{button,input,card}.css`（骨架占位）
+- `src/styles/shadcn-alias.css`
+- `src/styles/globals.css`
 - `src/lib/useThemeMode.ts`
 - `src/lib/AppShellContext.tsx`
 - `src/lib/mock/{tasks,projects,agents,skills,plugins,scheduled}.ts`
@@ -237,8 +268,8 @@ type AppShellContext = {
 - `public/theme-init.js`
 
 **修改**：
-- `index.html` — 加 `data-theme` + theme-init + Google Fonts
-- `src/index.css` — merge globals + 加 shadcn token alias 层
+- `index.html` — 加 theme-init + Google Fonts（不加 `data-theme`）
+- `src/index.css` — import 三层 token + shadcn-alias，`@theme inline` + `@custom-variant dark`
 - `src/App.tsx` — 替换 hello-world，挂 AppShellContext.Provider + AppShell
 - `package.json` — 加 storybook 系列 devDeps + scripts
 
