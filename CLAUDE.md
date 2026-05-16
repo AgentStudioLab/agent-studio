@@ -79,11 +79,14 @@ Frontend client lives in `src/lib/sidecar-client.ts`:
 
 6. **Sidecar binaries are gitignored** (`src-tauri/binaries/agent-studio-sidecar*`). `tauri build` requires the host-triple binary to exist — `beforeBuildCommand` runs `build:sidecar` to ensure that. `tauri dev` does NOT; use `bun run tauri:dev` (which prefixes `build:sidecar -- --host-only`) rather than raw `tauri dev`.
 
+7. **Styling MUST go through the 3-tier design token system.** Whenever you write component CSS, apply a Tailwind class for color/spacing/radius, or pick any style value — first consult the `design-tokens` skill. The chain is `src/styles/primitives/` → `src/styles/semantic/` → `src/styles/components/` → `src/styles/shadcn-alias.css` → Tailwind utility via `@theme inline` in `src/index.css`. Theme is single-axis (`data-mode="light|dark"`, no `data-theme`). Hardcoding hex / raw HSL anywhere in `src/components/` or `src/features/` is forbidden — those values must come from primitives.
+
 ## Skills
 
-This repo vendors three agent skill bundles in `.agents/skills/` (managed by `skills-lock.json`):
-- `ai-elements` (vercel/ai-elements) — UI primitives for AI chat/agent UX
-- `vercel-react-best-practices` (vercel-labs/agent-skills) — React performance rules
-- `skill-creator` (anthropics/skills) — meta-skill for authoring new skills
+Project skills live under `.claude/skills/`:
+- `design-tokens` — **always invoke before any styling change.** Enforces the 3-tier token discipline (primitives / semantic / components) and gates new token decisions.
+- `ai-elements` (vercel/ai-elements) — UI primitives for AI chat/agent UX. Required reading before installing or reconciling any ai-elements component.
+- `vercel-react-best-practices` (vercel-labs/agent-skills) — React performance rules.
+- `skill-creator` (anthropics/skills) — meta-skill for authoring new skills.
 
 Consult these when relevant; they are part of the project's documented context.
