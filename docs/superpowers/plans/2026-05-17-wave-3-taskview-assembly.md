@@ -430,6 +430,8 @@ PRD § 4.2 文件预览面板：
 
 ## 风险点
 
+0. **TooltipProvider 多实例**（Wave 2 review 标注）：ai-elements 的 message 里 MessageAction、artifact 里 ArtifactAction、prompt-input 里 PromptInputButton 各自 wrap 自己的 `TooltipProvider`。装配 TaskView 时一个屏幕 10+ provider 是浪费。Mitigation: TaskView (Task 10) 顶层挂一个全局 `<TooltipProvider delayDuration={200}>`，确保 child providers 不冲突（Radix 实现下 nested provider 是 no-op）。如有干扰需删 child providers，则在对应 ai-elements 组件做单点修改并记 commit。
+
 1. **PreviewPane resize handle 浏览器兼容性**：mouse events 在 Tauri WebView 可能行为异常。Mitigation: 先用 `pointer-events` 实现，必要时降级 fixed width。
 2. **ai-elements `Tool` 组件渲染 mock toolCalls 时 prop shape**：Wave 2 装的 ai-elements Tool 期望特定 `state` 和 `input` 结构。Mitigation: Task 4 / 5 实施时 fit mock data shape 到 Tool 实际 prop。
 3. **Storybook stories 渲染 React Context-dependent 组件**：TaskChatStream 调 `useAppShell()` → stories 里需要 wrap `<AppShellProvider>`。Mitigation: 在 preview.tsx 加一个 decorator 或每个 story 显式 wrap。
