@@ -501,7 +501,7 @@ shadcn / ai-elements 的标准名 → 引用 semantic。**这是让 shadcn 自�
     --sidebar-border:                hsl(var(--border-300) / 0.15);
     --sidebar-ring:                  hsl(var(--brand-100));
 
-    --radius: 0.5rem;
+    --radius: var(--radius-lg);
 }
 ```
 
