@@ -1,0 +1,89 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project layout
+
+Three independent subprojects in one repo, **no workspaces**:
+
+- `src/` — React 19 + TypeScript + Tailwind v4 + shadcn frontend (Vite 8 / rolldown)
+- `src-tauri/` — Rust shell (Tauri v2), spawns sidecar + manages persistence
+- `sidecar/` — Bun + Hono HTTP/SSE server, compiled to a single native binary per platform
+- `scripts/build-sidecar.ts` — orchestrates `bun build --compile` across target triples
+
+Vite MUST live at the repo root because `tauri.conf.json` has `frontendDist: "../dist"` resolved relative to `src-tauri/`. Do not introduce a `package.json` workspace setup.
+
+## Common commands
+
+```bash
+bun run dev                          # Vite only, http://localhost:1420
+bun run build                        # tsc -b && vite build → dist/
+bun run build:sidecar -- --host-only # compile sidecar for current host only
+bun run build:sidecar                # compile sidecar for all 3 targets
+bun run tauri:dev                    # host sidecar + tauri dev (full app)
+bun run tauri:build                  # all sidecars + tauri release build
+
+# Rust side
+cargo check --manifest-path src-tauri/Cargo.toml
+
+# Sidecar standalone (dev token, fixed port 4123)
+cd sidecar && bun run dev
+```
+
+Target triples handled by `scripts/build-sidecar.ts`:
+
+| Bun target | Tauri triple | Output |
+|---|---|---|
+| `bun-darwin-arm64` | `aarch64-apple-darwin` | `src-tauri/binaries/agent-studio-sidecar-aarch64-apple-darwin` |
+| `bun-darwin-x64` | `x86_64-apple-darwin` | `…-x86_64-apple-darwin` |
+| `bun-windows-x64` | `x86_64-pc-windows-msvc` | `…-x86_64-pc-windows-msvc.exe` |
+
+No Linux support — explicit project decision.
+
+## Architecture: how the three pieces talk
+
+```
+[ React UI ]
+   │
+   │  invoke('get_sidecar_info') → { port, token }   (one-time, cached)
+   │  fetch http://127.0.0.1:<port>/* + Bearer <token>
+   ▼
+[ Tauri Rust shell ]                [ Bun sidecar (HTTP/SSE) ]
+   │  setup():                          ▲
+   │    portpicker pick_unused_port     │ Hono bearer middleware
+   │    rand 32-char Alphanumeric token │ rejects bad/missing token → 401
+   │    shell.sidecar(...).spawn        │
+   │       --port=<n> --token=<t>  ─────┘
+   │  app.manage(SidecarInfo { port, token })
+   │  on RunEvent::Exit → child.kill()
+   ▼
+tauri-plugin-store (Rust-side JSON KV, persistence)
+```
+
+Frontend client lives in `src/lib/sidecar-client.ts`:
+- `getSidecarInfo()` — invokes Tauri command once, caches the promise
+- `fetchSidecar(path, init?)` — injects base URL + Authorization header
+- `subscribeSSE(path, onEvent, signal?)` — manual SSE parser over fetch+ReadableStream (not EventSource, because EventSource can't carry auth headers)
+
+## Critical conventions
+
+1. **Tauri plugin versions are version-locked across Cargo and npm.** `tauri-plugin-shell` Rust crate version MUST equal `@tauri-apps/plugin-shell` npm major+minor. Same for `tauri-plugin-store`. When upgrading one side, upgrade the other in the same commit, or the plugin IPC will fail at runtime.
+
+2. **Capability uses `shell:allow-spawn`, NOT `shell:allow-execute`.** The sidecar is long-running. Allow-execute is for run-to-completion processes only. The arg validators in `src-tauri/capabilities/default.json` constrain `--port=` and `--token=` formats — the token generator MUST use `rand::distr::Alphanumeric` to match `[A-Za-z0-9]+`.
+
+3. **Vite `build.target = "esnext"`** — do NOT downgrade to `safari13`/`safari14`. esbuild can't downlevel shadcn/CVA's object rest destructuring, and Tauri v2's WebView baseline already supports modern JS.
+
+4. **`@tailwindcss/node` requires explicit `esbuild` devDep.** Already in `package.json`. If you ever remove it, Vite build will fail with `Cannot find package 'esbuild'`.
+
+5. **shadcn config:** `components.json` style is `radix-nova` (modern equivalent of the old `new-york` style). Alias `@/*` → `./src/*`. Add new components with `bunx shadcn@latest add <component>`.
+
+6. **Sidecar binaries are gitignored** (`src-tauri/binaries/agent-studio-sidecar*`). `tauri build` requires the host-triple binary to exist — `beforeBuildCommand` runs `build:sidecar` to ensure that. `tauri dev` does NOT; use `bun run tauri:dev` (which prefixes `build:sidecar -- --host-only`) rather than raw `tauri dev`.
+
+## Skills
+
+This repo vendors three agent skill bundles in `.agents/skills/` (managed by `skills-lock.json`):
+- `ai-elements` (vercel/ai-elements) — UI primitives for AI chat/agent UX
+- `vercel-react-best-practices` (vercel-labs/agent-skills) — React performance rules
+- `skill-creator` (anthropics/skills) — meta-skill for authoring new skills
+
+Consult these when relevant; they are part of the project's documented context.
