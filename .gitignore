@@ -42,3 +42,6 @@ src-tauri/binaries/agent-studio-sidecar*
 sidecar/dist
 
 .superpowers/
+
+*storybook.log
+storybook-static
