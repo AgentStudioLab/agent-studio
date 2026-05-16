@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="claude">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Anthropic Design System · Demo</title>
+
+  <!-- ⚠️ theme-init.js 必须放在第一个 <script>, 防 FOUC -->
+  <script src="./public/theme-init.js"></script>
+
+  <!-- Google Fonts (开源字体替代). 自托管时改为本地路径. -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,300..700;1,8..60,400..700&family=Inter:wght@300..700&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet"
+  />
+
+  <!-- 设计系统入口 -->
+  <link rel="stylesheet" href="./src/styles/globals.css" />
+
+  <style>
+    /* Demo 局部样式 */
+    body { padding: 48px; max-width: 960px; margin: 0 auto; }
+    .demo-card {
+      background: hsl(var(--bg-000));
+      border: 1px solid hsl(var(--border-300) / 0.15);
+      border-radius: var(--radius-xl);
+      padding: 24px;
+      margin-bottom: 16px;
+    }
+    .demo-row {
+      display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+    }
+    .swatch {
+      width: 60px; height: 60px;
+      border-radius: var(--radius-md);
+      border: 1px solid hsl(var(--border-300) / 0.15);
+    }
+    .swatch-label {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: hsl(var(--text-400));
+      margin-top: 6px;
+      display: block;
+    }
+    button.theme-btn {
+      padding: 6px 12px;
+      border-radius: var(--radius-md);
+      background: hsl(var(--bg-200));
+      color: hsl(var(--text-100));
+      border: 1px solid hsl(var(--border-300) / 0.15);
+      font-family: var(--font-ui);
+      cursor: pointer;
+    }
+    button.theme-btn.active {
+      background: hsl(var(--bg-000));
+      box-shadow: 0 0 0 1px hsl(var(--accent-100));
+    }
+  </style>
+</head>
+<body>
+  <h1 class="font-serif" style="font-size: 32px; margin: 0 0 8px;">Anthropic Design System</h1>
+  <p style="color: hsl(var(--text-300)); margin: 0 0 32px;">
+    可移植版 · 双轴主题 (<code style="font-family: var(--font-mono); font-size: 12px;">data-theme</code> × <code style="font-family: var(--font-mono); font-size: 12px;">data-mode</code>) · light / dark 自动跟随系统
+  </p>
+
+  <!-- Theme toggle -->
+  <div class="demo-card">
+    <h2 class="font-serif" style="font-size: 18px; margin: 0 0 12px;">Theme</h2>
+    <div class="demo-row">
+      <button class="theme-btn" id="pref-system">跟随系统</button>
+      <button class="theme-btn" id="pref-light">明亮</button>
+      <button class="theme-btn" id="pref-dark">暗黑</button>
+    </div>
+  </div>
+
+  <!-- Color swatches -->
+  <div class="demo-card">
+    <h2 class="font-serif" style="font-size: 18px; margin: 0 0 12px;">Color Tokens</h2>
+    <div class="demo-row">
+      <div>
+        <div class="swatch" style="background: hsl(var(--bg-100));"></div>
+        <span class="swatch-label">--bg-100</span>
+      </div>
+      <div>
+        <div class="swatch" style="background: hsl(var(--text-100));"></div>
+        <span class="swatch-label">--text-100</span>
+      </div>
+      <div>
+        <div class="swatch" style="background: hsl(var(--brand-100));"></div>
+        <span class="swatch-label">--brand-100</span>
+      </div>
+      <div>
+        <div class="swatch" style="background: hsl(var(--accent-100));"></div>
+        <span class="swatch-label">--accent-100</span>
+      </div>
+      <div>
+        <div class="swatch" style="background: hsl(var(--success-100));"></div>
+        <span class="swatch-label">--success-100</span>
+      </div>
+      <div>
+        <div class="swatch" style="background: hsl(var(--danger-100));"></div>
+        <span class="swatch-label">--danger-100</span>
+      </div>
+      <div>
+        <div class="swatch" style="background: hsl(var(--warning-100));"></div>
+        <span class="swatch-label">--warning-100</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Typography -->
+  <div class="demo-card">
+    <h2 class="font-serif" style="font-size: 18px; margin: 0 0 12px;">Typography</h2>
+    <p class="font-serif" style="font-size: 24px; margin: 0 0 8px;">Source Serif 4 — Display</p>
+    <p style="font-family: var(--font-ui); margin: 0 0 8px;">Inter — Body sans</p>
+    <p style="font-family: var(--font-mono); font-size: 13px; margin: 0; color: hsl(var(--text-300));">JetBrains Mono — code &amp; data</p>
+  </div>
+
+  <script>
+    const root = document.documentElement;
+    const KEY = 'preferred_theme_mode';
+    const btns = {
+      system: document.getElementById('pref-system'),
+      light:  document.getElementById('pref-light'),
+      dark:   document.getElementById('pref-dark'),
+    };
+    function syncActive() {
+      let pref = 'system';
+      try { pref = localStorage.getItem(KEY) || 'system'; } catch {}
+      Object.entries(btns).forEach(([k, b]) => b.classList.toggle('active', k === pref));
+    }
+    function setPref(p) {
+      if (p === 'system') {
+        try { localStorage.removeItem(KEY); } catch {}
+        const m = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        root.setAttribute('data-mode', m);
+      } else {
+        try { localStorage.setItem(KEY, p); } catch {}
+        root.setAttribute('data-mode', p);
+      }
+      syncActive();
+    }
+    btns.system.onclick = () => setPref('system');
+    btns.light.onclick  = () => setPref('light');
+    btns.dark.onclick   = () => setPref('dark');
+    syncActive();
+  </script>
+</body>
+</html>

@@ -1,0 +1,2575 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="claude">
+<head>
+  <meta charset="UTF-8" />
+  <title>Agent Studio</title>
+
+  <!--
+    Showcase 1 · Cowork · v6
+    v5 → v6 新增:
+      • UserBar 点击弹出气泡 (Image #14 简化): Email + Settings (⌘,) + Log out
+      • Settings 单独页面 (Image #15/#16):
+          - 左侧 nav 只有 General
+          - 右侧: Profile (Avatar / Full name / What should Agent Studio call you? /
+                          What best describes your work? / Instructions for Agent Studio)
+                 + Appearance (System / Light / Dark — 3 段 segment 切换)
+      • Light/Dark/System 切换从 titlebar 移到 Settings · Appearance
+      • Titlebar 不再有 sun/moon icon
+  -->
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone@7.24.7/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,300..700;1,8..60,400..700&family=Inter:wght@300..700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  <script>
+    (() => {
+      const STORAGE_KEY = 'preferred_theme_mode';
+      const root = document.documentElement;
+      let userPref = null;
+      try { userPref = localStorage.getItem(STORAGE_KEY); } catch {}
+      const media = window.matchMedia('(prefers-color-scheme: dark)');
+      const applyMode = (m) => root.setAttribute('data-mode', m);
+      if (userPref === 'light' || userPref === 'dark') applyMode(userPref);
+      else applyMode(media.matches ? 'dark' : 'light');
+      const handleChange = (ev) => {
+        let stored = null;
+        try { stored = localStorage.getItem(STORAGE_KEY); } catch {}
+        if (stored !== 'light' && stored !== 'dark') applyMode(ev.matches ? 'dark' : 'light');
+      };
+      if (media.addEventListener) media.addEventListener('change', handleChange);
+      else if (media.addListener) media.addListener(handleChange);
+    })();
+  </script>
+
+  <style>
+    :root { --always-white: 0 0% 100%; --always-black: 0 0% 0%; }
+    [data-theme="claude"],
+    [data-theme="claude"][data-mode="light"] {
+      --accent-brand: 15 63.1% 59.6%;
+      --accent-000: 210 73.7% 40.2%; --accent-100: 210 70.9% 51.6%;
+      --accent-200: 210 70.9% 51.6%; --accent-900: 211 72% 90%;
+      --accent-pro-000: 251 34.2% 33.3%; --accent-pro-100: 251 40% 45.1%;
+      --accent-pro-200: 251 61% 72.2%; --accent-pro-900: 253 33.3% 91.8%;
+      --bg-000: 0 0% 100%; --bg-100: 48 33.3% 97.1%; --bg-200: 53 28.6% 94.5%;
+      --bg-300: 48 25% 92.2%; --bg-400: 50 20.7% 88.6%; --bg-500: 50 20.7% 88.6%;
+      --brand-000: 15 54.2% 51.2%; --brand-100: 15 54.2% 51.2%;
+      --brand-200: 15 63.1% 59.6%; --brand-900: 0 0% 0%;
+      --border-100: 30 3.3% 11.8%; --border-200: 30 3.3% 11.8%;
+      --border-300: 30 3.3% 11.8%; --border-400: 30 3.3% 11.8%;
+      --danger-000: 0 58.6% 34.1%; --danger-100: 0 56.2% 45.4%;
+      --danger-200: 0 56.2% 45.4%; --danger-900: 0 50% 95%;
+      --oncolor-100: 0 0% 100%; --oncolor-200: 60 6.7% 97.1%; --oncolor-300: 60 6.7% 97.1%;
+      --pictogram-100: 50 20.7% 88.6%; --pictogram-200: 51 16.5% 84.5%;
+      --pictogram-300: 0 0% 100%; --pictogram-400: 48 33.3% 97.1%;
+      --success-000: 125 100% 18%; --success-100: 103 72.3% 26.9%;
+      --success-200: 103 72.3% 26.9%; --success-900: 86 45.1% 90%;
+      --text-000: 60 2.6% 7.6%; --text-100: 60 2.6% 7.6%;
+      --text-200: 60 2.5% 23.3%; --text-300: 60 2.5% 23.3%;
+      --text-400: 51 3.1% 43.7%; --text-500: 51 3.1% 43.7%;
+      --warning-000: 45 91.8% 19%; --warning-100: 39 88.8% 28%;
+      --warning-200: 39 88.8% 28%; --warning-900: 38 65.9% 92%;
+    }
+    [data-theme="claude"][data-mode="dark"] {
+      --accent-brand: 15 63.1% 59.6%;
+      --accent-000: 210 65.5% 67.1%; --accent-100: 210 70.9% 51.6%;
+      --accent-200: 210 70.9% 51.6%; --accent-900: 210 55.9% 24.6%;
+      --accent-pro-000: 251 84.6% 74.5%; --accent-pro-100: 251 40.2% 54.1%;
+      --accent-pro-200: 251 40% 45.1%; --accent-pro-900: 250 25.3% 19.4%;
+      --bg-000: 60 2.1% 18.4%; --bg-100: 60 2.7% 14.5%; --bg-200: 30 3.3% 11.8%;
+      --bg-300: 60 2.6% 7.6%; --bg-400: 0 0% 0%; --bg-500: 0 0% 0%;
+      --brand-000: 15 54.2% 51.2%; --brand-100: 15 63.1% 59.6%;
+      --brand-200: 15 63.1% 59.6%; --brand-900: 0 0% 0%;
+      --border-100: 51 16.5% 84.5%; --border-200: 51 16.5% 84.5%;
+      --border-300: 51 16.5% 84.5%; --border-400: 51 16.5% 84.5%;
+      --danger-000: 0 98.4% 75.1%; --danger-100: 0 67% 59.6%;
+      --danger-200: 0 67% 59.6%; --danger-900: 0 46.5% 27.8%;
+      --oncolor-100: 0 0% 100%; --oncolor-200: 60 6.7% 97.1%; --oncolor-300: 60 6.7% 97.1%;
+      --pictogram-100: 48 3.4% 29.2%; --pictogram-200: 60 2.5% 23.3%;
+      --pictogram-300: 60 2.1% 18.4%; --pictogram-400: 60 2.7% 14.5%;
+      --success-000: 97 59.1% 46.1%; --success-100: 97 75% 32.9%;
+      --success-200: 97 75% 32.9%; --success-900: 127 100% 13.9%;
+      --text-000: 48 33.3% 97.1%; --text-100: 48 33.3% 97.1%;
+      --text-200: 50 9% 73.7%; --text-300: 50 9% 73.7%;
+      --text-400: 48 4.8% 59.2%; --text-500: 48 4.8% 59.2%;
+      --warning-000: 40 71% 50%; --warning-100: 39 93.4% 35.9%;
+      --warning-200: 39 93.4% 35.9%; --warning-900: 45 94.8% 15.1%;
+    }
+    @media (prefers-color-scheme: dark) {
+      [data-theme="claude"]:not([data-mode="light"]) {
+        --bg-000: 60 2.1% 18.4%; --bg-100: 60 2.7% 14.5%; --bg-200: 30 3.3% 11.8%;
+        --bg-300: 60 2.6% 7.6%; --bg-400: 0 0% 0%; --bg-500: 0 0% 0%;
+        --brand-100: 15 63.1% 59.6%; --brand-200: 15 63.1% 59.6%;
+        --border-100: 51 16.5% 84.5%; --border-200: 51 16.5% 84.5%;
+        --border-300: 51 16.5% 84.5%; --border-400: 51 16.5% 84.5%;
+        --text-100: 48 33.3% 97.1%; --text-200: 50 9% 73.7%;
+        --text-300: 50 9% 73.7%; --text-400: 48 4.8% 59.2%; --text-500: 48 4.8% 59.2%;
+        --accent-100: 210 70.9% 51.6%; --accent-000: 210 65.5% 67.1%;
+        --success-100: 97 75% 32.9%; --danger-100: 0 67% 59.6%;
+      }
+    }
+
+    :root {
+      --font-anthropic-sans: "Inter", system-ui, -apple-system, sans-serif;
+      --font-anthropic-serif: "Source Serif 4", Georgia, serif;
+      --font-anthropic-mono: "JetBrains Mono", ui-monospace, monospace;
+      --font-mono: var(--font-anthropic-mono);
+      --font-ui: var(--font-anthropic-sans);
+      --font-ui-serif: var(--font-anthropic-serif);
+    }
+    .font-normal { font-weight: 430; } .font-medium { font-weight: 550; } .font-semibold { font-weight: 580; }
+    b, strong, .font-bold { font-weight: 600; }
+    .font-mono, code, pre, kbd { font-variant-ligatures: none; font-feature-settings: "calt" 0, "liga" 0; }
+    [data-theme="claude"][data-mode="dark"] .font-normal { font-weight: 400; }
+    [data-theme="claude"][data-mode="dark"] .font-medium { font-weight: 510; }
+    [data-theme="claude"][data-mode="dark"] .font-semibold { font-weight: 540; }
+    [data-theme="claude"][data-mode="dark"] b,
+    [data-theme="claude"][data-mode="dark"] strong { font-weight: 530; }
+
+    html, body {
+      font-family: var(--font-ui);
+      color: hsl(var(--text-100));
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+      transition: background-color 0.25s ease;
+    }
+    body { background: hsl(var(--bg-300)); }
+    [data-theme="claude"][data-mode="dark"] body { background: hsl(var(--bg-400)); }
+    .font-serif, .font-display { font-family: var(--font-ui-serif); }
+
+    .mac-window {
+      background: hsl(var(--bg-100));
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 40px 80px -20px hsla(0,0%,0%,0.35), 0 0 0 0.5px hsla(0,0%,0%,0.15);
+      transition: background-color 0.25s ease, box-shadow 0.25s ease;
+    }
+    [data-theme="claude"][data-mode="dark"] .mac-window {
+      box-shadow: 0 40px 80px -20px hsla(0,0%,0%,0.7), 0 0 0 0.5px hsla(0,0%,100%,0.08);
+    }
+    .mac-titlebar {
+      height: 36px;
+      background: linear-gradient(to bottom, hsl(48 25% 92.2%), hsl(50 20.7% 88.6%));
+      border-bottom: 0.5px solid hsl(var(--border-300) / 0.25);
+      display: flex; align-items: center; padding: 0 14px;
+      position: relative; user-select: none;
+      transition: background 0.25s ease;
+    }
+    [data-theme="claude"][data-mode="dark"] .mac-titlebar {
+      background: linear-gradient(to bottom, hsl(60 2.1% 22%), hsl(60 2.7% 16%));
+      border-bottom: 0.5px solid hsl(var(--border-300) / 0.15);
+    }
+    .traffic-light { width: 12px; height: 12px; border-radius: 50%; border: 0.5px solid rgba(0,0,0,0.12); }
+    .traffic-close { background: #ff5f57; }
+    .traffic-minimize { background: #febc2e; }
+    .traffic-maximize { background: #28c840; }
+
+    * { scrollbar-color: hsl(var(--border-300) / 0.35) transparent; scrollbar-width: thin; }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-thumb { background: hsl(var(--border-300) / 0.35); border-radius: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    :focus-visible { outline: 2px solid hsl(var(--accent-100)); outline-offset: 2px; border-radius: 4px; }
+
+    .dot-pattern {
+      background-image: radial-gradient(circle, hsl(var(--text-400) / 0.06) 1px, transparent 1.5px);
+      background-size: 14px 14px;
+    }
+    @keyframes pulse-dot { 0%, 100% { opacity: 0.3; } 50% { opacity: 1; } }
+    .pulse-dot { animation: pulse-dot 1.4s ease-in-out infinite; }
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    .spin { animation: spin 2.5s linear infinite; }
+    .ph { font-style: italic; color: hsl(var(--text-400)); }
+    code.inline {
+      font-family: var(--font-mono); font-size: 12.5px;
+      background: hsl(var(--bg-300)); border-radius: 4px;
+      padding: 1px 6px; color: hsl(var(--text-100));
+    }
+    .beta-tag {
+      font-size: 9.5px; font-weight: 600; letter-spacing: 0.04em;
+      padding: 1px 5px; border-radius: 4px;
+      background: hsl(var(--accent-pro-100) / 0.18);
+      color: hsl(var(--accent-pro-000));
+    }
+    .anthropic-star { display: inline-block; color: hsl(var(--brand-100)); }
+
+    .menu-popup {
+      position: absolute;
+      background: hsl(var(--bg-000));
+      border-radius: 10px;
+      border: 1px solid hsl(var(--border-300) / 0.18);
+      box-shadow: 0 16px 40px -12px hsla(0,0%,0%,0.4), 0 0 0 0.5px hsla(0,0%,0%,0.1);
+      min-width: 200px;
+      padding: 6px;
+      z-index: 50;
+    }
+    [data-theme="claude"][data-mode="dark"] .menu-popup {
+      box-shadow: 0 16px 40px -12px hsla(0,0%,0%,0.7), 0 0 0 0.5px hsla(0,0%,100%,0.05);
+    }
+
+    .item-row .item-more { opacity: 0; transition: opacity 0.15s; }
+    .item-row:hover .item-more { opacity: 1; }
+    .item-row.item-active .item-more { opacity: 1; }
+
+    /* Preview pane slide-in animation */
+    @keyframes slide-in-right {
+      from { transform: translateX(60px); opacity: 0; }
+      to   { transform: translateX(0);    opacity: 1; }
+    }
+    .slide-in-right { animation: slide-in-right 0.28s cubic-bezier(0.2, 0, 0, 1) both; }
+
+    /* Resize handle */
+    .resize-handle {
+      position: absolute;
+      top: 0;
+      left: -3px;
+      bottom: 0;
+      width: 6px;
+      cursor: col-resize;
+      z-index: 30;
+    }
+    .resize-handle::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 50%;
+      width: 2px;
+      transform: translateX(-1px);
+      background: hsla(0, 0%, 100%, 0);
+      transition: background 0.15s;
+    }
+    .resize-handle:hover::before,
+    .resize-handle.resize-handle-active::before {
+      background: hsla(0, 0%, 100%, 0.55);
+    }
+
+    /* Settings page form rows */
+    .settings-row {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      padding: 18px 0;
+      border-top: 1px solid hsl(var(--border-300) / 0.08);
+    }
+    .settings-row:first-of-type { border-top: none; }
+    .settings-row > .label { color: hsl(var(--text-100)); font-size: 14px; flex: 1; }
+    .settings-input {
+      background: hsl(var(--bg-200));
+      border: 1px solid hsl(var(--border-300) / 0.12);
+      border-radius: 6px;
+      padding: 6px 12px;
+      color: hsl(var(--text-100));
+      font-size: 14px;
+      min-width: 220px;
+    }
+    .settings-input:focus { outline: 2px solid hsl(var(--accent-100)); outline-offset: 1px; }
+  </style>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'bg-000': 'hsl(var(--bg-000))', 'bg-100': 'hsl(var(--bg-100))',
+            'bg-200': 'hsl(var(--bg-200))', 'bg-300': 'hsl(var(--bg-300))',
+            'bg-400': 'hsl(var(--bg-400))', 'bg-500': 'hsl(var(--bg-500))',
+            'text-000': 'hsl(var(--text-000))', 'text-100': 'hsl(var(--text-100))',
+            'text-200': 'hsl(var(--text-200))', 'text-300': 'hsl(var(--text-300))',
+            'text-400': 'hsl(var(--text-400))', 'text-500': 'hsl(var(--text-500))',
+            'brand-100': 'hsl(var(--brand-100))', 'brand-200': 'hsl(var(--brand-200))',
+            'accent-100': 'hsl(var(--accent-100))', 'accent-000': 'hsl(var(--accent-000))',
+            'accent-pro-100': 'hsl(var(--accent-pro-100))', 'accent-pro-000': 'hsl(var(--accent-pro-000))',
+            'success-100': 'hsl(var(--success-100))', 'success-000': 'hsl(var(--success-000))',
+            'danger-100': 'hsl(var(--danger-100))', 'warning-100': 'hsl(var(--warning-100))',
+            'oncolor-100': 'hsl(var(--oncolor-100))',
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            serif: ['"Source Serif 4"', 'Georgia', 'serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+        },
+      },
+    };
+  </script>
+</head>
+<body>
+  <div class="min-h-screen w-full flex items-center justify-center p-8 relative z-10">
+    <div id="root"></div>
+  </div>
+
+  <script type="text/babel" data-presets="react">
+    const { useState, useEffect, useRef } = React;
+
+    /* ===== Theme hook (含 pref: system|light|dark) ===== */
+    const useThemeMode = () => {
+      const STORAGE_KEY = 'preferred_theme_mode';
+      const [mode, setModeState] = useState(() => document.documentElement.getAttribute('data-mode') || 'light');
+      const [pref, setPrefState] = useState(() => {
+        try { return localStorage.getItem(STORAGE_KEY) || 'system'; } catch { return 'system'; }
+      });
+      const applyPref = (p) => {
+        if (p === 'system') {
+          try { localStorage.removeItem(STORAGE_KEY); } catch {}
+          const m = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+          document.documentElement.setAttribute('data-mode', m);
+          setModeState(m);
+        } else {
+          try { localStorage.setItem(STORAGE_KEY, p); } catch {}
+          document.documentElement.setAttribute('data-mode', p);
+          setModeState(p);
+        }
+        setPrefState(p);
+      };
+      useEffect(() => {
+        const media = window.matchMedia('(prefers-color-scheme: dark)');
+        const handler = (e) => {
+          let stored = null;
+          try { stored = localStorage.getItem(STORAGE_KEY); } catch {}
+          if (stored !== 'light' && stored !== 'dark') {
+            const resolved = e.matches ? 'dark' : 'light';
+            document.documentElement.setAttribute('data-mode', resolved);
+            setModeState(resolved);
+          }
+        };
+        media.addEventListener('change', handler);
+        return () => media.removeEventListener('change', handler);
+      }, []);
+      return { mode, pref, setPref: applyPref };
+    };
+
+    /* ===== Icons ===== */
+    const Icon = ({ children, size = 16, className = '', strokeWidth = 1.75, fill = 'none' }) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill={fill} stroke="currentColor" strokeWidth={strokeWidth}
+           strokeLinecap="round" strokeLinejoin="round" className={className}>{children}</svg>
+    );
+    const IconPlus = (p) => <Icon {...p}><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></Icon>;
+    const IconFolder = (p) => <Icon {...p}><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></Icon>;
+    const IconClock = (p) => <Icon {...p}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></Icon>;
+    const IconLeaf = (p) => <Icon {...p}><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19.2 2c1 1.38 2 3.22 2 5.5a13.1 13.1 0 0 1-1.7 6.5 11.4 11.4 0 0 1-8 6.7"/><path d="M2 21c0-3 1.85-5.36 5.08-6"/></Icon>;
+    const IconSidebar = (p) => <Icon {...p}><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></Icon>;
+    const IconSearch = (p) => <Icon {...p}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></Icon>;
+    const IconChevron = (p) => <Icon {...p}><polyline points="6 9 12 15 18 9"/></Icon>;
+    const IconChevronRight = (p) => <Icon {...p}><polyline points="9 18 15 12 9 6"/></Icon>;
+    const IconArrowRight = (p) => <Icon {...p}><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></Icon>;
+    const IconArrowLeft = (p) => <Icon {...p}><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></Icon>;
+    const IconArrowUp = (p) => <Icon {...p}><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></Icon>;
+    const IconDownload = (p) => <Icon {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></Icon>;
+    const IconMic = (p) => <Icon {...p}><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></Icon>;
+    const IconHand = (p) => <Icon {...p}><path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"/><path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></Icon>;
+    const IconBriefcase = (p) => <Icon {...p}><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></Icon>;
+    const IconCheck = (p) => <Icon {...p}><polyline points="20 6 9 17 4 12"/></Icon>;
+    const IconCopy = (p) => <Icon {...p}><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></Icon>;
+    const IconThumbUp = (p) => <Icon {...p}><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></Icon>;
+    const IconThumbDown = (p) => <Icon {...p}><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3"/></Icon>;
+    const IconFile = (p) => <Icon {...p}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></Icon>;
+    const IconFileSpreadsheet = (p) => <Icon {...p}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/><line x1="12" y1="13" x2="12" y2="21"/></Icon>;
+    const IconSun = (p) => <Icon {...p}><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></Icon>;
+    const IconMoon = (p) => <Icon {...p}><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></Icon>;
+    const IconDesktop = (p) => <Icon {...p}><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></Icon>;
+    const IconPanelRight = (p) => <Icon {...p}><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="15" y1="3" x2="15" y2="21"/></Icon>;
+    const IconLayers = (p) => <Icon {...p}><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></Icon>;
+    const IconMoreH = (p) => <Icon {...p}><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></Icon>;
+    const IconMoreV = (p) => <Icon {...p}><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></Icon>;
+    const IconPinSimple = (p) => <Icon {...p}><path d="M12 2v6"/><path d="M5 8h14"/><path d="M7 8c0 4 1.5 6 5 6s5-2 5-6"/><line x1="12" y1="14" x2="12" y2="22"/></Icon>;
+    const IconPencil = (p) => <Icon {...p}><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></Icon>;
+    const IconArchive = (p) => <Icon {...p}><rect x="2" y="3" width="20" height="5" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><line x1="10" y1="12" x2="14" y2="12"/></Icon>;
+    const IconTrash = (p) => <Icon {...p}><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14H7L5 6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/><path d="M9 6V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/></Icon>;
+    const IconSparkleBox = (p) => <Icon {...p}><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M9 9l1.5 3L14 13l-3.5 1L9 17l-1.5-3L4 13l3.5-1z" fill="currentColor"/></Icon>;
+    const IconSortLines = (p) => <Icon {...p}><line x1="3" y1="6" x2="15" y2="6"/><line x1="3" y1="12" x2="11" y2="12"/><line x1="3" y1="18" x2="7" y2="18"/><polyline points="17 9 20 6 17 3"/><line x1="20" y1="6" x2="20" y2="20"/></Icon>;
+    const IconSettings = (p) => <Icon {...p}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></Icon>;
+    const IconLogout = (p) => <Icon {...p}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></Icon>;
+    const IconScroll = (p) => <Icon {...p}><path d="M8 21h12a2 2 0 0 0 2-2v-1H10v1a2 2 0 0 1-2 2 2 2 0 0 1-2-2V5a2 2 0 0 0-2-2 2 2 0 0 0-2 2v3h6"/><path d="M19 17V5a2 2 0 0 0-2-2H4"/></Icon>;
+    const IconAgentGrid = (p) => <Icon {...p}><rect x="3" y="3" width="7" height="7" rx="1.2"/><rect x="14" y="3" width="7" height="7" rx="1.2"/><rect x="14" y="14" width="7" height="7" rx="1.2"/><rect x="3" y="14" width="7" height="7" rx="1.2"/></Icon>;
+    const IconPlug = (p) => <Icon {...p}><path d="M12 22v-5"/><path d="M9 2v6"/><path d="M15 2v6"/><path d="M18 8a6 6 0 0 1-6 6h0a6 6 0 0 1-6-6V8z"/></Icon>;
+    const IconEye = (p) => <Icon {...p}><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></Icon>;
+    const IconCodeBracket = (p) => <Icon {...p}><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></Icon>;
+    const IconInfo = (p) => <Icon {...p}><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></Icon>;
+    const IconX = (p) => <Icon {...p}><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></Icon>;
+    const IconTerminal = (p) => <Icon {...p}><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></Icon>;
+    const IconWrench = (p) => <Icon {...p}><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></Icon>;
+    const IconBookOpen = (p) => <Icon {...p}><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></Icon>;
+    const IconPlay = (p) => <Icon {...p} fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></Icon>;
+    const IconAgentRun = (p) => <Icon {...p}><path d="M18 8h2v2"/><path d="M22 12c0 5-4 8-10 8s-10-3-10-8"/><path d="M2 12c0-5 4-8 10-8 4 0 6 1.5 7.5 3.5"/></Icon>;
+    const IconRefresh = (p) => <Icon {...p}><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></Icon>;
+    const IconCoffee = (p) => <Icon {...p}><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></Icon>;
+    const IconMail = (p) => <Icon {...p}><rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="22 6 12 13 2 6"/></Icon>;
+    const IconAlert = (p) => <Icon {...p}><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></Icon>;
+    const IconTimeline = (p) => <Icon {...p}><circle cx="5" cy="6" r="2"/><line x1="5" y1="8" x2="5" y2="16"/><circle cx="5" cy="18" r="2"/><line x1="10" y1="6" x2="20" y2="6"/><line x1="10" y1="18" x2="20" y2="18"/></Icon>;
+    const IconToolbox = ({ size = 96 }) => (
+      <svg width={size} height={size * 0.78} viewBox="0 0 100 78" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M30 30v-7a4 4 0 0 1 4-4h32a4 4 0 0 1 4 4v7" />
+        <rect x="15" y="30" width="70" height="38" rx="2.5" />
+        <line x1="15" y1="42" x2="85" y2="42" />
+        <rect x="44" y="38" width="12" height="6" rx="1" />
+      </svg>
+    );
+
+    /* Anthropic star */
+    const AnthropicStar = ({ size = 28, className = '' }) => (
+      <svg width={size} height={size} viewBox="0 0 100 100" className={className} fill="currentColor">
+        {[0, 22.5, 45, 67.5, 90, 112.5, 135, 157.5].map((deg, i) => (
+          <rect key={i} x="46" y="6" width="8" height="88" rx="3" ry="3" transform={`rotate(${deg} 50 50)`} />
+        ))}
+      </svg>
+    );
+
+    const TrafficLights = () => (
+      <div className="flex items-center gap-2">
+        <div className="traffic-light traffic-close" />
+        <div className="traffic-light traffic-minimize" />
+        <div className="traffic-light traffic-maximize" />
+      </div>
+    );
+
+    /* ============================================================
+       Right-click Item context menu (Image #13)
+       ============================================================ */
+    const MenuItem = ({ icon, label, danger, hasSubmenu, hint, onClick }) => (
+      <button onClick={onClick}
+        className={
+          'w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-[13px] transition ' +
+          (danger ? 'text-danger-100 hover:bg-danger-100/10' : 'text-text-200 hover:text-text-100 hover:bg-bg-200/70')
+        }>
+        <span className="text-text-300 shrink-0">{icon}</span>
+        <span className="flex-1 text-left">{label}</span>
+        {hasSubmenu && <IconChevronRight size={10} className="text-text-400" />}
+        {hint && <span className="text-[11px] text-text-400 font-mono">{hint}</span>}
+      </button>
+    );
+
+    /**
+     * variant='sidebar' (Image #17): 5 项 - Move to project / Pin / Rename / Archive / Delete
+     * variant='title'   (Image #18): 7 项 - + Schedule + Turn into skill (顶部)
+     */
+    const ItemContextMenu = ({ isPinned, variant = 'sidebar', position = 'top' }) => {
+      const isFull = variant === 'title';
+      const positionStyle = position === 'top'
+        ? { top: '100%', left: 0, marginTop: 4 }
+        : { top: '100%', right: 0, marginTop: 4 };
+      return (
+        <div className="menu-popup" style={positionStyle} onClick={(e) => e.stopPropagation()}>
+          {isFull && (
+            <>
+              <MenuItem icon={<IconClock size={14} />} label="Schedule" />
+              <MenuItem icon={<IconSparkleBox size={14} />} label="Turn into skill" />
+              <div className="my-1" style={{ borderTop: '1px solid hsl(var(--border-300) / 0.12)' }}></div>
+            </>
+          )}
+          <MenuItem icon={<IconFolder size={14} />} label="Move to project" hasSubmenu />
+          <div className="my-1" style={{ borderTop: '1px solid hsl(var(--border-300) / 0.12)' }}></div>
+          <MenuItem icon={<IconPinSimple size={14} />} label={isPinned ? 'Unpin' : 'Pin'} />
+          <MenuItem icon={<IconPencil size={14} />} label="Rename" />
+          <div className="my-1" style={{ borderTop: '1px solid hsl(var(--border-300) / 0.12)' }}></div>
+          <MenuItem icon={<IconArchive size={14} />} label="Archive" />
+          <MenuItem icon={<IconTrash size={14} />} label="Delete" danger />
+        </div>
+      );
+    };
+
+    /* ============================================================
+       Sidebar items
+       ============================================================ */
+    const NavItem = ({ icon, label, active, badge, onClick }) => (
+      <button onClick={onClick}
+        className={
+          'w-full flex items-center gap-3 px-3 py-2 rounded-md text-[14px] transition-colors ' +
+          (active ? 'bg-bg-000 text-text-100' : 'text-text-200 hover:text-text-100 hover:bg-bg-100')
+        }>
+        <span className={active ? 'text-text-100' : 'text-text-300'}>{icon}</span>
+        <span className="flex-1 text-left">{label}</span>
+        {badge && <span className="beta-tag">{badge}</span>}
+      </button>
+    );
+
+    const RecentItem = ({ id, label, active, status = 'idle', onClick, openMenuId, setOpenMenuId, isPinned = false }) => {
+      const menuOpen = openMenuId === id;
+      return (
+        <div className={'item-row relative w-full ' + (active ? 'item-active' : '')}>
+          <button onClick={onClick}
+            className={
+              'w-full flex items-center gap-3 pl-3 pr-9 py-2 rounded-md text-[13.5px] transition-colors ' +
+              (active ? 'bg-bg-000 text-text-100' : 'text-text-300 hover:text-text-100 hover:bg-bg-100')
+            }>
+            <span className="shrink-0">
+              {status === 'running' ? (
+                <span className="relative inline-flex items-center justify-center w-3 h-3">
+                  <span className="absolute inset-0 rounded-full bg-success-100/30 pulse-dot"></span>
+                  <span className="relative w-1.5 h-1.5 rounded-full bg-success-100"></span>
+                </span>
+              ) : status === 'done' ? (
+                <span className="w-3 h-3 rounded-full flex items-center justify-center" style={{ background: 'hsl(var(--success-100))' }}>
+                  <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="hsl(var(--oncolor-100))" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                </span>
+              ) : status === 'failed' ? (
+                <span className="w-3 h-3 rounded-full flex items-center justify-center" style={{ background: 'hsl(var(--danger-100))' }}>
+                  <svg width="6" height="6" viewBox="0 0 24 24" fill="none" stroke="hsl(var(--oncolor-100))" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </span>
+              ) : status === 'scheduled' ? (
+                <span className="text-accent-100 flex items-center justify-center w-3 h-3">
+                  <IconClock size={11} strokeWidth={2.2} />
+                </span>
+              ) : (
+                <span className="block w-3 h-3 rounded-full" style={{ border: '1.5px solid hsl(var(--text-400) / 0.55)' }}></span>
+              )}
+            </span>
+            <span className="flex-1 text-left truncate">{label}</span>
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); setOpenMenuId(menuOpen ? null : id); }}
+            className="item-more absolute right-1.5 top-1/2 -translate-y-1/2 p-1 rounded text-text-400 hover:text-text-100 hover:bg-bg-200">
+            <IconMoreH size={13} />
+          </button>
+          {menuOpen && <ItemContextMenu isPinned={isPinned} />}
+        </div>
+      );
+    };
+
+    const PinnedProjectItem = ({ id, label, active, onClick, openMenuId, setOpenMenuId }) => {
+      const menuOpen = openMenuId === id;
+      return (
+        <div className={'item-row relative w-full ' + (active ? 'item-active' : '')}>
+          <button onClick={onClick}
+            className={
+              'w-full flex items-center gap-3 pl-3 pr-9 py-2 rounded-md text-[14px] transition-colors ' +
+              (active ? 'bg-bg-000 text-text-100' : 'text-text-200 hover:text-text-100 hover:bg-bg-100')
+            }>
+            <IconFolder size={15} className={active ? 'text-text-100' : 'text-text-300'} />
+            <span className="flex-1 text-left truncate font-medium">{label}</span>
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); setOpenMenuId(menuOpen ? null : id); }}
+            className="item-more absolute right-1.5 top-1/2 -translate-y-1/2 p-1 rounded text-text-400 hover:text-text-100 hover:bg-bg-200">
+            <IconMoreH size={13} />
+          </button>
+          {menuOpen && <ItemContextMenu isPinned={true} />}
+        </div>
+      );
+    };
+
+    /* ============================================================
+       Footer · Update card + UserBar with popover
+       ============================================================ */
+    const UpdateCard = ({ version = 'v1.7196.0' }) => (
+      <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left hover:bg-bg-100 transition-colors group" style={{ border: '1px solid hsl(var(--border-300) / 0.15)' }}>
+        <div className="w-9 h-9 rounded-md flex items-center justify-center shrink-0" style={{ background: 'hsl(var(--success-100) / 0.12)', color: 'hsl(var(--success-100))' }}>
+          <IconLeaf size={18} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-[13.5px] font-medium text-text-100 leading-tight">Relaunch to update</div>
+          <div className="text-[11px] text-text-400 leading-tight mt-0.5 font-mono">{version}</div>
+        </div>
+        <IconArrowRight size={14} className="text-text-400 group-hover:text-text-200 transition shrink-0" />
+      </button>
+    );
+
+    const UserBar = ({ email = 'SadieClaytonrwj@chinamail.com', onSettingsClick, onLogout }) => {
+      const [open, setOpen] = useState(false);
+      useEffect(() => {
+        if (!open) return;
+        const onDoc = (e) => {
+          if (!e.target.closest('.user-bar-root')) setOpen(false);
+        };
+        document.addEventListener('click', onDoc);
+        return () => document.removeEventListener('click', onDoc);
+      }, [open]);
+
+      return (
+        <div className="user-bar-root relative">
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setOpen(!open)}
+              className="flex-1 flex items-center gap-2.5 px-2 py-2 rounded-md hover:bg-bg-100/60 transition-colors text-left">
+              <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold shrink-0" style={{ background: 'hsl(var(--brand-100) / 0.18)', color: 'hsl(var(--brand-100))' }}>JY</div>
+              <div className="flex-1 min-w-0 flex items-center gap-1">
+                <span className="text-[13px] text-text-100 truncate">Jay Yang</span>
+                <span className="text-[12px] text-text-400">·</span>
+                <span className="text-[12px] text-text-300">Max</span>
+                <IconChevron size={12} className="text-text-400 ml-0.5" />
+              </div>
+            </button>
+            <button className="p-1.5 rounded-md hover:bg-bg-100 text-text-400 hover:text-text-200 transition" title="下载 App">
+              <IconDownload size={14} />
+            </button>
+          </div>
+
+          {open && (
+            <div className="menu-popup" style={{ bottom: '100%', left: 0, right: 6, marginBottom: 6 }}>
+              <div className="px-2 pt-1 pb-2 text-[11.5px] text-text-400 truncate">{email}</div>
+              <MenuItem
+                icon={<IconSettings size={14} />}
+                label="Settings"
+                hint="⌘,"
+                onClick={() => { setOpen(false); onSettingsClick?.(); }}
+              />
+              <div className="my-1" style={{ borderTop: '1px solid hsl(var(--border-300) / 0.12)' }}></div>
+              <MenuItem
+                icon={<IconLogout size={14} />}
+                label="Log out"
+                onClick={() => { setOpen(false); onLogout?.(); }}
+              />
+            </div>
+          )}
+        </div>
+      );
+    };
+
+    /* ============================================================
+       Sidebar
+       ============================================================ */
+    const AppSidebar = ({ view, activeTaskId, activeProjectId, onNavClick, onTaskClick, onProjectClick, onSettingsClick }) => {
+      const [openMenuId, setOpenMenuId] = useState(null);
+      useEffect(() => {
+        const onDocClick = (e) => {
+          if (!e.target.closest('.item-row')) setOpenMenuId(null);
+        };
+        document.addEventListener('click', onDocClick);
+        return () => document.removeEventListener('click', onDocClick);
+      }, []);
+
+      const pinnedProjects = [{ id: 'jay', label: 'jay' }];
+      const pinnedTasks = [{ id: 'weekly', label: 'Weekly review', status: 'done' }];
+      const recents = [
+        { id: 'identify', label: 'Identify inactive projects',     status: 'running'   },
+        { id: 'briefing', label: 'Daily briefing · today',          status: 'done'      },
+        { id: 'casual',   label: 'Casual conversation' },
+        { id: 'greeting', label: 'Chinese greeting conversation' },
+        { id: 'newsched', label: 'New scheduled task',              status: 'scheduled' },
+        { id: 'inbox',    label: 'Inbox triage · 每天 18:00',        status: 'scheduled' },
+        { id: 'refactor', label: 'Refactor huashu-design plugins',  status: 'failed'    },
+        { id: 'newart',   label: 'New live artifact' },
+      ];
+
+      return (
+        <aside className="w-[260px] shrink-0 flex flex-col bg-bg-200" style={{ borderRight: '1px solid hsl(var(--border-300) / 0.15)' }}>
+          <div className="flex items-center gap-1 px-3 pt-3">
+            <button className="p-1.5 rounded-md hover:bg-bg-100 text-text-400 hover:text-text-200 transition" title="收起侧栏">
+              <IconSidebar size={15} />
+            </button>
+            <button className="p-1.5 rounded-md hover:bg-bg-100 text-text-400 hover:text-text-200 transition" title="搜索 ⌘K">
+              <IconSearch size={15} />
+            </button>
+          </div>
+
+          <div className="flex flex-col gap-0.5 px-2 pt-4">
+            <NavItem icon={<IconPlus size={16} />} label="New task"
+              active={view === 'new-task'} onClick={() => onNavClick('new-task')} />
+            <NavItem icon={<IconBriefcase size={16} />} label="Projects"
+              active={view === 'projects-list' || view === 'project-detail'} onClick={() => onNavClick('projects-list')} />
+            <NavItem icon={<IconClock size={16} />} label="Scheduled"
+              active={view === 'scheduled'} onClick={() => onNavClick('scheduled')} />
+            <NavItem icon={<IconSparkleBox size={16} />} label="Customize"
+              active={view === 'customize'} onClick={() => onNavClick('customize')} />
+          </div>
+
+          <div className="px-3 pt-6 pb-2">
+            <div className="text-[11px] font-medium tracking-wider uppercase text-text-400 px-2 mb-2">Pinned</div>
+          </div>
+          <div className="flex flex-col gap-0.5 px-2">
+            {pinnedProjects.map((p) => (
+              <PinnedProjectItem key={p.id} id={p.id} label={p.label}
+                active={view === 'project-detail' && activeProjectId === p.id}
+                onClick={() => onProjectClick(p.id)}
+                openMenuId={openMenuId} setOpenMenuId={setOpenMenuId} />
+            ))}
+            {pinnedTasks.map((t) => (
+              <RecentItem key={t.id} id={t.id} label={t.label} status={t.status}
+                active={view === 'task' && activeTaskId === t.id}
+                onClick={() => onTaskClick(t.id)}
+                openMenuId={openMenuId} setOpenMenuId={setOpenMenuId} isPinned />
+            ))}
+          </div>
+
+          <div className="px-3 pt-5 pb-2">
+            <div className="text-[11px] font-medium tracking-wider uppercase text-text-400 px-2 mb-2">Recents</div>
+          </div>
+          <div className="flex flex-col gap-0.5 px-2 flex-1 overflow-y-auto">
+            {recents.map((t) => (
+              <RecentItem key={t.id} id={t.id} label={t.label} status={t.status}
+                active={view === 'task' && activeTaskId === t.id}
+                onClick={() => onTaskClick(t.id)}
+                openMenuId={openMenuId} setOpenMenuId={setOpenMenuId} />
+            ))}
+          </div>
+
+          <div className="px-3 pb-3 pt-2 flex flex-col gap-2" style={{ borderTop: '1px solid hsl(var(--border-300) / 0.12)' }}>
+            <div className="pt-2"><UpdateCard /></div>
+            <UserBar onSettingsClick={onSettingsClick} onLogout={() => alert('Logged out (mock)')} />
+          </div>
+        </aside>
+      );
+    };
+
+    /* ============================================================
+       Input cards
+       ============================================================ */
+    const BigInputCard = ({ placeholder, toolbarLeft }) => (
+      <div className="w-full">
+        <div className="rounded-2xl bg-bg-000/70 backdrop-blur-sm" style={{ border: '1px solid hsl(var(--border-300) / 0.18)' }}>
+          <textarea rows={3} placeholder={placeholder}
+            className="w-full px-5 pt-4 pb-2 bg-transparent text-[14.5px] text-text-100 resize-none focus:outline-none placeholder:text-text-400" />
+          <div className="flex items-center gap-2 px-3 pb-3">
+            <button className="p-1.5 rounded-md text-text-300 hover:text-text-100 hover:bg-bg-200 transition" title="附加">
+              <IconPlus size={16} />
+            </button>
+            <div className="flex-1"></div>
+            <button className="p-1.5 rounded-md text-text-300 hover:text-text-100 hover:bg-bg-200 transition" title="语音">
+              <IconMic size={15} />
+            </button>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 mt-3 px-1">
+          {toolbarLeft}
+          <button className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[12.5px] text-text-300 hover:text-text-100 hover:bg-bg-200 transition">
+            <IconHand size={13} /> Ask <IconChevron size={11} />
+          </button>
+          <div className="flex-1"></div>
+          <button className="flex items-center gap-1 px-2 py-1 rounded-md text-[12.5px] text-text-300 hover:text-text-100 hover:bg-bg-200 transition">
+            Legacy Model <IconChevron size={11} />
+          </button>
+        </div>
+      </div>
+    );
+
+    const TaskMessageInput = () => (
+      <div className="w-full">
+        <div className="rounded-2xl bg-bg-000/70 backdrop-blur-sm" style={{ border: '1px solid hsl(var(--border-300) / 0.18)' }}>
+          <textarea rows={2} placeholder="Write a message..."
+            className="w-full px-4 pt-3 pb-1 bg-transparent text-[14px] text-text-100 resize-none focus:outline-none placeholder:text-text-400" />
+          <div className="flex items-center gap-1 px-2 pb-2">
+            <button className="p-1.5 rounded-md text-text-300 hover:text-text-100 hover:bg-bg-200 transition"><IconPlus size={16} /></button>
+            <button className="flex items-center gap-1 px-2 py-1 rounded-md text-[12.5px] text-text-300 hover:text-text-100 hover:bg-bg-200 transition">
+              <IconHand size={12} /> Ask <IconChevron size={10} />
+            </button>
+            <div className="flex-1"></div>
+            <button className="flex items-center gap-1 px-2 py-1 rounded-md text-[12.5px] text-text-300 hover:text-text-100 hover:bg-bg-200 transition">
+              Legacy Model <IconChevron size={10} />
+            </button>
+            <button className="p-1.5 rounded-md text-text-300 hover:text-text-100 hover:bg-bg-200 transition"><IconMic size={15} /></button>
+          </div>
+        </div>
+        <div className="text-[11.5px] text-text-400 text-center mt-2">
+          Agent Studio is AI and can make mistakes. Please double-check responses.
+        </div>
+      </div>
+    );
+
+    /* ============================================================
+       Views
+       ============================================================ */
+    const NewTaskView = () => (
+      <main className="flex-1 flex flex-col min-w-0 bg-bg-100 dot-pattern relative overflow-y-auto">
+        <div className="flex-1 flex flex-col items-center justify-start pt-[18%] px-12">
+          <div className="w-full max-w-[760px] flex flex-col items-start">
+            <div className="flex items-center gap-4 mb-3">
+              <AnthropicStar size={28} className="anthropic-star shrink-0" />
+              <h1 className="font-serif text-[36px] leading-[1.15] font-normal text-text-100 tracking-tight">
+                Let&apos;s knock something off your list
+              </h1>
+            </div>
+            <a href="#" className="text-[13.5px] text-text-300 hover:text-text-100 underline underline-offset-4 decoration-text-400/60 mb-10 ml-12">
+              Learn how to use Cowork safely.
+            </a>
+            <BigInputCard
+              placeholder="How can I help you today?"
+              toolbarLeft={
+                <button className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[12.5px] text-text-300 hover:text-text-100 hover:bg-bg-200 transition">
+                  <IconBriefcase size={13} /> Work in a project <IconChevron size={11} />
+                </button>
+              }
+            />
+          </div>
+        </div>
+      </main>
+    );
+
+    const UserMessage = ({ children }) => (
+      <div className="flex justify-end">
+        <div className="max-w-[78%] px-4 py-2.5 rounded-2xl text-[14px] leading-relaxed text-text-100"
+          style={{ background: 'hsl(var(--bg-300))' }}>
+          {children}
+        </div>
+      </div>
+    );
+
+    /* Tool call timeline — 折叠展开后展示步骤链 (Image #29 / #30) */
+    const ToolCallSubStep = ({ icon, title, isLast }) => (
+      <div className="relative flex gap-3">
+        <div className="flex flex-col items-center shrink-0">
+          <div className="w-4 h-4 flex items-center justify-center text-text-400 mt-0.5">{icon}</div>
+          {!isLast && <div className="flex-1 w-px min-h-[6px] mt-0.5" style={{ background: 'hsl(var(--border-300) / 0.15)' }}></div>}
+        </div>
+        <div className="text-[12.5px] text-text-300 pb-2">{title}</div>
+      </div>
+    );
+
+    const ToolCallStep = ({ icon, title, chip, chipVariant = 'default', subSteps, isLast }) => {
+      const [subOpen, setSubOpen] = useState(true);
+      const chipStyle = chipVariant === 'danger'
+        ? { background: 'hsl(var(--danger-100) / 0.18)', color: 'hsl(var(--danger-100))' }
+        : { background: 'hsl(var(--bg-300))', color: 'hsl(var(--text-300))' };
+      return (
+        <div className="relative flex gap-3">
+          <div className="flex flex-col items-center shrink-0">
+            <div className="w-6 h-6 flex items-center justify-center text-text-300 mt-0.5">{icon}</div>
+            {!isLast && <div className="flex-1 w-px min-h-[14px] mt-1" style={{ background: 'hsl(var(--border-300) / 0.2)' }}></div>}
+          </div>
+          <div className="flex-1 min-w-0 pb-3">
+            <div className="flex items-center gap-2 pt-1">
+              <span className="text-[13.5px] text-text-200 leading-tight">{title}</span>
+              {subSteps && (
+                <button onClick={() => setSubOpen(!subOpen)}
+                  className="text-[11.5px] text-text-400 hover:text-text-200 ml-auto flex items-center gap-1 transition">
+                  {subSteps.length} steps
+                  <IconChevron size={9} className={'transition-transform ' + (subOpen ? '' : '-rotate-90')} />
+                </button>
+              )}
+            </div>
+            {chip && (
+              <div className="mt-1.5">
+                <span className="inline-block px-2 py-0.5 rounded-md text-[10.5px] font-mono" style={chipStyle}>
+                  {chip}
+                </span>
+              </div>
+            )}
+            {subSteps && subOpen && (
+              <div className="mt-2 flex flex-col">
+                {subSteps.map((sub, i) => (
+                  <ToolCallSubStep key={i} icon={sub.icon} title={sub.title} isLast={i === subSteps.length - 1} />
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    };
+
+    const ToolCallTimeline = ({ summary, steps, defaultOpen = true }) => {
+      const [open, setOpen] = useState(defaultOpen);
+      return (
+        <div className="rounded-xl p-5" style={{ background: 'hsl(var(--bg-200) / 0.35)', border: '1px solid hsl(var(--border-300) / 0.08)' }}>
+          <button onClick={() => setOpen(!open)}
+            className="flex items-center gap-1.5 text-[13px] text-text-300 hover:text-text-100 transition w-full">
+            <span>{summary}</span>
+            <IconChevron size={11} className={'transition-transform ' + (open ? '' : '-rotate-90')} />
+          </button>
+          {open && (
+            <div className="mt-4 flex flex-col">
+              {steps.map((s, i) => (
+                <ToolCallStep key={i} {...s} isLast={i === steps.length - 1} />
+              ))}
+              <div className="flex items-center gap-3 pt-1">
+                <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0" style={{ border: '1.5px solid hsl(var(--text-300) / 0.5)' }}>
+                  <IconCheck size={11} className="text-text-300" strokeWidth={2.5} />
+                </div>
+                <span className="text-[13.5px] text-text-200">Done</span>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    };
+    const PresetQuestion = ({ q, a }) => (
+      <div className="px-4 py-3 rounded-xl" style={{ background: 'hsl(var(--bg-200) / 0.6)', border: '1px solid hsl(var(--border-300) / 0.1)' }}>
+        <div className="font-serif text-[15.5px] font-medium text-text-100 leading-snug">{q}</div>
+        {a && <div className="text-[13.5px] text-text-300 mt-1">{a}</div>}
+      </div>
+    );
+    const ArtifactInlineCard = ({ title, kind = 'Spreadsheet', ext = 'XLSX', opener = 'wpsoffice' }) => (
+      <div className="flex items-center gap-3 px-3 py-3 rounded-xl" style={{ background: 'hsl(var(--bg-200) / 0.5)', border: '1px solid hsl(var(--border-300) / 0.12)' }}>
+        <div className="w-12 h-12 rounded-md flex items-center justify-center shrink-0" style={{ background: 'hsl(var(--bg-300))', color: 'hsl(var(--text-300))' }}>
+          <IconFileSpreadsheet size={22} strokeWidth={1.5} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-[14px] text-text-100 font-medium truncate">{title}</div>
+          <div className="text-[12px] text-text-400 mt-0.5">{kind} · {ext}</div>
+        </div>
+        <button className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[12.5px] text-text-200 hover:text-text-100 transition" style={{ border: '1px solid hsl(var(--border-300) / 0.18)' }}>
+          <span className="w-3.5 h-3.5 rounded-sm flex items-center justify-center text-[9px] font-bold text-oncolor-100" style={{ background: 'hsl(15 75% 55%)' }}>W</span>
+          {opener}<IconChevron size={11} />
+        </button>
+      </div>
+    );
+    const MessageActions = () => (
+      <div className="flex items-center gap-1 -ml-1.5 pt-2">
+        <button className="p-1.5 rounded-md hover:bg-bg-200 text-text-400 hover:text-text-200 transition"><IconCopy size={13} /></button>
+        <button className="p-1.5 rounded-md hover:bg-bg-200 text-text-400 hover:text-text-200 transition"><IconThumbUp size={13} /></button>
+        <button className="p-1.5 rounded-md hover:bg-bg-200 text-text-400 hover:text-text-200 transition"><IconThumbDown size={13} /></button>
+      </div>
+    );
+
+    const TaskProgressView = ({ taskTitle, onToggleRight }) => {
+      const [titleMenuOpen, setTitleMenuOpen] = useState(false);
+      useEffect(() => {
+        if (!titleMenuOpen) return;
+        const onDoc = (e) => {
+          if (!e.target.closest('.task-title-menu-root')) setTitleMenuOpen(false);
+        };
+        document.addEventListener('click', onDoc);
+        return () => document.removeEventListener('click', onDoc);
+      }, [titleMenuOpen]);
+
+      return (
+      <main className="flex-1 flex flex-col min-w-0 bg-bg-100">
+        <header className="h-12 px-6 flex items-center gap-3 shrink-0">
+          <div className="task-title-menu-root relative">
+            <button
+              onClick={(e) => { e.stopPropagation(); setTitleMenuOpen(!titleMenuOpen); }}
+              className="flex items-center gap-1.5 text-[14px] text-text-100 hover:bg-bg-200 px-2 py-1 rounded-md transition">
+              <span className="font-medium">{taskTitle}</span>
+              <IconChevron size={13} className="text-text-400" />
+            </button>
+            {titleMenuOpen && <ItemContextMenu variant="title" />}
+          </div>
+          <div className="flex-1"></div>
+          <button onClick={onToggleRight} className="p-1.5 rounded-md hover:bg-bg-200 text-text-300 transition">
+            <IconPanelRight size={15} />
+          </button>
+        </header>
+        <div className="flex-1 overflow-y-auto">
+          <div className="max-w-[760px] mx-auto px-8 py-6 space-y-6">
+            <UserMessage>生成以后 excel 电子表格 demo</UserMessage>
+            <div className="space-y-3 max-w-[100%]">
+              <PresetQuestion q="您想要怎样的 Excel demo？" a="项目清理报表" />
+              <ToolCallTimeline
+                summary="Ran 4 commands, used a skill, read a file"
+                steps={[
+                  { icon: <IconWrench size={16} />, title: 'Running skill', chip: 'Result' },
+                  { icon: <IconFile size={16} />,   title: 'Read xlsx-spec.md' },
+                  { icon: <IconTerminal size={16} />, title: 'Running command', chip: 'Script' },
+                  { icon: <IconAgentRun size={16} />, title: 'Visual QA on cells',
+                    subSteps: [
+                      { icon: <IconBookOpen size={12} />, title: 'Reading 概览 sheet' },
+                      { icon: <IconBookOpen size={12} />, title: 'Reading 不活跃项目 sheet' },
+                      { icon: <IconBookOpen size={12} />, title: 'Reading 清理详情 sheet' },
+                      { icon: <IconBookOpen size={12} />, title: 'Reading 空间释放图表 sheet' },
+                    ],
+                  },
+                  { icon: <IconTerminal size={16} />, title: 'Running command', chip: 'Script', chipVariant: 'danger' },
+                ]}
+              />
+              <div className="text-[14px] leading-[1.75] text-text-100 space-y-3">
+                <p>报表生成完成, 28 条公式全部正确计算, 零错误。</p>
+                <p><a href="#" className="text-text-100 underline underline-offset-4 decoration-text-400/60">查看报表</a></p>
+                <p>工作簿包含 4 个工作表:</p>
+                <ul className="list-disc pl-6 space-y-1.5 marker:text-text-400">
+                  <li><strong className="font-semibold">概览</strong> — 4 个关键指标卡片</li>
+                  <li><strong className="font-semibold">不活跃项目</strong> — 7 个 90 天未更新的项目清单</li>
+                  <li><strong className="font-semibold">清理详情</strong> — 17 个已删除依赖/构建目录</li>
+                  <li><strong className="font-semibold">空间释放图表</strong> — 按项目汇总 (SUMIF 公式)</li>
+                </ul>
+                <p>所有合计、平均值、占比都用 Excel 公式实现, 源数据修改后会自动重算。</p>
+              </div>
+              <ArtifactInlineCard title="项目清理报告" kind="Spreadsheet" ext="XLSX" opener="wpsoffice" />
+              <MessageActions />
+            </div>
+
+            {/* Round 2 — user follow-up */}
+            <UserMessage>把"不活跃项目"那张表加一列「清理建议」,分三档:立即清理 / 待评估 / 保留</UserMessage>
+            <div className="space-y-3">
+              <div className="text-[14px] leading-[1.75] text-text-100 space-y-3">
+                <p>好, 已加。基于<strong className="font-semibold">最后活动时间 + 依赖体积 + 是否有 README</strong> 三维打分:</p>
+                <ul className="list-disc pl-6 space-y-1.5 marker:text-text-400">
+                  <li><strong className="font-semibold" style={{ color: 'hsl(var(--danger-100))' }}>立即清理</strong> — 闲置 ≥ 180 天 + 无 README + 依赖目录可重建。共 <strong>4</strong> 个项目, 预计释放 <strong>2.8 GB</strong>。</li>
+                  <li><strong className="font-semibold" style={{ color: 'hsl(var(--warning-100))' }}>待评估</strong> — 闲置 90-180 天, 或有非标准结构。共 <strong>3</strong> 个项目, 需手动确认。</li>
+                  <li><strong className="font-semibold" style={{ color: 'hsl(var(--success-100))' }}>保留</strong> — 近 30 天内有 commit, 或有 active branch。<strong>不建议删除</strong>。</li>
+                </ul>
+                <p>报表已更新 (v2 · 28 条公式 → 31 条公式, 新增 SUMIFS 按建议分类汇总)。</p>
+              </div>
+              <ArtifactInlineCard title="项目清理报告 v2" kind="Spreadsheet" ext="XLSX" opener="wpsoffice" />
+              <MessageActions />
+            </div>
+
+            {/* Round 3 — user follow-up */}
+            <UserMessage>再生成一份对应的 PPT 给 review 会议用,深色科技风</UserMessage>
+            <div className="space-y-3">
+              <div className="text-[14px] leading-[1.75] text-text-100 space-y-3">
+                <p>Now let me convert to images for visual QA:</p>
+              </div>
+              <ToolCallTimeline
+                summary="Ran a command, ran an agent"
+                defaultOpen={false}
+                steps={[
+                  { icon: <IconTerminal size={16} />, title: 'Running command', chip: 'Script' },
+                  { icon: <IconAgentRun size={16} />, title: 'Visual QA on PPT slides',
+                    subSteps: [
+                      { icon: <IconBookOpen size={12} />, title: 'Reading slide 1 · 封面' },
+                      { icon: <IconBookOpen size={12} />, title: 'Reading slide 2 · 执行摘要' },
+                      { icon: <IconBookOpen size={12} />, title: 'Reading slide 3 · 不活跃项目清单' },
+                      { icon: <IconBookOpen size={12} />, title: 'Reading slide 4 · 清理范围与保留' },
+                      { icon: <IconBookOpen size={12} />, title: 'Reading slide 5 · 空间释放分布' },
+                      { icon: <IconBookOpen size={12} />, title: 'Reading slide 6 · 依赖目录清理明细' },
+                      { icon: <IconBookOpen size={12} />, title: 'Reading slide 7 · 后续建议' },
+                    ],
+                  },
+                ]}
+              />
+              <div className="text-[14px] leading-[1.75] text-text-100 space-y-3">
+                <p>I&apos;ll fix the visible defects:</p>
+              </div>
+              <ToolCallTimeline
+                summary="Edited 4 files"
+                defaultOpen={false}
+                steps={[
+                  { icon: <IconFile size={16} />,     title: 'Edited slide_05.tsx', chip: '+12 / -8' },
+                  { icon: <IconFile size={16} />,     title: 'Edited slide_06.tsx', chip: '+8 / -4' },
+                  { icon: <IconFile size={16} />,     title: 'Edited slide_07.tsx', chip: '+3 / -2' },
+                  { icon: <IconFile size={16} />,     title: 'Edited theme.css',    chip: '+5' },
+                ]}
+              />
+              <div className="text-[14px] leading-[1.75] text-text-100 space-y-3">
+                <p>Now fix slide 5 (&quot;4.27 GB&quot; right margin) and slide 6 (table row height) and slide 7 (banner position):</p>
+              </div>
+              <ToolCallTimeline
+                summary="Edited 6 files, read 5 files, ran 3 commands"
+                defaultOpen={false}
+                steps={[
+                  { icon: <IconFile size={16} />,     title: 'Edited slide_05.tsx', chip: '+4 / -3' },
+                  { icon: <IconFile size={16} />,     title: 'Edited slide_06.tsx', chip: '+6 / -5' },
+                  { icon: <IconTerminal size={16} />, title: 'Running command', chip: 'Build' },
+                  { icon: <IconAgentRun size={16} />, title: 'Re-render QA', subSteps: [
+                    { icon: <IconBookOpen size={12} />, title: 'Verified slide 5' },
+                    { icon: <IconBookOpen size={12} />, title: 'Verified slide 6' },
+                    { icon: <IconBookOpen size={12} />, title: 'Verified slide 7' },
+                  ]},
+                ]}
+              />
+              <div className="text-[14px] leading-[1.75] text-text-100 space-y-3">
+                <p>PPT 制作完成, 深色科技风, 共 <strong>7 页</strong>, 已通过视觉 QA 修正所有可见问题。</p>
+                <p><a href="#" className="text-text-100 underline underline-offset-4 decoration-text-400/60">查看 PPT</a></p>
+                <p>页面结构:</p>
+                <ol className="list-decimal pl-6 space-y-1 marker:text-text-400">
+                  <li><strong className="font-semibold">封面</strong> — 标题 + 装饰圆形点缀 + 元信息行</li>
+                  <li><strong className="font-semibold">执行摘要</strong> — 4 个 KPI 卡片 (19 / 7 / 17 / 4.3 GB) + 3 个关键发现</li>
+                  <li><strong className="font-semibold">不活跃项目清单</strong> — 7 项目表格 + 闲置天数横向进度条</li>
+                  <li><strong className="font-semibold">清理范围与保留</strong> — 两列对比 (已清理 vs 完整保留)</li>
+                  <li><strong className="font-semibold">空间释放分布</strong> — 自绘条形图 + 右侧汇总卡 (&quot;4.27 GB&quot; 大字)</li>
+                  <li><strong className="font-semibold">依赖目录清理明细</strong> — 17 行详细表格 + 合计行</li>
+                  <li><strong className="font-semibold">后续建议</strong> — 三步路径卡 (RESTORE / ARCHIVE / AUTOMATE) + 结束语</li>
+                </ol>
+                <p>配色: 极深蓝底 (<code className="inline" style={{ color: 'hsl(125 100% 50%)' }}>● #0A0E1A</code>) + 薄荷绿主调 (<code className="inline" style={{ color: 'hsl(165 70% 55%)' }}>● #00D4AA</code>) + 电光蓝/琥珀/紫色辅助。</p>
+              </div>
+              <ArtifactInlineCard title="项目清理报告" kind="Presentation" ext="PPTX" opener="wpsoffice" />
+              <MessageActions />
+              <div className="pt-4"><AnthropicStar size={20} className="anthropic-star spin" /></div>
+            </div>
+
+          </div>
+        </div>
+        <div className="px-8 pb-6 pt-2">
+          <div className="max-w-[760px] mx-auto"><TaskMessageInput /></div>
+        </div>
+      </main>
+      );
+    };
+
+    /* Process timeline (任务链) */
+    const ProcessStep = ({ status, name, desc, isLast, isActive }) => {
+      const indicator =
+        status === 'done' ? (
+          <span className="w-6 h-6 rounded-full flex items-center justify-center shrink-0" style={{ background: 'hsl(var(--success-100))' }}>
+            <IconCheck size={12} className="text-oncolor-100" strokeWidth={2.5} />
+          </span>
+        ) : status === 'active' ? (
+          <span className="relative w-6 h-6 rounded-full flex items-center justify-center shrink-0" style={{ background: 'hsl(var(--brand-100))' }}>
+            <span className="absolute -inset-1 rounded-full pulse-dot" style={{ background: 'hsl(var(--brand-100))', opacity: 0.2 }}></span>
+            <span className="relative w-2 h-2 rounded-full bg-oncolor-100"></span>
+          </span>
+        ) : status === 'failed' ? (
+          <span className="w-6 h-6 rounded-full flex items-center justify-center shrink-0" style={{ background: 'hsl(var(--danger-100))' }}>
+            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="hsl(var(--oncolor-100))" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </span>
+        ) : (
+          <span className="w-6 h-6 rounded-full shrink-0" style={{ border: '1.5px dashed hsl(var(--text-400) / 0.4)' }}></span>
+        );
+      return (
+        <div className="relative flex gap-3">
+          <div className="flex flex-col items-center shrink-0">
+            {indicator}
+            {!isLast && <div className="flex-1 w-px mt-1 mb-1 min-h-[18px]" style={{ background: status === 'done' ? 'hsl(var(--success-100) / 0.5)' : 'hsl(var(--border-300) / 0.2)' }}></div>}
+          </div>
+          <div className="flex-1 min-w-0 pt-0.5 pb-4">
+            <div className={
+              'text-[13px] leading-snug ' +
+              (status === 'active' ? 'text-text-100 font-medium' :
+               status === 'done' ? 'text-text-200' :
+               status === 'failed' ? 'text-danger-100' :
+               'text-text-400')
+            }>
+              {name}
+            </div>
+            {desc && (
+              <div className={'text-[11.5px] mt-1 leading-relaxed ' + (status === 'active' ? 'text-text-300' : 'text-text-400')}>
+                {status === 'active' && (
+                  <span className="inline-flex w-1 h-1 rounded-full bg-brand-100 pulse-dot mr-1.5 align-middle"></span>
+                )}
+                {desc}
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    };
+
+    const ProcessTimeline = () => {
+      const steps = [
+        { status: 'done',    name: 'List all projects in ~/Workspace', desc: '14 directories · 1.2s' },
+        { status: 'done',    name: 'Run `git log` for each',           desc: '14 git logs · 8.4s' },
+        { status: 'active',  name: 'Filter projects no commits 30d',   desc: 'scanning 9 / 14 ...' },
+        { status: 'pending', name: 'Categorize by activity',           desc: 'active / inactive / dormant 90d+' },
+        { status: 'pending', name: 'Generate markdown report',         desc: '~/Desktop/inactive-projects.md' },
+      ];
+      const doneCount = steps.filter(s => s.status === 'done').length;
+      const totalCount = steps.length;
+      return (
+        <div>
+          <div className="flex items-center justify-between px-2 pt-3 pb-3">
+            <span className="text-[11px] tracking-wider uppercase text-text-400">Plan</span>
+            <span className="text-[11.5px] text-text-300 font-mono">{doneCount} of {totalCount}</span>
+          </div>
+          <div className="px-2">
+            {steps.map((s, i) => (
+              <ProcessStep key={i} status={s.status} name={s.name} desc={s.desc} isLast={i === steps.length - 1} />
+            ))}
+          </div>
+          <div className="mt-3 mx-2 px-3 py-2 rounded-md text-[11.5px] text-text-400 leading-relaxed" style={{ background: 'hsl(var(--bg-200) / 0.4)', border: '1px solid hsl(var(--border-300) / 0.08)' }}>
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-success-100 pulse-dot mr-2 align-middle"></span>
+            Task running · 02:13 elapsed
+          </div>
+        </div>
+      );
+    };
+
+    const TaskContextPanel = ({ onPreviewFile }) => {
+      const [tab, setTab] = useState('process');
+      const tabBtn = (id, label, icon) => (
+        <button onClick={() => setTab(id)}
+          className={
+            'flex items-center justify-center gap-1.5 px-2 py-1.5 rounded transition ' +
+            (tab === id ? 'bg-bg-000 text-text-100 shadow-sm flex-[1.6]' : 'text-text-300 hover:text-text-100 flex-1')
+          } title={label}>
+          {icon}
+          {tab === id && <span className="text-[12px] font-medium">{label}</span>}
+        </button>
+      );
+      return (
+        <aside className="w-[320px] shrink-0 flex flex-col" style={{ background: 'hsl(var(--bg-100))', borderLeft: '1px solid hsl(var(--border-300) / 0.12)' }}>
+          <div className="px-3 pt-3 pb-2">
+            <div className="flex items-center gap-0.5 p-0.5 rounded-md" style={{ background: 'hsl(var(--bg-200))', border: '1px solid hsl(var(--border-300) / 0.12)' }}>
+              {tabBtn('process', 'Process', <IconTimeline size={14} />)}
+              {tabBtn('files', 'Files', <IconFolder size={14} />)}
+              {tabBtn('context', 'Context', <IconLayers size={14} />)}
+            </div>
+          </div>
+          <div className="flex-1 overflow-y-auto px-3 pb-3">
+            {tab === 'process' && <ProcessTimeline />}
+            {tab === 'files' && (
+              <div>
+                <div className="flex items-center gap-2 px-2 pt-3 pb-2">
+                  <IconFolder size={14} className="text-text-300" />
+                  <span className="text-[13.5px] font-medium text-text-100">stuio</span>
+                  <span className="ml-auto text-[11px] text-text-400 font-mono">4 files</span>
+                </div>
+                <div className="flex flex-col gap-1">
+                  {[
+                    { name: 'Instructions · CLAUDE.md', type: 'md',    icon: <IconFile size={14} className="text-text-400 shrink-0" /> },
+                    { name: '项目清理报告.xlsx',          type: 'xlsx',  icon: <IconFileSpreadsheet size={14} className="shrink-0" style={{ color: 'hsl(125 40% 50%)' }} />, badge: 'new' },
+                    { name: 'inactive-projects.md',     type: 'md',    icon: <IconFile size={14} className="text-text-400 shrink-0" /> },
+                    { name: 'summary.pptx',             type: 'pptx',  icon: <IconFileSpreadsheet size={14} className="shrink-0" style={{ color: 'hsl(15 75% 55%)' }} /> },
+                  ].map((f) => (
+                    <button key={f.name} onClick={() => onPreviewFile?.(f)}
+                      className="flex items-center gap-2.5 px-2 py-1.5 rounded-md hover:bg-bg-200/60 transition text-left">
+                      {f.icon}
+                      <span className="text-[13px] text-text-200 truncate flex-1">{f.name}</span>
+                      {f.badge && <span className="text-[10.5px] px-1.5 py-px rounded shrink-0" style={{ background: 'hsl(var(--brand-100) / 0.15)', color: 'hsl(var(--brand-100))' }}>{f.badge}</span>}
+                    </button>
+                  ))}
+                </div>
+                <button className="mt-3 w-full text-[12.5px] text-text-400 hover:text-text-200 px-2 py-2 rounded-md flex items-center justify-center gap-1.5 transition hover:bg-bg-200/40" style={{ border: '1px dashed hsl(var(--border-300) / 0.2)' }}>
+                  <IconPlus size={12} /> Add files to working tree
+                </button>
+              </div>
+            )}
+            {tab === 'context' && (
+              <div>
+                <div className="text-[11px] tracking-wider uppercase text-text-400 pt-3 pb-2 px-2 flex items-center justify-between">
+                  <span>Skills</span>
+                  <span className="text-text-400/70 font-mono normal-case tracking-normal">3 loaded</span>
+                </div>
+                <div className="flex flex-col gap-1">
+                  {[
+                    { name: 'xlsx', desc: '生成 Excel 电子表格', color: 'hsl(125 40% 50%)' },
+                    { name: 'pptx', desc: '生成 PowerPoint', color: 'hsl(15 75% 55%)' },
+                    { name: 'huashu-design', desc: 'HTML 原型 / 设计探索', color: 'hsl(var(--brand-100))' },
+                  ].map((s) => (
+                    <div key={s.name} className="flex items-center gap-2.5 px-2 py-2 rounded-md hover:bg-bg-200/60 transition">
+                      <span className="w-5 h-5 rounded-sm flex items-center justify-center text-[10px] font-bold text-oncolor-100 shrink-0" style={{ background: s.color }}>
+                        {s.name === 'xlsx' ? 'X' : s.name === 'pptx' ? 'P' : 'H'}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[13px] text-text-200 font-mono leading-tight">{s.name}</div>
+                        <div className="text-[11px] text-text-400 leading-tight mt-0.5">{s.desc}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="text-[11px] tracking-wider uppercase text-text-400 pt-5 pb-2 px-2 flex items-center justify-between">
+                  <span>MCP servers</span>
+                  <span className="text-text-400/70 font-mono normal-case tracking-normal">2 / 3 on</span>
+                </div>
+                <div className="flex flex-col gap-1">
+                  {[
+                    { name: 'filesystem', desc: '本地文件读写', on: true },
+                    { name: 'github', desc: 'Issues / PRs', on: true },
+                    { name: 'slack', desc: '消息 / 频道', on: false },
+                  ].map((m) => (
+                    <div key={m.name} className="flex items-center gap-2.5 px-2 py-2 rounded-md hover:bg-bg-200/60 transition">
+                      <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: m.on ? 'hsl(var(--success-100))' : 'hsl(var(--text-400))', opacity: m.on ? 1 : 0.4 }}></span>
+                      <div className="flex-1 min-w-0">
+                        <div className={'text-[13px] font-mono leading-tight ' + (m.on ? 'text-text-200' : 'text-text-400')}>{m.name}</div>
+                        <div className="text-[11px] text-text-400 leading-tight mt-0.5">{m.desc}</div>
+                      </div>
+                      {!m.on && <span className="text-[10px] text-text-400 italic">off</span>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </aside>
+      );
+    };
+
+    /* Projects list */
+    const ProjectCard = ({ name, time, onClick }) => (
+      <button onClick={onClick}
+        className="w-full text-left rounded-xl px-5 py-5 transition hover:bg-bg-000/50 group"
+        style={{ background: 'hsl(var(--bg-200) / 0.45)', border: '1px solid hsl(var(--border-300) / 0.12)', minHeight: 120 }}>
+        <div className="font-serif text-[22px] font-medium text-text-100 leading-tight mb-2">{name}</div>
+        <div className="text-[12px] text-text-400 mt-auto">{time}</div>
+      </button>
+    );
+
+    const ProjectsListView = ({ onProjectClick, onNewProject }) => (
+      <main className="flex-1 flex flex-col min-w-0 bg-bg-100 overflow-y-auto">
+        <div className="px-12 pt-12 pb-8 flex items-end gap-4">
+          <h1 className="font-serif text-[34px] font-normal text-text-100 leading-none flex-1">Projects</h1>
+          <button className="p-2 rounded-md hover:bg-bg-200 text-text-300 hover:text-text-100 transition" title="排序"><IconSortLines size={16} /></button>
+          <button className="p-2 rounded-md hover:bg-bg-200 text-text-300 hover:text-text-100 transition" title="搜索"><IconSearch size={16} /></button>
+          <button onClick={onNewProject} className="ml-1 px-4 py-2 rounded-lg text-[13.5px] font-medium bg-text-100 text-bg-100 hover:opacity-90 transition">New project</button>
+        </div>
+        <div className="px-12 grid grid-cols-3 gap-4 pb-12">
+          <ProjectCard name="jay" time="2 minutes ago" onClick={() => onProjectClick('jay')} />
+          <ProjectCard name="huashu-design" time="2 hours ago" onClick={() => onProjectClick('huashu')} />
+          <ProjectCard name="ugreen-ai 原型稿" time="yesterday" onClick={() => onProjectClick('ugreen')} />
+          <ProjectCard name="stuio" time="3 days ago" onClick={() => onProjectClick('stuio')} />
+          <ProjectCard name="claude-skills-pack" time="last week" onClick={() => onProjectClick('skills')} />
+        </div>
+      </main>
+    );
+
+    /* Project detail */
+    const ConversationCard = ({ icon, title, preview, time }) => (
+      <button className="w-full flex items-start gap-3 p-4 rounded-xl text-left transition hover:bg-bg-200/40"
+        style={{ background: 'hsl(var(--bg-200) / 0.3)', border: '1px solid hsl(var(--border-300) / 0.1)' }}>
+        <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 mt-0.5" style={{ background: 'hsl(var(--bg-300))', color: 'hsl(var(--text-300))' }}>
+          {icon}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start gap-3">
+            <div className="text-[14px] font-medium text-text-100 leading-tight flex-1 truncate">{title}</div>
+            <div className="text-[11.5px] text-text-400 shrink-0 mt-0.5">{time}</div>
+          </div>
+          <div className="text-[13px] text-text-400 mt-1 truncate">{preview}</div>
+        </div>
+      </button>
+    );
+
+    const ProjectPanelCard = ({ title, action, children, defaultOpen = true }) => {
+      const [open, setOpen] = useState(defaultOpen);
+      return (
+        <div className="rounded-xl overflow-hidden" style={{ background: 'hsl(var(--bg-200) / 0.45)', border: '1px solid hsl(var(--border-300) / 0.1)' }}>
+          <div className="flex items-center gap-2 px-4 py-3">
+            <span className="flex-1 text-[13.5px] font-medium text-text-100">{title}</span>
+            {action && <span className="text-text-300">{action}</span>}
+            <button onClick={() => setOpen(!open)} className="text-text-400 hover:text-text-200 transition">
+              <IconChevron size={14} className={'transition-transform ' + (open ? '' : '-rotate-90')} />
+            </button>
+          </div>
+          {open && <div className="px-4 pb-4 -mt-1">{children}</div>}
+        </div>
+      );
+    };
+
+    const ProjectRightPanel = () => (
+      <aside className="w-[320px] shrink-0 flex flex-col p-3 gap-3 overflow-y-auto" style={{ background: 'hsl(var(--bg-100))', borderLeft: '1px solid hsl(var(--border-300) / 0.12)' }}>
+        <ProjectPanelCard title="Instructions" action={<button className="p-1 rounded hover:bg-bg-200 text-text-300 hover:text-text-100"><IconPencil size={13} /></button>}>
+          <p className="font-serif italic text-[13.5px] text-text-300 leading-relaxed">
+            Add tone, formatting, or rules to guide how Agent Studio works.
+          </p>
+        </ProjectPanelCard>
+        <ProjectPanelCard title="Scheduled" action={<button className="p-1 rounded hover:bg-bg-200 text-text-300 hover:text-text-100"><IconPlus size={13} /></button>}>
+          <p className="font-serif italic text-[13.5px] text-text-300 leading-relaxed">
+            Set up recurring tasks for this project.
+          </p>
+        </ProjectPanelCard>
+        <ProjectPanelCard title="Context" action={<button className="p-1 rounded hover:bg-bg-200 text-text-300 hover:text-text-100"><IconPlus size={13} /></button>}>
+          <div className="text-[11.5px] font-medium text-text-200 pt-1 pb-1.5">On your computer</div>
+          <div className="flex flex-col gap-0.5">
+            <button className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-bg-200/60 text-left">
+              <IconChevronRight size={11} className="text-text-400 shrink-0" />
+              <IconFolder size={14} className="text-text-300 shrink-0" />
+              <span className="text-[13px] text-text-200 truncate">jay</span>
+            </button>
+            <button className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-bg-200/60 text-left">
+              <IconChevronRight size={11} className="text-text-400 shrink-0" />
+              <IconFolder size={14} className="text-text-300 shrink-0" />
+              <span className="text-[13px] text-text-200 truncate">webCode</span>
+            </button>
+          </div>
+          <div className="text-[11.5px] font-medium text-text-200 pt-3 pb-1.5">Memory</div>
+          <div className="flex flex-col gap-0.5">
+            <button className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-bg-200/60 text-left">
+              <IconChevronRight size={11} className="text-text-400 shrink-0" />
+              <span className="w-3.5 h-3.5 rounded-full flex items-center justify-center shrink-0" style={{ background: 'hsl(var(--bg-300))' }}>
+                <span className="block w-1 h-1 rounded-full bg-text-300"></span>
+              </span>
+              <span className="text-[13px] text-text-200 truncate">Memory</span>
+            </button>
+          </div>
+        </ProjectPanelCard>
+      </aside>
+    );
+
+    const ProjectDetailView = ({ projectName }) => (
+      <main className="flex-1 flex flex-col min-w-0 bg-bg-100 overflow-y-auto">
+        <header className="px-12 pt-10 pb-6 flex items-start gap-3">
+          <h1 className="font-serif text-[40px] font-normal text-text-100 leading-none flex-1">{projectName}</h1>
+          <div className="flex items-center gap-1 mt-2">
+            <button className="p-2 rounded-md hover:bg-bg-200 text-text-200 hover:text-text-100 transition" title="Unpin"><IconPinSimple size={15} /></button>
+            <button className="p-2 rounded-md hover:bg-bg-200 text-text-200 hover:text-text-100 transition" title="更多"><IconMoreV size={15} /></button>
+          </div>
+        </header>
+        <section className="px-12 pb-8">
+          <div className="max-w-[860px]">
+            <BigInputCard
+              placeholder="What would you like to work on in this project?"
+              toolbarLeft={
+                <button className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[12.5px] text-text-300 hover:text-text-100 hover:bg-bg-200 transition">
+                  <IconBriefcase size={13} /> {projectName} <span className="text-text-400">+1</span> <IconChevron size={11} />
+                </button>
+              }
+            />
+          </div>
+        </section>
+        <section className="px-12 pb-12">
+          <div className="max-w-[860px]">
+            <div className="text-[12px] tracking-wide text-text-400 mb-3 ml-1">Recents</div>
+            <div className="flex flex-col gap-2.5">
+              {[
+                { title: '项目结构分析',                    preview: '帮我梳理 jay/ 的当前架构, 哪些文件是入口, 哪些是工具脚本', time: '8 minutes ago' },
+                { title: '生成项目清理报告',                  preview: '扫描 ~/Workspace 找出不活跃项目, 生成 xlsx + pptx 双格式', time: '12 minutes ago' },
+                { title: 'Refactor: 把 utils.js 拆分',     preview: '现在的 utils.js 已经 800+ 行, 按功能域拆成 4-5 个独立模块', time: '昨天 16:43' },
+                { title: '调试 build 失败',                  preview: 'vite build 报 "Cannot find module ./theme", 但本地 dev 是正常的', time: '昨天 11:20' },
+                { title: 'Casual conversation',           preview: '哈哈', time: '4 days ago' },
+                { title: 'Chinese greeting conversation', preview: '你好', time: '5 days ago' },
+              ].map((c, i) => (
+                <ConversationCard key={i}
+                  icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>}
+                  title={c.title} preview={c.preview} time={c.time} />
+              ))}
+            </div>
+          </div>
+        </section>
+      </main>
+    );
+
+    /* ============================================================
+       Customize View (Image #19, #20)
+       ============================================================ */
+    const ToggleSwitch = ({ on, onChange }) => (
+      <button onClick={() => onChange?.(!on)}
+        className="relative inline-flex items-center w-9 h-5 rounded-full transition shrink-0"
+        style={{ background: on ? 'hsl(var(--accent-100))' : 'hsl(var(--bg-300))' }}>
+        <span className="block w-4 h-4 rounded-full bg-oncolor-100 transition-transform"
+          style={{ transform: on ? 'translateX(18px)' : 'translateX(2px)', boxShadow: '0 1px 2px rgba(0,0,0,0.25)' }} />
+      </button>
+    );
+
+    const ActionCard = ({ icon, title, desc, onClick }) => (
+      <button onClick={onClick}
+        className="w-full flex items-center gap-4 p-4 rounded-xl text-left transition hover:bg-bg-200/60"
+        style={{ background: 'hsl(var(--bg-200) / 0.4)', border: '1px solid hsl(var(--border-300) / 0.1)' }}>
+        <div className="w-11 h-11 rounded-full flex items-center justify-center shrink-0" style={{ background: 'hsl(var(--bg-300))', color: 'hsl(var(--text-200))' }}>
+          {icon}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-[14.5px] font-medium text-text-100 mb-0.5">{title}</div>
+          <div className="text-[12.5px] text-text-400">{desc}</div>
+        </div>
+      </button>
+    );
+
+    const CustomizeNav = ({ tab, setTab }) => (
+      <aside className="w-[240px] shrink-0 px-3 py-4 flex flex-col" style={{ borderRight: '1px solid hsl(var(--border-300) / 0.12)' }}>
+        <button onClick={() => setTab('skills')}
+          className={
+            'w-full flex items-center gap-3 px-3 py-2 rounded-md text-[14px] transition-colors ' +
+            (tab === 'skills' ? 'bg-bg-000 text-text-100' : 'text-text-200 hover:text-text-100 hover:bg-bg-200')
+          }>
+          <IconScroll size={16} className={tab === 'skills' ? 'text-text-100' : 'text-text-300'} />
+          <span className="flex-1 text-left">Skills</span>
+        </button>
+        <button onClick={() => setTab('agents')}
+          className={
+            'mt-1 w-full flex items-center gap-3 px-3 py-2 rounded-md text-[14px] transition-colors ' +
+            (tab === 'agents' ? 'bg-bg-000 text-text-100' : 'text-text-200 hover:text-text-100 hover:bg-bg-200')
+          }>
+          <IconAgentGrid size={16} className={tab === 'agents' ? 'text-text-100' : 'text-text-300'} />
+          <span className="flex-1 text-left">Agents</span>
+        </button>
+
+        <div className="mt-6 pt-4" style={{ borderTop: '1px solid hsl(var(--border-300) / 0.08)' }}>
+          <div className="px-2 flex items-center mb-1">
+            <span className="text-[11.5px] tracking-wide text-text-400 flex-1">Personal plugins</span>
+            <button className="p-1 rounded hover:bg-bg-200 text-text-400 hover:text-text-200"><IconPlus size={12} /></button>
+          </div>
+          <p className="text-[11.5px] text-text-400 leading-relaxed px-2 mb-3">
+            Give Agent Studio role-level expertise with plugins
+          </p>
+          <button onClick={() => setTab('plugins')}
+            className="ml-2 px-3 py-1.5 rounded-md text-[12.5px] text-text-100 hover:bg-bg-300 transition"
+            style={{ background: 'hsl(var(--bg-300))', border: '1px solid hsl(var(--border-300) / 0.15)' }}>
+            Browse plugins
+          </button>
+        </div>
+      </aside>
+    );
+
+    const CustomizeHome = ({ setTab }) => (
+      <div className="flex-1 flex flex-col items-center justify-center px-12 py-16 overflow-y-auto">
+        <div className="text-text-200 mb-6 opacity-75">
+          <IconToolbox size={110} />
+        </div>
+        <h1 className="font-serif text-[28px] font-normal text-text-100 mb-3">Customize Agent Studio</h1>
+        <p className="text-[13.5px] text-text-300 mb-12 text-center max-w-[480px]">
+          Skills, connectors, and plugins shape how Agent Studio works with you.
+        </p>
+        <div className="w-full max-w-[600px] flex flex-col gap-3">
+          <ActionCard icon={<IconAgentGrid size={18} />} title="Connect your apps"
+            desc="Let Agent Studio read and write to the tools you already use."
+            onClick={() => setTab('agents')} />
+          <ActionCard icon={<IconScroll size={18} />} title="Create new skills"
+            desc="Teach Agent Studio your processes, team norms, and expertise."
+            onClick={() => setTab('skills')} />
+          <ActionCard icon={<IconPlug size={18} />} title="Browse plugins"
+            desc="Add pre-built knowledge for your field."
+            onClick={() => setTab('plugins')} />
+        </div>
+      </div>
+    );
+
+    /* Skills (Image #20) */
+    const SkillsBody = () => {
+      const [activeSkill, setActiveSkill] = useState('skill-creator');
+      const tree = ['SKILL.md', 'agents/', 'assets/', 'eval-viewer/', 'references/', 'scripts/', 'LICENSE.txt'];
+      const builtin = ['schedule', 'setup-cowork', 'context'];
+      return (
+        <>
+          <div className="w-[340px] shrink-0 flex flex-col" style={{ borderRight: '1px solid hsl(var(--border-300) / 0.12)' }}>
+            <div className="h-12 flex items-center justify-between px-4 shrink-0">
+              <h2 className="text-[16px] font-semibold text-text-100">Skills</h2>
+              <div className="flex items-center gap-1">
+                <button className="p-1.5 rounded hover:bg-bg-200 text-text-300 hover:text-text-100"><IconSearch size={14} /></button>
+                <button className="p-1.5 rounded hover:bg-bg-200 text-text-300 hover:text-text-100"><IconPlus size={14} /></button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto px-2 pb-4">
+              <div className="px-2 pt-2 pb-1 flex items-center gap-1.5">
+                <IconChevron size={12} className="text-text-400" />
+                <span className="text-[12px] text-text-300">Personal skills</span>
+              </div>
+              <button className="w-full flex items-center gap-2 px-2.5 py-2 rounded-md bg-bg-000 text-text-100">
+                <IconScroll size={14} className="text-text-300" />
+                <span className="flex-1 text-left text-[13.5px]">skill-creator</span>
+                <IconChevron size={12} className="text-text-400" />
+              </button>
+              <div className="ml-5 mt-1 flex flex-col">
+                {tree.map((f) => {
+                  const isDir = f.endsWith('/');
+                  return (
+                    <div key={f} className="flex items-center gap-2 px-2.5 py-1 text-[12.5px] text-text-200 hover:bg-bg-200/50 rounded">
+                      {isDir ? <IconFolder size={13} className="text-text-400" /> : <IconFile size={13} className="text-text-400" />}
+                      <span className="flex-1">{isDir ? f.slice(0, -1) : f}</span>
+                      {isDir && <IconChevronRight size={10} className="text-text-400" />}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="px-2 pt-4 pb-1 flex items-center gap-1.5">
+                <IconChevron size={12} className="text-text-400" />
+                <span className="text-[12px] text-text-300">Built-in skills</span>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                {builtin.map((s) => (
+                  <button key={s} className="w-full flex items-center gap-2 px-2.5 py-2 rounded-md hover:bg-bg-200 text-text-200">
+                    <IconScroll size={14} className="text-text-400" />
+                    <span className="text-[13.5px]">{s}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto">
+            <div className="max-w-[860px] mx-auto px-10 py-8">
+              <div className="flex items-center justify-between mb-6">
+                <h1 className="text-[22px] font-semibold text-text-100">skill-creator</h1>
+                <div className="flex items-center gap-2">
+                  <ToggleSwitch on={true} onChange={() => {}} />
+                  <button className="p-1.5 rounded hover:bg-bg-200 text-text-300"><IconMoreV size={14} /></button>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-x-12 gap-y-4 text-[13.5px] mb-6">
+                <div>
+                  <div className="text-text-400 text-[12px] mb-1">Added by</div>
+                  <div className="text-text-100">Anthropic</div>
+                </div>
+                <div>
+                  <div className="text-text-400 text-[12px] mb-1">Trigger</div>
+                  <div className="text-text-200 underline underline-offset-2 decoration-text-400/40">Slash command + auto</div>
+                </div>
+              </div>
+              <div className="mb-6">
+                <div className="text-text-400 text-[12px] mb-2">Description <span className="inline-block w-3 h-3 rounded-full text-center" style={{ background: 'hsl(var(--text-400) / 0.2)' }}>ⓘ</span></div>
+                <p className="text-[14px] text-text-200 leading-relaxed">
+                  Create new skills, modify and improve existing skills, and measure skill performance. Use when users want to create a skill from scratch, edit, or optimize an existing skill, run evals to test a skill, benchmark skill performance with variance analysis, or optimize a skill's description for better triggering accuracy.
+                </p>
+              </div>
+              <div className="rounded-xl p-6 mt-6" style={{ background: 'hsl(var(--bg-200) / 0.4)', border: '1px solid hsl(var(--border-300) / 0.1)' }}>
+                <div className="flex items-center justify-end mb-4 gap-1">
+                  <button className="p-1.5 rounded hover:bg-bg-200 text-text-100"><IconEye size={13} /></button>
+                  <button className="p-1.5 rounded hover:bg-bg-200 text-text-400"><IconCodeBracket size={13} /></button>
+                </div>
+                <h2 className="font-serif text-[22px] text-text-100 mb-3">Skill Creator</h2>
+                <p className="text-[14px] text-text-200 mb-3 leading-relaxed">
+                  A skill for creating new skills and iteratively improving them.
+                </p>
+                <p className="text-[14px] text-text-200 mb-2 leading-relaxed">
+                  At a high level, the process of creating a skill goes like this:
+                </p>
+                <ul className="list-disc pl-6 space-y-1.5 text-[14px] text-text-200 leading-relaxed marker:text-text-400">
+                  <li>Decide what you want the skill to do and roughly how it should do it</li>
+                  <li>Write a draft of the skill</li>
+                  <li>Create a few test prompts and run claude-with-access-to-the-skill on them</li>
+                  <li>Help the user evaluate the results both qualitatively and quantitatively</li>
+                  <li>Rewrite the skill based on feedback from the user's evaluation</li>
+                  <li>Repeat until you're satisfied</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </>
+      );
+    };
+
+    /* Agents (新设计) */
+    const agentsData = {
+      my: [
+        { id: 'pc-keeper', emoji: '🖥️', name: '电脑管家智能体', desc: '磁盘扫描、识别不活跃项目、文件清理',
+          systemPrompt: '你是一个专业的电脑管家智能体。任务是帮助用户管理本地文件、监控磁盘使用、识别不活跃的项目。在执行任何文件删除操作前, 必须向用户确认。优先生成清晰的清理建议清单, 让用户决策, 不主动执行破坏性操作。',
+          skills: ['filesystem', 'disk-analyzer', 'xlsx', 'cleanup-advisor'],
+          mcps: ['filesystem'], projects: ['stuio', 'ugreen-ai 原型稿'] },
+        { id: 'office', emoji: '💼', name: '办公智能体', desc: '邮件、日程、会议纪要、周报生成',
+          systemPrompt: '你是办公助手。处理日常办公场景: 写邮件、安排日程、做会议纪要、生成周报。语气专业简洁, 邮件遵循商务礼仪。会议纪要按"决策 / 行动项 / 待跟进"三段式组织。',
+          skills: ['gmail', 'calendar', 'pptx', 'docx', 'xlsx'],
+          mcps: ['gmail', 'calendar', 'slack'], projects: ['工作'] },
+        { id: 'research', emoji: '🔍', name: '研究助手', desc: '网搜、读 PDF、做研究总结',
+          systemPrompt: '你是研究助手。任务: 网搜 → 抽取核心论据 → 用结构化笔记总结。引用必须标明来源 URL。结论分"高置信 / 中等 / 推测"三档标注。',
+          skills: ['web-search', 'pdf-reader', 'citation', 'summarize'],
+          mcps: ['web-search', 'filesystem'], projects: [] },
+      ],
+      builtin: [
+        { id: 'designer', emoji: '🎨', name: '设计助手', desc: 'UI / UX 原型、HTML、设计探索',
+          systemPrompt: '你是 UI/UX 设计助手。生成 HTML 高保真原型, 支持设计变体探索。避免 AI slop (紫渐变 / emoji 图标 / 圆角左 border 等)。',
+          skills: ['huashu-design', 'figma'], mcps: [], projects: [] },
+        { id: 'writer', emoji: '✍️', name: '写作助手', desc: '博客、文档、营销文案',
+          systemPrompt: '你是写作助手。任务: 写博客、文档、营销文案。语气因受众而变 (技术博客严谨 / 推文活泼 / 文档清晰)。中文标点用 「」 不用 ""。',
+          skills: ['markdown', 'writing-style'], mcps: [], projects: [] },
+        { id: 'analyst', emoji: '📊', name: '数据分析师', desc: 'Excel 自动化、可视化、报表',
+          systemPrompt: '你是数据分析师。任务: 清洗数据 → 建立透视 → 生成可视化报表。Excel 公式优先, 不写死值。图表用柱状 / 饼图按数据特征选。',
+          skills: ['xlsx', 'pandas', 'plotly'], mcps: [], projects: [] },
+      ],
+    };
+
+    const AgentsBody = () => {
+      const [activeId, setActiveId] = useState('pc-keeper');
+      const allAgents = [...agentsData.my, ...agentsData.builtin];
+      const active = allAgents.find(a => a.id === activeId);
+      const isMy = agentsData.my.some(a => a.id === activeId);
+
+      return (
+        <>
+          <div className="w-[340px] shrink-0 flex flex-col" style={{ borderRight: '1px solid hsl(var(--border-300) / 0.12)' }}>
+            <div className="h-12 flex items-center justify-between px-4 shrink-0">
+              <h2 className="text-[16px] font-semibold text-text-100">Agents</h2>
+              <div className="flex items-center gap-1">
+                <button className="p-1.5 rounded hover:bg-bg-200 text-text-300 hover:text-text-100"><IconSearch size={14} /></button>
+                <button className="p-1.5 rounded hover:bg-bg-200 text-text-300 hover:text-text-100" title="新建智能体"><IconPlus size={14} /></button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto px-2 pb-4">
+              <div className="px-2 pt-2 pb-1 flex items-center gap-1.5">
+                <IconChevron size={12} className="text-text-400" />
+                <span className="text-[12px] text-text-300">My agents</span>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                {agentsData.my.map(a => (
+                  <button key={a.id} onClick={() => setActiveId(a.id)}
+                    className={
+                      'w-full flex items-start gap-3 px-2.5 py-2 rounded-md transition text-left ' +
+                      (activeId === a.id ? 'bg-bg-000' : 'hover:bg-bg-200')
+                    }>
+                    <span className="text-[20px] leading-none shrink-0">{a.emoji}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[13.5px] font-medium text-text-100 leading-tight truncate">{a.name}</div>
+                      <div className="text-[11.5px] text-text-400 mt-0.5 truncate">{a.desc}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+
+              <div className="px-2 pt-4 pb-1 flex items-center gap-1.5">
+                <IconChevron size={12} className="text-text-400" />
+                <span className="text-[12px] text-text-300">Built-in agents</span>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                {agentsData.builtin.map(a => (
+                  <button key={a.id} onClick={() => setActiveId(a.id)}
+                    className={
+                      'w-full flex items-start gap-3 px-2.5 py-2 rounded-md transition text-left ' +
+                      (activeId === a.id ? 'bg-bg-000' : 'hover:bg-bg-200')
+                    }>
+                    <span className="text-[20px] leading-none shrink-0">{a.emoji}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[13.5px] font-medium text-text-100 leading-tight truncate">{a.name}</div>
+                      <div className="text-[11.5px] text-text-400 mt-0.5 truncate">{a.desc}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto">
+            <div className="max-w-[860px] mx-auto px-10 py-8">
+              <div className="flex items-start justify-between mb-6">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-full flex items-center justify-center shrink-0 text-[28px]" style={{ background: 'hsl(var(--bg-200))' }}>
+                    {active.emoji}
+                  </div>
+                  <div>
+                    <h1 className="font-serif text-[26px] text-text-100 mb-0.5 leading-tight">{active.name}</h1>
+                    <div className="text-[13px] text-text-400">{active.desc}</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 mt-2">
+                  <ToggleSwitch on={true} onChange={() => {}} />
+                  <button className="p-1.5 rounded hover:bg-bg-200 text-text-300"><IconMoreV size={14} /></button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-x-12 gap-y-4 text-[13.5px] mb-8">
+                <div>
+                  <div className="text-text-400 text-[12px] mb-1">Added by</div>
+                  <div className="text-text-100">{isMy ? '你' : 'Anthropic'}</div>
+                </div>
+                <div>
+                  <div className="text-text-400 text-[12px] mb-1">Trigger</div>
+                  <div className="text-text-100">@mention + Auto</div>
+                </div>
+              </div>
+
+              {/* System prompt */}
+              <div className="mb-8">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-text-100 text-[13.5px] font-medium">System prompt</div>
+                  <button className="text-[12px] text-text-400 hover:text-text-200 flex items-center gap-1 px-2 py-1 rounded hover:bg-bg-200">
+                    <IconPencil size={11} /> Edit
+                  </button>
+                </div>
+                <div className="rounded-lg p-4 text-[13.5px] text-text-200 leading-relaxed font-serif italic" style={{ background: 'hsl(var(--bg-200) / 0.4)', border: '1px solid hsl(var(--border-300) / 0.1)' }}>
+                  {active.systemPrompt}
+                </div>
+              </div>
+
+              {/* Allowed skills */}
+              <div className="mb-8">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="text-text-100 text-[13.5px] font-medium">
+                    Allowed skills <span className="text-text-400 font-normal">({active.skills.length})</span>
+                  </div>
+                  <button className="text-[12px] text-text-400 hover:text-text-200 flex items-center gap-1 px-2 py-1 rounded hover:bg-bg-200">
+                    <IconPlus size={11} /> Add skill
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {active.skills.map(s => (
+                    <span key={s} className="inline-flex items-center gap-2 pl-2 pr-2.5 py-1 rounded-md text-[12.5px] text-text-200 font-mono" style={{ background: 'hsl(var(--bg-200))', border: '1px solid hsl(var(--border-300) / 0.12)' }}>
+                      <span className="w-3.5 h-3.5 rounded-sm flex items-center justify-center text-[8.5px] font-bold text-oncolor-100" style={{ background: 'hsl(var(--brand-100))' }}>
+                        {s.charAt(0).toUpperCase()}
+                      </span>
+                      {s}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {/* MCP servers */}
+              <div className="mb-8">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="text-text-100 text-[13.5px] font-medium">
+                    MCP servers <span className="text-text-400 font-normal">({active.mcps.length})</span>
+                  </div>
+                  <button className="text-[12px] text-text-400 hover:text-text-200 flex items-center gap-1 px-2 py-1 rounded hover:bg-bg-200">
+                    <IconPlus size={11} /> Add server
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {active.mcps.length > 0 ? active.mcps.map(m => (
+                    <span key={m} className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md text-[12.5px] text-text-200 font-mono" style={{ background: 'hsl(var(--bg-200))', border: '1px solid hsl(var(--border-300) / 0.12)' }}>
+                      <span className="w-1.5 h-1.5 rounded-full bg-success-100"></span>
+                      {m}
+                    </span>
+                  )) : <span className="text-[12px] text-text-400 italic">None</span>}
+                </div>
+              </div>
+
+              {/* Allowed projects */}
+              <div className="mb-8">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="text-text-100 text-[13.5px] font-medium">Allowed projects</div>
+                  <button className="text-[12px] text-text-400 hover:text-text-200 flex items-center gap-1 px-2 py-1 rounded hover:bg-bg-200">
+                    <IconPlus size={11} /> Add project
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {active.projects.length > 0 ? active.projects.map(p => (
+                    <span key={p} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12.5px] text-text-200" style={{ background: 'hsl(var(--bg-200))', border: '1px solid hsl(var(--border-300) / 0.12)' }}>
+                      <IconBriefcase size={11} className="text-text-400" />
+                      {p}
+                    </span>
+                  )) : <span className="text-[12px] text-text-400 italic">All projects (无限制)</span>}
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      );
+    };
+
+    const PluginCard = ({ initial, color, name, author, desc, installs, rating, installed }) => (
+      <div className="rounded-xl p-4 transition hover:bg-bg-200/50 flex flex-col" style={{ background: 'hsl(var(--bg-200) / 0.35)', border: '1px solid hsl(var(--border-300) / 0.1)' }}>
+        <div className="flex items-start gap-3 mb-3">
+          <div className="w-10 h-10 rounded-md flex items-center justify-center text-[14px] font-semibold text-oncolor-100 shrink-0" style={{ background: color }}>
+            {initial}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-[14px] font-medium text-text-100 leading-tight truncate">{name}</div>
+            <div className="text-[11.5px] text-text-400 mt-0.5 truncate">by {author}</div>
+          </div>
+        </div>
+        <p className="text-[12.5px] text-text-300 leading-relaxed mb-3 flex-1">{desc}</p>
+        <div className="flex items-center justify-between">
+          <div className="text-[11px] text-text-400 flex items-center gap-2">
+            <span>★ {rating}</span>
+            <span className="text-text-400/40">·</span>
+            <span>{installs}</span>
+          </div>
+          {installed ? (
+            <button className="px-3 py-1 rounded-md text-[12px] font-medium flex items-center gap-1" style={{ background: 'hsl(var(--success-100) / 0.15)', color: 'hsl(var(--success-100))' }}>
+              <IconCheck size={11} strokeWidth={2.5} /> Installed
+            </button>
+          ) : (
+            <button className="px-3 py-1 rounded-md text-[12px] font-medium bg-text-100 text-bg-100 hover:opacity-90 transition">
+              Install
+            </button>
+          )}
+        </div>
+      </div>
+    );
+
+    const PluginsBody = () => {
+      const plugins = [
+        { initial: 'W', color: 'hsl(210 80% 55%)',   name: 'Web Research Pro',    author: 'Anthropic',  desc: '多源网页搜索 + 综合摘要。引用必标来源, 结论分高/中/推测三档。', installs: '12.4k installs', rating: '4.8', installed: true },
+        { initial: 'P', color: 'hsl(0 70% 55%)',     name: 'PDF Reader Pro',      author: 'Community', desc: '处理 100+ 页 PDF, 支持表格识别、OCR、参考文献抽取。', installs: '8.2k installs',  rating: '4.7', installed: true },
+        { initial: 'X', color: 'hsl(125 50% 40%)',   name: 'Excel Wizard',        author: 'Microsoft', desc: '复杂公式生成 + 数据透视表 + 自动条件格式。源数据修改自动重算。', installs: '15.1k installs', rating: '4.9' },
+        { initial: 'C', color: 'hsl(var(--brand-100))', name: 'Code Refactor',       author: 'Anthropic',  desc: '重构建议 + 单元测试生成。支持 TypeScript / Python / Rust / Go。', installs: '6.8k installs',  rating: '4.6' },
+        { initial: 'S', color: 'hsl(280 60% 55%)',   name: 'Slack Companion',     author: 'Slack Inc.', desc: '跨频道消息总结、未读智能分类、回复草稿建议。', installs: '9.3k installs',  rating: '4.5' },
+        { initial: 'L', color: 'hsl(245 60% 55%)',   name: 'Linear PM',           author: 'Linear',    desc: '任务管理双向同步, 自动从对话生成 issue 草稿。', installs: '4.1k installs',  rating: '4.7' },
+        { initial: 'F', color: 'hsl(335 75% 55%)',   name: 'Figma Bridge',        author: 'Figma',     desc: '设计 token 同步, 选区截图标注, 自动生成 React 组件骨架。', installs: '3.5k installs',  rating: '4.4' },
+        { initial: 'N', color: 'hsl(0 0% 25%)',      name: 'Notion Sync',         author: 'Notion',    desc: '会议纪要自动归档到 Notion, 跨 page 智能链接。', installs: '7.7k installs',  rating: '4.6' },
+        { initial: 'G', color: 'hsl(125 60% 45%)',   name: 'Calendar Genius',     author: 'Google',    desc: '智能日程安排, 冲突识别, 时区自动转换, 自动会议纪要预订。', installs: '11.2k installs', rating: '4.8' },
+      ];
+      return (
+        <div className="flex-1 overflow-y-auto bg-bg-100">
+          <div className="px-12 pt-10 pb-3 flex items-end gap-4">
+            <div className="flex-1">
+              <h1 className="font-serif text-[28px] font-normal text-text-100 leading-none mb-2">Browse plugins</h1>
+              <p className="text-[13.5px] text-text-300">Add pre-built knowledge for your field.</p>
+            </div>
+            <button className="p-2 rounded-md hover:bg-bg-200 text-text-300 hover:text-text-100 transition" title="排序"><IconSortLines size={16} /></button>
+            <button className="p-2 rounded-md hover:bg-bg-200 text-text-300 hover:text-text-100 transition" title="搜索"><IconSearch size={16} /></button>
+          </div>
+
+          {/* Category chips */}
+          <div className="px-12 pt-6 pb-2 flex items-center gap-2 flex-wrap">
+            {['All', 'Productivity', 'Research', 'Development', 'Communication', 'Design', 'Data'].map((c, i) => (
+              <button key={c}
+                className={
+                  'px-3 py-1 rounded-full text-[12.5px] transition ' +
+                  (i === 0 ? 'bg-bg-000 text-text-100' : 'text-text-300 hover:text-text-100 hover:bg-bg-200')
+                }
+                style={i === 0 ? { border: '1px solid hsl(var(--border-300) / 0.2)' } : { border: '1px solid hsl(var(--border-300) / 0.1)' }}>
+                {c}
+              </button>
+            ))}
+          </div>
+
+          <div className="px-12 pt-4 grid grid-cols-3 gap-3 pb-12">
+            {plugins.map((p) => <PluginCard key={p.name} {...p} />)}
+          </div>
+        </div>
+      );
+    };
+
+    const CustomizeView = ({ onBack }) => {
+      const [tab, setTab] = useState('home');
+      return (
+        <div className="flex-1 flex flex-col min-w-0 bg-bg-100 overflow-hidden">
+          <header className="h-14 flex items-center gap-3 px-5 shrink-0" style={{ borderBottom: '1px solid hsl(var(--border-300) / 0.12)' }}>
+            <button onClick={onBack} className="p-1.5 rounded-md hover:bg-bg-200 text-text-300 hover:text-text-100 transition" title="返回">
+              <IconArrowLeft size={16} />
+            </button>
+            <span className="text-[14.5px] font-medium text-text-100">Customize</span>
+          </header>
+          <div className="flex flex-1 min-h-0">
+            <CustomizeNav tab={tab} setTab={setTab} />
+            {tab === 'home' && <CustomizeHome setTab={setTab} />}
+            {tab === 'skills' && <SkillsBody />}
+            {tab === 'agents' && <AgentsBody />}
+            {tab === 'plugins' && <PluginsBody />}
+          </div>
+        </div>
+      );
+    };
+
+    /* ============================================================
+       Settings View (Image #15, #16)
+       ============================================================ */
+    const SettingsRow = ({ label, children }) => (
+      <div className="settings-row">
+        <div className="label">{label}</div>
+        {children}
+      </div>
+    );
+
+    const AppearanceToggle = ({ pref, setPref }) => {
+      const opts = [
+        { id: 'system', icon: <IconDesktop size={14} />, title: '跟随系统' },
+        { id: 'light',  icon: <IconSun size={14} />,     title: '明亮' },
+        { id: 'dark',   icon: <IconMoon size={14} />,    title: '暗黑' },
+      ];
+      return (
+        <div className="flex items-center gap-0.5 p-0.5 rounded-md" style={{ background: 'hsl(var(--bg-200))', border: '1px solid hsl(var(--border-300) / 0.12)' }}>
+          {opts.map((o) => (
+            <button
+              key={o.id}
+              onClick={() => setPref(o.id)}
+              title={o.title}
+              className={
+                'flex items-center justify-center w-8 h-7 rounded transition ' +
+                (pref === o.id ? 'bg-bg-000 text-text-100 shadow-sm' : 'text-text-300 hover:text-text-100')
+              }
+            >
+              {o.icon}
+            </button>
+          ))}
+        </div>
+      );
+    };
+
+    const SettingsNav = () => (
+      <nav className="w-[240px] shrink-0 p-3" style={{ borderRight: '1px solid hsl(var(--border-300) / 0.12)' }}>
+        <button className="w-full flex items-center px-3 py-2 rounded-md text-[14px] bg-bg-000 text-text-100 font-medium">
+          General
+        </button>
+      </nav>
+    );
+
+    const SettingsView = ({ onBack, pref, setPref }) => (
+      <div className="flex-1 flex flex-col min-w-0 bg-bg-100 overflow-hidden">
+        <header className="h-14 flex items-center gap-3 px-5 shrink-0" style={{ borderBottom: '1px solid hsl(var(--border-300) / 0.12)' }}>
+          <button onClick={onBack} className="p-1.5 rounded-md hover:bg-bg-200 text-text-300 hover:text-text-100 transition" title="返回">
+            <IconArrowLeft size={16} />
+          </button>
+          <span className="text-[14.5px] font-medium text-text-100">Settings</span>
+        </header>
+        <div className="flex flex-1 min-h-0">
+          <SettingsNav />
+          <div className="flex-1 overflow-y-auto px-10 py-10">
+            <div className="max-w-[760px]">
+              {/* Profile */}
+              <section className="mb-12">
+                <h2 className="text-[18px] font-semibold text-text-100 mb-2">Profile</h2>
+                <div className="mt-4">
+                  <SettingsRow label="Avatar">
+                    <div className="w-9 h-9 rounded-full flex items-center justify-center text-[12px] font-semibold" style={{ background: 'hsl(var(--bg-300))', color: 'hsl(var(--text-100))' }}>JY</div>
+                  </SettingsRow>
+                  <SettingsRow label="Full name">
+                    <input className="settings-input" defaultValue="Jay Yang" />
+                  </SettingsRow>
+                  <SettingsRow label="What should Agent Studio call you?">
+                    <input className="settings-input" defaultValue="Jay Yang" />
+                  </SettingsRow>
+                  <SettingsRow label="What best describes your work?">
+                    <button className="settings-input flex items-center gap-2 hover:bg-bg-300/60 transition">
+                      <span className="text-text-400 flex-1 text-left">Select</span>
+                      <IconChevron size={12} className="text-text-400" />
+                    </button>
+                  </SettingsRow>
+                </div>
+                <div className="pt-8">
+                  <div className="text-[14px] text-text-100 mb-1.5">Instructions for Agent Studio</div>
+                  <p className="text-[12.5px] text-text-400 mb-3 leading-relaxed">
+                    Agent Studio will keep these in mind across chats and Cowork within{' '}
+                    <a href="#" className="text-text-200 underline underline-offset-2 decoration-text-400/50 hover:text-text-100">Anthropic&apos;s guidelines</a>.{' '}
+                    <a href="#" className="text-text-200 underline underline-offset-2 decoration-text-400/50 hover:text-text-100">Learn more</a>
+                  </p>
+                  <textarea rows={3}
+                    placeholder="e.g. ask clarifying questions before giving detailed answers"
+                    className="w-full px-3 py-2.5 rounded-md text-[14px] text-text-100 resize-none focus:outline-none placeholder:text-text-400 transition focus:ring-2 focus:ring-accent-100/30"
+                    style={{ background: 'hsl(var(--bg-200))', border: '1px solid hsl(var(--border-300) / 0.12)' }} />
+                </div>
+              </section>
+
+              {/* Appearance */}
+              <section>
+                <h2 className="text-[18px] font-semibold text-text-100 mb-2">Appearance</h2>
+                <div className="mt-4">
+                  <SettingsRow label="Theme">
+                    <AppearanceToggle pref={pref} setPref={setPref} />
+                  </SettingsRow>
+                </div>
+              </section>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+
+    /* ============================================================
+       Scheduled View (Image #25 / #28) + New task modal (Image #27)
+       ============================================================ */
+    const ScheduledTaskCard = ({ title, description, frequency, onClick }) => (
+      <button onClick={onClick} className="text-left rounded-xl p-4 transition hover:bg-bg-200/60" style={{ background: 'hsl(var(--bg-200) / 0.3)', border: '1px solid hsl(var(--border-300) / 0.1)' }}>
+        <div className="text-[14.5px] font-medium text-text-100 mb-1 truncate">{title}</div>
+        <div className="text-[12.5px] text-text-400 mb-3 line-clamp-2 leading-relaxed">{description}</div>
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11.5px]"
+          style={{ background: 'hsl(var(--success-100) / 0.15)', color: 'hsl(var(--success-100))' }}>
+          <IconClock size={11} />
+          {frequency}
+        </span>
+      </button>
+    );
+
+    const FrequencyDropdown = ({ value, onChange, onClose }) => {
+      const opts = ['Manual', 'Hourly', 'Daily', 'Weekdays', 'Weekly'];
+      useEffect(() => {
+        const onDoc = (e) => {
+          if (!e.target.closest('.freq-popover')) onClose();
+        };
+        document.addEventListener('mousedown', onDoc);
+        return () => document.removeEventListener('mousedown', onDoc);
+      }, []);
+      return (
+        <div className="freq-popover absolute top-full left-0 mt-1.5 menu-popup" style={{ minWidth: 200 }}>
+          {opts.map((o) => (
+            <button key={o} onClick={() => { onChange(o); onClose(); }}
+              className="w-full flex items-center gap-2 px-2.5 py-2 rounded-md text-[13.5px] text-text-200 hover:text-text-100 hover:bg-bg-200/70 transition">
+              <span className="flex-1 text-left">{o}</span>
+              {value === o && <IconCheck size={13} className="text-accent-100" strokeWidth={2.5} />}
+            </button>
+          ))}
+        </div>
+      );
+    };
+
+    const NewTaskModal = ({ onClose, onSave }) => {
+      const [name, setName] = useState('daily-work');
+      const [description, setDescription] = useState('ugreen daily work');
+      const [prompt, setPrompt] = useState('use fo cli work');
+      const [frequency, setFrequency] = useState('Daily');
+      const [time, setTime] = useState('09:00');
+      const [freqOpen, setFreqOpen] = useState(false);
+      const canSave = name.trim() && description.trim();
+
+      const handleSave = () => {
+        if (!canSave) return;
+        const cronText =
+          frequency === 'Daily'    ? `Every day at ~${time}` :
+          frequency === 'Hourly'   ? `Every hour` :
+          frequency === 'Weekdays' ? `Weekdays at ${time}` :
+          frequency === 'Weekly'   ? `Every Monday at ${time}` :
+          'Manual';
+        onSave({
+          title: name.charAt(0).toUpperCase() + name.slice(1).replace(/-/g, ' '),
+          description,
+          frequency: cronText,
+        });
+      };
+
+      return (
+        <div className="absolute inset-0 z-40 flex items-start justify-center pt-16 px-12 overflow-y-auto"
+          style={{ background: 'hsla(0,0%,0%,0.55)', backdropFilter: 'blur(2px)' }}
+          onClick={onClose}>
+          <div className="w-full max-w-[640px] rounded-2xl p-7"
+            onClick={(e) => e.stopPropagation()}
+            style={{ background: 'hsl(var(--bg-100))', border: '1px solid hsl(var(--border-300) / 0.18)', boxShadow: '0 30px 80px -20px hsla(0,0%,0%,0.7)' }}>
+            <div className="flex items-start justify-between mb-6">
+              <h2 className="text-[19px] font-semibold text-text-100">Create scheduled task</h2>
+              <button onClick={onClose} className="p-1 rounded hover:bg-bg-200 text-text-400 hover:text-text-100">
+                <IconX size={16} />
+              </button>
+            </div>
+
+            {/* Name */}
+            <div className="mb-5">
+              <label className="block text-[13px] text-text-200 mb-1.5">
+                Name <span className="text-danger-100">*</span>
+              </label>
+              <input type="text" value={name} onChange={(e) => setName(e.target.value)}
+                className="w-full px-3 py-2 rounded-md text-[14px] text-text-100 placeholder:text-text-400 focus:outline-none focus:ring-2 focus:ring-accent-100/30"
+                style={{ background: 'hsl(var(--bg-200))', border: '1px solid hsl(var(--border-300) / 0.12)' }} />
+            </div>
+
+            {/* Description */}
+            <div className="mb-5">
+              <label className="block text-[13px] text-text-200 mb-1.5">
+                Description <span className="text-danger-100">*</span>
+              </label>
+              <input type="text" value={description} onChange={(e) => setDescription(e.target.value)}
+                className="w-full px-3 py-2 rounded-md text-[14px] text-text-100 placeholder:text-text-400 focus:outline-none focus:ring-2 focus:ring-accent-100/30"
+                style={{ background: 'hsl(var(--bg-200))', border: '1px solid hsl(var(--border-300) / 0.12)' }} />
+            </div>
+
+            {/* Prompt body */}
+            <div className="rounded-xl mb-6" style={{ background: 'hsl(var(--bg-200) / 0.5)', border: '1px solid hsl(var(--border-300) / 0.12)' }}>
+              <textarea rows={4} value={prompt} onChange={(e) => setPrompt(e.target.value)}
+                className="w-full px-4 pt-3 pb-2 bg-transparent text-[14px] text-text-100 resize-none focus:outline-none placeholder:text-text-400" />
+              <div className="flex items-center gap-2 px-3 pb-3">
+                <button className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[12.5px] text-text-300 hover:text-text-100 hover:bg-bg-300 transition">
+                  <IconBriefcase size={13} /> Work in a project <IconChevron size={11} />
+                </button>
+                <button className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[12.5px] text-text-300 hover:text-text-100 hover:bg-bg-300 transition">
+                  <IconHand size={13} /> Ask <IconChevron size={11} />
+                </button>
+                <div className="flex-1"></div>
+                <button className="flex items-center gap-1 px-2 py-1 rounded-md text-[12.5px] text-text-300 hover:text-text-100 hover:bg-bg-300 transition">
+                  Default model <IconChevron size={11} />
+                </button>
+              </div>
+            </div>
+
+            {/* Frequency */}
+            <div className="mb-2">
+              <label className="block text-[13px] text-text-200 mb-1.5">Frequency</label>
+              <div className="flex items-center gap-2">
+                <div className="relative">
+                  <button onClick={() => setFreqOpen(!freqOpen)}
+                    className="flex items-center gap-2 px-3 py-2 rounded-md text-[14px] text-text-100 transition hover:bg-bg-300"
+                    style={{ background: 'hsl(var(--bg-200))', border: '1px solid hsl(var(--border-300) / 0.12)', minWidth: 130 }}>
+                    <span className="flex-1 text-left">{frequency}</span>
+                    <IconChevron size={12} className="text-text-400" />
+                  </button>
+                  {freqOpen && (
+                    <FrequencyDropdown value={frequency} onChange={setFrequency} onClose={() => setFreqOpen(false)} />
+                  )}
+                </div>
+                <input type="text" value={time} onChange={(e) => setTime(e.target.value)}
+                  className="px-3 py-2 rounded-md text-[14px] text-text-100 focus:outline-none focus:ring-2 focus:ring-accent-100/30"
+                  style={{ background: 'hsl(var(--bg-200))', border: '1px solid hsl(var(--border-300) / 0.12)', width: 90 }} />
+              </div>
+              <p className="text-[11.5px] text-text-400 mt-2 leading-relaxed">
+                Add a randomized delay of several minutes for server performance.
+              </p>
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-end gap-2 mt-6">
+              <button onClick={onClose}
+                className="px-4 py-2 text-[13.5px] text-text-200 hover:bg-bg-200 rounded-md transition">
+                Cancel
+              </button>
+              <button onClick={handleSave} disabled={!canSave}
+                className="px-4 py-2 rounded-md bg-text-100 text-bg-100 text-[13.5px] font-medium hover:opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    const ScheduledView = ({ onTaskClick, onOpenTask }) => {
+      const [keepAwake, setKeepAwake] = useState(false);
+      const [modalOpen, setModalOpen] = useState(false);
+      const [tasks, setTasks] = useState([
+        { id: 'daily-brief', title: 'Daily brief',                  description: 'Generate a morning briefing with calendar + inbox highlights.', frequency: 'Every day at ~9:00',  instructions: 'Pull today\'s calendar + unread Gmail + Slack DMs, summarize top 3 priorities.' },
+        { id: 'weekly',      title: 'Weekly review',                description: 'Summarize last week\'s progress, blockers, and plan next week.', frequency: 'Every Monday at 9:00', instructions: '查看上周完成的所有 task, 标记 blocker, 起草下周计划。' },
+        { id: 'inactive',    title: 'Identify inactive projects',   description: 'Scan ~/Workspace, flag projects with no commits in 30 days.',   frequency: 'Every day at ~9:00',  instructions: 'cd ~/Workspace && for d in */; do (cd $d && git log -1 --since="30 days ago" --format="%cd") done' },
+        { id: 'inbox',       title: 'Inbox triage',                 description: 'Classify and draft replies for unread mail in Gmail.',          frequency: 'Weekdays at 18:00',    instructions: '把 inbox 邮件分类成 Reply / Forward / Archive 三档, 起草回复草稿。' },
+        { id: 'digest',      title: 'Sunday digest · ugreen-ai',    description: 'Pull weekly metrics and ship summary to Notion.',               frequency: 'Every Sunday at 21:00', instructions: 'Pull weekly product metrics from analytics, ship summary to Notion page.' },
+      ]);
+
+      const addTask = (t) => {
+        setTasks([{ id: 'new-' + Date.now(), ...t }, ...tasks]);
+        setModalOpen(false);
+      };
+
+      return (
+        <main className="flex-1 flex flex-col min-w-0 bg-bg-100 overflow-y-auto relative">
+          <div className="px-12 pt-12 pb-3 flex items-start gap-4">
+            <div className="flex-1">
+              <h1 className="font-serif text-[32px] font-normal text-text-100 leading-none mb-3">Scheduled tasks</h1>
+              <p className="text-[13.5px] text-text-300 leading-relaxed max-w-[680px]">
+                Run tasks on a schedule or whenever you need them. Type <code className="inline">/schedule</code> in any existing task to set one up.
+              </p>
+            </div>
+            <div className="flex items-center gap-1 mt-2 shrink-0">
+              <button className="p-2 rounded-md hover:bg-bg-200 text-text-300 hover:text-text-100 transition" title="排序"><IconSortLines size={16} /></button>
+              <button className="p-2 rounded-md hover:bg-bg-200 text-text-300 hover:text-text-100 transition" title="搜索"><IconSearch size={16} /></button>
+              <button onClick={() => setModalOpen(true)}
+                className="ml-1 px-4 py-2 rounded-lg text-[13.5px] font-medium bg-text-100 text-bg-100 hover:opacity-90 transition flex items-center gap-1.5">
+                <IconPlus size={13} strokeWidth={2.2} /> New task <IconChevron size={11} />
+              </button>
+            </div>
+          </div>
+
+          {/* Keep awake banner */}
+          <div className="px-12 pt-6 pb-2">
+            <div className="flex items-center gap-3 px-4 py-3 rounded-xl" style={{ background: 'hsl(var(--bg-200) / 0.5)', border: '1px solid hsl(var(--border-300) / 0.12)' }}>
+              <IconInfo size={16} className="text-text-300 shrink-0" />
+              <span className="flex-1 text-[13.5px] text-text-200">Scheduled tasks only run while your computer is awake.</span>
+              <div className="flex items-center gap-2.5">
+                <IconSun size={14} className="text-text-300" />
+                <span className="text-[12.5px] text-text-300">Keep awake</span>
+                <ToggleSwitch on={keepAwake} onChange={setKeepAwake} />
+              </div>
+            </div>
+          </div>
+
+          {/* Scheduled tasks grid */}
+          <div className="px-12 pt-6 grid grid-cols-3 gap-3 pb-8">
+            {tasks.map((t) => (
+              <ScheduledTaskCard key={t.id} title={t.title} description={t.description} frequency={t.frequency}
+                onClick={() => onOpenTask?.(t)} />
+            ))}
+          </div>
+
+          {/* More ideas */}
+          <div className="px-12 pb-12 flex flex-col items-center">
+            <div className="text-[12.5px] text-text-400 mb-3">More ideas</div>
+            <div className="flex items-center gap-3">
+              <button onClick={() => setModalOpen(true)}
+                className="flex items-center gap-2 px-4 py-2 rounded-full text-[13px] text-text-200 hover:text-text-100 transition"
+                style={{ background: 'hsl(var(--bg-200) / 0.5)', border: '1px solid hsl(var(--border-300) / 0.15)' }}>
+                <IconCoffee size={14} /> Daily brief
+              </button>
+              <button onClick={() => setModalOpen(true)}
+                className="flex items-center gap-2 px-4 py-2 rounded-full text-[13px] text-text-200 hover:text-text-100 transition"
+                style={{ background: 'hsl(var(--bg-200) / 0.5)', border: '1px solid hsl(var(--border-300) / 0.15)' }}>
+                <IconTimeline size={14} /> Weekly review
+              </button>
+            </div>
+          </div>
+
+          {modalOpen && <NewTaskModal onClose={() => setModalOpen(false)} onSave={addTask} />}
+        </main>
+      );
+    };
+
+    /* Scheduled detail (Image #32) */
+    const ScheduledDetailView = ({ task, onBack }) => {
+      const [active, setActive] = useState(true);
+      if (!task) return null;
+      return (
+        <main className="flex-1 flex flex-col min-w-0 bg-bg-100 overflow-y-auto">
+          <div className="px-12 pt-10 pb-3">
+            <button onClick={onBack} className="flex items-center gap-1.5 text-[13.5px] text-text-300 hover:text-text-100 mb-8 transition">
+              <IconChevron size={12} className="rotate-90" />
+              All scheduled tasks
+            </button>
+
+            <div className="flex items-start gap-3 mb-3">
+              <h1 className="font-serif text-[36px] font-normal text-text-100 leading-none flex-1">{task.title}</h1>
+              <div className="flex items-center gap-1 mt-2">
+                <button className="p-2 rounded-md hover:bg-bg-200 text-text-300 hover:text-text-100 transition" title="编辑">
+                  <IconPencil size={15} />
+                </button>
+                <button className="p-2 rounded-md hover:bg-bg-200 text-text-300 hover:text-text-100 transition" title="删除">
+                  <IconTrash size={15} />
+                </button>
+                <button className="ml-1 px-4 py-2 rounded-lg text-[13.5px] font-medium bg-text-100 text-bg-100 hover:opacity-90 transition flex items-center gap-1.5">
+                  <IconPlay size={11} /> Run now
+                </button>
+              </div>
+            </div>
+
+            <p className="text-[14px] text-text-300 mb-5">{task.description}</p>
+
+            <div className="flex items-center gap-3">
+              <ToggleSwitch on={active} onChange={setActive} />
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11.5px]"
+                style={{ background: 'hsl(var(--success-100) / 0.15)', color: 'hsl(var(--success-100))' }}>
+                <IconClock size={11} /> Active
+              </span>
+              <span className="text-[13px] text-text-300">Next run: tomorrow at ~9:00</span>
+            </div>
+          </div>
+
+          <div className="px-12 pt-6 mt-2" style={{ borderTop: '1px solid hsl(var(--border-300) / 0.1)' }}>
+            <div className="grid grid-cols-2 gap-12 max-w-[1100px] py-6">
+              <div></div>
+              <div className="flex flex-col gap-10">
+                <section>
+                  <div className="text-[14px] text-text-100 font-medium mb-2">Instructions</div>
+                  <p className="text-[14px] text-text-300 leading-relaxed">{task.instructions || task.description}</p>
+                </section>
+                <section>
+                  <div className="text-[14px] text-text-100 font-medium mb-2">Repeats</div>
+                  <p className="text-[14px] text-text-100 font-medium">{task.frequency}</p>
+                </section>
+                <section>
+                  <div className="text-[14px] text-text-100 font-medium mb-2 flex items-center gap-1.5">
+                    Always allowed <IconInfo size={11} className="text-text-400" />
+                  </div>
+                  <p className="text-[13.5px] text-text-400 leading-relaxed">Approvals you grant during a run appear here.</p>
+                </section>
+              </div>
+            </div>
+          </div>
+        </main>
+      );
+    };
+
+    /* ============================================================
+       PreviewPane (Image #34 / #35)
+       - 滑入动画 (slide-in from right)
+       - 鼠标 hover 左边缘 → 白条 (resize handle)
+       - 拖拽 resize, 360 ~ 720 px
+       - 点 X 关闭
+       ============================================================ */
+    const PPTCoverSlide = () => (
+      <div className="rounded-md p-7 relative overflow-hidden" style={{ background: '#0A0E1A', aspectRatio: '16 / 10', minHeight: 280 }}>
+        <div className="absolute -top-8 -right-8 w-40 h-40 rounded-full" style={{ background: 'radial-gradient(circle, #1A6A52 0%, transparent 70%)' }}></div>
+        <div className="absolute bottom-8 right-16 w-28 h-28 rounded-full" style={{ background: 'radial-gradient(circle, #142440 0%, transparent 70%)' }}></div>
+        <div className="text-[9px] tracking-[0.3em] mb-10" style={{ color: '#3CDCAB' }}>
+          I N T E R N A L &nbsp; R E P O R T &nbsp; · &nbsp; 2 0 2 6 . 0 5 . 1 5
+        </div>
+        <h1 className="text-[26px] font-bold mb-2 leading-tight" style={{ color: 'white' }}>项目清理报告</h1>
+        <p className="text-[11.5px] tracking-wide mb-3" style={{ color: '#5B8DF0' }}>Local Project Inactivity &amp; Dependency Cleanup</p>
+        <div className="h-px w-10 mb-3" style={{ background: '#3CDCAB' }}></div>
+        <p className="text-[9.5px] leading-relaxed mb-8 max-w-[60%]" style={{ color: 'rgba(255,255,255,0.7)' }}>
+          对本地工作目录下 19 个项目进行不活跃度扫描, 识别长期未维护的项目并清理可重建的依赖目录与构建产物。
+        </p>
+        <div className="grid grid-cols-3 gap-3 text-[8px]">
+          <div>
+            <div className="tracking-[0.25em] mb-1" style={{ color: '#3CDCAB' }}>扫 描 范 围</div>
+            <div className="font-mono leading-snug" style={{ color: 'white' }}>/Users/yangjie.ugreen/<br/>webCode</div>
+          </div>
+          <div>
+            <div className="tracking-[0.25em] mb-1" style={{ color: '#3CDCAB' }}>不 活 跃 阈 值</div>
+            <div style={{ color: 'white' }}>90 天无文件修改</div>
+          </div>
+          <div>
+            <div className="tracking-[0.25em] mb-1" style={{ color: '#3CDCAB' }}>生 成 日 期</div>
+            <div style={{ color: 'white' }}>2026 年 05 月 15 日</div>
+          </div>
+        </div>
+        <div className="absolute bottom-3 left-7 right-7 flex items-baseline justify-between text-[7px]" style={{ color: 'rgba(255,255,255,0.4)' }}>
+          <span className="font-mono tracking-[0.25em]">P R O J E C T &nbsp; C L E A N U P &nbsp; R E P O R T &nbsp; · &nbsp; 2 0 2 6 . 0 5 . 1 5</span>
+          <span className="font-mono">01 / 07</span>
+        </div>
+      </div>
+    );
+
+    const PPTSummarySlide = () => (
+      <div className="rounded-md p-7 relative" style={{ background: '#0A0E1A', aspectRatio: '16 / 10', minHeight: 280 }}>
+        <div className="flex items-center gap-3 mb-1 text-[8.5px] tracking-[0.3em]" style={{ color: '#3CDCAB' }}>
+          <span style={{ borderLeft: '2px solid #3CDCAB', paddingLeft: 5 }}>0 1</span>
+          <span style={{ opacity: 0.7 }}>·</span>
+          <span>E X E C U T I V E &nbsp; S U M M A R Y</span>
+        </div>
+        <h2 className="text-[18px] font-bold mb-5 leading-none" style={{ color: 'white' }}>执行摘要</h2>
+        <div className="grid grid-cols-4 gap-2 mb-5">
+          {[
+            { label: '项 目 总 数',    value: '19',  sub: '扫描覆盖',          color: '#3CDCAB' },
+            { label: '不 活 跃 项 目', value: '7',   sub: '≥ 90 天未更新',     color: '#FFB347' },
+            { label: '已 清 理 目 录', value: '17',  sub: 'node_modules / .next', color: '#5B8DF0' },
+            { label: 'GB 释 放 空 间', value: '4.3', sub: '可重建恢复',         color: '#B47BFF' },
+          ].map((c, i) => (
+            <div key={i} className="px-2 pt-2 pb-1.5" style={{ borderTop: `1.5px solid ${c.color}`, background: 'rgba(255,255,255,0.02)' }}>
+              <div className="text-[6.5px] tracking-[0.2em] mb-1" style={{ color: 'rgba(255,255,255,0.55)' }}>{c.label}</div>
+              <div className="text-[20px] font-bold leading-none mb-0.5" style={{ color: c.color }}>{c.value}</div>
+              <div className="text-[7px]" style={{ color: 'rgba(255,255,255,0.5)' }}>{c.sub}</div>
+            </div>
+          ))}
+        </div>
+        <div className="text-[8.5px] tracking-[0.25em] mb-2" style={{ color: '#3CDCAB' }}>关 键 发 现</div>
+        <div className="grid grid-cols-3 gap-2">
+          {[
+            { text: 'mcp-servers / xeno 闲置超 8 个月', sub: '最久未活动项目' },
+            { text: 'agent-ui-projects 释放 2.4 GB',   sub: '占总清理量 55%' },
+            { text: '所有内容均可一键恢复',              sub: '零数据丢失风险' },
+          ].map((f, i) => (
+            <div key={i} className="px-2 py-1.5" style={{ background: 'rgba(255,255,255,0.03)', borderLeft: '1.5px solid #3CDCAB' }}>
+              <div className="text-[8.5px] font-medium leading-snug" style={{ color: 'white' }}>{f.text}</div>
+              <div className="text-[7px] mt-0.5" style={{ color: 'rgba(255,255,255,0.5)' }}>{f.sub}</div>
+            </div>
+          ))}
+        </div>
+        <div className="absolute bottom-3 left-7 right-7 flex items-baseline justify-between text-[7px]" style={{ color: 'rgba(255,255,255,0.4)' }}>
+          <span className="font-mono tracking-[0.25em]">P R O J E C T &nbsp; C L E A N U P &nbsp; R E P O R T &nbsp; · &nbsp; 2 0 2 6 . 0 5 . 1 5</span>
+          <span className="font-mono">02 / 07</span>
+        </div>
+      </div>
+    );
+
+    const MDPreview = ({ filename }) => (
+      <div className="rounded-md p-6 font-mono text-[12.5px] leading-relaxed" style={{ background: 'hsl(var(--bg-200) / 0.6)', border: '1px solid hsl(var(--border-300) / 0.08)' }}>
+        <div className="text-text-100 mb-4 text-[15px] font-serif"># {filename.replace('.md', '')}</div>
+        <p className="text-text-300 mb-3">本任务对本地工作目录 <code className="inline">~/Workspace</code> 进行不活跃度扫描, 找出 ≥ 30 天没有 git commit 的项目。</p>
+        <p className="text-text-300 mb-3">## 扫描配置</p>
+        <p className="text-text-400">- 扫描路径: <span className="text-text-200">~/Workspace</span></p>
+        <p className="text-text-400">- 不活跃阈值: <span className="text-text-200">30 days</span></p>
+        <p className="text-text-400">- 沉睡阈值: <span className="text-text-200">90 days</span></p>
+        <p className="text-text-300 mb-3 mt-4">## 结果摘要</p>
+        <p className="text-text-300">共扫描 <span className="text-text-100 font-bold">14</span> 个项目, 标记 <span className="text-text-100 font-bold">7</span> 个不活跃。</p>
+      </div>
+    );
+
+    const XlsxPreview = () => (
+      <div className="rounded-md overflow-hidden font-mono text-[11.5px]" style={{ background: 'hsl(var(--bg-200) / 0.5)', border: '1px solid hsl(var(--border-300) / 0.1)' }}>
+        <div className="grid grid-cols-4 text-text-300 text-[10px] tracking-wider uppercase" style={{ background: 'hsl(125 40% 50% / 0.15)' }}>
+          <div className="px-3 py-2">Project</div>
+          <div className="px-3 py-2">Last commit</div>
+          <div className="px-3 py-2">Days idle</div>
+          <div className="px-3 py-2">Status</div>
+        </div>
+        {[
+          { p: 'huashu-design', d: '2025-05-13', i: 2, s: 'active', sc: '#3CDCAB' },
+          { p: 'ugreen-ai', d: '2025-05-15', i: 0, s: 'active', sc: '#3CDCAB' },
+          { p: 'stuio', d: '2025-05-15', i: 0, s: 'active', sc: '#3CDCAB' },
+          { p: 'blog-posts-q2', d: '2025-03-29', i: 47, s: 'inactive', sc: '#FFB347' },
+          { p: 'design-tokens-lib', d: '2025-03-14', i: 62, s: 'inactive', sc: '#FFB347' },
+          { p: 'side-project-cron', d: '2024-12-10', i: 156, s: 'dormant', sc: '#FF6B6B' },
+        ].map((row, i) => (
+          <div key={i} className="grid grid-cols-4" style={{ borderTop: '1px solid hsl(var(--border-300) / 0.08)' }}>
+            <div className="px-3 py-2 text-text-100">{row.p}</div>
+            <div className="px-3 py-2 text-text-300">{row.d}</div>
+            <div className="px-3 py-2 text-text-200 font-bold">{row.i}</div>
+            <div className="px-3 py-2"><span className="px-2 py-0.5 rounded" style={{ background: row.sc + '26', color: row.sc }}>{row.s}</span></div>
+          </div>
+        ))}
+      </div>
+    );
+
+    const PreviewPane = ({ file, onClose }) => {
+      const [width, setWidth] = useState(520);
+      const [dragging, setDragging] = useState(false);
+      const MIN_W = 360, MAX_W = 720;
+
+      useEffect(() => {
+        if (!dragging) return;
+        const onMove = (e) => {
+          const w = window.innerWidth - e.clientX - 32;
+          const clamped = Math.max(MIN_W, Math.min(MAX_W, w));
+          setWidth(clamped);
+        };
+        const onUp = () => setDragging(false);
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
+        return () => {
+          document.removeEventListener('mousemove', onMove);
+          document.removeEventListener('mouseup', onUp);
+          document.body.style.cursor = '';
+          document.body.style.userSelect = '';
+        };
+      }, [dragging]);
+
+      const ext = file.type;
+      const isPPT = ext === 'pptx';
+      const isXLSX = ext === 'xlsx';
+      const isMD = ext === 'md';
+      const fileLabel =
+        isPPT ? 'PPTX' : isXLSX ? 'XLSX' : isMD ? 'Markdown' : ext.toUpperCase();
+      const baseName = file.name.replace(/\.(pptx|xlsx|md)$/, '').replace(/^Instructions · /, '');
+      const openerName = isPPT ? 'wpsoffice' : isXLSX ? 'wpsoffice' : 'VS Code';
+      const openerColor = isMD ? 'hsl(210 100% 55%)' : 'hsl(15 75% 55%)';
+      const openerLetter = isMD ? 'C' : 'W';
+
+      return (
+        <aside className="relative shrink-0 flex flex-col bg-bg-100 slide-in-right"
+          style={{ width, borderLeft: '1px solid hsl(var(--border-300) / 0.12)' }}>
+          <div
+            className={'resize-handle ' + (dragging ? 'resize-handle-active' : '')}
+            onMouseDown={(e) => { e.preventDefault(); setDragging(true); }}
+          />
+          <header className="h-12 px-4 flex items-center gap-3 shrink-0" style={{ borderBottom: '1px solid hsl(var(--border-300) / 0.1)' }}>
+            <div className="flex-1 min-w-0">
+              <span className="text-[13.5px] text-text-100 font-medium truncate">{baseName}</span>
+              <span className="text-text-400 mx-2 text-[12px]">·</span>
+              <span className="text-[12px] text-text-300">{fileLabel}</span>
+            </div>
+            <button className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] text-text-200 hover:text-text-100 hover:bg-bg-200 transition" style={{ border: '1px solid hsl(var(--border-300) / 0.15)' }}>
+              <span className="w-3.5 h-3.5 rounded-sm flex items-center justify-center text-[8.5px] font-bold text-oncolor-100" style={{ background: openerColor }}>{openerLetter}</span>
+              {openerName}
+              <IconChevron size={11} />
+            </button>
+            <button className="p-1.5 rounded-md hover:bg-bg-200 text-text-300 hover:text-text-100 transition" title="刷新">
+              <IconRefresh size={13} />
+            </button>
+            <button onClick={onClose} className="p-1.5 rounded-md hover:bg-bg-200 text-text-300 hover:text-text-100 transition" title="关闭">
+              <IconX size={14} />
+            </button>
+          </header>
+
+          <div className="flex-1 overflow-y-auto p-3 space-y-3">
+            {isPPT && (<><PPTCoverSlide /><PPTSummarySlide /></>)}
+            {isXLSX && <XlsxPreview />}
+            {isMD && <MDPreview filename={baseName} />}
+            {!isPPT && !isXLSX && !isMD && (
+              <div className="text-[13px] text-text-400 italic px-4 py-8 text-center">
+                [Preview for .{ext} not implemented in this mock]
+              </div>
+            )}
+          </div>
+        </aside>
+      );
+    };
+
+    /* ============================================================
+       App composition
+       ============================================================ */
+    const App = () => {
+      const { mode, pref, setPref } = useThemeMode();
+      const [view, setView] = useState('project-detail');
+      const [prevView, setPrevView] = useState('project-detail');
+      const [activeTaskId, setActiveTaskId] = useState(null);
+      const [activeProjectId, setActiveProjectId] = useState('jay');
+      const [activeScheduled, setActiveScheduled] = useState(null);
+      const [rightOpen, setRightOpen] = useState(true);
+      const [previewFile, setPreviewFile] = useState(null);
+
+      const taskLabels = {
+        identify: 'Identify inactive projects',
+        weekly: 'Weekly review',
+        newsched: 'New scheduled task',
+        newart: 'New live artifact',
+        casual: 'Casual conversation',
+        greeting: 'Chinese greeting conversation',
+        briefing: 'Daily briefing',
+      };
+      const projectLabels = {
+        jay: 'jay', huashu: 'huashu-design', ugreen: 'ugreen-ai 原型稿',
+        stuio: 'stuio', skills: 'claude-skills-pack',
+      };
+
+      const goTo = (v) => { if (view !== 'settings') setPrevView(view); setView(v); };
+      const handleNavClick = (v) => goTo(v);
+      const handleTaskClick = (id) => { setActiveTaskId(id); goTo('task'); };
+      const handleProjectClick = (id) => { setActiveProjectId(id); goTo('project-detail'); };
+      const handleSettingsClick = () => { setPrevView(view); setView('settings'); };
+      const handleBackFromSettings = () => setView(prevView || 'project-detail');
+
+      const inSettings = view === 'settings';
+      const inCustomize = view === 'customize';
+      const inFullscreen = inSettings || inCustomize;
+
+      return (
+        <div>
+          <div className="mac-window" style={{ width: 1480 }}>
+            <div className="mac-titlebar">
+              <TrafficLights />
+              {!inFullscreen && (
+                <div className="absolute inset-x-0 text-center text-[13px] text-text-300 pointer-events-none font-medium">Agent Studio</div>
+              )}
+            </div>
+
+            <div className="flex" style={{ height: 880 }}>
+              {!inFullscreen && (
+                <AppSidebar
+                  view={view}
+                  activeTaskId={activeTaskId}
+                  activeProjectId={activeProjectId}
+                  onNavClick={handleNavClick}
+                  onTaskClick={handleTaskClick}
+                  onProjectClick={handleProjectClick}
+                  onSettingsClick={handleSettingsClick}
+                />
+              )}
+
+              {view === 'new-task' && <NewTaskView />}
+              {view === 'task' && (
+                <TaskProgressView taskTitle={taskLabels[activeTaskId] || 'Task'} onToggleRight={() => setRightOpen(!rightOpen)} />
+              )}
+              {view === 'projects-list' && (
+                <ProjectsListView onProjectClick={handleProjectClick} onNewProject={() => alert('TODO: New project')} />
+              )}
+              {view === 'project-detail' && (
+                <ProjectDetailView projectName={projectLabels[activeProjectId]} />
+              )}
+              {view === 'scheduled' && (
+                <ScheduledView
+                  onTaskClick={handleTaskClick}
+                  onOpenTask={(t) => { setActiveScheduled(t); setPrevView('scheduled'); setView('scheduled-detail'); }}
+                />
+              )}
+              {view === 'scheduled-detail' && (
+                <ScheduledDetailView
+                  task={activeScheduled}
+                  onBack={() => setView('scheduled')}
+                />
+              )}
+              {view === 'customize' && (
+                <CustomizeView onBack={() => setView(prevView || 'project-detail')} />
+              )}
+              {view === 'settings' && (
+                <SettingsView onBack={handleBackFromSettings} pref={pref} setPref={setPref} />
+              )}
+
+              {view === 'task' && rightOpen && !previewFile && (
+                <TaskContextPanel onPreviewFile={setPreviewFile} />
+              )}
+              {view === 'task' && previewFile && (
+                <PreviewPane key={previewFile.name} file={previewFile} onClose={() => setPreviewFile(null)} />
+              )}
+              {view === 'project-detail' && rightOpen && <ProjectRightPanel />}
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>

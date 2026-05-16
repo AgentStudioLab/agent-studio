@@ -1,0 +1,59 @@
+/* ============================================================
+ * Anthropic Design System · Globals
+ * --------------------------------------
+ * 入口文件. 按顺序 @import 四件套, 再加上 reset / 滚动条 / 焦点环.
+ * ============================================================ */
+
+@import "./tokens.css";       /* 颜色 token (light/dark + media 兜底) */
+@import "./typography.css";   /* 字体家族 + @font-face + 字重 */
+@import "./theme.css";        /* @layer theme (尺寸/字号/圆角/动效/utility 别名) */
+
+/* ---- Base ---- */
+html, body {
+  font-family: var(--font-ui);
+  color: hsl(var(--text-100));
+  background: hsl(var(--bg-100));
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+/* ---- 3.11 滚动条 (Firefox + WebKit 双轨) ---- */
+* {
+  scrollbar-color: hsl(var(--border-300) / 0.35) transparent;
+  scrollbar-width: thin;
+}
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--border-300) / 0.35);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--border-300) / 0.55);
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* 局部需要完全隐藏滚动条时用 .u-hidden-scrollbar */
+.u-hidden-scrollbar {
+  scrollbar-width: none;
+}
+.u-hidden-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* ---- 焦点环 ---- */
+:focus-visible {
+  outline: 2px solid hsl(var(--accent-100));
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ---- 字体语义 utility ---- */
+.font-serif   { font-family: var(--font-ui-serif); }
+.font-display { font-family: var(--font-ui-serif); }
+.font-system  { font-family: var(--font-system); }

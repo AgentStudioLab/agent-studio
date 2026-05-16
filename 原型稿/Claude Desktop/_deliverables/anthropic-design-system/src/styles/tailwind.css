@@ -1,0 +1,3 @@
+/* Tailwind v4 入口 — 项目里 import 此文件即可 */
+@import "tailwindcss";
+@import "./globals.css";
