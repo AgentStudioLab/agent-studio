@@ -81,6 +81,8 @@ Frontend client lives in `src/lib/sidecar-client.ts`:
 
 7. **Styling MUST go through the 3-tier design token system.** Whenever you write component CSS, apply a Tailwind class for color/spacing/radius, or pick any style value — first consult the `design-tokens` skill. The chain is `src/styles/primitives/` → `src/styles/semantic/` → `src/styles/components/` → `src/styles/shadcn-alias.css` → Tailwind utility via `@theme inline` in `src/index.css`. Theme is single-axis (`data-mode="light|dark"`, no `data-theme`). Hardcoding hex / raw HSL anywhere in `src/components/` or `src/features/` is forbidden — those values must come from primitives.
 
+8. **反 AI slop（必守）：** ❌ 紫色渐变 / ❌ emoji 装饰 icon / ❌ 圆角左 border 色条 / ❌ SVG 画的头像。改用：单一 brand-100 橙色 / lucide-react inline SVG / InitialsAvatar 字母方块。code review 期间任一条违反 = block，不是 nit。Anthropic 视觉身份是克制。
+
 ## Skills
 
 Project skills live under `.claude/skills/`:
