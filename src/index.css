@@ -15,7 +15,12 @@
     --font-mono:    var(--font-family-mono);
     --font-heading: var(--font-family-serif);
 
-    /* Color utility 入口 — Tailwind 解析到 shadcn-alias.css 内 :root 上的 var */
+    /* Radius scale (--radius-sm/md/lg/...) is auto-discovered by Tailwind v4
+     * from primitives/radius.css — no inline mapping needed. Colors need this
+     * inline indirection because they route through shadcn-alias for theming. */
+
+    /* Color utility 入口 — Tailwind 解析到 shadcn-alias.css 内 :root 上的 var.
+     * chart-N tokens intentionally omitted; re-add when installing shadcn/chart. */
     --color-background:                  var(--background);
     --color-foreground:                  var(--foreground);
     --color-card:                        var(--card);
