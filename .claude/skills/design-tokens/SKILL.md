@@ -120,6 +120,8 @@ This is the most common cause of "the new component looks weird" — a token lef
 ❌ Raw HSL primitive in component: `style={{ color: 'hsl(15 54% 51%)' }}`
 ❌ Tailwind arbitrary value with raw color: `className="bg-[#C66E51]"`
 ❌ Skip semantic and reference primitive from components: `style={{ background: 'hsl(var(--color-orange-500))' }}` (use `--brand-100` or `--brand-200` instead)
+
+> **Narrow exception — categorical palette pickers.** When the **primitive scale itself IS the UI concept** (a user-pickable hue palette, like `InitialsAvatar`'s 7-hue selector, or any future "tag color" picker), referencing primitives directly (`hsl(var(--color-orange-500))`, etc.) is allowed. The test: would minting a semantic alias add real meaning, or just rename the primitive 1:1? If the latter, stay on the primitive. This exception is narrow — default to semantic.
 ❌ Add a new token without first searching existing ones (`grep -rn "stone-50\|bg-100" src/styles/`)
 ❌ Adding a primitive without a semantic alias on top — primitives without semantic meaning don't survive a refactor
 ❌ Adding a semantic token without dark-mode override block — even if same value, force explicit thought
