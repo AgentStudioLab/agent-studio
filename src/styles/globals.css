@@ -79,3 +79,10 @@ html, body {
 /* ---- Slow spin (BrandStar loading state) ---- */
 @keyframes spin-slow { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 .animate-spin-slow { animation: spin-slow 2s linear infinite; }
+
+/* ---- PreviewPane slide-in (right-side panel) ---- */
+@keyframes slide-in-pane {
+    from { transform: translateX(60px); opacity: 0; }
+    to   { transform: translateX(0);    opacity: 1; }
+}
+.animate-slide-in-pane { animation: slide-in-pane 0.28s cubic-bezier(0.4, 0, 0.2, 1); }
