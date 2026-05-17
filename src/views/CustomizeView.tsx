@@ -10,6 +10,7 @@ import {
   type CustomizeHomeAction,
 } from "@/features/customize/CustomizeHome";
 import { SkillsBody } from "@/features/customize/SkillsBody";
+import { AgentsBody } from "@/features/customize/AgentsBody";
 
 interface CustomizeViewProps {
   initialSection?: CustomizeNavSection;
@@ -45,11 +46,7 @@ export function CustomizeView({ initialSection = "home" }: CustomizeViewProps) {
             <CustomizeHome onSelectAction={handleHomeAction} />
           )}
           {section === "skills" && <SkillsBody />}
-          {section === "agents" && (
-            <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-              Agents subview coming in Task 11.
-            </div>
-          )}
+          {section === "agents" && <AgentsBody />}
           {section === "plugins" && (
             <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
               Plugins marketplace coming in Task 12.
