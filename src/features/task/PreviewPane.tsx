@@ -224,16 +224,17 @@ function SpreadsheetPreview({ content }: { content: string }) {
   );
 }
 
+const MOCK_SLIDES = [
+  { title: "扫描概览", subtitle: "5 个不活跃项目" },
+  { title: "Top 3", subtitle: "old-project-1 / old-project-2 / archive-x" },
+  { title: "建议", subtitle: "归档 4 个 · 删除 1 个" },
+];
+
 function PresentationPreview() {
   // Mock 3 dark slides — bg-300 in dark mode is near-black, giving a pptx-card feel.
-  const slides = [
-    { title: "扫描概览", subtitle: "5 个不活跃项目" },
-    { title: "Top 3", subtitle: "old-project-1 / old-project-2 / archive-x" },
-    { title: "建议", subtitle: "归档 4 个 · 删除 1 个" },
-  ];
   return (
     <div className="flex flex-col gap-4 p-6">
-      {slides.map((s, i) => (
+      {MOCK_SLIDES.map((s, i) => (
         <div
           key={`slide-${i}`}
           className="rounded-md p-8 text-[hsl(var(--always-white))]"

@@ -2,6 +2,7 @@ import { AppShell } from "@/app/AppShell";
 import { useAppShell } from "@/app/AppShellContext";
 import { TaskHeader } from "@/features/task/TaskHeader";
 import { TaskChatStream } from "@/features/task/TaskChatStream";
+import { TaskMessageInput } from "@/features/task/TaskMessageInput";
 import { TaskRightPanel } from "@/features/task/TaskRightPanel";
 import { PreviewPane } from "@/features/task/PreviewPane";
 import { inactiveProjectsTask } from "@/lib/mock/task";
@@ -26,10 +27,19 @@ export function TaskView() {
             title={inactiveProjectsTask.title}
             onMoveToProject={() => setView("project-detail")}
           />
-          <TaskChatStream
-            messages={inactiveProjectsTask.messages}
-            onOpenArtifact={handleOpenArtifact}
-          />
+          <div className="flex-1 overflow-y-auto">
+            <div className="mx-auto max-w-[760px] px-8 py-6">
+              <TaskChatStream
+                messages={inactiveProjectsTask.messages}
+                onOpenArtifact={handleOpenArtifact}
+              />
+            </div>
+          </div>
+          <div className="shrink-0 px-8 pb-6 pt-2">
+            <div className="mx-auto max-w-[760px]">
+              <TaskMessageInput />
+            </div>
+          </div>
         </>
       }
       aside={

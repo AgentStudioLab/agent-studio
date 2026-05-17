@@ -16,6 +16,7 @@ import type { MockPinnedItem, MockRecentItem } from "@/lib/mock/types";
 import { NavItem } from "@/features/sidebar/NavItem";
 import { PinnedItem } from "@/features/sidebar/PinnedItem";
 import { RecentItem } from "@/features/sidebar/RecentItem";
+import { UpdateCard } from "@/features/sidebar/UpdateCard";
 import { UserBar } from "@/features/sidebar/UserBar";
 
 interface SidebarProps {
@@ -117,7 +118,7 @@ export function Sidebar({ onCollapse }: SidebarProps) {
         {/* Pinned */}
         {pinned.length > 0 && (
           <div className="flex flex-col gap-0.5 px-2 pt-2">
-            <div className="px-2 pb-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            <div className="px-2 pb-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
               Pinned
             </div>
             {pinned.map((item) => (
@@ -134,7 +135,7 @@ export function Sidebar({ onCollapse }: SidebarProps) {
 
         {/* Recents */}
         <div className="mt-2 flex min-h-0 flex-1 flex-col px-2">
-          <div className="px-2 pb-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          <div className="px-2 pb-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
             Recents
           </div>
           <div className="flex flex-col gap-0.5 overflow-y-auto">
@@ -151,11 +152,11 @@ export function Sidebar({ onCollapse }: SidebarProps) {
         </div>
 
         {/* Footer */}
-        <div className="mt-2 flex flex-col gap-2 px-2 pb-2">
-          <div className="rounded-md bg-muted px-3 py-2 text-xs">
-            <div className="text-foreground">Relaunch to update</div>
-            <div className="text-muted-foreground">Version {APP_VERSION}</div>
-          </div>
+        <div
+          className="mt-2 flex flex-col gap-2 px-3 pb-3 pt-2"
+          style={{ borderTop: "1px solid hsl(var(--border-300) / 0.12)" }}
+        >
+          <UpdateCard version={`v${APP_VERSION}`} />
           <UserBar
             onSettings={() => setView("settings")}
             onLogout={() => console.log("logout")}

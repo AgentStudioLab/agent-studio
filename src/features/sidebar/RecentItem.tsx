@@ -33,7 +33,7 @@ export function RecentItem({
       <button
         type="button"
         onClick={onClick}
-        className="flex min-w-0 flex-1 items-center gap-2 text-left text-sm"
+        className="flex min-w-0 flex-1 items-center gap-2 text-left text-[13.5px]"
       >
         <span className="shrink-0">
           {item.kind === "task" && item.status ? (

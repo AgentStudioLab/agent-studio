@@ -16,9 +16,9 @@ export function ScheduledListView() {
     <AppShell
       main={
         <div className="flex h-full flex-col overflow-y-auto">
-          <header className="flex items-start justify-between gap-4 px-8 pt-10 pb-4">
+          <header className="flex items-start justify-between gap-4 px-12 pt-12 pb-4">
             <div>
-              <h1 className="font-serif text-4xl font-semibold text-foreground">Scheduled tasks</h1>
+              <h1 className="font-serif text-[32px] font-normal leading-none text-foreground">Scheduled tasks</h1>
               <p className="mt-2 max-w-xl text-sm text-muted-foreground">
                 Run tasks on a schedule or whenever you need them. Type{" "}
                 <code className="rounded-sm bg-muted px-1 font-mono text-xs">/schedule</code> in
@@ -48,10 +48,10 @@ export function ScheduledListView() {
               </button>
             </div>
           </header>
-          <div className="px-8 pb-4">
+          <div className="px-12 pb-4 pt-6">
             <KeepAwakeBanner />
           </div>
-          <section className="grid grid-cols-1 gap-4 px-8 pb-8 sm:grid-cols-2 xl:grid-cols-3">
+          <section className="grid grid-cols-1 gap-4 px-12 pb-8 sm:grid-cols-2 xl:grid-cols-3">
             {scheduledTasks.map((task) => (
               <ScheduledCard
                 key={task.id}
@@ -60,7 +60,7 @@ export function ScheduledListView() {
               />
             ))}
           </section>
-          <section className="flex flex-col items-center gap-3 px-8 pb-12 pt-6 text-center">
+          <section className="flex flex-col items-center gap-3 px-12 pb-12 pt-6 text-center">
             <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               More ideas
             </h3>

@@ -72,7 +72,7 @@ export function TaskChatStream({
   onOpenArtifact,
 }: TaskChatStreamProps) {
   return (
-    <div className="flex flex-col gap-6 px-6 py-4">
+    <div className="flex flex-col gap-6">
       {messages.map((m) => (
         <Message key={m.id} from={m.from}>
           <MessageContent>

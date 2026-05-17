@@ -14,20 +14,22 @@ export function NewTaskView() {
   return (
     <AppShell
       main={
-        <div className="flex h-full items-center justify-center px-6 py-12">
-          <div className="flex w-full max-w-2xl flex-col items-center gap-6 text-center">
-            <BrandStar size={48} />
-            <h1 className="font-serif text-4xl font-semibold leading-tight text-foreground">
-              Let's knock something off your list
-            </h1>
+        <div className="flex h-full flex-col items-center overflow-y-auto px-12 pt-[18%]">
+          <div className="flex w-full max-w-[760px] flex-col items-start">
+            <div className="mb-3 flex items-center gap-4">
+              <BrandStar size={28} />
+              <h1 className="font-serif text-[36px] font-normal leading-[1.15] tracking-tight text-foreground">
+                Let's knock something off your list
+              </h1>
+            </div>
             <a
               href="#"
-              className="inline-flex items-center gap-1 text-sm text-muted-foreground underline-offset-4 hover:underline"
+              className="mb-10 ml-12 inline-flex items-center gap-1 text-sm text-muted-foreground underline-offset-4 hover:underline"
             >
               Learn how to use Agent Studio safely.
               <ExternalLink className="size-3" />
             </a>
-            <div className="w-full text-left">
+            <div className="w-full">
               <PromptInput onSubmit={() => {}}>
                 <PromptInputTextarea placeholder="How can I help you today?" />
                 <PromptInputFooter>

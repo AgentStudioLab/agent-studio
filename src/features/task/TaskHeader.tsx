@@ -7,6 +7,7 @@ import {
   Pencil,
   Archive,
   Trash2,
+  PanelRight,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -18,6 +19,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuSubContent,
 } from "@/components/ui/dropdown-menu";
+import { useAppShell } from "@/app/AppShellContext";
 import { projects as mockProjects } from "@/lib/mock/projects";
 
 interface TaskHeaderProps {
@@ -43,19 +45,18 @@ export function TaskHeader({
   onArchive,
   onDelete,
 }: TaskHeaderProps) {
+  const { toggleAside } = useAppShell();
   return (
-    <header className="flex items-center gap-2 px-6 py-4">
-      <h1 className="min-w-0 flex-1 truncate font-serif text-2xl font-semibold text-foreground">
-        {title}
-      </h1>
+    <header className="flex h-12 shrink-0 items-center gap-3 px-6">
       <DropdownMenu>
         <DropdownMenuTrigger
           aria-label="Task menu"
-          className="rounded-md p-1 text-muted-foreground outline-hidden hover:bg-muted hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring"
+          className="inline-flex min-w-0 items-center gap-1.5 rounded-md px-2 py-1 text-[14px] font-medium text-foreground outline-hidden hover:bg-muted focus-visible:ring-1 focus-visible:ring-ring"
         >
-          <ChevronDown className="size-5" />
+          <span className="truncate">{title}</span>
+          <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuContent align="start" className="w-56">
           <DropdownMenuItem onSelect={onSchedule}>
             <Calendar /> Schedule
           </DropdownMenuItem>
@@ -92,6 +93,15 @@ export function TaskHeader({
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+      <div className="flex-1" />
+      <button
+        type="button"
+        onClick={toggleAside}
+        aria-label="Toggle right panel"
+        className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+      >
+        <PanelRight className="size-4" />
+      </button>
     </header>
   );
 }

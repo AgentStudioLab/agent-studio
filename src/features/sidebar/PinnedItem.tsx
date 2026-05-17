@@ -33,7 +33,7 @@ export function PinnedItem({
       <button
         type="button"
         onClick={onClick}
-        className="flex min-w-0 flex-1 items-center gap-2 text-left text-sm"
+        className="flex min-w-0 flex-1 items-center gap-2 text-left text-[14px] font-medium"
       >
         {isProject ? (
           <FolderOpen className="size-4 shrink-0 text-muted-foreground" />
@@ -43,7 +43,7 @@ export function PinnedItem({
             className="inline-block size-2 shrink-0 rounded-full border border-[hsl(var(--text-400))]"
           />
         )}
-        <span className={cn("truncate", isProject && "font-semibold")}>{item.name}</span>
+        <span className="truncate">{item.name}</span>
       </button>
       <SidebarItemContextMenu
         pinMode="unpin"

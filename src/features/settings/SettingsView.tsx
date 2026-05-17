@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 export function SettingsView() {
   const { setView } = useAppShell();
   return (
-    <div className="flex h-screen w-screen flex-col bg-background">
+    <div className="flex min-h-0 flex-1 flex-col bg-background">
       <header className="flex items-center gap-3 border-b border-border px-4 py-3">
         <button
           type="button"
@@ -33,13 +33,13 @@ export function SettingsView() {
         <main className="flex min-w-0 flex-1 flex-col overflow-y-auto bg-background px-8 py-8">
           <div className="flex max-w-2xl flex-col gap-10">
             <section>
-              <h2 className="mb-6 font-serif text-2xl font-semibold text-foreground">
+              <h2 className="mb-6 text-[18px] font-semibold text-foreground">
                 Profile
               </h2>
               <ProfileForm />
             </section>
             <section className="border-t border-border pt-8">
-              <h2 className="mb-4 font-serif text-2xl font-semibold text-foreground">
+              <h2 className="mb-4 text-[18px] font-semibold text-foreground">
                 Appearance
               </h2>
               <div className="flex flex-col gap-2">

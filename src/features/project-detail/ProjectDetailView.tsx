@@ -29,8 +29,8 @@ export function ProjectDetailView() {
     <AppShell
       main={
         <div className="flex h-full flex-col overflow-y-auto">
-          <header className="flex items-center justify-between gap-4 px-8 pt-10 pb-6">
-            <h1 className="font-serif text-4xl font-semibold text-foreground">
+          <header className="flex items-center justify-between gap-4 px-12 pt-10 pb-6">
+            <h1 className="font-serif text-[40px] font-normal leading-none text-foreground">
               {project.name}
             </h1>
             <div className="flex items-center gap-2">
@@ -51,7 +51,7 @@ export function ProjectDetailView() {
             </div>
           </header>
 
-          <section className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-8 pb-10">
+          <section className="flex w-full max-w-[860px] flex-col gap-8 px-12 pb-12">
             <PromptInput onSubmit={() => {}}>
               <PromptInputTextarea
                 placeholder="What would you like to work on in this project?"

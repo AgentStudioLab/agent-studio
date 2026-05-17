@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronLeft, Clock, Pencil, Play, Trash2 } from "lucide-react";
+import { ChevronLeft, Clock, Info, Pencil, Play, Trash2 } from "lucide-react";
 import { AppShell } from "@/app/AppShell";
 import { useAppShell } from "@/app/AppShellContext";
 import { Switch } from "@/components/ui/switch";
@@ -9,7 +9,6 @@ import type { MockScheduledTask } from "@/lib/mock/types";
 
 export function ScheduledDetailView() {
   const { setView } = useAppShell();
-  // Show the first task as the "current" detail
   const task = scheduledTasks[0]!;
   const [active, setActive] = useState(task.active);
 
@@ -17,7 +16,7 @@ export function ScheduledDetailView() {
     <AppShell
       main={
         <div className="flex h-full flex-col overflow-y-auto">
-          <div className="px-8 pt-8">
+          <div className="px-12 pt-10">
             <button
               type="button"
               onClick={() => setView("scheduled-list")}
@@ -27,8 +26,11 @@ export function ScheduledDetailView() {
               All scheduled tasks
             </button>
           </div>
-          <header className="flex items-start justify-between gap-4 px-8 pt-4 pb-6">
-            <h1 className="font-serif text-4xl font-semibold text-foreground">{task.name}</h1>
+
+          <header className="flex items-start justify-between gap-4 px-12 pt-8 pb-3">
+            <h1 className="font-serif text-[36px] font-normal leading-none text-foreground">
+              {task.name}
+            </h1>
             <div className="flex items-center gap-2">
               <button
                 type="button"
@@ -53,8 +55,16 @@ export function ScheduledDetailView() {
             </div>
           </header>
 
-          <div className="flex items-center gap-3 px-8 pb-6">
-            <Switch checked={active} onCheckedChange={setActive} aria-label="Active" />
+          <p className="px-12 pb-5 text-sm text-muted-foreground">
+            {task.description}
+          </p>
+
+          <div className="flex items-center gap-3 px-12 pb-6">
+            <Switch
+              checked={active}
+              onCheckedChange={setActive}
+              aria-label="Active"
+            />
             <span
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-sm px-2 py-0.5 text-xs",
@@ -71,45 +81,54 @@ export function ScheduledDetailView() {
             </span>
           </div>
 
-          <div className="flex flex-col gap-8 px-8 pb-12">
-            <section>
-              <h2 className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Instructions
-              </h2>
-              <pre className="overflow-x-auto whitespace-pre-wrap rounded-md border border-border bg-muted px-4 py-3 font-mono text-sm text-foreground">
-                {task.prompt}
-              </pre>
-            </section>
+          <div
+            className="px-12 pt-6"
+            style={{ borderTop: "1px solid hsl(var(--border-300) / 0.1)" }}
+          >
+            <div className="grid max-w-[1100px] grid-cols-2 gap-12 py-6">
+              <div />
+              <div className="flex flex-col gap-10">
+                <section>
+                  <h2 className="mb-2 text-sm font-medium text-foreground">
+                    Instructions
+                  </h2>
+                  <p className="text-sm leading-relaxed text-muted-foreground">
+                    {task.prompt}
+                  </p>
+                </section>
 
-            <section>
-              <h2 className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Repeats
-              </h2>
-              <p className="text-sm text-foreground">{describeFrequency(task)}</p>
-            </section>
+                <section>
+                  <h2 className="mb-2 text-sm font-medium text-foreground">
+                    Repeats
+                  </h2>
+                  <p className="text-sm font-medium text-foreground">
+                    {describeFrequency(task)}
+                  </p>
+                </section>
 
-            <section>
-              <h2 className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Always allowed
-              </h2>
-              <p className="mb-3 text-sm text-muted-foreground">
-                Approvals you grant during a run appear here.
-              </p>
-              {task.alwaysAllowed && task.alwaysAllowed.length > 0 ? (
-                <ul className="flex flex-col gap-2">
-                  {task.alwaysAllowed.map((approval, i) => (
-                    <li
-                      key={i}
-                      className="rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground"
-                    >
-                      {approval}
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-sm italic text-muted-foreground">No approvals yet.</p>
-              )}
-            </section>
+                <section>
+                  <h2 className="mb-2 flex items-center gap-1.5 text-sm font-medium text-foreground">
+                    Always allowed
+                    <Info className="size-3 text-muted-foreground" />
+                  </h2>
+                  <p className="mb-3 text-sm leading-relaxed text-muted-foreground">
+                    Approvals you grant during a run appear here.
+                  </p>
+                  {task.alwaysAllowed && task.alwaysAllowed.length > 0 && (
+                    <ul className="flex flex-col gap-2">
+                      {task.alwaysAllowed.map((approval, i) => (
+                        <li
+                          key={i}
+                          className="rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground"
+                        >
+                          {approval}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </section>
+              </div>
+            </div>
           </div>
         </div>
       }

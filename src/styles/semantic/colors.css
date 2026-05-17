@@ -18,6 +18,10 @@
     --bg-400: var(--color-stone-200);
     --bg-500: var(--color-stone-200);
 
+    /* Chrome (window titlebar / system decorations) */
+    --chrome-bg-top: var(--color-stone-100);
+    --chrome-bg-bottom: var(--color-stone-200);
+
     /* Text */
     --text-000: var(--color-stone-950);
     --text-100: var(--color-stone-950);
@@ -86,6 +90,9 @@
     --bg-300: var(--color-stone-950);
     --bg-400: var(--color-pure-black);
     --bg-500: var(--color-pure-black);
+
+    --chrome-bg-top: var(--color-stone-800);
+    --chrome-bg-bottom: var(--color-stone-850);
 
     --text-000: var(--color-stone-50);
     --text-100: var(--color-stone-50);

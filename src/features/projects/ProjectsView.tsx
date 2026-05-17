@@ -11,8 +11,8 @@ export function ProjectsView() {
     <AppShell
       main={
         <div className="flex h-full flex-col overflow-y-auto">
-          <header className="flex items-center justify-between gap-4 px-8 pt-10 pb-6">
-            <h1 className="font-serif text-4xl font-semibold text-foreground">Projects</h1>
+          <header className="flex items-center justify-between gap-4 px-12 pt-12 pb-8">
+            <h1 className="font-serif text-[34px] font-normal leading-none text-foreground">Projects</h1>
             <div className="flex items-center gap-2">
               <button
                 type="button"
@@ -36,7 +36,7 @@ export function ProjectsView() {
               </button>
             </div>
           </header>
-          <section className="grid grid-cols-1 gap-4 px-8 pb-10 sm:grid-cols-2 xl:grid-cols-3">
+          <section className="grid grid-cols-1 gap-4 px-12 pb-12 sm:grid-cols-2 xl:grid-cols-3">
             {projects.map((p) => (
               <ProjectCard
                 key={p.id}

@@ -14,7 +14,7 @@ export function CustomizeHome({ onSelectAction }: CustomizeHomeProps) {
         <div className="flex size-16 items-center justify-center rounded-lg bg-muted text-muted-foreground">
           <Wrench className="size-8" />
         </div>
-        <h1 className="font-serif text-3xl font-semibold text-foreground">
+        <h1 className="font-serif text-[28px] font-normal text-foreground">
           Customize Agent Studio
         </h1>
         <p className="text-sm text-muted-foreground">

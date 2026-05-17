@@ -40,7 +40,7 @@ export function AgentDetail({ agent }: AgentDetailProps) {
           {agent.emoji}
         </div>
         <div className="flex-1 space-y-1">
-          <h1 className="font-serif text-2xl font-semibold text-foreground">
+          <h1 className="font-serif text-[26px] font-normal leading-tight text-foreground">
             {agent.name}
           </h1>
           <p className="text-sm text-muted-foreground">{agent.description}</p>

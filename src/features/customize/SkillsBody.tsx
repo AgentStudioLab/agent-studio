@@ -87,7 +87,7 @@ function SkillDetail({ skill, enabled, onToggle }: SkillDetailProps) {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-start justify-between gap-4">
-        <h1 className="font-serif text-3xl font-semibold text-foreground">
+        <h1 className="text-[22px] font-semibold text-foreground">
           {skill.name}
         </h1>
         <div className="flex items-center gap-2">
@@ -116,7 +116,7 @@ function SkillDetail({ skill, enabled, onToggle }: SkillDetailProps) {
         <span>{skill.description}</span>
       </div>
       <article className="flex flex-col gap-3 text-sm">
-        <h2 className="font-serif text-xl font-semibold text-foreground">
+        <h2 className="font-serif text-[22px] font-normal text-foreground">
           How it works
         </h2>
         <ul className="ml-4 list-disc text-foreground">

@@ -38,11 +38,10 @@ export function UserBar({
         type="button"
         className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-sidebar-accent"
       >
-        <InitialsAvatar initials={initials} size={24} hue="orange" />
-        <span className="min-w-0 flex-1 truncate font-medium">{name}</span>
-        <span className="shrink-0 rounded-sm bg-muted px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
-          {plan}
-        </span>
+        <InitialsAvatar initials={initials} size={28} hue="orange" />
+        <span className="min-w-0 flex-1 truncate text-[13px]">{name}</span>
+        <span className="shrink-0 text-[12px] text-muted-foreground">·</span>
+        <span className="shrink-0 text-[12px] text-muted-foreground">{plan}</span>
       </button>
     </UserPopover>
   );
