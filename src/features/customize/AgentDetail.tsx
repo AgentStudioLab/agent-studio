@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Circle, MoreHorizontal, Pencil, Plus } from "lucide-react";
+import { Circle, FolderOpen, MoreHorizontal, Pencil, Plus } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { InitialsAvatar } from "@/features/_atoms/InitialsAvatar";
 import { cn } from "@/lib/utils";
@@ -152,12 +152,7 @@ export function AgentDetail({ agent }: AgentDetailProps) {
                 key={projectId}
                 className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1 text-xs text-foreground"
               >
-                {/*
-                  Folder glyph is an emoji used as a generic icon, not an
-                  identity marker. We keep it inline because no equivalent
-                  Lucide chip-sized folder exists at this size without padding.
-                */}
-                <span aria-hidden>📁</span>
+                <FolderOpen className="size-3 text-muted-foreground" />
                 {project?.name ?? projectId}
               </span>
             );

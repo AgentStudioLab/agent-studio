@@ -11,7 +11,7 @@ import { mcpServers } from "@/lib/mock/mcp-servers";
 import type { Artifact } from "@/lib/mock/types";
 
 export function TaskView() {
-  const { preview, openPreview, closePreview } = useAppShell();
+  const { preview, openPreview, closePreview, setView } = useAppShell();
 
   const handleOpenArtifact = (artifact: Artifact) => {
     const match = workingTreeFiles.find((f) => f.name === artifact.name);
@@ -22,7 +22,10 @@ export function TaskView() {
     <AppShell
       main={
         <>
-          <TaskHeader title={inactiveProjectsTask.title} />
+          <TaskHeader
+            title={inactiveProjectsTask.title}
+            onMoveToProject={() => setView("project-detail")}
+          />
           <TaskChatStream
             messages={inactiveProjectsTask.messages}
             onOpenArtifact={handleOpenArtifact}
