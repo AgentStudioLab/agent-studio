@@ -1,5 +1,13 @@
 import type { ReactNode } from "react";
-import { MoreHorizontal, Pin, PinOff, Pencil, Archive, Trash2, FolderInput } from "lucide-react";
+import {
+  Archive,
+  FolderInput,
+  MoreHorizontal,
+  Pencil,
+  Pin,
+  PinOff,
+  Trash2,
+} from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,9 +29,15 @@ export interface SidebarItemContextMenuProps {
   trigger?: ReactNode;
   /** Extra classes for the default trigger (e.g. opacity/group-hover). */
   triggerClassName?: string;
+  /** Icon pixel size for the default trigger. Defaults to 16. */
+  iconSize?: number;
   align?: "start" | "center" | "end";
 }
 
+/**
+ * Sidebar item context menu — order matches prototype HTML 463-470:
+ *   Move to project / --- / Pin · Rename / --- / Archive · Delete (danger)
+ */
 export function SidebarItemContextMenu({
   pinMode,
   onPinToggle,
@@ -33,6 +47,7 @@ export function SidebarItemContextMenu({
   onMoveToProject,
   trigger,
   triggerClassName,
+  iconSize = 16,
   align = "end",
 }: SidebarItemContextMenuProps) {
   return (
@@ -48,11 +63,16 @@ export function SidebarItemContextMenu({
               triggerClassName,
             )}
           >
-            <MoreHorizontal className="size-4" />
+            <MoreHorizontal style={{ width: iconSize, height: iconSize }} />
           </button>
         )}
       </DropdownMenuTrigger>
       <DropdownMenuContent align={align} className="w-44">
+        <DropdownMenuItem onSelect={onMoveToProject}>
+          <FolderInput className="size-4" />
+          Move to project
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={onPinToggle}>
           {pinMode === "pin" ? <Pin className="size-4" /> : <PinOff className="size-4" />}
           {pinMode === "pin" ? "Pin" : "Unpin"}
@@ -61,6 +81,7 @@ export function SidebarItemContextMenu({
           <Pencil className="size-4" />
           Rename
         </DropdownMenuItem>
+        <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={onArchive}>
           <Archive className="size-4" />
           Archive
@@ -68,11 +89,6 @@ export function SidebarItemContextMenu({
         <DropdownMenuItem onSelect={onDelete} variant="destructive">
           <Trash2 className="size-4" />
           Delete
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={onMoveToProject}>
-          <FolderInput className="size-4" />
-          Move to project
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

@@ -1,9 +1,16 @@
-export type StepStatus = "done" | "active" | "pending" | "failed";
+/** Full status union supported by StatusDot — used by recent/pinned task rows. */
+export type Status = "done" | "active" | "pending" | "failed" | "scheduled";
+/** PlanStep subset (a step can't be "scheduled"). */
+export type StepStatus = Exclude<Status, "scheduled">;
 
 export interface PlanStep {
   id: string;
   status: StepStatus;
+  /** Step name shown as the primary label. */
   description: string;
+  /** Optional secondary line — prototype HTML 1120-1124 uses this for live
+   *  details on the active step (e.g. "scanning 9 / 14 ..."). */
+  detail?: string;
 }
 
 export interface ToolCall {
@@ -23,10 +30,61 @@ export interface Artifact {
   opener?: string; // e.g., "wpsoffice"
 }
 
+/* -------------------------------------------------------------
+ * ChatMessage content blocks
+ * ----------
+ * Each assistant/user message is a sequence of ContentBlocks rendered
+ * in order. Discriminated on `type`.
+ * ----------------------------------------------------------- */
+
+/** Tool-timeline icon identifier (mapped to lucide icon in renderer) */
+export type TimelineIconName =
+  | "wrench"
+  | "file"
+  | "terminal"
+  | "agent-run"
+  | "book-open";
+
+export interface TimelineSubStep {
+  icon: TimelineIconName;
+  title: string;
+}
+
+export interface TimelineStep {
+  icon: TimelineIconName;
+  title: string;
+  chip?: string;
+  chipVariant?: "default" | "danger";
+  subSteps?: TimelineSubStep[];
+}
+
+export type ContentBlock =
+  | { type: "text"; text: string }
+  | { type: "preset-question"; q: string; a?: string }
+  | {
+      type: "tool-call-timeline";
+      summary: string;
+      defaultOpen?: boolean;
+      steps: TimelineStep[];
+    }
+  | { type: "prose"; html: string }
+  | {
+      type: "artifact";
+      name: string;
+      kind: "Spreadsheet" | "Presentation" | "Document";
+      ext: "XLSX" | "PPTX" | "DOCX" | "MD";
+      opener: string;
+    }
+  | { type: "message-actions" }
+  | { type: "brand-star"; size?: number; spin?: boolean };
+
 export interface ChatMessage {
   id: string;
   from: "user" | "assistant";
-  content: string;
+  /** Preferred — discriminated content. Falls back to `content` if absent. */
+  blocks?: ContentBlock[];
+  /** Legacy single-string body; renderer treats as a single text block. */
+  content?: string;
   toolCalls?: ToolCall[];
   artifacts?: Artifact[];
 }
@@ -130,7 +188,9 @@ export interface MockRecentItem {
   id: string;
   kind: "task" | "conversation";
   title: string;
-  status?: StepStatus;
+  /** Prototype HTML 636-645 uses "running" / "scheduled" / "done" / "failed".
+   *  We use "active" for "running" (same visual) for parity with PlanStep. */
+  status?: Status;
   time: string;
 }
 
@@ -138,4 +198,6 @@ export interface MockPinnedItem {
   id: string;
   kind: "task" | "project";
   name: string;
+  /** For task-kind pinned items, status drives the StatusDot rendering. */
+  status?: Status;
 }

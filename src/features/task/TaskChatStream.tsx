@@ -1,70 +1,102 @@
-import {
-  FileSpreadsheet,
-  FileText,
-  Presentation,
-  FileCode,
-  File as FileIcon,
-  ChevronRight,
-} from "lucide-react";
-import type { ToolUIPart } from "ai";
-import { Message, MessageContent } from "@/components/ai-elements/message";
-import {
-  Tool,
-  ToolHeader,
-  ToolContent,
-  ToolInput,
-  ToolOutput,
-} from "@/components/ai-elements/tool";
-import { cn } from "@/lib/utils";
-import type { Artifact, ChatMessage, ToolCall } from "@/lib/mock/types";
-
-const TYPE_ICON = {
-  spreadsheet: FileSpreadsheet,
-  presentation: Presentation,
-  document: FileText,
-  markdown: FileText,
-  code: FileCode,
-} as const;
-
-const TOOL_TYPE_MAP: Record<ToolCall["type"], ToolUIPart["type"]> = {
-  bash: "tool-bash",
-  "fs-read": "tool-fs-read",
-  "fs-write": "tool-fs-write",
-  "web-search": "tool-web-search",
-  search: "tool-search",
-};
-
-interface ArtifactChipProps {
-  artifact: Artifact;
-  onClick?: () => void;
-}
-
-export function ArtifactChip({ artifact, onClick }: ArtifactChipProps) {
-  const Icon = TYPE_ICON[artifact.type] ?? FileIcon;
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "inline-flex items-center gap-2 rounded-sm border bg-card px-2.5 py-1.5 text-sm text-foreground transition-colors",
-        "hover:bg-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-      )}
-    >
-      <Icon className="size-4 text-muted-foreground" />
-      <span className="font-medium">{artifact.name}</span>
-      {artifact.opener && (
-        <span className="flex items-center gap-0.5 text-xs text-muted-foreground">
-          <ChevronRight className="size-3" />
-          {artifact.opener}
-        </span>
-      )}
-    </button>
-  );
-}
+import { BrandStar } from "@/shared/atoms/BrandStar";
+import { ArtifactInlineCard } from "@/features/task/ArtifactInlineCard";
+import { MessageActions } from "@/features/task/MessageActions";
+import { PresetQuestion } from "@/features/task/PresetQuestion";
+import { ToolCallTimeline } from "@/features/task/ToolCallTimeline";
+import { UserMessage } from "@/features/task/UserMessage";
+import type {
+  Artifact,
+  ChatMessage,
+  ContentBlock,
+} from "@/lib/mock/types";
 
 interface TaskChatStreamProps {
   messages: ChatMessage[];
   onOpenArtifact?: (artifact: Artifact) => void;
+}
+
+/* ------------------ block dispatcher ------------------ */
+function Block({
+  block,
+  onOpenArtifact,
+}: {
+  block: ContentBlock;
+  onOpenArtifact?: (artifact: Artifact) => void;
+}) {
+  switch (block.type) {
+    case "text":
+      return (
+        <div
+          className="text-[14px] leading-[1.75]"
+          style={{ color: "hsl(var(--text-100))" }}
+        >
+          {block.text}
+        </div>
+      );
+
+    case "preset-question":
+      return <PresetQuestion q={block.q} a={block.a} />;
+
+    case "tool-call-timeline":
+      return (
+        <ToolCallTimeline
+          summary={block.summary}
+          steps={block.steps}
+          defaultOpen={block.defaultOpen}
+        />
+      );
+
+    case "prose":
+      // Prose paragraphs / lists with inline HTML. The fixture builds these
+      // strings so list markers / strong tags / link colors can be expressed
+      // without inventing yet more block types.
+      return (
+        <div
+          className="prose-stream space-y-3 text-[14px] leading-[1.75]"
+          style={{ color: "hsl(var(--text-100))" }}
+          // eslint-disable-next-line react/no-danger
+          dangerouslySetInnerHTML={{ __html: block.html }}
+        />
+      );
+
+    case "artifact":
+      return (
+        <ArtifactInlineCard
+          title={block.name}
+          kind={block.kind}
+          ext={block.ext}
+          opener={block.opener}
+          onOpen={() =>
+            onOpenArtifact?.({
+              id: block.name,
+              name: block.name,
+              type:
+                block.kind === "Spreadsheet"
+                  ? "spreadsheet"
+                  : block.kind === "Presentation"
+                    ? "presentation"
+                    : "document",
+              opener: block.opener,
+            })
+          }
+        />
+      );
+
+    case "message-actions":
+      return <MessageActions />;
+
+    case "brand-star":
+      return (
+        <div className="pt-4">
+          <BrandStar size={block.size ?? 20} spinning={block.spin ?? true} />
+        </div>
+      );
+  }
+}
+
+/* ------------------ legacy fallback (string content only) ------------------ */
+function legacyBlocks(m: ChatMessage): ContentBlock[] {
+  return m.content ? [{ type: "text", text: m.content }] : [];
 }
 
 export function TaskChatStream({
@@ -73,46 +105,29 @@ export function TaskChatStream({
 }: TaskChatStreamProps) {
   return (
     <div className="flex flex-col gap-6">
-      {messages.map((m) => (
-        <Message key={m.id} from={m.from}>
-          <MessageContent>
-            {m.content && <p>{m.content}</p>}
-            {m.toolCalls && m.toolCalls.length > 0 && (
-              <div className="mt-3 flex flex-col gap-2">
-                {m.toolCalls.map((tc) => (
-                  <Tool
-                    key={tc.id}
-                    defaultOpen={tc.state === "output-available"}
-                  >
-                    <ToolHeader
-                      type={TOOL_TYPE_MAP[tc.type]}
-                      state={tc.state as ToolUIPart["state"]}
-                    />
-                    <ToolContent>
-                      <ToolInput input={tc.input} />
-                      <ToolOutput
-                        output={tc.output}
-                        errorText={tc.errorText}
-                      />
-                    </ToolContent>
-                  </Tool>
-                ))}
-              </div>
-            )}
-            {m.artifacts && m.artifacts.length > 0 && (
-              <div className="mt-3 flex flex-wrap gap-2">
-                {m.artifacts.map((a) => (
-                  <ArtifactChip
-                    key={a.id}
-                    artifact={a}
-                    onClick={() => onOpenArtifact?.(a)}
-                  />
-                ))}
-              </div>
-            )}
-          </MessageContent>
-        </Message>
-      ))}
+      {messages.map((m) => {
+        const blocks = m.blocks ?? legacyBlocks(m);
+
+        if (m.from === "user") {
+          // User messages render as a single bubble. If a user message ever
+          // carried multi-block content, only the first text block is shown.
+          const first = blocks.find((b) => b.type === "text");
+          const text = first && first.type === "text" ? first.text : "";
+          return <UserMessage key={m.id}>{text}</UserMessage>;
+        }
+
+        return (
+          <div key={m.id} className="space-y-3">
+            {blocks.map((block, i) => (
+              <Block
+                key={i}
+                block={block}
+                onOpenArtifact={onOpenArtifact}
+              />
+            ))}
+          </div>
+        );
+      })}
     </div>
   );
 }

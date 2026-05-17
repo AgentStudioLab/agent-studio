@@ -1,5 +1,4 @@
-import { useCallback, useRef, useState } from "react";
-import type React from "react";
+import { useEffect, useState } from "react";
 import { ChevronDown, RotateCw, X } from "lucide-react";
 import { CodeBlock } from "@/components/ai-elements/code-block";
 import { cn } from "@/lib/utils";
@@ -10,90 +9,133 @@ interface PreviewPaneProps {
   onClose: () => void;
 }
 
-const MIN_WIDTH = 360;
-const MAX_WIDTH = 720;
-const DEFAULT_WIDTH = 480;
+const MIN_W = 360;
+const MAX_W = 720;
+const DEFAULT_W = 520;
 
-// Mock opener mapping by file type (MockFile has no `opener` field of its own)
+// Mock opener mapping by file type (MockFile has no `opener` field of its own).
 const OPENER_BY_TYPE: Record<MockFile["type"], string | null> = {
-  markdown: "typora",
+  markdown: "VS Code",
   spreadsheet: "wpsoffice",
   presentation: "wpsoffice",
-  code: "vscode",
+  code: "VS Code",
   image: null,
   generic: null,
 };
 
-export function PreviewPane({ file, onClose }: PreviewPaneProps) {
-  const [width, setWidth] = useState(DEFAULT_WIDTH);
-  const [resizing, setResizing] = useState(false);
-  const paneRef = useRef<HTMLDivElement>(null);
+const FILE_LABEL_BY_TYPE: Record<MockFile["type"], string> = {
+  markdown: "Markdown",
+  spreadsheet: "XLSX",
+  presentation: "PPTX",
+  code: "Code",
+  image: "Image",
+  generic: "File",
+};
 
-  const onResizeStart = useCallback(
-    (e: React.PointerEvent) => {
-      e.preventDefault();
-      setResizing(true);
-      const startX = e.clientX;
-      const startWidth = width;
-      const onMove = (ev: PointerEvent) => {
-        // Handle sits on LEFT edge of pane: dragging left increases width
-        const delta = startX - ev.clientX;
-        const next = Math.min(
-          MAX_WIDTH,
-          Math.max(MIN_WIDTH, startWidth + delta)
-        );
-        setWidth(next);
-      };
-      const onUp = () => {
-        setResizing(false);
-        window.removeEventListener("pointermove", onMove);
-        window.removeEventListener("pointerup", onUp);
-      };
-      window.addEventListener("pointermove", onMove);
-      window.addEventListener("pointerup", onUp);
-    },
-    [width]
-  );
+// Opener badge (small colored square w/ a letter) — markdown opener is blue,
+// office openers are brand-orange. Uses semantic tokens.
+function openerBadgeStyle(type: MockFile["type"]): {
+  background: string;
+  letter: string;
+} {
+  if (type === "markdown" || type === "code") {
+    return { background: "hsl(var(--accent-100))", letter: "C" };
+  }
+  return { background: "hsl(var(--brand-100))", letter: "W" };
+}
+
+export function PreviewPane({ file, onClose }: PreviewPaneProps) {
+  const [width, setWidth] = useState<number>(DEFAULT_W);
+  const [dragging, setDragging] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (!dragging) return;
+    const onMove = (e: MouseEvent) => {
+      const w = window.innerWidth - e.clientX - 32;
+      const clamped = Math.max(MIN_W, Math.min(MAX_W, w));
+      setWidth(clamped);
+    };
+    const onUp = () => setDragging(false);
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    return () => {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+  }, [dragging]);
 
   const opener = OPENER_BY_TYPE[file.type];
+  const fileLabel = FILE_LABEL_BY_TYPE[file.type];
+  const badge = openerBadgeStyle(file.type);
 
   return (
-    <div
-      ref={paneRef}
-      className="animate-slide-in-pane relative flex h-full shrink-0 flex-col overflow-hidden bg-background"
-      style={{ width, borderLeft: "1px solid hsl(var(--border-300) / 0.12)" }}
+    <aside
+      className="animate-slide-in-pane relative flex shrink-0 flex-col"
+      style={{
+        width,
+        background: "hsl(var(--bg-100))",
+        borderLeft: "1px solid hsl(var(--border-300) / 0.12)",
+      }}
     >
-      {/* Left-edge resize hot zone (6px) with 2px white handle on hover/active */}
+      {/* Resize handle (left edge, 6px hot zone + 2px hairline) */}
       <div
-        onPointerDown={onResizeStart}
-        className={cn(
-          "group absolute top-0 left-0 z-10 h-full w-[6px] cursor-col-resize",
-          resizing && "pointer-events-none"
-        )}
-      >
-        <div
-          className={cn(
-            "absolute top-0 left-1/2 h-full w-[2px] -translate-x-1/2 bg-foreground/40 opacity-0 transition-opacity group-hover:opacity-100",
-            resizing && "opacity-100"
-          )}
-        />
-      </div>
+        className={cn("resize-handle", dragging && "resize-handle-active")}
+        onMouseDown={(e) => {
+          e.preventDefault();
+          setDragging(true);
+        }}
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize preview pane"
+      />
 
       {/* Header */}
-      <header className="flex items-center gap-2 border-b border-border px-4 py-3">
+      <header
+        className="flex h-12 shrink-0 items-center gap-3 px-4"
+        style={{ borderBottom: "1px solid hsl(var(--border-300) / 0.1)" }}
+      >
         <div className="min-w-0 flex-1">
-          <div className="truncate font-medium text-foreground text-sm">
+          <span
+            className="truncate font-medium text-[13.5px]"
+            style={{ color: "hsl(var(--text-100))" }}
+          >
             {file.name}
-          </div>
-          <div className="truncate text-muted-foreground text-xs">
-            {file.path}
-          </div>
+          </span>
+          <span
+            className="mx-2 text-[12px]"
+            style={{ color: "hsl(var(--text-400))" }}
+          >
+            ·
+          </span>
+          <span
+            className="text-[12px]"
+            style={{ color: "hsl(var(--text-300))" }}
+          >
+            {fileLabel}
+          </span>
         </div>
         {opener && (
           <button
             type="button"
-            className="flex items-center gap-1 rounded-md px-2 py-1 text-muted-foreground text-xs hover:bg-muted hover:text-foreground"
+            className="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[12px] transition hover:bg-muted hover:text-foreground"
+            style={{
+              color: "hsl(var(--text-200))",
+              border: "1px solid hsl(var(--border-300) / 0.15)",
+            }}
           >
+            <span
+              className="flex h-3.5 w-3.5 items-center justify-center rounded-sm text-[8.5px] font-bold"
+              style={{
+                background: badge.background,
+                color: "hsl(var(--oncolor-100))",
+              }}
+            >
+              {badge.letter}
+            </span>
             {opener}
             <ChevronDown className="size-3" />
           </button>
@@ -101,25 +143,27 @@ export function PreviewPane({ file, onClose }: PreviewPaneProps) {
         <button
           type="button"
           aria-label="Refresh"
-          className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+          className="rounded-md p-1.5 transition hover:bg-muted hover:text-foreground"
+          style={{ color: "hsl(var(--text-300))" }}
         >
-          <RotateCw className="size-4" />
+          <RotateCw className="size-[13px]" />
         </button>
         <button
           type="button"
           aria-label="Close"
           onClick={onClose}
-          className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+          className="rounded-md p-1.5 transition hover:bg-muted hover:text-foreground"
+          style={{ color: "hsl(var(--text-300))" }}
         >
-          <X className="size-4" />
+          <X className="size-[14px]" />
         </button>
       </header>
 
       {/* Body */}
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 space-y-3 overflow-y-auto p-3">
         <PreviewContent file={file} />
       </div>
-    </div>
+    </aside>
   );
 }
 
@@ -133,14 +177,17 @@ function PreviewContent({ file }: { file: MockFile }) {
       return <PresentationPreview />;
     case "code":
       return (
-        <div className="p-4">
+        <div className="p-1">
           <CodeBlock code={file.content ?? ""} language="typescript" />
         </div>
       );
     default:
       return (
-        <div className="flex h-full items-center justify-center p-8 text-muted-foreground text-sm">
-          No preview available for this file type.
+        <div
+          className="px-4 py-8 text-center text-[13px] italic"
+          style={{ color: "hsl(var(--text-400))" }}
+        >
+          [Preview for .{file.type} not implemented in this mock]
         </div>
       );
   }
@@ -150,7 +197,7 @@ function MarkdownPreview({ content }: { content: string }) {
   // Minimal renderer: split on newlines, treat # / ## as headings, blank line as gap.
   const lines = content.split(/\r?\n/);
   return (
-    <article className="px-6 py-4 text-sm">
+    <article className="px-3 py-2 text-sm">
       {lines.map((line, i) => {
         const key = `md-${i}`;
         if (line.startsWith("## ")) {
@@ -191,7 +238,7 @@ function SpreadsheetPreview({ content }: { content: string }) {
     .map((row) => row.split(","));
   const [header, ...body] = rows;
   return (
-    <div className="overflow-auto p-4">
+    <div className="overflow-auto">
       <table className="w-full border-collapse text-sm">
         <thead>
           <tr>
@@ -231,9 +278,8 @@ const MOCK_SLIDES = [
 ];
 
 function PresentationPreview() {
-  // Mock 3 dark slides — bg-300 in dark mode is near-black, giving a pptx-card feel.
   return (
-    <div className="flex flex-col gap-4 p-6">
+    <div className="flex flex-col gap-4">
       {MOCK_SLIDES.map((s, i) => (
         <div
           key={`slide-${i}`}

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
+  Briefcase,
   Clock,
-  FolderOpen,
   PanelLeftClose,
   Plus,
   Search,
@@ -73,27 +73,27 @@ export function SidebarContent() {
   return (
     <>
       {/* Top icon bar */}
-      <div className="flex h-10 shrink-0 items-center justify-between px-2">
+      <div className="flex shrink-0 items-center gap-1 px-3 pt-3">
         <button
           type="button"
           aria-label={toggleLabel}
           onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-          className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-sidebar-accent"
+          className="rounded-md p-1.5 text-[hsl(var(--text-400))] transition-colors hover:bg-[hsl(var(--bg-100))] hover:text-[hsl(var(--text-200))]"
         >
-          <PanelLeftClose className="size-4" />
+          <PanelLeftClose className="size-[15px]" />
         </button>
         <button
           type="button"
           aria-label="Search (Cmd+K)"
           onClick={() => setSearchOpen(true)}
-          className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-sidebar-accent"
+          className="rounded-md p-1.5 text-[hsl(var(--text-400))] transition-colors hover:bg-[hsl(var(--bg-100))] hover:text-[hsl(var(--text-200))]"
         >
-          <Search className="size-4" />
+          <Search className="size-[15px]" />
         </button>
       </div>
 
       {/* Main nav */}
-      <nav className="flex shrink-0 flex-col gap-0.5 px-2 pb-2">
+      <nav className="flex shrink-0 flex-col gap-0.5 px-2 pt-4">
         <NavItem
           icon={Plus}
           label="New task"
@@ -101,9 +101,11 @@ export function SidebarContent() {
           onClick={() => setView("new-task")}
         />
         <NavItem
-          icon={FolderOpen}
+          icon={Briefcase}
           label="Projects"
-          active={currentView === "projects"}
+          active={
+            currentView === "projects" || currentView === "project-detail"
+          }
           onClick={() => setView("projects")}
         />
         <NavItem
@@ -122,48 +124,54 @@ export function SidebarContent() {
 
       {/* Pinned */}
       {pinned.length > 0 && (
-        <div className="flex shrink-0 flex-col gap-0.5 px-2 pt-2">
-          <div className="px-2 pb-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-            Pinned
+        <>
+          <div className="px-3 pb-2 pt-6">
+            <div className="mb-2 px-2 text-[11px] font-medium uppercase tracking-wider text-[hsl(var(--text-400))]">
+              Pinned
+            </div>
           </div>
-          {pinned.map((item) => (
-            <PinnedItem
-              key={item.id}
-              item={item}
-              onClick={() =>
-                setView(item.kind === "project" ? "project-detail" : "task")
-              }
-              onUnpin={() => handleUnpin(item)}
-              onDelete={() => handleRemovePinned(item.id)}
-            />
-          ))}
-        </div>
+          <div className="flex shrink-0 flex-col gap-0.5 px-2">
+            {pinned.map((item) => (
+              <PinnedItem
+                key={item.id}
+                item={item}
+                onClick={() =>
+                  setView(item.kind === "project" ? "project-detail" : "task")
+                }
+                onUnpin={() => handleUnpin(item)}
+                onDelete={() => handleRemovePinned(item.id)}
+              />
+            ))}
+          </div>
+        </>
       )}
 
       {/* Recents */}
-      <div className="mt-2 flex min-h-0 flex-1 flex-col px-2">
-        <div className="px-2 pb-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+      <div className="px-3 pb-2 pt-5">
+        <div className="mb-2 px-2 text-[11px] font-medium uppercase tracking-wider text-[hsl(var(--text-400))]">
           Recents
         </div>
-        <div className="flex flex-col gap-0.5 overflow-y-auto">
-          {recents.map((item) => (
-            <RecentItem
-              key={item.id}
-              item={item}
-              onClick={() => setView("task")}
-              onPin={() => handlePin(item)}
-              onDelete={() => handleRemoveRecent(item.id)}
-            />
-          ))}
-        </div>
+      </div>
+      <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-2">
+        {recents.map((item) => (
+          <RecentItem
+            key={item.id}
+            item={item}
+            onClick={() => setView("task")}
+            onPin={() => handlePin(item)}
+            onDelete={() => handleRemoveRecent(item.id)}
+          />
+        ))}
       </div>
 
       {/* Footer */}
       <div
-        className="mt-2 flex shrink-0 flex-col gap-2 px-3 pb-3 pt-2"
+        className="flex shrink-0 flex-col gap-2 px-3 pb-3 pt-2"
         style={{ borderTop: "1px solid hsl(var(--border-300) / 0.12)" }}
       >
-        <UpdateCard version={`v${APP_VERSION}`} />
+        <div className="pt-2">
+          <UpdateCard version={`v${APP_VERSION}`} />
+        </div>
         <UserBar
           onSettings={() => setView("settings")}
           onLogout={() => console.log("logout")}

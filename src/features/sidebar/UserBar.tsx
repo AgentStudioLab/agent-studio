@@ -36,12 +36,18 @@ export function UserBar({
     >
       <button
         type="button"
-        className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-sidebar-accent"
+        className="flex w-full items-center gap-2.5 rounded-md px-2 py-2 text-left transition-colors hover:bg-[hsl(var(--bg-100)/0.6)]"
       >
         <InitialsAvatar initials={initials} size={28} hue="orange" />
-        <span className="min-w-0 flex-1 truncate text-[13px]">{name}</span>
-        <span className="shrink-0 text-[12px] text-muted-foreground">·</span>
-        <span className="shrink-0 text-[12px] text-muted-foreground">{plan}</span>
+        <span className="flex min-w-0 flex-1 items-center gap-1">
+          <span className="min-w-0 truncate text-[13px] text-[hsl(var(--text-100))]">
+            {name}
+          </span>
+          <span className="shrink-0 text-[12px] text-[hsl(var(--text-400))]">·</span>
+          <span className="shrink-0 text-[12px] text-[hsl(var(--text-300))]">
+            {plan}
+          </span>
+        </span>
       </button>
     </UserPopover>
   );

@@ -15,10 +15,12 @@ export const pinned: MockPinnedItem[] = [
     id: "recent-1",
     kind: "task",
     name: "扫描 ~/Workspace 找出不活跃项目",
+    status: "active",
   },
   {
-    id: "recent-3",
+    id: "pinned-weekly",
     kind: "task",
-    name: "生成 Q3 市场研究简报 PPT",
+    name: "Weekly review",
+    status: "done",
   },
 ];

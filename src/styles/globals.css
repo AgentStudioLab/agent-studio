@@ -91,9 +91,68 @@ html, body {
     .spike-loader { animation-duration: 4s !important; }
 }
 
+/* ---- Pulse-dot (status indicators: active step, running banner) ---- */
+@keyframes pulse-dot { 0%, 100% { opacity: 0.3; } 50% { opacity: 1; } }
+.pulse-dot { animation: pulse-dot 1.4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+    .pulse-dot { animation: none; opacity: 0.7; }
+}
+
+/* ---- Task chat prose stream ----
+ * Used by HTML-string `prose` ContentBlock in TaskChatStream. Scoped so
+ * list markers, links, and inline <code> pick up semantic text tokens
+ * without leaking onto neighboring chat surfaces. */
+.prose-stream ul,
+.prose-stream ol {
+    list-style-position: outside;
+}
+.prose-stream li::marker {
+    color: hsl(var(--text-400));
+}
+.prose-stream a {
+    color: hsl(var(--text-100));
+    text-decoration: underline;
+    text-decoration-color: hsl(var(--text-400) / 0.6);
+    text-underline-offset: 4px;
+}
+.prose-stream code {
+    font-family: var(--font-family-mono);
+    font-size: 0.92em;
+}
+
 /* ---- PreviewPane slide-in (right-side panel) ---- */
 @keyframes slide-in-pane {
     from { transform: translateX(60px); opacity: 0; }
     to   { transform: translateX(0);    opacity: 1; }
 }
 .animate-slide-in-pane { animation: slide-in-pane 0.28s cubic-bezier(0.4, 0, 0.2, 1); }
+
+/* ---- PreviewPane resize handle ----
+ * Chrome affordance — the 2px hairline uses raw white at low alpha as a
+ * neutral indicator that works in both light and dark mode without
+ * competing with content color. This is the documented exception to the
+ * token discipline (see CLAUDE.md / design-tokens skill). */
+.resize-handle {
+    position: absolute;
+    top: 0;
+    left: -3px;
+    bottom: 0;
+    width: 6px;
+    cursor: col-resize;
+    z-index: 30;
+}
+.resize-handle::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    width: 2px;
+    transform: translateX(-1px);
+    background: hsla(0, 0%, 100%, 0);
+    transition: background 0.15s;
+}
+.resize-handle:hover::before,
+.resize-handle.resize-handle-active::before {
+    background: hsla(0, 0%, 100%, 0.55);
+}

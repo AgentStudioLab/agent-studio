@@ -1,4 +1,3 @@
-import { MessageSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { MockRecentItem } from "@/lib/mock/types";
 import { StatusDot } from "@/shared/atoms/StatusDot";
@@ -6,6 +5,8 @@ import { SidebarItemContextMenu } from "@/features/sidebar/SidebarItemContextMen
 
 interface RecentItemProps {
   item: MockRecentItem;
+  active?: boolean;
+  isPinned?: boolean;
   onClick?: () => void;
   onPin?: () => void;
   onRename?: () => void;
@@ -16,6 +17,8 @@ interface RecentItemProps {
 
 export function RecentItem({
   item,
+  active,
+  isPinned,
   onClick,
   onPin,
   onRename,
@@ -23,38 +26,33 @@ export function RecentItem({
   onDelete,
   onMoveToProject,
 }: RecentItemProps) {
+  const status = item.kind === "task" && item.status ? item.status : "pending";
   return (
-    <div
-      className={cn(
-        "group flex items-center gap-2 rounded-md px-2 py-1.5",
-        "hover:bg-sidebar-accent",
-      )}
-    >
+    <div className="group relative w-full">
       <button
         type="button"
         onClick={onClick}
-        className="flex min-w-0 flex-1 items-center gap-2 text-left text-[13.5px]"
+        className={cn(
+          "flex w-full items-center gap-3 rounded-md py-2 pl-3 pr-9 text-left text-[13.5px] transition-colors",
+          active
+            ? "bg-[hsl(var(--bg-000))] text-[hsl(var(--text-100))]"
+            : "text-[hsl(var(--text-300))] hover:bg-[hsl(var(--bg-100))] hover:text-[hsl(var(--text-100))]",
+        )}
       >
-        <span className="shrink-0">
-          {item.kind === "task" && item.status ? (
-            <StatusDot status={item.status} size={14} />
-          ) : (
-            <MessageSquare className="size-3.5 text-muted-foreground" />
-          )}
+        <span className="flex size-3 shrink-0 items-center justify-center">
+          <StatusDot status={status} size={12} />
         </span>
-        <span className="min-w-0 flex-1 truncate">{item.title}</span>
-        <span className="shrink-0 text-xs text-muted-foreground group-hover:hidden">
-          {item.time}
-        </span>
+        <span className="min-w-0 flex-1 truncate text-left">{item.title}</span>
       </button>
       <SidebarItemContextMenu
-        pinMode="pin"
+        pinMode={isPinned ? "unpin" : "pin"}
         onPinToggle={onPin}
         onRename={onRename}
         onArchive={onArchive}
         onDelete={onDelete}
         onMoveToProject={onMoveToProject}
-        triggerClassName="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100"
+        triggerClassName="absolute right-1.5 top-1/2 -translate-y-1/2 size-auto p-1 rounded text-[hsl(var(--text-400))] hover:bg-[hsl(var(--bg-200))] hover:text-[hsl(var(--text-100))] opacity-0 group-hover:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100"
+        iconSize={13}
       />
     </div>
   );

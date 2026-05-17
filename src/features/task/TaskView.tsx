@@ -19,8 +19,11 @@ export function TaskView() {
     if (match) openPreview(match);
   };
 
+  const previewOpen = preview.open && preview.file;
+
   return (
     <AppShell
+      bareAside={Boolean(previewOpen)}
       main={
         <>
           <TaskHeader
@@ -43,8 +46,8 @@ export function TaskView() {
         </>
       }
       aside={
-        preview.open && preview.file ? (
-          <PreviewPane file={preview.file} onClose={closePreview} />
+        previewOpen ? (
+          <PreviewPane file={preview.file!} onClose={closePreview} />
         ) : (
           <TaskRightPanel
             task={inactiveProjectsTask}

@@ -3,84 +3,112 @@ import {
   File as FileIcon,
   FileSpreadsheet,
   FileText,
+  Folder,
+  Image as ImageIcon,
   Plus,
   Presentation,
 } from "lucide-react";
-import {
-  FileTree,
-  FileTreeActions,
-  FileTreeFile,
-  FileTreeIcon,
-  FileTreeName,
-} from "@/components/ai-elements/file-tree";
 import { cn } from "@/lib/utils";
 import type { MockFile } from "@/lib/mock/types";
 
 type LucideIcon = typeof FileIcon;
 
-const TYPE_META = {
-  markdown: { Icon: FileText, color: "text-[hsl(var(--accent-100))]" },
-  spreadsheet: {
-    Icon: FileSpreadsheet,
-    color: "text-[hsl(var(--success-100))]",
-  },
-  presentation: { Icon: Presentation, color: "text-[hsl(var(--brand-100))]" },
-  code: { Icon: FileText, color: "text-[hsl(var(--accent-pro-100))]" },
-  image: { Icon: FileIcon, color: "text-muted-foreground" },
-  generic: { Icon: FileIcon, color: "text-muted-foreground" },
-} satisfies Record<MockFile["type"], { Icon: LucideIcon; color: string }>;
+// Per-file-type icon + color. The two literal HSL values (xlsx green, pptx
+// terracotta) are categorical-palette identifiers from the prototype — they
+// brand the file format itself (Excel green, PowerPoint orange-red), much
+// like InitialsAvatar's hue picker. This is the documented exception clause
+// in the design-tokens skill: minting --xlsx-100 / --pptx-100 semantic tokens
+// would just rename primitives 1:1 with no added meaning.
+const TYPE_META: Record<
+  MockFile["type"],
+  { Icon: LucideIcon; color: string }
+> = {
+  markdown: { Icon: FileText, color: "hsl(var(--text-400))" },
+  spreadsheet: { Icon: FileSpreadsheet, color: "hsl(125 40% 50%)" },
+  presentation: { Icon: Presentation, color: "hsl(15 75% 55%)" },
+  code: { Icon: FileText, color: "hsl(var(--accent-pro-100))" },
+  image: { Icon: ImageIcon, color: "hsl(var(--text-400))" },
+  generic: { Icon: FileIcon, color: "hsl(var(--text-400))" },
+};
 
 interface FilesTabProps {
   files: MockFile[];
+  folderName?: string;
   onOpenFile?: (file: MockFile) => void;
   onAddFiles?: () => void;
 }
 
-export function FilesTab({ files, onOpenFile, onAddFiles }: FilesTabProps) {
+export function FilesTab({
+  files,
+  folderName = "stuio",
+  onOpenFile,
+  onAddFiles,
+}: FilesTabProps) {
   const handleSelect = useCallback(
-    (path: string) => {
-      const file = files.find((f) => f.path === path);
-      if (file) onOpenFile?.(file);
+    (file: MockFile) => {
+      onOpenFile?.(file);
     },
-    [files, onOpenFile]
+    [onOpenFile]
   );
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex-1 overflow-y-auto px-2 py-3">
-        <FileTree className="border-none bg-transparent" onSelect={handleSelect}>
-          {files.map((file) => {
-            const meta = TYPE_META[file.type];
-            return (
-              <FileTreeFile key={file.path} path={file.path} name={file.name}>
-                {/* Spacer matches FileTreeFile's default layout (no folder chevron at root) */}
-                <span className="size-4 shrink-0" />
-                <FileTreeIcon>
-                  <meta.Icon className={cn("size-4", meta.color)} />
-                </FileTreeIcon>
-                <FileTreeName>{file.name}</FileTreeName>
-                {file.isNew && (
-                  <FileTreeActions>
-                    <span className="rounded-sm bg-[hsl(var(--success-100)/0.15)] px-1.5 py-0.5 font-medium text-[hsl(var(--success-100))] text-xs">
-                      new
-                    </span>
-                  </FileTreeActions>
-                )}
-              </FileTreeFile>
-            );
-          })}
-        </FileTree>
+    <div>
+      <div className="flex items-center gap-2 px-2 pt-3 pb-2">
+        <Folder size={14} className="text-text-300" />
+        <span className="text-[13.5px] font-medium text-text-100">
+          {folderName}
+        </span>
+        <span className="ml-auto text-[11px] text-text-400 font-mono">
+          {files.length} files
+        </span>
       </div>
-      <div className="border-t border-border px-2 py-2">
-        <button
-          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-muted-foreground text-sm hover:bg-muted hover:text-foreground"
-          onClick={onAddFiles}
-          type="button"
-        >
-          <Plus className="size-4" />
-          Add files to working tree
-        </button>
+      <div className="flex flex-col gap-1">
+        {files.map((file) => {
+          const meta = TYPE_META[file.type];
+          const Icon = meta.Icon;
+          return (
+            <button
+              key={file.path}
+              type="button"
+              onClick={() => handleSelect(file)}
+              className="flex items-center gap-2.5 px-2 py-1.5 rounded-md hover:bg-bg-200/60 transition text-left"
+            >
+              <Icon
+                size={14}
+                className="shrink-0"
+                style={{ color: meta.color }}
+              />
+              <span className="text-[13px] text-text-200 truncate flex-1">
+                {file.name}
+              </span>
+              {file.isNew && (
+                <span
+                  className="text-[10.5px] px-1.5 py-px rounded shrink-0"
+                  style={{
+                    background: "hsl(var(--brand-100) / 0.15)",
+                    color: "hsl(var(--brand-100))",
+                  }}
+                >
+                  new
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
+      <button
+        type="button"
+        onClick={onAddFiles}
+        className={cn(
+          "mt-3 w-full text-[12.5px] text-text-400 hover:text-text-200",
+          "px-2 py-2 rounded-md flex items-center justify-center gap-1.5",
+          "transition hover:bg-bg-200/40"
+        )}
+        style={{ border: "1px dashed hsl(var(--border-300) / 0.2)" }}
+      >
+        <Plus size={12} />
+        Add files to working tree
+      </button>
     </div>
   );
 }

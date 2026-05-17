@@ -15,13 +15,20 @@ export function NavItem({ icon: Icon, label, active, onClick }: NavItemProps) {
       onClick={onClick}
       data-active={active ? "true" : undefined}
       className={cn(
-        "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm",
-        "text-sidebar-foreground hover:bg-sidebar-accent",
-        "data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium",
+        "flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-[14px] transition-colors",
+        "text-[hsl(var(--text-200))] hover:bg-[hsl(var(--bg-100))] hover:text-[hsl(var(--text-100))]",
+        "data-[active=true]:bg-[hsl(var(--bg-000))] data-[active=true]:text-[hsl(var(--text-100))]",
       )}
     >
-      <Icon className="size-4 shrink-0 text-muted-foreground" />
-      <span className="truncate">{label}</span>
+      <Icon
+        className={cn(
+          "size-4 shrink-0",
+          active
+            ? "text-[hsl(var(--text-100))]"
+            : "text-[hsl(var(--text-300))]",
+        )}
+      />
+      <span className="flex-1 truncate">{label}</span>
     </button>
   );
 }
