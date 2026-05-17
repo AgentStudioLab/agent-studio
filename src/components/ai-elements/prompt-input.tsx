@@ -919,7 +919,17 @@ export const PromptInput = ({
         ref={formRef}
         {...props}
       >
-        <InputGroup className="overflow-hidden rounded-2xl">{children}</InputGroup>
+        <InputGroup
+          className={cn(
+            "overflow-hidden rounded-2xl",
+            // Neutralize shadcn InputGroup's focus-within ring (3px brand ring +
+            // border color shift) — prototype uses a static border, no focus glow.
+            "has-[[data-slot=input-group-control]:focus-visible]:border-input",
+            "has-[[data-slot=input-group-control]:focus-visible]:ring-0",
+          )}
+        >
+          {children}
+        </InputGroup>
       </form>
     </>
   );
