@@ -53,9 +53,14 @@ html, body {
 .u-hidden-scrollbar { scrollbar-width: none; }
 .u-hidden-scrollbar::-webkit-scrollbar { display: none; }
 
-/* ---- Focus ring ---- */
+/* ---- Focus ring ----
+ * Set color + offset only — DO NOT use the `outline` shorthand here, because
+ * shorthand defines outline-style:solid which then defeats per-element
+ * `outline-style: none` (Tailwind v4 `outline-none` utility) due to later
+ * cascade order. Elements that want focus chrome opt-in by NOT setting
+ * outline-style: none. */
 :focus-visible {
-    outline: 2px solid hsl(var(--accent-100));
+    outline-color: hsl(var(--accent-100));
     outline-offset: 2px;
     border-radius: var(--radius-xs);
 }
@@ -79,6 +84,12 @@ html, body {
 /* ---- Slow spin (BrandStar loading state) ---- */
 @keyframes spin-slow { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 .animate-spin-slow { animation: spin-slow 2s linear infinite; }
+
+/* ---- Spike loader (12-spoke chase, steps() easing required) ---- */
+@keyframes spike-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+    .spike-loader { animation-duration: 4s !important; }
+}
 
 /* ---- PreviewPane slide-in (right-side panel) ---- */
 @keyframes slide-in-pane {

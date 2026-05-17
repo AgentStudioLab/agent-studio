@@ -20,6 +20,7 @@ import {
   DropdownMenuSubContent,
 } from "@/components/ui/dropdown-menu";
 import { useAppShell } from "@/app/AppShellContext";
+import { cn } from "@/lib/utils";
 import { projects as mockProjects } from "@/lib/mock/projects";
 
 interface TaskHeaderProps {
@@ -45,9 +46,16 @@ export function TaskHeader({
   onArchive,
   onDelete,
 }: TaskHeaderProps) {
-  const { toggleAside } = useAppShell();
+  const { toggleAside, sidebarCollapsed } = useAppShell();
   return (
-    <header className="flex h-12 shrink-0 items-center gap-3 px-6">
+    <header
+      className={cn(
+        "flex h-12 shrink-0 items-center gap-3 px-6",
+        // Leave room for the absolute-positioned SidebarToggle (~40px footprint
+        // at left-3) so the title button doesn't crowd it.
+        sidebarCollapsed && "pl-14",
+      )}
+    >
       <DropdownMenu>
         <DropdownMenuTrigger
           aria-label="Task menu"
