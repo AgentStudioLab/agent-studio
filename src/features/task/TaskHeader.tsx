@@ -18,6 +18,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuSubContent,
 } from "@/components/ui/dropdown-menu";
+import { projects as mockProjects } from "@/lib/mock/projects";
 
 interface TaskHeaderProps {
   title: string;
@@ -31,14 +32,9 @@ interface TaskHeaderProps {
   onDelete?: () => void;
 }
 
-const DEFAULT_PROJECTS = [
-  { id: "jay", name: "jay" },
-  { id: "webCode", name: "webCode" },
-];
-
 export function TaskHeader({
   title,
-  projects = DEFAULT_PROJECTS,
+  projects = mockProjects,
   onSchedule,
   onTurnIntoSkill,
   onMoveToProject,
