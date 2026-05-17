@@ -13,6 +13,21 @@ const MIN_W = 360;
 const MAX_W = 720;
 const DEFAULT_W = 520;
 
+/**
+ * Width the preview content is designed for. Anything narrower zooms the
+ * whole preview DOWN proportionally (so tables don't column-squeeze and
+ * paragraphs don't reflow); anything wider zooms it UP. Picked so the
+ * default pane width (520) gives ~1.0× content. Uses CSS `zoom` instead of
+ * `transform: scale` because zoom recomputes layout — scrollbar sizing
+ * stays correct and the parent's flex-1 height accounts for the scaled
+ * content. Clamped to a sane range so extreme widths don't produce
+ * unreadable or comically-large text.
+ */
+const DESIGN_CONTENT_WIDTH = 480;
+const PANE_BODY_PADDING = 24; // p-3 = 12px each side
+const MIN_ZOOM = 0.6;
+const MAX_ZOOM = 1.5;
+
 // Mock opener mapping by file type (MockFile has no `opener` field of its own).
 const OPENER_BY_TYPE: Record<MockFile["type"], string | null> = {
   markdown: "VS Code",
@@ -159,9 +174,26 @@ export function PreviewPane({ file, onClose }: PreviewPaneProps) {
         </button>
       </header>
 
-      {/* Body */}
-      <div className="flex-1 space-y-3 overflow-y-auto p-3">
-        <PreviewContent file={file} />
+      {/* Body — zoom the content proportionally with the pane width so tables /
+          slides / docs scale rather than reflow. `zoom` chosen over
+          `transform: scale` because it affects layout (scrollbar bounds + flex
+          height adapt). The wrapper keeps a constant 480px design width; the
+          inner scales relative to that. */}
+      <div className="flex-1 overflow-y-auto p-3">
+        <div
+          className="space-y-3"
+          style={{
+            zoom: Math.min(
+              MAX_ZOOM,
+              Math.max(
+                MIN_ZOOM,
+                Math.max(0, width - PANE_BODY_PADDING) / DESIGN_CONTENT_WIDTH,
+              ),
+            ),
+          }}
+        >
+          <PreviewContent file={file} />
+        </div>
       </div>
     </aside>
   );
