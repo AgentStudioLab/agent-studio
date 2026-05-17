@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { InitialsAvatar } from "@/features/_atoms/InitialsAvatar";
+import { InitialsAvatar } from "@/shared/atoms/InitialsAvatar";
 import type { MockSkill, MockMcpServer } from "@/lib/mock/types";
 
 interface ContextTabProps {

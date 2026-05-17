@@ -1,5 +1,5 @@
 import { ChevronRight } from "lucide-react";
-import { InitialsAvatar } from "@/features/_atoms/InitialsAvatar";
+import { InitialsAvatar } from "@/shared/atoms/InitialsAvatar";
 import { cn } from "@/lib/utils";
 import type { MockSkill } from "@/lib/mock/types";
 

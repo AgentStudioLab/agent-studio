@@ -1,7 +1,7 @@
 import { MessageSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { MockRecentItem } from "@/lib/mock/types";
-import { StatusDot } from "@/features/_atoms/StatusDot";
+import { StatusDot } from "@/shared/atoms/StatusDot";
 import { SidebarItemContextMenu } from "@/features/sidebar/SidebarItemContextMenu";
 
 interface RecentItemProps {

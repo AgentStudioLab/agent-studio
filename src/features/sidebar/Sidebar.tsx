@@ -9,7 +9,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { useAppShell } from "@/lib/AppShellContext";
+import { useAppShell } from "@/app/AppShellContext";
 import { pinned as pinnedFixtures } from "@/lib/mock/pinned";
 import { recents as recentFixtures } from "@/lib/mock/recents";
 import type { MockPinnedItem, MockRecentItem } from "@/lib/mock/types";

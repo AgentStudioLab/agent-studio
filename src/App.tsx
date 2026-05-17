@@ -1,6 +1,6 @@
-import { AppShellProvider } from "@/lib/AppShellContext";
+import { AppShellProvider } from "@/app/AppShellContext";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { RouterView } from "@/views";
+import { RouterView } from "@/app/RouterView";
 
 function App() {
   return (

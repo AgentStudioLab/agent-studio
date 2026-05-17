@@ -1,6 +1,6 @@
 import { Star, Check, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { InitialsAvatar } from "@/features/_atoms/InitialsAvatar";
+import { InitialsAvatar } from "@/shared/atoms/InitialsAvatar";
 import type { MockPlugin } from "@/lib/mock/types";
 
 interface PluginCardProps {

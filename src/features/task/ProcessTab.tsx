@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
-import { StatusDot } from "@/features/_atoms/StatusDot";
+import { StatusDot } from "@/shared/atoms/StatusDot";
 import type { MockTask } from "@/lib/mock/types";
 
 interface ProcessTabProps {

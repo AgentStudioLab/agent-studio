@@ -13,6 +13,45 @@ Three independent subprojects in one repo, **no workspaces**:
 
 Vite MUST live at the repo root because `tauri.conf.json` has `frontendDist: "../dist"` resolved relative to `src-tauri/`. Do not introduce a `package.json` workspace setup.
 
+## Frontend directory layout (`src/`)
+
+Feature-folder + co-location convention. Each feature owns its page composer + private subcomponents in the same directory. No `views/` folder. No `index.ts` barrels (breaks tree-shaking per `vercel-react-best-practices` `bundle-barrel-imports`).
+
+```
+src/
+  app/                          # App-level chrome + routing
+    AppShell.tsx                # 3-pane layout (sidebar + main + optional aside)
+    AppShellContext.tsx         # currentView + setView + preview + hideSidebar
+    RouterView.tsx              # switch-on-currentView routing
+    MacTitlebar.tsx             # 36px overlay titlebar (Tauri)
+  features/                     # Each feature self-contained
+    new-task/                   # NewTaskView
+    task/                       # TaskView + TaskHeader/ChatStream/RightPanel/PreviewPane/tabs
+    projects/                   # ProjectsView + ProjectCard
+    project-detail/             # ProjectDetailView + InstructionsCard/ScheduledMiniCard/etc.
+    scheduled/                  # ScheduledListView + ScheduledDetailView + cards
+    customize/                  # CustomizeView + Nav/Home + skills/agents/plugins bodies
+    settings/                   # SettingsView + ProfileForm
+    sidebar/                    # Sidebar + NavItem/PinnedItem/RecentItem/UserBar
+  shared/
+    atoms/                      # BrandStar / InitialsAvatar / StatusDot / ThemeSegment
+  components/
+    ui/                         # shadcn primitives (do not modify by hand)
+    ai-elements/                # vercel/ai-elements (do not modify by hand)
+  lib/
+    mock/                       # static fixtures (typed)
+    sidecar-client.ts
+    useThemeMode.ts
+    utils.ts
+  styles/                       # 3-tier design tokens (see convention #7)
+```
+
+**Rules:**
+- View = thin composer (< 80 lines). Logic lives in feature-local hooks/utils; UI in private subcomponents.
+- Private subcomponents stay inside their feature. Promote to `shared/` only when a second feature needs them.
+- Import via direct path (`@/features/task/TaskView`), never via barrel.
+- New feature → new directory under `features/`. Don't add it to `app/` or `shared/`.
+
 ## Common commands
 
 ```bash

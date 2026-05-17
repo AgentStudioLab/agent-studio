@@ -8,7 +8,7 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
-import { InitialsAvatar } from "@/features/_atoms/InitialsAvatar";
+import { InitialsAvatar } from "@/shared/atoms/InitialsAvatar";
 
 const WORK_OPTIONS = [
   { value: "engineer", label: "Software engineer" },

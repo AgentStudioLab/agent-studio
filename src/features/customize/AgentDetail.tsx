@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Circle, FolderOpen, MoreHorizontal, Pencil, Plus } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
-import { InitialsAvatar } from "@/features/_atoms/InitialsAvatar";
+import { InitialsAvatar } from "@/shared/atoms/InitialsAvatar";
 import { cn } from "@/lib/utils";
 import { loadedSkills } from "@/lib/mock/skills";
 import { mcpServers } from "@/lib/mock/mcp-servers";
