@@ -22,6 +22,8 @@ interface AppShellContextValue {
   currentView: ViewKey;
   setView: (v: ViewKey) => void;
   hideSidebar: boolean;
+  sidebarCollapsed: boolean;
+  setSidebarCollapsed: (collapsed: boolean) => void;
   asideOpen: boolean;
   toggleAside: () => void;
   preview: PreviewState;
@@ -39,6 +41,7 @@ export function AppShellProvider({
   initialView?: ViewKey;
 }) {
   const [currentView, setView] = useState<ViewKey>(initialView);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [asideOpen, setAsideOpen] = useState(true);
   const [preview, setPreview] = useState<PreviewState>({ file: null, open: false });
   const value = useMemo(
@@ -46,13 +49,15 @@ export function AppShellProvider({
       currentView,
       setView,
       hideSidebar: FULLSCREEN_VIEWS.includes(currentView),
+      sidebarCollapsed,
+      setSidebarCollapsed,
       asideOpen,
       toggleAside: () => setAsideOpen((v) => !v),
       preview,
       openPreview: (file: MockFile) => setPreview({ file, open: true }),
       closePreview: () => setPreview((p) => ({ ...p, open: false })),
     }),
-    [currentView, asideOpen, preview],
+    [currentView, sidebarCollapsed, asideOpen, preview],
   );
   return <AppShellContext.Provider value={value}>{children}</AppShellContext.Provider>;
 }
