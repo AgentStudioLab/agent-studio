@@ -125,8 +125,8 @@ export function SidebarContent() {
       {/* Pinned */}
       {pinned.length > 0 && (
         <>
-          <div className="px-3 pb-2 pt-6">
-            <div className="mb-2 px-2 text-[11px] font-medium uppercase tracking-wider text-[hsl(var(--text-400))]">
+          <div className="px-3 pb-1 pt-5">
+            <div className="px-2 text-[12px] font-medium text-[hsl(var(--text-400))]">
               Pinned
             </div>
           </div>
@@ -147,8 +147,8 @@ export function SidebarContent() {
       )}
 
       {/* Recents */}
-      <div className="px-3 pb-2 pt-5">
-        <div className="mb-2 px-2 text-[11px] font-medium uppercase tracking-wider text-[hsl(var(--text-400))]">
+      <div className="px-3 pb-1 pt-4">
+        <div className="px-2 text-[12px] font-medium text-[hsl(var(--text-400))]">
           Recents
         </div>
       </div>

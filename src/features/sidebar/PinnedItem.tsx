@@ -32,7 +32,7 @@ export function PinnedItem({
         type="button"
         onClick={onClick}
         className={cn(
-          "flex w-full items-center gap-3 rounded-md py-2 pl-3 pr-9 text-left text-[14px] font-medium transition-colors",
+          "flex w-full items-center gap-3 rounded-md py-1.5 pl-3 pr-9 text-left text-[14px] transition-colors",
           active
             ? "bg-[hsl(var(--bg-000))] text-[hsl(var(--text-100))]"
             : "text-[hsl(var(--text-200))] hover:bg-[hsl(var(--bg-100))] hover:text-[hsl(var(--text-100))]",

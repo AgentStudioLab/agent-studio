@@ -85,10 +85,13 @@ html, body {
 @keyframes spin-slow { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 .animate-spin-slow { animation: spin-slow 2s linear infinite; }
 
-/* ---- Spike loader (12-spoke chase, steps() easing required) ---- */
-@keyframes spike-spin { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) {
-    .spike-loader { animation-duration: 4s !important; }
+/* ---- Sprite loader (frame-by-frame mascot via WAAPI)
+ * Inner div hosts a vertically-stacked SVG sprite sheet; WAAPI animates
+ * translateY on the inner div with steps() easing. This rule only sizes
+ * the injected SVG to fill the inner div — animation lives in JS. */
+.sprite-loader-inner > svg {
+    display: block;
+    width: 100%;
 }
 
 /* ---- Pulse-dot (status indicators: active step, running banner) ---- */

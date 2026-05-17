@@ -15,7 +15,7 @@ export function NavItem({ icon: Icon, label, active, onClick }: NavItemProps) {
       onClick={onClick}
       data-active={active ? "true" : undefined}
       className={cn(
-        "flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-[14px] transition-colors",
+        "flex w-full items-center gap-3 rounded-md px-3 py-1.5 text-left text-[14px] transition-colors",
         "text-[hsl(var(--text-200))] hover:bg-[hsl(var(--bg-100))] hover:text-[hsl(var(--text-100))]",
         "data-[active=true]:bg-[hsl(var(--bg-000))] data-[active=true]:text-[hsl(var(--text-100))]",
       )}

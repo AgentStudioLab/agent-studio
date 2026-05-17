@@ -21,6 +21,6 @@ export const pinned: MockPinnedItem[] = [
     id: "pinned-weekly",
     kind: "task",
     name: "Weekly review",
-    status: "done",
+    status: "pending",
   },
 ];
