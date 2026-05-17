@@ -11,6 +11,7 @@ import {
 } from "@/features/customize/CustomizeHome";
 import { SkillsBody } from "@/features/customize/SkillsBody";
 import { AgentsBody } from "@/features/customize/AgentsBody";
+import { PluginsBody } from "@/features/customize/PluginsBody";
 
 interface CustomizeViewProps {
   initialSection?: CustomizeNavSection;
@@ -47,11 +48,7 @@ export function CustomizeView({ initialSection = "home" }: CustomizeViewProps) {
           )}
           {section === "skills" && <SkillsBody />}
           {section === "agents" && <AgentsBody />}
-          {section === "plugins" && (
-            <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-              Plugins marketplace coming in Task 12.
-            </div>
-          )}
+          {section === "plugins" && <PluginsBody />}
         </main>
       </div>
     </div>
