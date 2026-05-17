@@ -62,3 +62,80 @@ export interface MockMcpServer {
   description: string;
   connected: boolean;
 }
+
+export interface MockProject {
+  id: string;
+  name: string;
+  lastActivity: string; // ISO or "2 hours ago"
+  instructions?: string;
+  scheduledTasks?: string[]; // scheduled task IDs
+  computerContext?: { path: string; folderName: string }[];
+  memory?: string[];
+  recentConversations?: Array<{
+    id: string;
+    title: string;
+    preview: string;
+    time: string;
+  }>;
+}
+
+export type Frequency = "manual" | "hourly" | "daily" | "weekdays" | "weekly";
+
+export interface MockScheduledTask {
+  id: string;
+  name: string;
+  description: string;
+  prompt: string;
+  frequency: Frequency;
+  timeOfDay?: string; // "09:00"
+  nextRun?: string;
+  active: boolean;
+  alwaysAllowed?: string[]; // approvals
+}
+
+export interface MockAgent {
+  id: string;
+  // Categorical primitive: agent emoji is a semantic identity marker per PRD § 4.7.3,
+  // not decoration. design-tokens skill exception clause allows this.
+  emoji: string;
+  name: string;
+  description: string;
+  systemPrompt: string;
+  skills: string[]; // skill IDs
+  mcpServers: string[]; // server IDs
+  allowedProjects: string[] | "all";
+  category: "my" | "built-in";
+}
+
+export interface MockPlugin {
+  id: string;
+  initials: string; // 2-letter avatar
+  hue: "orange" | "blue" | "purple" | "red" | "green" | "amber" | "stone";
+  name: string;
+  author: string;
+  description: string;
+  rating: number;
+  installs: number;
+  installed: boolean;
+  category:
+    | "productivity"
+    | "research"
+    | "development"
+    | "communication"
+    | "design"
+    | "data";
+}
+
+export interface MockRecentItem {
+  id: string;
+  kind: "task" | "conversation";
+  title: string;
+  status?: StepStatus;
+  time: string;
+}
+
+export interface MockPinnedItem {
+  id: string;
+  kind: "task" | "project";
+  name: string;
+}
