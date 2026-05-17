@@ -11,6 +11,8 @@ type ViewKey =
   | "customize"
   | "settings";
 
+const FULLSCREEN_VIEWS: ViewKey[] = ["customize", "settings"];
+
 interface PreviewState {
   file: MockFile | null;
   open: boolean;
@@ -19,6 +21,7 @@ interface PreviewState {
 interface AppShellContextValue {
   currentView: ViewKey;
   setView: (v: ViewKey) => void;
+  hideSidebar: boolean;
   preview: PreviewState;
   openPreview: (file: MockFile) => void;
   closePreview: () => void;
@@ -39,6 +42,7 @@ export function AppShellProvider({
     () => ({
       currentView,
       setView,
+      hideSidebar: FULLSCREEN_VIEWS.includes(currentView),
       preview,
       openPreview: (file: MockFile) => setPreview({ file, open: true }),
       closePreview: () => setPreview((p) => ({ ...p, open: false })),

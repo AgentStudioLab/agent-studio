@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Sidebar } from "@/features/sidebar/Sidebar";
+import { useAppShell } from "@/lib/AppShellContext";
 
 interface AppShellProps {
   main: ReactNode;
@@ -7,9 +8,10 @@ interface AppShellProps {
 }
 
 export function AppShell({ main, aside }: AppShellProps) {
+  const { hideSidebar } = useAppShell();
   return (
     <div className="flex h-screen min-h-screen w-screen overflow-hidden bg-background text-foreground">
-      <Sidebar />
+      {!hideSidebar && <Sidebar />}
       <main className="flex min-w-0 flex-1 flex-col overflow-y-auto bg-background">{main}</main>
       {aside && (
         <aside
