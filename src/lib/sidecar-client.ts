@@ -4,6 +4,19 @@ export type SidecarInfo = { port: number; token: string };
 
 let cached: Promise<SidecarInfo> | null = null;
 
+/** True when running inside the Tauri webview (vs plain browser via `pnpm dev`). */
+const isTauri =
+  typeof window !== "undefined" &&
+  ("__TAURI_INTERNALS__" in window || "__TAURI__" in window);
+
+/**
+ * Fixed dev defaults used when frontend runs in a browser (e.g. via
+ * `pnpm dev` + `pnpm dev:server`). Must match the `--port=` and `--token=`
+ * flags in package.json's dev:server script.
+ */
+const BROWSER_DEV_PORT = 4123;
+const BROWSER_DEV_TOKEN = "dev-token";
+
 /**
  * Returns sidecar connection info, blocking until the sidecar HTTP server is
  * actually accepting connections. Rust spawns the sidecar process and stores
@@ -21,7 +34,9 @@ const READY_PROBE_TIMEOUT_MS = 15_000;
 export function getSidecarInfo(): Promise<SidecarInfo> {
   if (cached) return cached;
   cached = (async () => {
-    const info = await invoke<SidecarInfo>("get_sidecar_info");
+    const info: SidecarInfo = isTauri
+      ? await invoke<SidecarInfo>("get_sidecar_info")
+      : { port: BROWSER_DEV_PORT, token: BROWSER_DEV_TOKEN };
     const start = Date.now();
     while (Date.now() - start < READY_PROBE_TIMEOUT_MS) {
       try {

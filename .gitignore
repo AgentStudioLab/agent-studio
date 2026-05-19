@@ -41,6 +41,11 @@ src-tauri/binaries/agent-studio-sidecar*
 # Bun build artifacts
 sidecar/dist
 
+# Local dev DB (from `pnpm dev:server`)
+sidecar/dev.db
+sidecar/dev.db-wal
+sidecar/dev.db-shm
+
 .superpowers/
 
 *storybook.log
