@@ -4,6 +4,11 @@ import { migrate } from "../../src/db";
 import {
   createConversation,
   listConversations,
+  getConversation,
+  getMessages,
+  updatePin,
+  updateTitle,
+  deleteConversation,
 } from "../../src/services/conversations";
 
 let db: Database;
@@ -57,5 +62,60 @@ describe("listConversations", () => {
     const rows = listConversations(db, { limit: 10, pinnedOnly: true });
     expect(rows).toHaveLength(1);
     expect(rows[0]!.id).toBe(a.id);
+  });
+});
+
+describe("getConversation", () => {
+  it("returns conversation by id", () => {
+    const a = createConversation(db, { prompt: "x", mode: "ask" });
+    const got = getConversation(db, a.id);
+    expect(got?.id).toBe(a.id);
+  });
+
+  it("returns null when missing", () => {
+    expect(getConversation(db, "01HZZZZZZZZZZZZZZZZZZZZZZZ")).toBeNull();
+  });
+});
+
+describe("getMessages", () => {
+  it("returns messages ordered by created_at ASC", async () => {
+    const c = createConversation(db, { prompt: "p1", mode: "ask" });
+    await new Promise((r) => setTimeout(r, 5));
+    db.prepare(
+      `INSERT INTO messages (id, conversation_id, role, blocks_json, created_at, finish_reason, error_text)
+       VALUES ('msg-asst-1', ?, 'assistant', '[{"type":"text","text":"hi"}]', ?, 'end_turn', NULL)`,
+    ).run(c.id, Date.now());
+    const msgs = getMessages(db, c.id);
+    expect(msgs.map((m) => m.role)).toEqual(["user", "assistant"]);
+    expect(msgs[1]!.blocks).toEqual([{ type: "text", text: "hi" }]);
+  });
+});
+
+describe("updatePin", () => {
+  it("toggles pinned + bumps updated_at", async () => {
+    const c = createConversation(db, { prompt: "x", mode: "ask" });
+    await new Promise((r) => setTimeout(r, 5));
+    updatePin(db, c.id, true);
+    const got = getConversation(db, c.id)!;
+    expect(got.pinned).toBe(true);
+    expect(got.updatedAt).toBeGreaterThan(c.updatedAt);
+  });
+});
+
+describe("updateTitle", () => {
+  it("updates title", () => {
+    const c = createConversation(db, { prompt: "x", mode: "ask" });
+    updateTitle(db, c.id, "renamed");
+    expect(getConversation(db, c.id)!.title).toBe("renamed");
+  });
+});
+
+describe("deleteConversation", () => {
+  it("cascade deletes messages", () => {
+    const c = createConversation(db, { prompt: "x", mode: "ask" });
+    deleteConversation(db, c.id);
+    expect(getConversation(db, c.id)).toBeNull();
+    const msgs = db.prepare("SELECT COUNT(*) as n FROM messages WHERE conversation_id = ?").get(c.id) as { n: number };
+    expect(msgs.n).toBe(0);
   });
 });

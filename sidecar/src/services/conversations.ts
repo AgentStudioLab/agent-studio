@@ -4,6 +4,7 @@ import type {
   Conversation,
   ConversationMode,
   CreateConversationInput,
+  Message,
 } from "../types";
 
 interface ConversationRow {
@@ -75,4 +76,58 @@ export function listConversations(
     )
     .all(opts.limit) as ConversationRow[];
   return rows.map(rowToConversation);
+}
+
+interface MessageRow {
+  id: string;
+  conversation_id: string;
+  role: "user" | "assistant";
+  blocks_json: string;
+  created_at: number;
+  finish_reason: string | null;
+  error_text: string | null;
+}
+
+export function getConversation(db: Database, id: string): Conversation | null {
+  const row = db.prepare("SELECT * FROM conversations WHERE id = ?").get(id) as
+    | ConversationRow
+    | undefined;
+  return row ? rowToConversation(row) : null;
+}
+
+export function getMessages(db: Database, conversationId: string) {
+  const rows = db
+    .prepare(
+      "SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at ASC",
+    )
+    .all(conversationId) as MessageRow[];
+  return rows.map((r) => ({
+    id: r.id,
+    conversationId: r.conversation_id,
+    role: r.role,
+    blocks: JSON.parse(r.blocks_json),
+    createdAt: r.created_at,
+    finishReason: r.finish_reason as Message["finishReason"],
+    errorText: r.error_text,
+  }));
+}
+
+export function updatePin(db: Database, id: string, pinned: boolean): void {
+  db.prepare("UPDATE conversations SET pinned = ?, updated_at = ? WHERE id = ?").run(
+    pinned ? 1 : 0,
+    Date.now(),
+    id,
+  );
+}
+
+export function updateTitle(db: Database, id: string, title: string): void {
+  db.prepare("UPDATE conversations SET title = ?, updated_at = ? WHERE id = ?").run(
+    title,
+    Date.now(),
+    id,
+  );
+}
+
+export function deleteConversation(db: Database, id: string): void {
+  db.prepare("DELETE FROM conversations WHERE id = ?").run(id);
 }
