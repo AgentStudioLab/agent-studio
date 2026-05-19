@@ -23,6 +23,21 @@ fn get_sidecar_info(state: State<'_, SidecarInfo>) -> SidecarInfo {
     state.inner().clone()
 }
 
+#[tauri::command]
+async fn set_api_key(
+    app: tauri::AppHandle,
+    key: String,
+) -> Result<(), String> {
+    let store = app.store("settings.json").map_err(|e| e.to_string())?;
+    if key.is_empty() {
+        store.delete("anthropic_api_key");
+    } else {
+        store.set("anthropic_api_key", key);
+    }
+    store.save().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 fn spawn_sidecar(app: &AppHandle) -> Result<SidecarInfo, Box<dyn std::error::Error>> {
     let port = portpicker::pick_unused_port().ok_or("no free port")?;
     let token = Alphanumeric.sample_string(&mut rand::rng(), 32);
@@ -83,7 +98,7 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .manage(SidecarChild::default())
-        .invoke_handler(tauri::generate_handler![get_sidecar_info])
+        .invoke_handler(tauri::generate_handler![get_sidecar_info, set_api_key])
         .setup(|app| {
             if cfg!(debug_assertions) {
                 app.handle().plugin(
