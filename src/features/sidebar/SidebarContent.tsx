@@ -1,6 +1,11 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { togglePin as togglePinApi } from "@/lib/data/conversations";
+import {
+  useRecentConversations,
+  usePinnedConversations,
+  useTogglePinMutation,
+} from "@/lib/data/queries";
+import type { Conversation } from "@/lib/data/types";
 import {
   Briefcase,
   Clock,
@@ -19,12 +24,37 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useAppShell } from "@/app/AppShellContext";
-import type { MockPinnedItem, MockRecentItem } from "@/lib/mock/types";
+import type { MockPinnedItem, MockRecentItem, Status } from "@/lib/mock/types";
 import { NavItem } from "@/features/sidebar/NavItem";
 import { PinnedItem } from "@/features/sidebar/PinnedItem";
 import { RecentItem } from "@/features/sidebar/RecentItem";
 import { UpdateCard } from "@/features/sidebar/UpdateCard";
 import { UserBar } from "@/features/sidebar/UserBar";
+
+function statusOf(c: Conversation): Status {
+  if (c.status === "active") return "active";
+  if (c.status === "done") return "done";
+  return "failed";
+}
+
+function toRecentItem(c: Conversation): MockRecentItem {
+  return {
+    id: c.id,
+    kind: "conversation",
+    title: c.title,
+    status: statusOf(c),
+    time: new Date(c.updatedAt).toLocaleString(),
+  };
+}
+
+function toPinnedItem(c: Conversation): MockPinnedItem {
+  return {
+    id: c.id,
+    kind: "task",
+    name: c.title,
+    status: statusOf(c),
+  };
+}
 
 const APP_VERSION = "0.1.0";
 
@@ -40,30 +70,28 @@ export function SidebarContent() {
     setActiveTaskId,
     sidebarCollapsed,
     setSidebarCollapsed,
-    pinned,
-    setPinned,
-    recents,
-    setRecents,
-    refreshRecentsAndPinned,
   } = useAppShell();
   const { t } = useTranslation();
   const [searchOpen, setSearchOpen] = useState(false);
 
-  const handlePin = async (recent: MockRecentItem) => {
-    await togglePinApi(recent.id, true);
-    await refreshRecentsAndPinned();
+  const { data: recentsData = [] } = useRecentConversations();
+  const { data: pinnedData = [] } = usePinnedConversations();
+  const togglePinMutation = useTogglePinMutation();
+
+  const recents = useMemo(() => recentsData.map(toRecentItem), [recentsData]);
+  const pinned = useMemo(() => pinnedData.map(toPinnedItem), [pinnedData]);
+
+  const handlePin = (recent: MockRecentItem) => {
+    togglePinMutation.mutate({ id: recent.id, pinned: true });
   };
 
-  const handleUnpin = async (item: MockPinnedItem) => {
-    await togglePinApi(item.id, false);
-    await refreshRecentsAndPinned();
+  const handleUnpin = (item: MockPinnedItem) => {
+    togglePinMutation.mutate({ id: item.id, pinned: false });
   };
 
-  const handleRemoveRecent = (id: string) =>
-    setRecents((prev) => prev.filter((r) => r.id !== id));
-
-  const handleRemovePinned = (id: string) =>
-    setPinned((prev) => prev.filter((p) => p.id !== id));
+  // v1：本地 "从列表移除" 暂时 no-op（DB 真删需要 mutation；后续 wave 接 deleteConversationMutation）
+  const handleRemoveRecent = (_id: string) => {};
+  const handleRemovePinned = (_id: string) => {};
 
   const toggleLabel = sidebarCollapsed
     ? t("sidebar.toggle.open")

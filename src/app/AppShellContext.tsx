@@ -1,8 +1,5 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import type { MockFile, MockPinnedItem, MockRecentItem } from "@/lib/mock/types";
-import { pinned as pinnedFixtures } from "@/lib/mock/pinned";
-import { recents as recentFixtures } from "@/lib/mock/recents";
-import { listRecents, listPinned } from "@/lib/data/conversations";
+import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from "react";
+import type { MockFile } from "@/lib/mock/types";
 
 type ViewKey =
   | "new-task"
@@ -50,14 +47,8 @@ interface AppShellContextValue {
   setActiveTaskId: (id: string | null) => void;
   pendingFirstPrompt: { conversationId: string; text: string } | null;
   setPendingFirstPrompt: (v: { conversationId: string; text: string } | null) => void;
-  // Sidebar pinned/recents live on the provider, not inside SidebarContent — collapsing
-  // the sidebar unmounts SidebarContent and the floating popover remounts a fresh
-  // instance. Local state there would discard pin/unpin/delete actions on every collapse.
-  pinned: MockPinnedItem[];
-  setPinned: (next: MockPinnedItem[] | ((prev: MockPinnedItem[]) => MockPinnedItem[])) => void;
-  recents: MockRecentItem[];
-  setRecents: (next: MockRecentItem[] | ((prev: MockRecentItem[]) => MockRecentItem[])) => void;
-  refreshRecentsAndPinned: () => Promise<void>;
+  // Sidebar pinned/recents now live in TanStack Query cache (see lib/data/queries.ts).
+  // SidebarContent reads via useRecentConversations / usePinnedConversations directly.
   streamingByConversation: Map<string, StreamState>;
   setStreamState: (conversationId: string, state: StreamState) => void;
   clearStreamState: (conversationId: string) => void;
@@ -85,43 +76,9 @@ export function AppShellProvider({
     conversationId: string;
     text: string;
   } | null>(null);
-  const [pinned, setPinned] = useState<MockPinnedItem[]>(pinnedFixtures);
-  const [recents, setRecents] = useState<MockRecentItem[]>(recentFixtures);
   const [streamingByConversation, setStreamingByConversation] = useState<Map<string, StreamState>>(
     new Map(),
   );
-
-  const refreshRecentsAndPinned = useCallback(async () => {
-    // Swallow errors during initial mount: sidecar may still be booting; the
-    // sidecar-client ready-probe blocks up to 15s. If it ultimately fails, we
-    // keep the mock-fixture initial values so UI still renders.
-    try {
-      const [r, p] = await Promise.all([listRecents(20), listPinned()]);
-      setRecents(
-        r.map((c) => ({
-          id: c.id,
-          kind: "conversation" as const,
-          title: c.title,
-          status: c.status === "active" ? "active" : c.status === "done" ? "done" : "failed",
-          time: new Date(c.updatedAt).toLocaleString(),
-        })),
-      );
-      setPinned(
-        p.map((c) => ({
-          id: c.id,
-          kind: "task" as const,
-          name: c.title,
-          status: c.status === "active" ? "active" : c.status === "done" ? "done" : "failed",
-        })),
-      );
-    } catch (e) {
-      console.warn("[sidebar] refresh failed:", e);
-    }
-  }, []);
-
-  useEffect(() => {
-    void refreshRecentsAndPinned();
-  }, [refreshRecentsAndPinned]);
 
   const toggleAside = useCallback(() => setAsideOpen((v) => !v), []);
 
@@ -176,11 +133,6 @@ export function AppShellProvider({
       setActiveTaskId,
       pendingFirstPrompt,
       setPendingFirstPrompt,
-      pinned,
-      setPinned,
-      recents,
-      setRecents,
-      refreshRecentsAndPinned,
       streamingByConversation,
       setStreamState,
       clearStreamState,
@@ -199,9 +151,6 @@ export function AppShellProvider({
       activeScheduledId,
       activeTaskId,
       pendingFirstPrompt,
-      pinned,
-      recents,
-      refreshRecentsAndPinned,
       streamingByConversation,
       setStreamState,
       clearStreamState,

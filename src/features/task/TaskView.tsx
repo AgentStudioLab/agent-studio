@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { AppShell } from "@/app/AppShell";
 import { useAppShell } from "@/app/AppShellContext";
 import { TaskHeader } from "@/features/task/TaskHeader";
@@ -6,8 +6,15 @@ import { ChatStream } from "@/features/task/ChatStream";
 import { TaskMessageInput } from "@/features/task/TaskMessageInput";
 import { TaskRightPanel } from "@/features/task/TaskRightPanel";
 import { PreviewPane } from "@/features/task/PreviewPane";
-import { getMessages, sendMessage } from "@/lib/data/conversations";
-import type { Message } from "@/lib/data/types";
+import { sendMessage } from "@/lib/data/conversations";
+import { useInvalidateAfterTurn, useMessages } from "@/lib/data/queries";
+
+/**
+ * Module-level set tracking conversations whose first-turn stream has been
+ * kicked off. Used to prevent React.StrictMode's double-mount in dev from
+ * spawning two parallel SSE streams (which the server 409s on the second).
+ */
+const startedTurns = new Set<string>();
 
 export function TaskView() {
   const {
@@ -20,26 +27,22 @@ export function TaskView() {
     openPreview,
     closePreview,
     registerLocalAbort,
-    refreshRecentsAndPinned,
   } = useAppShell();
 
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: messages = [], isLoading: loading } = useMessages(activeTaskId);
+  const invalidateAfterTurn = useInvalidateAfterTurn();
   const abortRef = useRef<AbortController | null>(null);
 
-  // 初次加载历史
-  useEffect(() => {
-    if (!activeTaskId) return;
-    setLoading(true);
-    getMessages(activeTaskId)
-      .then(setMessages)
-      .finally(() => setLoading(false));
-  }, [activeTaskId]);
-
-  // 如果 NewTask 跳过来且有 pendingFirstPrompt，触发首轮 stream
+  // 触发首轮 stream（仅当 NewTask 跳过来携带 pendingFirstPrompt 时）。
+  // 重要：不在 cleanup 里 abort —— StrictMode 双跑会立刻 kill 自己刚起的流，
+  // 抛 "signal is aborted without reason"。Stop 行为由 TaskHeader 走 abortLocalStream
+  // 显式触发。
   useEffect(() => {
     if (!activeTaskId || !pendingFirstPrompt) return;
     if (pendingFirstPrompt.conversationId !== activeTaskId) return;
+    if (startedTurns.has(activeTaskId)) return; // StrictMode reentry guard
+    startedTurns.add(activeTaskId);
+
     const conversationId = pendingFirstPrompt.conversationId;
     const text = pendingFirstPrompt.text;
     setPendingFirstPrompt(null);
@@ -101,17 +104,18 @@ export function TaskView() {
           errorMessage: e instanceof Error ? e.message : String(e),
         });
       } finally {
-        // stream 结束后从 DB 重读 messages（包括服务端写入的 assistant row）
-        const fresh = await getMessages(conversationId).catch(() => null);
-        if (fresh) setMessages(fresh);
-        void refreshRecentsAndPinned();
+        invalidateAfterTurn(conversationId);
+        startedTurns.delete(conversationId);
       }
     })();
-
-    return () => {
-      ctrl.abort();
-    };
-  }, [activeTaskId, pendingFirstPrompt, setPendingFirstPrompt, setStreamState, registerLocalAbort, refreshRecentsAndPinned]);
+  }, [
+    activeTaskId,
+    pendingFirstPrompt,
+    setPendingFirstPrompt,
+    setStreamState,
+    registerLocalAbort,
+    invalidateAfterTurn,
+  ]);
 
   if (!activeTaskId) return null;
 
