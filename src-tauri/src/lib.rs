@@ -104,6 +104,11 @@ fn spawn_sidecar(app: &AppHandle) -> Result<SidecarInfo, Box<dyn std::error::Err
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // 从 repo 根的 .env 加载环境变量（dotenvy 从 CWD 向上搜索）。
+    // 仅 dev 路径有意义；打包后的 .app 没有 .env 文件，会静默跳过。
+    // 已存在的 OS env 不会被覆盖（dotenvy 默认行为）。
+    let _ = dotenvy::dotenv();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_store::Builder::new().build())
