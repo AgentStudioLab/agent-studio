@@ -7,6 +7,7 @@ use tauri_plugin_shell::{
     process::{CommandChild, CommandEvent},
     ShellExt,
 };
+use tauri_plugin_store::StoreExt;
 
 #[derive(Clone, Serialize)]
 pub struct SidecarInfo {
@@ -26,12 +27,27 @@ fn spawn_sidecar(app: &AppHandle) -> Result<SidecarInfo, Box<dyn std::error::Err
     let port = portpicker::pick_unused_port().ok_or("no free port")?;
     let token = Alphanumeric.sample_string(&mut rand::rng(), 32);
 
-    let sidecar = app
+    let app_data = app.path().app_data_dir()?;
+    std::fs::create_dir_all(&app_data)?;
+    let db_path = app_data.join("agent-studio.db");
+
+    let api_key: Option<String> = {
+        let store = app.store("settings.json")?;
+        store.get("anthropic_api_key").and_then(|v| v.as_str().map(String::from))
+    };
+
+    let mut cmd = app
         .shell()
         .sidecar("agent-studio-sidecar")?
-        .args([format!("--port={port}"), format!("--token={token}")]);
-
-    let (mut rx, child) = sidecar.spawn()?;
+        .args([
+            format!("--port={port}"),
+            format!("--token={token}"),
+            format!("--db={}", db_path.display()),
+        ]);
+    if let Some(k) = api_key {
+        cmd = cmd.env("ANTHROPIC_API_KEY", k);
+    }
+    let (mut rx, child) = cmd.spawn()?;
 
     app.state::<SidecarChild>()
         .0

@@ -15,7 +15,8 @@
           "sidecar": true,
           "args": [
             { "validator": "^--port=\\d+$" },
-            { "validator": "^--token=[A-Za-z0-9]+$" }
+            { "validator": "^--token=[A-Za-z0-9]+$" },
+            { "validator": "^--db=.+\\.db$" }
           ]
         }
       ]
