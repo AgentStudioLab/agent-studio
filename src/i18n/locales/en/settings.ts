@@ -38,6 +38,14 @@ export const settings: typeof Zh = {
       languageZh: "中文",
       languageEn: "English",
     },
+    apiKey: {
+      title: "Anthropic API Key",
+      description: "Required to call Claude. Stored locally in plugin-store (plaintext).",
+      placeholder: "sk-ant-...",
+      save: "Save",
+      saved: "Saved",
+      saveError: "Save failed",
+    },
     back: "Back",
   },
 };

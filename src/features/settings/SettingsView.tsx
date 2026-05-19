@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { ChevronLeft } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useAppShell } from "@/app/AppShellContext";
@@ -5,10 +6,29 @@ import { ProfileForm } from "@/features/settings/ProfileForm";
 import { ThemeSegment } from "@/shared/atoms/ThemeSegment";
 import { LanguageSegment } from "@/shared/atoms/LanguageSegment";
 import { cn } from "@/lib/utils";
+import { setApiKey } from "@/lib/data/settings";
 
 export function SettingsView() {
   const { setView } = useAppShell();
   const { t } = useTranslation();
+
+  const [apiKeyInput, setApiKeyInput] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState<"saved" | "error" | null>(null);
+
+  const handleSaveApiKey = async () => {
+    setSaving(true);
+    setSaveMsg(null);
+    try {
+      await setApiKey(apiKeyInput.trim());
+      setSaveMsg("saved");
+      setApiKeyInput("");
+    } catch {
+      setSaveMsg("error");
+    } finally {
+      setSaving(false);
+    }
+  };
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-background">
       <header className="flex items-center gap-3 border-b border-border px-4 py-3">
@@ -42,6 +62,42 @@ export function SettingsView() {
                 {t("settings.profile.title")}
               </h2>
               <ProfileForm />
+            </section>
+            <section className="border-t border-border pt-8 space-y-3">
+              <div>
+                <h2 className="text-[18px] font-semibold text-foreground">
+                  {t("settings.apiKey.title")}
+                </h2>
+                <p className="text-sm text-muted-foreground">{t("settings.apiKey.description")}</p>
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="password"
+                  value={apiKeyInput}
+                  onChange={(e) => setApiKeyInput(e.target.value)}
+                  placeholder={t("settings.apiKey.placeholder")}
+                  className="flex-1 rounded-md border border-border bg-bg-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-100"
+                />
+                <button
+                  type="button"
+                  onClick={handleSaveApiKey}
+                  disabled={saving || apiKeyInput.length === 0}
+                  className="rounded-md px-4 py-2 text-sm hover:opacity-90 disabled:opacity-50"
+                  style={{ background: "hsl(var(--text-100))", color: "hsl(var(--bg-100))" }}
+                >
+                  {t("settings.apiKey.save")}
+                </button>
+              </div>
+              {saveMsg === "saved" && (
+                <p className="text-sm" style={{ color: "hsl(var(--text-300))" }}>
+                  {t("settings.apiKey.saved")}
+                </p>
+              )}
+              {saveMsg === "error" && (
+                <p className="text-sm" style={{ color: "hsl(var(--danger-100))" }}>
+                  {t("settings.apiKey.saveError")}
+                </p>
+              )}
             </section>
             <section className="border-t border-border pt-8">
               <h2 className="mb-4 text-[18px] font-semibold text-foreground">
