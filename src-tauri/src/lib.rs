@@ -46,10 +46,12 @@ fn spawn_sidecar(app: &AppHandle) -> Result<SidecarInfo, Box<dyn std::error::Err
     std::fs::create_dir_all(&app_data)?;
     let db_path = app_data.join("agent-studio.db");
 
-    let api_key: Option<String> = {
+    // API key 优先级：Settings UI (plugin-store) > .env / OS env。
+    let api_key_from_store: Option<String> = {
         let store = app.store("settings.json")?;
         store.get("anthropic_api_key").and_then(|v| v.as_str().map(String::from))
     };
+    let api_key = api_key_from_store.or_else(|| std::env::var("ANTHROPIC_API_KEY").ok());
 
     let mut cmd = app
         .shell()
