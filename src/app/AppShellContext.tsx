@@ -20,6 +20,13 @@ interface PreviewState {
   open: boolean;
 }
 
+interface StreamState {
+  status: "streaming" | "done" | "aborted" | "error";
+  textBuffer: string;
+  messageId: string | null;
+  errorMessage?: string;
+}
+
 interface AppShellContextValue {
   currentView: ViewKey;
   setView: (v: ViewKey) => void;
@@ -45,6 +52,9 @@ interface AppShellContextValue {
   setPinned: (next: MockPinnedItem[] | ((prev: MockPinnedItem[]) => MockPinnedItem[])) => void;
   recents: MockRecentItem[];
   setRecents: (next: MockRecentItem[] | ((prev: MockRecentItem[]) => MockRecentItem[])) => void;
+  streamingByConversation: Map<string, StreamState>;
+  setStreamState: (conversationId: string, state: StreamState) => void;
+  clearStreamState: (conversationId: string) => void;
 }
 
 const AppShellContext = createContext<AppShellContextValue | null>(null);
@@ -64,8 +74,27 @@ export function AppShellProvider({
   const [activeScheduledId, setActiveScheduledId] = useState<string | null>(null);
   const [pinned, setPinned] = useState<MockPinnedItem[]>(pinnedFixtures);
   const [recents, setRecents] = useState<MockRecentItem[]>(recentFixtures);
+  const [streamingByConversation, setStreamingByConversation] = useState<Map<string, StreamState>>(
+    new Map(),
+  );
 
   const toggleAside = useCallback(() => setAsideOpen((v) => !v), []);
+
+  const setStreamState = useCallback((conversationId: string, state: StreamState) => {
+    setStreamingByConversation((prev) => {
+      const next = new Map(prev);
+      next.set(conversationId, state);
+      return next;
+    });
+  }, []);
+
+  const clearStreamState = useCallback((conversationId: string) => {
+    setStreamingByConversation((prev) => {
+      const next = new Map(prev);
+      next.delete(conversationId);
+      return next;
+    });
+  }, []);
   const openPreview = useCallback((file: MockFile) => setPreview({ file, open: true }), []);
   const closePreview = useCallback(() => setPreview((p) => ({ ...p, open: false })), []);
 
@@ -89,6 +118,9 @@ export function AppShellProvider({
       setPinned,
       recents,
       setRecents,
+      streamingByConversation,
+      setStreamState,
+      clearStreamState,
     }),
     [
       currentView,
@@ -102,6 +134,9 @@ export function AppShellProvider({
       activeScheduledId,
       pinned,
       recents,
+      streamingByConversation,
+      setStreamState,
+      clearStreamState,
     ],
   );
   return <AppShellContext.Provider value={value}>{children}</AppShellContext.Provider>;
