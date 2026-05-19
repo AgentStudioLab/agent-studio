@@ -19,6 +19,9 @@ export const task: typeof Zh = {
       files: "Files",
       context: "Context",
     },
+    rightPanel: {
+      empty: "No artifacts yet",
+    },
     processTab: {
       plan: "Plan",
       countOf: "{{done}} of {{total}}",

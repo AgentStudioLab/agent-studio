@@ -10,10 +10,10 @@ import type { MockTask, MockFile, MockSkill, MockMcpServer } from "@/lib/mock/ty
 type TabId = "process" | "files" | "context";
 
 interface TaskRightPanelProps {
-  task: MockTask;
-  files: MockFile[];
-  skills: MockSkill[];
-  mcpServers: MockMcpServer[];
+  task?: MockTask | null;
+  files?: MockFile[];
+  skills?: MockSkill[];
+  mcpServers?: MockMcpServer[];
   onOpenFile?: (file: MockFile) => void;
 }
 
@@ -48,9 +48,9 @@ function TabButton({ id, label, icon, active, onClick }: TabButtonProps) {
 // border-left + bg. We render the tab bar + tab body inside that.
 export function TaskRightPanel({
   task,
-  files,
-  skills,
-  mcpServers,
+  files = [],
+  skills = [],
+  mcpServers = [],
   onOpenFile,
 }: TaskRightPanelProps) {
   const [tab, setTab] = useState<TabId>("process");

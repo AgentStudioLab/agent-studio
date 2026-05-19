@@ -7,22 +7,7 @@ import { TaskMessageInput } from "@/features/task/TaskMessageInput";
 import { TaskRightPanel } from "@/features/task/TaskRightPanel";
 import { PreviewPane } from "@/features/task/PreviewPane";
 import { getMessages, sendMessage } from "@/lib/data/conversations";
-import { workingTreeFiles } from "@/lib/mock/files";
-import { loadedSkills } from "@/lib/mock/skills";
-import { mcpServers } from "@/lib/mock/mcp-servers";
 import type { Message } from "@/lib/data/types";
-import type { MockTask } from "@/lib/mock/types";
-
-// Stub task used by TaskRightPanel until that panel is migrated to real data.
-// TODO(task-27+): replace with real conversation metadata.
-const STUB_TASK: MockTask = {
-  id: "",
-  title: "",
-  plan: [],
-  messages: [],
-  elapsedSeconds: 0,
-  status: "done",
-};
 
 export function TaskView() {
   const {
@@ -159,13 +144,7 @@ export function TaskView() {
         previewOpen ? (
           <PreviewPane file={preview.file!} onClose={closePreview} />
         ) : (
-          <TaskRightPanel
-            task={STUB_TASK}
-            files={workingTreeFiles}
-            skills={loadedSkills}
-            mcpServers={mcpServers}
-            onOpenFile={openPreview}
-          />
+          <TaskRightPanel onOpenFile={openPreview} />
         )
       }
     />

@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import type { MockTask, PlanStep, StepStatus } from "@/lib/mock/types";
 
 interface ProcessTabProps {
-  task: MockTask;
+  task?: MockTask | null;
 }
 
 function formatElapsed(seconds: number): string {
@@ -138,19 +138,28 @@ function ProcessStep({ status, name, desc, isLast }: ProcessStepProps) {
 
 export function ProcessTab({ task }: ProcessTabProps) {
   const { t } = useTranslation();
-  const [elapsed, setElapsed] = useState(task.elapsedSeconds);
+  const [elapsed, setElapsed] = useState(task?.elapsedSeconds ?? 0);
 
   useEffect(() => {
-    setElapsed(task.elapsedSeconds);
-  }, [task.elapsedSeconds]);
+    setElapsed(task?.elapsedSeconds ?? 0);
+  }, [task?.elapsedSeconds]);
 
   useEffect(() => {
-    if (task.status !== "running") return;
+    if (task?.status !== "running") return;
     const id = setInterval(() => setElapsed((s) => s + 1), 1000);
     return () => clearInterval(id);
-  }, [task.status]);
+  }, [task?.status]);
 
-  const steps: PlanStep[] = task.plan;
+  const steps: PlanStep[] = task?.plan ?? [];
+
+  if (steps.length === 0) {
+    return (
+      <div className="px-6 py-12 text-center text-sm" style={{ color: "hsl(var(--text-300))" }}>
+        {t("task.rightPanel.empty")}
+      </div>
+    );
+  }
+
   const doneCount = steps.filter((s) => s.status === "done").length;
   const totalCount = steps.length;
 
@@ -173,16 +182,18 @@ export function ProcessTab({ task }: ProcessTabProps) {
           />
         ))}
       </div>
-      <div
-        className="mt-3 mx-2 px-3 py-2 rounded-md text-[11.5px] text-text-400 leading-relaxed"
-        style={{
-          background: "hsl(var(--bg-200) / 0.4)",
-          border: "1px solid hsl(var(--border-300) / 0.08)",
-        }}
-      >
-        <span className="inline-block w-1.5 h-1.5 rounded-full bg-success-100 pulse-dot mr-2 align-middle" />
-        {t(STATUS_KEY[task.status])} · {t("task.processTab.elapsed", { time: formatElapsed(elapsed) })}
-      </div>
+      {task && (
+        <div
+          className="mt-3 mx-2 px-3 py-2 rounded-md text-[11.5px] text-text-400 leading-relaxed"
+          style={{
+            background: "hsl(var(--bg-200) / 0.4)",
+            border: "1px solid hsl(var(--border-300) / 0.08)",
+          }}
+        >
+          <span className="inline-block w-1.5 h-1.5 rounded-full bg-success-100 pulse-dot mr-2 align-middle" />
+          {t(STATUS_KEY[task.status])} · {t("task.processTab.elapsed", { time: formatElapsed(elapsed) })}
+        </div>
+      )}
     </div>
   );
 }

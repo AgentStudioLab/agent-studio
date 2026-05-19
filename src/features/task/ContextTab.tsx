@@ -28,6 +28,14 @@ export function ContextTab({ skills, mcpServers }: ContextTabProps) {
   const { t } = useTranslation();
   const onCount = mcpServers.filter((m) => m.connected).length;
 
+  if (skills.length === 0 && mcpServers.length === 0) {
+    return (
+      <div className="px-6 py-12 text-center text-sm" style={{ color: "hsl(var(--text-300))" }}>
+        {t("task.rightPanel.empty")}
+      </div>
+    );
+  }
+
   return (
     <div>
       <SectionHeading

@@ -17,6 +17,9 @@ export const task = {
       files: "文件",
       context: "上下文",
     },
+    rightPanel: {
+      empty: "暂无产出",
+    },
     processTab: {
       plan: "计划",
       countOf: "{{done}} / {{total}}",

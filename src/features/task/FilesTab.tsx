@@ -53,6 +53,14 @@ export function FilesTab({
     [onOpenFile]
   );
 
+  if (files.length === 0) {
+    return (
+      <div className="px-6 py-12 text-center text-sm" style={{ color: "hsl(var(--text-300))" }}>
+        {t("task.rightPanel.empty")}
+      </div>
+    );
+  }
+
   return (
     <div>
       <div className="flex items-center gap-2 px-2 pt-3 pb-2">
