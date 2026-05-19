@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { togglePin as togglePinApi } from "@/lib/data/conversations";
 import {
   Briefcase,
   Clock,
@@ -36,36 +37,26 @@ export function SidebarContent() {
   const {
     currentView,
     setView,
+    setActiveTaskId,
     sidebarCollapsed,
     setSidebarCollapsed,
     pinned,
     setPinned,
     recents,
     setRecents,
+    refreshRecentsAndPinned,
   } = useAppShell();
   const { t } = useTranslation();
   const [searchOpen, setSearchOpen] = useState(false);
 
-  const handlePin = (recent: MockRecentItem) => {
-    setRecents((prev) => prev.filter((r) => r.id !== recent.id));
-    setPinned((prev) => [
-      ...prev,
-      { id: recent.id, kind: "task", name: recent.title },
-    ]);
+  const handlePin = async (recent: MockRecentItem) => {
+    await togglePinApi(recent.id, true);
+    await refreshRecentsAndPinned();
   };
 
-  const handleUnpin = (item: MockPinnedItem) => {
-    setPinned((prev) => prev.filter((p) => p.id !== item.id));
-    setRecents((prev) => [
-      {
-        id: item.id,
-        kind: item.kind === "project" ? "conversation" : "task",
-        title: item.name,
-        time: "just now",
-        ...(item.kind === "task" ? { status: "pending" as const } : {}),
-      },
-      ...prev,
-    ]);
+  const handleUnpin = async (item: MockPinnedItem) => {
+    await togglePinApi(item.id, false);
+    await refreshRecentsAndPinned();
   };
 
   const handleRemoveRecent = (id: string) =>
@@ -143,10 +134,15 @@ export function SidebarContent() {
               <PinnedItem
                 key={item.id}
                 item={item}
-                onClick={() =>
-                  setView(item.kind === "project" ? "project-detail" : "task")
-                }
-                onUnpin={() => handleUnpin(item)}
+                onClick={() => {
+                  if (item.kind !== "project") {
+                    setActiveTaskId(item.id);
+                    setView("task");
+                  } else {
+                    setView("project-detail");
+                  }
+                }}
+                onUnpin={() => void handleUnpin(item)}
                 onDelete={() => handleRemovePinned(item.id)}
               />
             ))}
@@ -165,8 +161,11 @@ export function SidebarContent() {
           <RecentItem
             key={item.id}
             item={item}
-            onClick={() => setView("task")}
-            onPin={() => handlePin(item)}
+            onClick={() => {
+              setActiveTaskId(item.id);
+              setView("task");
+            }}
+            onPin={() => void handlePin(item)}
             onDelete={() => handleRemoveRecent(item.id)}
           />
         ))}

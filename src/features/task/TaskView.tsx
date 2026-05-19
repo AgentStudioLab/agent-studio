@@ -35,6 +35,7 @@ export function TaskView() {
     openPreview,
     closePreview,
     registerLocalAbort,
+    refreshRecentsAndPinned,
   } = useAppShell();
 
   const [messages, setMessages] = useState<Message[]>([]);
@@ -118,13 +119,14 @@ export function TaskView() {
         // stream 结束后从 DB 重读 messages（包括服务端写入的 assistant row）
         const fresh = await getMessages(conversationId).catch(() => null);
         if (fresh) setMessages(fresh);
+        void refreshRecentsAndPinned();
       }
     })();
 
     return () => {
       ctrl.abort();
     };
-  }, [activeTaskId, pendingFirstPrompt, setPendingFirstPrompt, setStreamState, registerLocalAbort]);
+  }, [activeTaskId, pendingFirstPrompt, setPendingFirstPrompt, setStreamState, registerLocalAbort, refreshRecentsAndPinned]);
 
   if (!activeTaskId) return null;
 

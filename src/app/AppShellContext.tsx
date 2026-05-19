@@ -1,7 +1,8 @@
-import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { MockFile, MockPinnedItem, MockRecentItem } from "@/lib/mock/types";
 import { pinned as pinnedFixtures } from "@/lib/mock/pinned";
 import { recents as recentFixtures } from "@/lib/mock/recents";
+import { listRecents, listPinned } from "@/lib/data/conversations";
 
 type ViewKey =
   | "new-task"
@@ -56,6 +57,7 @@ interface AppShellContextValue {
   setPinned: (next: MockPinnedItem[] | ((prev: MockPinnedItem[]) => MockPinnedItem[])) => void;
   recents: MockRecentItem[];
   setRecents: (next: MockRecentItem[] | ((prev: MockRecentItem[]) => MockRecentItem[])) => void;
+  refreshRecentsAndPinned: () => Promise<void>;
   streamingByConversation: Map<string, StreamState>;
   setStreamState: (conversationId: string, state: StreamState) => void;
   clearStreamState: (conversationId: string) => void;
@@ -88,6 +90,31 @@ export function AppShellProvider({
   const [streamingByConversation, setStreamingByConversation] = useState<Map<string, StreamState>>(
     new Map(),
   );
+
+  const refreshRecentsAndPinned = useCallback(async () => {
+    const [r, p] = await Promise.all([listRecents(20), listPinned()]);
+    setRecents(
+      r.map((c) => ({
+        id: c.id,
+        kind: "conversation" as const,
+        title: c.title,
+        status: c.status === "active" ? "active" : c.status === "done" ? "done" : "failed",
+        time: new Date(c.updatedAt).toLocaleString(),
+      })),
+    );
+    setPinned(
+      p.map((c) => ({
+        id: c.id,
+        kind: "task" as const,
+        name: c.title,
+        status: c.status === "active" ? "active" : c.status === "done" ? "done" : "failed",
+      })),
+    );
+  }, []);
+
+  useEffect(() => {
+    void refreshRecentsAndPinned();
+  }, [refreshRecentsAndPinned]);
 
   const toggleAside = useCallback(() => setAsideOpen((v) => !v), []);
 
@@ -146,6 +173,7 @@ export function AppShellProvider({
       setPinned,
       recents,
       setRecents,
+      refreshRecentsAndPinned,
       streamingByConversation,
       setStreamState,
       clearStreamState,
@@ -166,6 +194,7 @@ export function AppShellProvider({
       pendingFirstPrompt,
       pinned,
       recents,
+      refreshRecentsAndPinned,
       streamingByConversation,
       setStreamState,
       clearStreamState,
