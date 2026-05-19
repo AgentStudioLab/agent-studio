@@ -9,6 +9,7 @@ import {
   updatePin,
   updateTitle,
   deleteConversation,
+  insertAssistantMessage,
 } from "../../src/services/conversations";
 
 let db: Database;
@@ -117,5 +118,32 @@ describe("deleteConversation", () => {
     expect(getConversation(db, c.id)).toBeNull();
     const msgs = db.prepare("SELECT COUNT(*) as n FROM messages WHERE conversation_id = ?").get(c.id) as { n: number };
     expect(msgs.n).toBe(0);
+  });
+});
+
+describe("insertAssistantMessage", () => {
+  it("writes assistant row with given blocks + finish reason", () => {
+    const c = createConversation(db, { prompt: "p", mode: "ask" });
+    const msgId = insertAssistantMessage(db, c.id, {
+      blocks: [{ type: "text", text: "answer" }],
+      finishReason: "end_turn",
+      errorText: null,
+    });
+    const msgs = getMessages(db, c.id);
+    expect(msgs).toHaveLength(2);
+    expect(msgs[1]!.id).toBe(msgId);
+    expect(msgs[1]!.finishReason).toBe("end_turn");
+    expect(msgs[1]!.blocks).toEqual([{ type: "text", text: "answer" }]);
+  });
+
+  it("returned id is monotonically newer than user message", () => {
+    const c = createConversation(db, { prompt: "p", mode: "ask" });
+    const userMsg = getMessages(db, c.id)[0]!;
+    const asstId = insertAssistantMessage(db, c.id, {
+      blocks: [{ type: "text", text: "a" }],
+      finishReason: "end_turn",
+      errorText: null,
+    });
+    expect(asstId > userMsg.id).toBe(true);
   });
 });

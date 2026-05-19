@@ -3,7 +3,9 @@ import { ulid } from "../lib/ulid";
 import type {
   Conversation,
   ConversationMode,
+  ContentBlock,
   CreateConversationInput,
+  FinishReason,
   Message,
 } from "../types";
 
@@ -130,4 +132,38 @@ export function updateTitle(db: Database, id: string, title: string): void {
 
 export function deleteConversation(db: Database, id: string): void {
   db.prepare("DELETE FROM conversations WHERE id = ?").run(id);
+}
+
+export interface AssistantMessagePayload {
+  blocks: ContentBlock[];
+  finishReason: Exclude<FinishReason, null>;
+  errorText: string | null;
+}
+
+export function insertAssistantMessage(
+  db: Database,
+  conversationId: string,
+  payload: AssistantMessagePayload,
+): string {
+  const id = ulid();
+  const now = Date.now();
+  db.transaction(() => {
+    db.prepare(
+      `INSERT INTO messages (id, conversation_id, role, blocks_json, created_at, finish_reason, error_text)
+       VALUES (?, ?, 'assistant', ?, ?, ?, ?)`,
+    ).run(
+      id,
+      conversationId,
+      JSON.stringify(payload.blocks),
+      now,
+      payload.finishReason,
+      payload.errorText,
+    );
+    db.prepare("UPDATE conversations SET updated_at = ?, status = ? WHERE id = ?").run(
+      now,
+      payload.finishReason === "end_turn" ? "done" : payload.finishReason,
+      conversationId,
+    );
+  })();
+  return id;
 }
