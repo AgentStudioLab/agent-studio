@@ -92,24 +92,31 @@ export function AppShellProvider({
   );
 
   const refreshRecentsAndPinned = useCallback(async () => {
-    const [r, p] = await Promise.all([listRecents(20), listPinned()]);
-    setRecents(
-      r.map((c) => ({
-        id: c.id,
-        kind: "conversation" as const,
-        title: c.title,
-        status: c.status === "active" ? "active" : c.status === "done" ? "done" : "failed",
-        time: new Date(c.updatedAt).toLocaleString(),
-      })),
-    );
-    setPinned(
-      p.map((c) => ({
-        id: c.id,
-        kind: "task" as const,
-        name: c.title,
-        status: c.status === "active" ? "active" : c.status === "done" ? "done" : "failed",
-      })),
-    );
+    // Swallow errors during initial mount: sidecar may still be booting; the
+    // sidecar-client ready-probe blocks up to 15s. If it ultimately fails, we
+    // keep the mock-fixture initial values so UI still renders.
+    try {
+      const [r, p] = await Promise.all([listRecents(20), listPinned()]);
+      setRecents(
+        r.map((c) => ({
+          id: c.id,
+          kind: "conversation" as const,
+          title: c.title,
+          status: c.status === "active" ? "active" : c.status === "done" ? "done" : "failed",
+          time: new Date(c.updatedAt).toLocaleString(),
+        })),
+      );
+      setPinned(
+        p.map((c) => ({
+          id: c.id,
+          kind: "task" as const,
+          name: c.title,
+          status: c.status === "active" ? "active" : c.status === "done" ? "done" : "failed",
+        })),
+      );
+    } catch (e) {
+      console.warn("[sidebar] refresh failed:", e);
+    }
   }, []);
 
   useEffect(() => {
