@@ -62,6 +62,16 @@ fn spawn_sidecar(app: &AppHandle) -> Result<SidecarInfo, Box<dyn std::error::Err
     if let Some(k) = api_key {
         cmd = cmd.env("ANTHROPIC_API_KEY", k);
     }
+    // Forward third-party Anthropic-protocol endpoints (e.g. DeepSeek's /anthropic).
+    // 从 Tauri 启动时所在 shell 的 env 取——所以 `export ANTHROPIC_BASE_URL=... && pnpm tauri:dev`
+    // 这种用法直接 work。生产打包后 .app 不会自动继承用户 shell 的 env，那时再考虑挪到
+    // Settings UI（plugin-store 持久化 + 运行时热更）。
+    if let Ok(base_url) = std::env::var("ANTHROPIC_BASE_URL") {
+        cmd = cmd.env("ANTHROPIC_BASE_URL", base_url);
+    }
+    if let Ok(model) = std::env::var("ANTHROPIC_MODEL") {
+        cmd = cmd.env("ANTHROPIC_MODEL", model);
+    }
     let (mut rx, child) = cmd.spawn()?;
 
     app.state::<SidecarChild>()
