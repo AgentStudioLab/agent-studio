@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from "react";
 import type { MockFile, MockPinnedItem, MockRecentItem } from "@/lib/mock/types";
 import { pinned as pinnedFixtures } from "@/lib/mock/pinned";
 import { recents as recentFixtures } from "@/lib/mock/recents";
@@ -59,6 +59,8 @@ interface AppShellContextValue {
   streamingByConversation: Map<string, StreamState>;
   setStreamState: (conversationId: string, state: StreamState) => void;
   clearStreamState: (conversationId: string) => void;
+  registerLocalAbort: (conversationId: string, controller: AbortController) => void;
+  abortLocalStream: (conversationId: string) => void;
 }
 
 const AppShellContext = createContext<AppShellContextValue | null>(null);
@@ -104,6 +106,19 @@ export function AppShellProvider({
       return next;
     });
   }, []);
+
+  const localAbortsRef = useRef<Map<string, AbortController>>(new Map());
+
+  const registerLocalAbort = useCallback((id: string, c: AbortController) => {
+    localAbortsRef.current.set(id, c);
+  }, []);
+
+  const abortLocalStream = useCallback((id: string) => {
+    const c = localAbortsRef.current.get(id);
+    c?.abort();
+    localAbortsRef.current.delete(id);
+  }, []);
+
   const openPreview = useCallback((file: MockFile) => setPreview({ file, open: true }), []);
   const closePreview = useCallback(() => setPreview((p) => ({ ...p, open: false })), []);
 
@@ -134,6 +149,8 @@ export function AppShellProvider({
       streamingByConversation,
       setStreamState,
       clearStreamState,
+      registerLocalAbort,
+      abortLocalStream,
     }),
     [
       currentView,
@@ -152,6 +169,8 @@ export function AppShellProvider({
       streamingByConversation,
       setStreamState,
       clearStreamState,
+      registerLocalAbort,
+      abortLocalStream,
     ],
   );
   return <AppShellContext.Provider value={value}>{children}</AppShellContext.Provider>;

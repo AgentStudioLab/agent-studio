@@ -20,11 +20,15 @@ const LONG_TITLE =
   "扫描 ~/Workspace 找出不活跃项目，生成 xlsx + pptx 报表";
 
 export const Default: Story = {
-  args: { title: "Untitled task" },
+  args: { conversationId: "conv-1", title: "Untitled task" },
 };
 
 export const LongTitle: Story = {
-  args: { title: LONG_TITLE },
+  args: { conversationId: "conv-1", title: LONG_TITLE },
+};
+
+export const Streaming: Story = {
+  args: { conversationId: "conv-1", title: "Active task", streaming: true },
 };
 
 export const SideBySide: Story = {
@@ -34,7 +38,7 @@ export const SideBySide: Story = {
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr" }}>
       <div style={{ background: "hsl(var(--bg-100))", padding: "1rem" }}>
         <div style={{ width: 480 }}>
-          <TaskHeader title={LONG_TITLE} />
+          <TaskHeader conversationId="conv-1" title={LONG_TITLE} />
         </div>
       </div>
       <div
@@ -42,7 +46,7 @@ export const SideBySide: Story = {
         style={{ background: "hsl(var(--bg-100))", padding: "1rem" }}
       >
         <div style={{ width: 480 }}>
-          <TaskHeader title={LONG_TITLE} />
+          <TaskHeader conversationId="conv-1" title={LONG_TITLE} streaming />
         </div>
       </div>
     </div>

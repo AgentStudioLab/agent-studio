@@ -11,6 +11,7 @@ export const task: typeof Zh = {
       rename: "Rename",
       archive: "Archive",
       delete: "Delete",
+      stop: "Stop",
       toggleRightPanel: "Toggle right panel",
     },
     tabs: {

@@ -8,6 +8,7 @@ import {
   Archive,
   Trash2,
   PanelRight,
+  Square,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -21,11 +22,14 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useTranslation } from "react-i18next";
 import { useAppShell } from "@/app/AppShellContext";
+import { abortStream } from "@/lib/data/conversations";
 import { cn } from "@/lib/utils";
 import { projects as mockProjects } from "@/lib/mock/projects";
 
 interface TaskHeaderProps {
-  title: string;
+  conversationId: string;
+  streaming?: boolean;
+  title?: string;
   projects?: { id: string; name: string }[];
   onSchedule?: () => void;
   onTurnIntoSkill?: () => void;
@@ -37,6 +41,8 @@ interface TaskHeaderProps {
 }
 
 export function TaskHeader({
+  conversationId,
+  streaming = false,
   title,
   projects = mockProjects,
   onSchedule,
@@ -47,7 +53,16 @@ export function TaskHeader({
   onArchive,
   onDelete,
 }: TaskHeaderProps) {
-  const { toggleAside, sidebarCollapsed } = useAppShell();
+  const { toggleAside, sidebarCollapsed, abortLocalStream } = useAppShell();
+
+  const handleStop = async () => {
+    abortLocalStream(conversationId);
+    try {
+      await abortStream(conversationId);
+    } catch {
+      // server may have already finished; swallow
+    }
+  };
   const { t } = useTranslation();
   return (
     <header
@@ -63,7 +78,7 @@ export function TaskHeader({
           aria-label={t("task.header.menu")}
           className="inline-flex min-w-0 items-center gap-1.5 rounded-md px-2 py-1 text-[14px] font-medium text-foreground outline-hidden hover:bg-muted focus-visible:ring-1 focus-visible:ring-ring"
         >
-          <span className="truncate">{title}</span>
+          <span className="truncate">{title ?? conversationId}</span>
           <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-56">
@@ -104,6 +119,17 @@ export function TaskHeader({
         </DropdownMenuContent>
       </DropdownMenu>
       <div className="flex-1" />
+      {streaming && (
+        <button
+          type="button"
+          onClick={handleStop}
+          aria-label={t("task.header.stop")}
+          className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[13px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+        >
+          <Square className="size-3.5" />
+          {t("task.header.stop")}
+        </button>
+      )}
       <button
         type="button"
         onClick={toggleAside}

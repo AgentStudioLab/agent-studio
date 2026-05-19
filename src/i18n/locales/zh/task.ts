@@ -9,6 +9,7 @@ export const task = {
       rename: "重命名",
       archive: "归档",
       delete: "删除",
+      stop: "停止",
       toggleRightPanel: "切换右侧面板",
     },
     tabs: {

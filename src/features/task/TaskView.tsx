@@ -34,6 +34,7 @@ export function TaskView() {
     preview,
     openPreview,
     closePreview,
+    registerLocalAbort,
   } = useAppShell();
 
   const [messages, setMessages] = useState<Message[]>([]);
@@ -59,6 +60,7 @@ export function TaskView() {
 
     const ctrl = new AbortController();
     abortRef.current = ctrl;
+    registerLocalAbort(conversationId, ctrl);
     setStreamState(conversationId, {
       status: "streaming",
       textBuffer: "",
@@ -122,7 +124,7 @@ export function TaskView() {
     return () => {
       ctrl.abort();
     };
-  }, [activeTaskId, pendingFirstPrompt, setPendingFirstPrompt, setStreamState]);
+  }, [activeTaskId, pendingFirstPrompt, setPendingFirstPrompt, setStreamState, registerLocalAbort]);
 
   if (!activeTaskId) return null;
 
@@ -134,8 +136,10 @@ export function TaskView() {
       bareAside={Boolean(previewOpen)}
       main={
         <>
-          {/* TODO(task-27): replace title with real conversation title from DB */}
+          {/* TODO(task-28): replace title with real conversation title from DB */}
           <TaskHeader
+            conversationId={activeTaskId}
+            streaming={stream?.status === "streaming"}
             title={activeTaskId}
             onMoveToProject={() => {}}
           />
