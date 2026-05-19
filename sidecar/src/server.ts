@@ -4,6 +4,7 @@ import { openDb } from "./db";
 import { healthRoutes } from "./routes/health";
 import { buildConversationRoutes } from "./routes/conversations";
 import { buildSettingsRoutes } from "./routes/settings";
+import { buildMessageRoutes } from "./routes/messages";
 import { createApiKeyState } from "./services/apiKey";
 
 type Args = { port: number; token: string; db: string };
@@ -54,6 +55,7 @@ app.use("*", async (c, next) => {
 
 app.route("/", healthRoutes);
 app.route("/", buildConversationRoutes(db));
+app.route("/", buildMessageRoutes(db, apiKey));
 app.route("/", buildSettingsRoutes(apiKey));
 
 console.log(`[sidecar] listening on http://127.0.0.1:${args.port} (db=${dbAbs})`);
