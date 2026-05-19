@@ -1,0 +1,400 @@
+// SDK → AG-UI translation layer.
+//
+// Reads SDKMessage stream from claude-agent-sdk's `query()` generator, emits
+// AG-UI events conforming to the @ag-ui/core schema. Only handles the text +
+// tool subset that's actually useful to UI; system/init/control/etc. are
+// inspected for side-effects (capturing session_id) but not surfaced.
+//
+// One bridge call = one TURN: emits RUN_STARTED → (TEXT_MESSAGE_* / TOOL_CALL_*)*
+// → (RUN_FINISHED on `result` | RUN_ERROR on error). Caller wraps the iteration
+// in `provider.run()` so each turn looks self-contained to the run loop.
+
+import { nanoid } from "nanoid";
+import { EventType } from "@ag-ui/core";
+import type { AGUIEvent } from "../core/types";
+import type { ProviderCallbacks } from "../core/provider-types";
+
+interface SdkContentBlock {
+  type: string;
+  text?: string;
+  id?: string;
+  name?: string;
+  input?: unknown;
+  thinking?: string;
+  tool_use_id?: string;
+  content?: unknown;
+  is_error?: boolean;
+}
+
+interface SdkAssistantLike {
+  type: "assistant";
+  message: { content?: SdkContentBlock[] | string; id?: string };
+  session_id?: string;
+  uuid?: string;
+}
+
+interface SdkUserLike {
+  type: "user";
+  message: { content?: SdkContentBlock[] | string; role?: string };
+  parent_tool_use_id?: string | null;
+}
+
+interface SdkResultLike {
+  type: "result";
+  subtype: "success" | string;
+  is_error?: boolean;
+  result?: string;
+  session_id?: string;
+}
+
+interface SdkSystemInitLike {
+  type: "system";
+  subtype: "init";
+  session_id: string;
+}
+
+interface SdkStreamEventLike {
+  type: "stream_event";
+  event: {
+    type: string;
+    index?: number;
+    delta?: { type?: string; text?: string; partial_json?: string };
+    content_block?: { type?: string; id?: string; name?: string; text?: string };
+  };
+}
+
+export interface BridgeOptions {
+  threadId: string;
+  runId: string;
+  callbacks?: ProviderCallbacks;
+  onSessionId?: (sessionId: string) => void;
+}
+
+/**
+ * Translate one turn's worth of SDK messages into AG-UI events.
+ *
+ * Persistence contract — every assistant AIMessage produces ONE `messages`
+ * row (via callbacks.onMessageEnd), even if content is empty. tool_use
+ * blocks reference that row through `parentMessageId`. Without this, a
+ * tool-only AIMessage would leave tool_calls orphaned (FK skipped in
+ * runWorker) and they vanish after page refresh.
+ */
+export async function* claudeSdkToAgui(
+  sdkStream: AsyncIterable<unknown>,
+  opts: BridgeOptions,
+): AsyncIterable<AGUIEvent> {
+  const { threadId, runId, callbacks, onSessionId } = opts;
+
+  yield {
+    type: EventType.RUN_STARTED,
+    threadId,
+    runId,
+  } as AGUIEvent;
+
+  // Per-message accumulators. Reset on each SDKAssistantMessage we close.
+  let currentTextMsgId: string | null = null;
+  let accumulatedText = "";
+  let accumulatedReasoning = "";
+
+  // Tool-call tracking. parentMsgId may be null when content_block_start
+  // for tool_use fires before any text block opened — finalized in the
+  // assistant-message handler against the actual persisted message id.
+  type ToolState = {
+    id: string;
+    toolName: string;
+    argsBuf: string;
+    parentMsgId: string | null;
+    ended: boolean; // already emitted TOOL_CALL_END + persisted via callback
+  };
+  const toolById = new Map<string, ToolState>();
+
+  try {
+    for await (const raw of sdkStream) {
+      const m = raw as { type?: string };
+      if (!m || !m.type) continue;
+
+      // system.init — capture session id once
+      if (m.type === "system") {
+        const init = m as Partial<SdkSystemInitLike>;
+        if (init.subtype === "init" && typeof init.session_id === "string") {
+          onSessionId?.(init.session_id);
+        }
+        continue;
+      }
+
+      // stream_event — fine-grained deltas from Anthropic's streaming API.
+      // Fires UI events early so the user sees text appearing per-token; the
+      // authoritative SDKAssistantMessage handler below does the persistence.
+      if (m.type === "stream_event") {
+        const ev = (m as SdkStreamEventLike).event;
+        if (!ev) continue;
+
+        if (ev.type === "content_block_start" && ev.content_block) {
+          const cb = ev.content_block;
+          if (cb.type === "text") {
+            currentTextMsgId = `msg_${nanoid(10)}`;
+            accumulatedText = "";
+            yield {
+              type: EventType.TEXT_MESSAGE_START,
+              messageId: currentTextMsgId,
+              role: "assistant",
+            } as AGUIEvent;
+          } else if (cb.type === "tool_use" && cb.id && cb.name) {
+            toolById.set(cb.id, {
+              id: cb.id,
+              toolName: cb.name,
+              argsBuf: "",
+              parentMsgId: currentTextMsgId,
+              ended: false,
+            });
+            yield {
+              type: EventType.TOOL_CALL_START,
+              toolCallId: cb.id,
+              toolCallName: cb.name,
+              parentMessageId: currentTextMsgId ?? undefined,
+            } as AGUIEvent;
+          } else if (cb.type === "thinking") {
+            const rid = `rsn_${nanoid(8)}`;
+            yield {
+              type: EventType.REASONING_START,
+              messageId: rid,
+              parentMessageId: currentTextMsgId ?? undefined,
+            } as AGUIEvent;
+          }
+        } else if (ev.type === "content_block_delta" && ev.delta) {
+          if (ev.delta.type === "text_delta" && ev.delta.text && currentTextMsgId) {
+            accumulatedText += ev.delta.text;
+            yield {
+              type: EventType.TEXT_MESSAGE_CONTENT,
+              messageId: currentTextMsgId,
+              delta: ev.delta.text,
+            } as AGUIEvent;
+          } else if (ev.delta.type === "input_json_delta" && ev.delta.partial_json) {
+            // Tool args streaming. Anthropic's API ties the delta to the
+            // open content_block by index, which the SDK doesn't surface
+            // here. We rely on the assistant-message handler to emit the
+            // full TOOL_CALL_ARGS once `input` parses on the final message.
+          } else if (ev.delta.type === "thinking_delta") {
+            accumulatedReasoning += (ev.delta as { thinking?: string }).thinking ?? "";
+          }
+        } else if (ev.type === "content_block_stop") {
+          // No event yet — wait for the SDKAssistantMessage authoritative
+          // pass to close text/tool blocks consistently.
+        }
+        continue;
+      }
+
+      // assistant — authoritative end of one AIMessage. This is where we
+      // persist (messages row + tool_calls rows) and emit *_END events.
+      if (m.type === "assistant") {
+        const am = m as SdkAssistantLike;
+        const content = am.message?.content;
+        const blocks = Array.isArray(content) ? content : [];
+        const textBlock = blocks.find((b) => b.type === "text");
+        const toolUseBlocks = blocks.filter((b) => b.type === "tool_use" && b.id && b.name);
+
+        // Allocate a stable message id for THIS AIMessage. Reuse the
+        // stream_event text id when there was one; otherwise synthesize a
+        // fresh id (covers: tool-only AIMessage AND non-stream synth path).
+        // Tool calls bound to this AIMessage will FK to messageId.
+        let messageId: string;
+        let textOpened: boolean;
+        if (currentTextMsgId) {
+          messageId = currentTextMsgId;
+          textOpened = true;
+        } else if (textBlock?.text) {
+          // Synthesize START + CONTENT for the non-stream-event path.
+          messageId = `msg_${nanoid(10)}`;
+          accumulatedText = textBlock.text;
+          yield {
+            type: EventType.TEXT_MESSAGE_START,
+            messageId,
+            role: "assistant",
+          } as AGUIEvent;
+          yield {
+            type: EventType.TEXT_MESSAGE_CONTENT,
+            messageId,
+            delta: textBlock.text,
+          } as AGUIEvent;
+          textOpened = true;
+        } else {
+          // Tool-only or empty AIMessage — still allocate so tool_calls
+          // have a valid parent row.
+          messageId = `msg_${nanoid(10)}`;
+          textOpened = false;
+        }
+
+        if (textOpened) {
+          yield {
+            type: EventType.TEXT_MESSAGE_END,
+            messageId,
+          } as AGUIEvent;
+        }
+
+        // Persist the messages row UNCONDITIONALLY for AIMessages that have
+        // any content — including tool-only — so the tool_calls FK is valid.
+        // Heuristic phase: if the AIMessage ends with tool_use blocks, this
+        // is an intermediate "reasoning" step; otherwise it's the conclusion.
+        const phase: "reasoning" | "conclusion" =
+          toolUseBlocks.length > 0 ? "reasoning" : "conclusion";
+        await callbacks?.onMessageEnd?.({
+          id: messageId,
+          content: accumulatedText,
+          reasoning: accumulatedReasoning || undefined,
+          phase,
+        });
+
+        // Reset per-message accumulators BEFORE handling tool_use blocks so
+        // any followup AIMessage starts clean.
+        currentTextMsgId = null;
+        accumulatedText = "";
+        accumulatedReasoning = "";
+
+        // Tool-use blocks: synthesize START (if streaming didn't), emit ARGS
+        // + END, then persist the tool_calls row keyed to messageId.
+        for (const block of toolUseBlocks) {
+          let st = toolById.get(block.id!);
+          if (!st) {
+            yield {
+              type: EventType.TOOL_CALL_START,
+              toolCallId: block.id,
+              toolCallName: block.name,
+              parentMessageId: messageId,
+            } as AGUIEvent;
+            st = {
+              id: block.id!,
+              toolName: block.name!,
+              argsBuf: "",
+              parentMsgId: messageId,
+              ended: false,
+            };
+            toolById.set(block.id!, st);
+          } else if (!st.parentMsgId) {
+            // Stream_event captured the tool_use before any text block was
+            // open; bind it to this AIMessage's id now.
+            st.parentMsgId = messageId;
+          }
+
+          if (st.ended) continue; // already finalised earlier
+
+          const argsJson = JSON.stringify(block.input ?? {});
+          yield {
+            type: EventType.TOOL_CALL_ARGS,
+            toolCallId: block.id,
+            delta: argsJson,
+          } as AGUIEvent;
+          yield {
+            type: EventType.TOOL_CALL_END,
+            toolCallId: block.id,
+          } as AGUIEvent;
+          st.ended = true;
+
+          await callbacks?.onToolCallEnd?.({
+            id: block.id!,
+            toolName: block.name!,
+            args: block.input,
+            parentMessageId: st.parentMsgId ?? messageId,
+          });
+        }
+        continue;
+      }
+
+      // user — tool_result blocks come back as a user message with
+      // `parent_tool_use_id` set (subagent) or with `content[]` containing
+      // tool_result entries. Emit TOOL_CALL_RESULT so the UI flips the
+      // spinner to a checkmark + the tool_calls row gets `result`/`status`.
+      if (m.type === "user") {
+        const um = m as SdkUserLike;
+        const content = um.message?.content;
+        if (!Array.isArray(content)) continue;
+        for (const block of content) {
+          if (block.type === "tool_result" && block.tool_use_id) {
+            const status = block.is_error ? "error" : "success";
+            // result content can be a string, an array of content blocks, or
+            // arbitrary structure; serialize a stable text form for the UI.
+            const resultText =
+              typeof block.content === "string"
+                ? block.content
+                : JSON.stringify(block.content);
+            yield {
+              type: EventType.TOOL_CALL_RESULT,
+              toolCallId: block.tool_use_id,
+              content: resultText,
+            } as AGUIEvent;
+            await callbacks?.onToolCallResult?.({
+              id: block.tool_use_id,
+              result: block.content ?? null,
+              status,
+              errorMsg: block.is_error
+                ? typeof block.content === "string"
+                  ? block.content
+                  : undefined
+                : undefined,
+            });
+          }
+        }
+        continue;
+      }
+
+      // result — turn finished
+      if (m.type === "result") {
+        const r = m as SdkResultLike;
+        // If the last AIMessage didn't close cleanly (no SDKAssistantMessage
+        // arrived after stream_event), finalize here to keep persistence
+        // contract.
+        if (currentTextMsgId) {
+          yield {
+            type: EventType.TEXT_MESSAGE_END,
+            messageId: currentTextMsgId,
+          } as AGUIEvent;
+          await callbacks?.onMessageEnd?.({
+            id: currentTextMsgId,
+            content: accumulatedText,
+            reasoning: accumulatedReasoning || undefined,
+            phase: "conclusion",
+          });
+          currentTextMsgId = null;
+          accumulatedText = "";
+          accumulatedReasoning = "";
+        }
+        if (r.is_error) {
+          yield {
+            type: EventType.RUN_ERROR,
+            message: r.result ?? "agent error",
+          } as AGUIEvent;
+        } else {
+          yield {
+            type: EventType.RUN_FINISHED,
+            threadId,
+            runId,
+          } as AGUIEvent;
+        }
+        return;
+      }
+    }
+
+    // Stream ended without `result` — defensive close.
+    if (currentTextMsgId) {
+      yield {
+        type: EventType.TEXT_MESSAGE_END,
+        messageId: currentTextMsgId,
+      } as AGUIEvent;
+      await callbacks?.onMessageEnd?.({
+        id: currentTextMsgId,
+        content: accumulatedText,
+        reasoning: accumulatedReasoning || undefined,
+        phase: "conclusion",
+      });
+    }
+    yield {
+      type: EventType.RUN_FINISHED,
+      threadId,
+      runId,
+    } as AGUIEvent;
+  } catch (err) {
+    yield {
+      type: EventType.RUN_ERROR,
+      message: err instanceof Error ? err.message : String(err),
+    } as AGUIEvent;
+  }
+}

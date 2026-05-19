@@ -4,9 +4,14 @@ import path from "node:path";
 import { openDb } from "./db";
 import { healthRoutes } from "./routes/health";
 import { buildConversationRoutes } from "./routes/conversations";
-import { buildSettingsRoutes } from "./routes/settings";
 import { buildMessageRoutes } from "./routes/messages";
+import { buildSettingsRoutes } from "./routes/settings";
+import { buildRunRoutes } from "./routes/runs";
 import { createApiKeyState } from "./services/apiKey";
+import { ThreadService } from "./services/threads";
+import { MessageService } from "./services/messages";
+import { createBunSqliteRunStore } from "./agui/store-sqlite";
+import { createClaudeProvider } from "./agui/provider-claude";
 
 type Args = { port: number; token: string; db: string };
 
@@ -33,8 +38,6 @@ function parseArgs(argv: string[]): Args {
 
 const args = parseArgs(process.argv.slice(2));
 
-// 路径白名单校验：db 必须在父级允许目录内（防 --db=../../etc/foo.db）。
-// 这里只做基础规则：必须以 .db 结尾且 resolved。
 const dbAbs = path.resolve(args.db);
 if (!dbAbs.endsWith(".db")) {
   console.error(`refusing non-.db path: ${dbAbs}`);
@@ -44,12 +47,19 @@ if (!dbAbs.endsWith(".db")) {
 const db = openDb(dbAbs);
 const apiKey = createApiKeyState(process.env.ANTHROPIC_API_KEY);
 
+const threads = new ThreadService(db);
+const messages = new MessageService(db);
+const store = createBunSqliteRunStore(db);
+
+// Mark orphan running rows (process crashed mid-stream) as error so the
+// sidebar pulse dot doesn't lie. Returns count.
+const orphans = await store.reconcileOrphans();
+if (orphans > 0) console.log(`[boot] reconciled ${orphans} orphan run(s) → error`);
+
 export const app = new Hono();
 
-// CORS 必须在 auth 之前 —— 否则 WKWebView 的 preflight OPTIONS
-// （因为我们发自定义 Authorization header）会被 auth middleware 401，
-// 浏览器拿不到 Access-Control-Allow-* 响应头就拒绝后续真正请求。
-// sidecar 只 listen 127.0.0.1 + Bearer token 校验，origin 放开是安全的。
+// CORS must run before auth — preflight OPTIONS sends no Authorization,
+// auth would 401 it and the browser drops the real request.
 app.use(
   "*",
   cors({
@@ -68,10 +78,48 @@ app.use("*", async (c, next) => {
   await next();
 });
 
+// Build provider lazily on each /ag-ui/run? No — single instance is fine
+// (sessions are tracked inside). Throws if no API key by the time first run hits.
+function buildProvider() {
+  const key = apiKey.get();
+  if (!key) throw new Error("api_key_missing");
+  return createClaudeProvider({
+    apiKey: key,
+    baseUrl: process.env.ANTHROPIC_BASE_URL,
+    model: process.env.ANTHROPIC_MODEL,
+    allowedTools: [],
+  });
+}
+
+// Build once at boot — sessionByThread map lives across requests.
+// If api key is missing, defer creation: build on first run() and store.
+let providerInstance: ReturnType<typeof createClaudeProvider> | null = null;
+function getProvider() {
+  if (!providerInstance) providerInstance = buildProvider();
+  return providerInstance;
+}
+// Lazy proxy so routes can wire it as a stable reference.
+const providerProxy = {
+  get name() { return "claude-agent-sdk"; },
+  run: ((ctx) => getProvider().run(ctx)) as ReturnType<typeof createClaudeProvider>["run"],
+  resume: ((ctx) => getProvider().resume(ctx)) as ReturnType<typeof createClaudeProvider>["resume"],
+  getPendingInterrupts: ((tid, rid) => getProvider().getPendingInterrupts(tid, rid)) as ReturnType<typeof createClaudeProvider>["getPendingInterrupts"],
+  notifyCancelled: ((tid) => getProvider().notifyCancelled?.(tid) ?? Promise.resolve()) as ReturnType<typeof createClaudeProvider>["notifyCancelled"],
+};
+
 app.route("/", healthRoutes);
-app.route("/", buildConversationRoutes(db));
-app.route("/", buildMessageRoutes(db, apiKey));
+app.route("/", buildConversationRoutes({ threads, store }));
+app.route("/", buildMessageRoutes(messages));
 app.route("/", buildSettingsRoutes(apiKey));
+app.route(
+  "/",
+  buildRunRoutes({
+    threads,
+    messages,
+    provider: providerProxy,
+    store,
+  }),
+);
 
 console.log(`[sidecar] listening on http://127.0.0.1:${args.port} (db=${dbAbs})`);
 console.log(

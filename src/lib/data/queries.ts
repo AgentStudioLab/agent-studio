@@ -3,6 +3,7 @@ import {
   createConversation,
   type CreateConversationArgs,
   deleteConversation,
+  getConversation,
   getMessages,
   listPinned,
   listRecents,
@@ -10,16 +11,22 @@ import {
   togglePin,
 } from "./conversations";
 
-/**
- * Central query-key factory. Use these everywhere instead of hand-written
- * arrays so invalidations stay aligned with reads.
- */
 export const queryKeys = {
   recents: ["conversations", "recents"] as const,
   pinned: ["conversations", "pinned"] as const,
+  detail: (id: string) => ["conversations", "detail", id] as const,
   messages: (conversationId: string) =>
     ["conversations", conversationId, "messages"] as const,
 };
+
+export function useConversation(id: string | null) {
+  return useQuery({
+    queryKey: queryKeys.detail(id ?? "__none__"),
+    queryFn: () => getConversation(id!),
+    enabled: !!id,
+    staleTime: 5_000,
+  });
+}
 
 export function useRecentConversations(limit = 20) {
   return useQuery({
@@ -61,7 +68,7 @@ export function useTogglePinMutation() {
 export function useCreateConversationMutation() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (args: CreateConversationArgs) => createConversation(args),
+    mutationFn: (args: CreateConversationArgs = {}) => createConversation(args),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.recents });
     },
@@ -89,16 +96,4 @@ export function useDeleteConversationMutation() {
       qc.invalidateQueries({ queryKey: queryKeys.pinned });
     },
   });
-}
-
-/**
- * Helper for the SSE streaming finally block — call after a turn completes to
- * refresh the persisted messages + sidebar.
- */
-export function useInvalidateAfterTurn() {
-  const qc = useQueryClient();
-  return (conversationId: string) => {
-    qc.invalidateQueries({ queryKey: queryKeys.messages(conversationId) });
-    qc.invalidateQueries({ queryKey: queryKeys.recents });
-  };
 }

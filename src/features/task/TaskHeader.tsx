@@ -8,7 +8,6 @@ import {
   Archive,
   Trash2,
   PanelRight,
-  Square,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -22,13 +21,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useTranslation } from "react-i18next";
 import { useAppShell } from "@/app/AppShellContext";
-import { abortStream } from "@/lib/data/conversations";
 import { cn } from "@/lib/utils";
 import { projects as mockProjects } from "@/lib/mock/projects";
 
 interface TaskHeaderProps {
   conversationId: string;
-  streaming?: boolean;
   title?: string;
   projects?: { id: string; name: string }[];
   onSchedule?: () => void;
@@ -42,7 +39,6 @@ interface TaskHeaderProps {
 
 export function TaskHeader({
   conversationId,
-  streaming = false,
   title,
   projects = mockProjects,
   onSchedule,
@@ -53,16 +49,10 @@ export function TaskHeader({
   onArchive,
   onDelete,
 }: TaskHeaderProps) {
-  const { toggleAside, sidebarCollapsed, abortLocalStream } = useAppShell();
-
-  const handleStop = async () => {
-    abortLocalStream(conversationId);
-    try {
-      await abortStream(conversationId);
-    } catch {
-      // server may have already finished; swallow
-    }
-  };
+  const { toggleAside, sidebarCollapsed } = useAppShell();
+  // conversationId currently unused (kept in signature for future per-task
+  // actions like rename / archive that will need it).
+  void conversationId;
   const { t } = useTranslation();
   return (
     <header
@@ -119,17 +109,9 @@ export function TaskHeader({
         </DropdownMenuContent>
       </DropdownMenu>
       <div className="flex-1" />
-      {streaming && (
-        <button
-          type="button"
-          onClick={handleStop}
-          aria-label={t("task.header.stop")}
-          className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[13px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
-        >
-          <Square className="size-3.5" />
-          {t("task.header.stop")}
-        </button>
-      )}
+      {/* Stop control lives in the composer (PromptInputSubmit toggles between
+          Send icon and Square icon while streaming). No duplicate Stop button
+          in the header. */}
       <button
         type="button"
         onClick={toggleAside}

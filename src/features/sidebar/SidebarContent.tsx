@@ -24,35 +24,52 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useAppShell } from "@/app/AppShellContext";
-import type { MockPinnedItem, MockRecentItem, Status } from "@/lib/mock/types";
+import type { MockPinnedItem, MockRecentItem } from "@/lib/mock/types";
+import { useThreadStatuses } from "@/lib/agui/react/useThreadStatuses";
 import { NavItem } from "@/features/sidebar/NavItem";
 import { PinnedItem } from "@/features/sidebar/PinnedItem";
 import { RecentItem } from "@/features/sidebar/RecentItem";
 import { UpdateCard } from "@/features/sidebar/UpdateCard";
 import { UserBar } from "@/features/sidebar/UserBar";
 
-function statusOf(c: Conversation): Status {
-  if (c.status === "active") return "active";
-  if (c.status === "done") return "done";
-  return "failed";
+import type { Status } from "@/lib/mock/types";
+import type { ThreadStatusItem } from "@/lib/agui/react/useThreadStatuses";
+
+function aguiToMockStatus(status: ThreadStatusItem["status"] | undefined): Status {
+  switch (status) {
+    case "running":
+    case "awaiting_approval":
+      return "active";
+    case "error":
+    case "cancelled":
+      return "failed";
+    default:
+      return "done";
+  }
 }
 
-function toRecentItem(c: Conversation): MockRecentItem {
+function toRecentItem(
+  c: Conversation,
+  statusByThread: Map<string, ThreadStatusItem["status"]>,
+): MockRecentItem {
   return {
     id: c.id,
     kind: "conversation",
     title: c.title,
-    status: statusOf(c),
+    status: aguiToMockStatus(statusByThread.get(c.id)),
     time: new Date(c.updatedAt).toLocaleString(),
   };
 }
 
-function toPinnedItem(c: Conversation): MockPinnedItem {
+function toPinnedItem(
+  c: Conversation,
+  statusByThread: Map<string, ThreadStatusItem["status"]>,
+): MockPinnedItem {
   return {
     id: c.id,
     kind: "task",
     name: c.title,
-    status: statusOf(c),
+    status: aguiToMockStatus(statusByThread.get(c.id)),
   };
 }
 
@@ -76,10 +93,22 @@ export function SidebarContent() {
 
   const { data: recentsData = [] } = useRecentConversations();
   const { data: pinnedData = [] } = usePinnedConversations();
+  const { data: threadStatuses = [] } = useThreadStatuses();
   const togglePinMutation = useTogglePinMutation();
 
-  const recents = useMemo(() => recentsData.map(toRecentItem), [recentsData]);
-  const pinned = useMemo(() => pinnedData.map(toPinnedItem), [pinnedData]);
+  const statusByThread = useMemo(() => {
+    const m = new Map<string, ThreadStatusItem["status"]>();
+    for (const t of threadStatuses) m.set(t.threadId, t.status);
+    return m;
+  }, [threadStatuses]);
+  const recents = useMemo(
+    () => recentsData.map((c) => toRecentItem(c, statusByThread)),
+    [recentsData, statusByThread],
+  );
+  const pinned = useMemo(
+    () => pinnedData.map((c) => toPinnedItem(c, statusByThread)),
+    [pinnedData, statusByThread],
+  );
 
   const handlePin = (recent: MockRecentItem) => {
     togglePinMutation.mutate({ id: recent.id, pinned: true });

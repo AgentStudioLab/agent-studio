@@ -1,89 +1,69 @@
 import { Hono } from "hono";
-import type { Database } from "bun:sqlite";
-import {
-  createConversation,
-  deleteConversation,
-  getConversation,
-  getMessages,
-  listConversations,
-  updatePin,
-  updateTitle,
-} from "../services/conversations";
+import type { ThreadService } from "../services/threads";
+import type { RunEventStore } from "../agui/core";
 
-const ULID_RE = /^[0-9A-HJKMNP-TV-Z]{26}$/;
-
-function validateId(id: string): boolean {
-  return ULID_RE.test(id);
+export interface MountConversationsDeps {
+  threads: ThreadService;
+  store: RunEventStore;
 }
 
-export function buildConversationRoutes(db: Database): Hono {
+export function buildConversationRoutes(deps: MountConversationsDeps): Hono {
+  const { threads, store } = deps;
   const app = new Hono();
 
   app.post("/conversations", async (c) => {
-    const body = (await c.req.json().catch(() => null)) as {
-      prompt?: string;
-      projectId?: string | null;
-      mode?: "ask" | "agent";
-    } | null;
-    if (!body?.prompt || typeof body.prompt !== "string" || body.prompt.trim().length === 0) {
-      return c.json({ error: "prompt_required" }, 400);
-    }
-    const mode = body.mode === "agent" ? "agent" : "ask";
-    const conv = createConversation(db, {
-      prompt: body.prompt,
-      projectId: body.projectId ?? null,
-      mode,
+    const body = (await c.req.json().catch(() => null)) as
+      | { id?: string; title?: string; projectId?: string | null }
+      | null;
+    const t = threads.create({
+      id: body?.id,
+      title: body?.title,
+      projectId: body?.projectId ?? null,
     });
-    return c.json(conv, 201);
+    return c.json(t, 201);
   });
 
   app.get("/conversations", (c) => {
     const limit = Math.min(Math.max(Number(c.req.query("limit") ?? "20"), 1), 100);
     const pinnedOnly = c.req.query("pinned") === "true";
-    const rows = listConversations(db, { limit, pinnedOnly });
-    return c.json(rows);
+    return c.json(threads.list({ limit, pinnedOnly }));
+  });
+
+  // Status aggregation — one row per conversation with lastRunId + run status.
+  // MUST be declared BEFORE `/conversations/:id` so the literal "status"
+  // segment doesn't get captured as an id param.
+  app.get("/conversations/status", async (c) => {
+    return c.json(await store.listThreadStatuses());
   });
 
   app.get("/conversations/:id", (c) => {
-    const id = c.req.param("id");
-    if (!validateId(id)) return c.json({ error: "invalid_id" }, 400);
-    const conv = getConversation(db, id);
-    if (!conv) return c.json({ error: "not_found" }, 404);
-    return c.json(conv);
+    const t = threads.get(c.req.param("id"));
+    if (!t) return c.json({ error: "not_found" }, 404);
+    return c.json(t);
   });
 
   app.patch("/conversations/:id", async (c) => {
     const id = c.req.param("id");
-    if (!validateId(id)) return c.json({ error: "invalid_id" }, 400);
-    if (!getConversation(db, id)) return c.json({ error: "not_found" }, 404);
+    if (!threads.get(id)) return c.json({ error: "not_found" }, 404);
 
-    const body = (await c.req.json().catch(() => null)) as {
-      title?: string;
-      pinned?: boolean;
-    } | null;
+    const body = (await c.req.json().catch(() => null)) as
+      | { title?: string; pinned?: boolean }
+      | null;
     if (body?.title !== undefined) {
       if (typeof body.title !== "string" || body.title.length === 0) {
         return c.json({ error: "invalid_title" }, 400);
       }
-      updateTitle(db, id, body.title);
+      threads.rename(id, body.title);
     }
     if (body?.pinned !== undefined) {
-      updatePin(db, id, body.pinned);
+      threads.updatePin(id, body.pinned);
     }
-    return c.json(getConversation(db, id));
+    return c.json(threads.get(id));
   });
 
   app.delete("/conversations/:id", (c) => {
-    const id = c.req.param("id");
-    if (!validateId(id)) return c.json({ error: "invalid_id" }, 400);
-    deleteConversation(db, id);
+    threads.delete(c.req.param("id"));
     return c.json({ ok: true });
-  });
-
-  app.get("/conversations/:id/messages", (c) => {
-    const id = c.req.param("id");
-    if (!validateId(id)) return c.json({ error: "invalid_id" }, 400);
-    return c.json(getMessages(db, id));
   });
 
   return app;

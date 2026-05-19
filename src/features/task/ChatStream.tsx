@@ -1,94 +1,140 @@
-import type { Message } from "@/lib/data/types";
-
-interface StreamState {
-  status: "streaming" | "done" | "aborted" | "error";
-  textBuffer: string;
-  messageId: string | null;
-  errorMessage?: string;
-}
+import { Streamdown } from "streamdown";
+import type { MessageView } from "@/lib/agui/runtime";
 
 interface ChatStreamProps {
-  messages: Message[];
-  stream: StreamState | null;
-  loading: boolean;
+  messages: MessageView[];
+  isThinking: boolean;
+  error: string | null;
+  loading?: boolean;
 }
 
-export function ChatStream({ messages, stream, loading }: ChatStreamProps) {
+/**
+ * Chat transcript layout per Showcase 1 prototype (Claude Desktop / Cowork):
+ *   - user msg: right-aligned bubble, max-w 78%, bg-bg-300
+ *   - assistant msg: full-width text content, no "CLAUDE" label
+ *   - column max-w 760px centered, generous vertical spacing between turns
+ *
+ * Tool-call cards / artifact cards / preset questions land in this column too
+ * (each rendered by an assistant block kind); we keep the per-block dispatch
+ * minimal here and let future blocks add their own component.
+ */
+export function ChatStream({
+  messages,
+  isThinking,
+  error,
+  loading = false,
+}: ChatStreamProps) {
   if (loading) {
-    return <div className="p-8 text-sm text-muted-foreground">Loading…</div>;
+    return (
+      <div className="flex-1 px-8 py-6 text-sm text-muted-foreground">
+        Loading…
+      </div>
+    );
   }
   return (
-    <div className="flex-1 overflow-y-auto px-12 py-6">
-      {messages.map((m) => (
-        <MessageRow key={m.id} message={m} />
-      ))}
-      {stream && stream.status === "streaming" && (
-        <MessageRow
-          message={{
-            id: "in-flight",
-            conversationId: "",
-            role: "assistant",
-            blocks: [{ type: "text", text: stream.textBuffer }],
-            createdAt: Date.now(),
-            finishReason: null,
-            errorText: null,
-          }}
-          streaming
-        />
-      )}
-      {stream && stream.status === "aborted" && (
-        <p className="mt-2 text-sm" style={{ color: "hsl(var(--text-300))" }}>
-          已停止
-        </p>
-      )}
-      {stream && stream.status === "error" && (
-        <p className="mt-2 text-sm" style={{ color: "hsl(var(--danger-100))" }}>
-          错误：{stream.errorMessage}
-        </p>
-      )}
+    <div className="flex-1 overflow-y-auto">
+      <div className="mx-auto max-w-[760px] space-y-6 px-8 py-6">
+        {messages.map((m) => (
+          <MessageRow key={m.id} message={m} />
+        ))}
+        {isThinking && (
+          <p className="text-[13px]" style={{ color: "hsl(var(--text-300))" }}>
+            思考中…
+          </p>
+        )}
+        {error && (
+          <p className="text-[13px]" style={{ color: "hsl(var(--danger-100))" }}>
+            错误：{error}
+          </p>
+        )}
+      </div>
     </div>
   );
 }
 
-function MessageRow({
-  message,
-  streaming = false,
-}: {
-  message: Message;
-  streaming?: boolean;
-}) {
-  // spec §6.4 resumption：DB 加载时 finish_reason=null 表示"残留 in-flight"（sidecar 崩溃 / 应用重启）。
-  // finish_reason="error" 表示流过程中出错。两种情况都在消息末尾渲染状态尾标 + Resend。
-  const interrupted =
-    message.role === "assistant" && !streaming && message.finishReason === null;
-  const failed = message.role === "assistant" && message.finishReason === "error";
-  const aborted = message.role === "assistant" && message.finishReason === "aborted";
+function MessageRow({ message }: { message: MessageView }) {
+  if (message.role === "user") {
+    return (
+      <div className="flex justify-end">
+        <div
+          className="max-w-[78%] whitespace-pre-wrap rounded-2xl px-4 py-2.5 text-[14px] leading-relaxed"
+          style={{
+            background: "hsl(var(--bg-300))",
+            color: "hsl(var(--text-100))",
+          }}
+        >
+          {message.content}
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="mb-6">
-      <div className="mb-2 text-xs uppercase text-muted-foreground">
-        {message.role === "user" ? "You" : "Claude"}
-      </div>
-      {message.blocks.map((b, i) => (
-        <p key={i} className="text-sm text-foreground">
-          {b.type === "text" ? b.text : null}
-          {streaming && i === message.blocks.length - 1 && (
-            <span className="ml-0.5 inline-block h-3 w-1.5 animate-pulse bg-current" />
-          )}
-        </p>
-      ))}
-      {(interrupted || failed || aborted) && (
-        <p className="mt-2 text-xs" style={{ color: "hsl(var(--text-300))" }}>
-          {interrupted && "已中断"}
-          {aborted && "已停止"}
-          {failed && `失败：${message.errorText ?? "unknown"}`}
-          {" · "}
-          {/* Resend handler wired in a later wave */}
-          <button className="underline" type="button">
-            Resend
-          </button>
-        </p>
-      )}
+    <div className="space-y-3">
+      {message.blocks.map((b, i) => {
+        if (b.kind === "text") {
+          // streamdown renders markdown progressively (handles half-open
+          // fences / lists / inline as deltas land) and ships its own CSS
+          // primitives. mode="streaming" enables incomplete-markdown patching.
+          return (
+            <div
+              key={`${b.id}-${i}`}
+              className="prose-stream text-[14px] leading-[1.75]"
+              style={{ color: "hsl(var(--text-100))" }}
+            >
+              <Streamdown mode="streaming" parseIncompleteMarkdown>
+                {b.content}
+              </Streamdown>
+            </div>
+          );
+        }
+        if (b.kind === "reasoning") {
+          return (
+            <div
+              key={`${b.id}-${i}`}
+              className="whitespace-pre-wrap text-[13px] leading-[1.7]"
+              style={{ color: "hsl(var(--text-300))" }}
+            >
+              {b.content}
+            </div>
+          );
+        }
+        if (b.kind === "tool_call") {
+          const tc = b.toolCall;
+          return (
+            <div
+              key={tc.id}
+              className="rounded-lg px-3 py-2 text-[12.5px]"
+              style={{
+                border: "1px solid hsl(var(--border-300) / 0.18)",
+                color: "hsl(var(--text-300))",
+              }}
+            >
+              <div
+                className="text-[13px] font-medium"
+                style={{ color: "hsl(var(--text-100))" }}
+              >
+                {tc.toolName}
+              </div>
+              <div className="mt-0.5 text-[11.5px] opacity-70">
+                status: {tc.status}
+              </div>
+            </div>
+          );
+        }
+        if (b.kind === "notice") {
+          return (
+            <p
+              key={`${b.id}-${i}`}
+              className="text-[12.5px]"
+              style={{ color: "hsl(var(--text-300))" }}
+            >
+              {b.content}
+            </p>
+          );
+        }
+        return null;
+      })}
     </div>
   );
 }

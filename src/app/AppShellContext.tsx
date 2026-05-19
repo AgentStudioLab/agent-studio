@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 import type { MockFile } from "@/lib/mock/types";
 
 type ViewKey =
@@ -18,13 +18,6 @@ interface PreviewState {
   open: boolean;
 }
 
-interface StreamState {
-  status: "streaming" | "done" | "aborted" | "error";
-  textBuffer: string;
-  messageId: string | null;
-  errorMessage?: string;
-}
-
 interface AppShellContextValue {
   currentView: ViewKey;
   setView: (v: ViewKey) => void;
@@ -37,23 +30,19 @@ interface AppShellContextValue {
   openPreview: (file: MockFile) => void;
   closePreview: () => void;
   // Active entity ids: persisted across view switches so that list-view → detail-view
-  // navigation can carry which entity was clicked (without ids, detail views fall back
-  // to the first mock fixture and silently lie about content).
+  // navigation can carry which entity was clicked.
   activeProjectId: string | null;
   setActiveProjectId: (id: string | null) => void;
   activeScheduledId: string | null;
   setActiveScheduledId: (id: string | null) => void;
   activeTaskId: string | null;
   setActiveTaskId: (id: string | null) => void;
+  // NewTaskView → TaskView handoff: NewTaskView creates a thread, drops the
+  // prompt here + navigates. TaskView reads it once and POST /ag-ui/run, clears.
   pendingFirstPrompt: { conversationId: string; text: string } | null;
   setPendingFirstPrompt: (v: { conversationId: string; text: string } | null) => void;
-  // Sidebar pinned/recents now live in TanStack Query cache (see lib/data/queries.ts).
-  // SidebarContent reads via useRecentConversations / usePinnedConversations directly.
-  streamingByConversation: Map<string, StreamState>;
-  setStreamState: (conversationId: string, state: StreamState) => void;
-  clearStreamState: (conversationId: string) => void;
-  registerLocalAbort: (conversationId: string, controller: AbortController) => void;
-  abortLocalStream: (conversationId: string) => void;
+  // Streaming state lives in the per-thread AG-UI ChatRuntime (see useChat),
+  // not here.
 }
 
 const AppShellContext = createContext<AppShellContextValue | null>(null);
@@ -76,42 +65,16 @@ export function AppShellProvider({
     conversationId: string;
     text: string;
   } | null>(null);
-  const [streamingByConversation, setStreamingByConversation] = useState<Map<string, StreamState>>(
-    new Map(),
-  );
 
   const toggleAside = useCallback(() => setAsideOpen((v) => !v), []);
-
-  const setStreamState = useCallback((conversationId: string, state: StreamState) => {
-    setStreamingByConversation((prev) => {
-      const next = new Map(prev);
-      next.set(conversationId, state);
-      return next;
-    });
-  }, []);
-
-  const clearStreamState = useCallback((conversationId: string) => {
-    setStreamingByConversation((prev) => {
-      const next = new Map(prev);
-      next.delete(conversationId);
-      return next;
-    });
-  }, []);
-
-  const localAbortsRef = useRef<Map<string, AbortController>>(new Map());
-
-  const registerLocalAbort = useCallback((id: string, c: AbortController) => {
-    localAbortsRef.current.set(id, c);
-  }, []);
-
-  const abortLocalStream = useCallback((id: string) => {
-    const c = localAbortsRef.current.get(id);
-    c?.abort();
-    localAbortsRef.current.delete(id);
-  }, []);
-
-  const openPreview = useCallback((file: MockFile) => setPreview({ file, open: true }), []);
-  const closePreview = useCallback(() => setPreview((p) => ({ ...p, open: false })), []);
+  const openPreview = useCallback(
+    (file: MockFile) => setPreview({ file, open: true }),
+    [],
+  );
+  const closePreview = useCallback(
+    () => setPreview((p) => ({ ...p, open: false })),
+    [],
+  );
 
   const value = useMemo<AppShellContextValue>(
     () => ({
@@ -133,11 +96,6 @@ export function AppShellProvider({
       setActiveTaskId,
       pendingFirstPrompt,
       setPendingFirstPrompt,
-      streamingByConversation,
-      setStreamState,
-      clearStreamState,
-      registerLocalAbort,
-      abortLocalStream,
     }),
     [
       currentView,
@@ -151,11 +109,6 @@ export function AppShellProvider({
       activeScheduledId,
       activeTaskId,
       pendingFirstPrompt,
-      streamingByConversation,
-      setStreamState,
-      clearStreamState,
-      registerLocalAbort,
-      abortLocalStream,
     ],
   );
   return <AppShellContext.Provider value={value}>{children}</AppShellContext.Provider>;

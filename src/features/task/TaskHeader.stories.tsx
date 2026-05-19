@@ -27,10 +27,6 @@ export const LongTitle: Story = {
   args: { conversationId: "conv-1", title: LONG_TITLE },
 };
 
-export const Streaming: Story = {
-  args: { conversationId: "conv-1", title: "Active task", streaming: true },
-};
-
 export const SideBySide: Story = {
   parameters: { layout: "fullscreen" },
   decorators: [],
@@ -46,7 +42,7 @@ export const SideBySide: Story = {
         style={{ background: "hsl(var(--bg-100))", padding: "1rem" }}
       >
         <div style={{ width: 480 }}>
-          <TaskHeader conversationId="conv-1" title={LONG_TITLE} streaming />
+          <TaskHeader conversationId="conv-1" title={LONG_TITLE} />
         </div>
       </div>
     </div>

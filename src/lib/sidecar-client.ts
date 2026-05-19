@@ -67,6 +67,28 @@ export async function fetchSidecar(
   return fetch(`http://127.0.0.1:${port}${path}`, { ...init, headers });
 }
 
+/**
+ * Fetch implementation that resolves the sidecar URL + auth lazily, so it can
+ * be passed into the AG-UI runtime (which calls fetch with relative paths
+ * like `/ag-ui/run`). The first call awaits `getSidecarInfo()`; subsequent
+ * calls hit the cached promise.
+ */
+export const authedFetch: typeof fetch = async (input, init = {}) => {
+  const { port, token } = await getSidecarInfo();
+  const urlStr =
+    typeof input === "string"
+      ? input
+      : input instanceof URL
+        ? input.href
+        : input.url;
+  const finalUrl = /^https?:/i.test(urlStr)
+    ? urlStr
+    : `http://127.0.0.1:${port}${urlStr}`;
+  const headers = new Headers(init.headers);
+  headers.set("Authorization", `Bearer ${token}`);
+  return fetch(finalUrl, { ...init, headers });
+};
+
 export type SSEHandler = (event: { type: string; data: string }) => void;
 
 export async function subscribeSSE(

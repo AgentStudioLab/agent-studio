@@ -26,8 +26,11 @@ export function NewTaskView() {
     setSubmitting(true);
     setError(null);
     try {
-      const conv = await createConversation({ prompt: text, mode: "ask" });
+      // Title = first ~60 chars of prompt so the sidebar entry is recognisable
+      // before the title summariser (future) replaces it.
+      const conv = await createConversation({ title: text.slice(0, 60) });
       setActiveTaskId(conv.id);
+      // TaskView reads this and immediately POST /ag-ui/run with the prompt.
       setPendingFirstPrompt({ conversationId: conv.id, text });
       setView("task");
     } catch (e) {

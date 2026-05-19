@@ -26,7 +26,11 @@ export function RecentItem({
   onDelete,
   onMoveToProject,
 }: RecentItemProps) {
-  const status = item.kind === "task" && item.status ? item.status : "pending";
+  // All real entries come from /conversations (kind="conversation"). The
+  // status is computed in SidebarContent's aguiToMockStatus from
+  // /conversations/status — "active" when a run is in flight (drives the
+  // pulse halo in StatusDot), otherwise "done"/"failed"/"pending".
+  const status = item.status ?? "pending";
   return (
     <div className="group relative w-full">
       <button

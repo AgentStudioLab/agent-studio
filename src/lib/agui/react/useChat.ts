@@ -1,0 +1,147 @@
+// React binding for ChatRuntime. Mirrors agui-vue/vue/useChat.ts but uses
+// useSyncExternalStore + memoised commands. The framework adapter is the only
+// React-specific surface; all protocol logic lives in ../runtime/.
+
+import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  createChatRuntime,
+  type ChatRuntime,
+  type ChatState,
+  type MessageView,
+  type PendingInterrupt,
+} from "../runtime";
+import { authedFetch } from "@/lib/sidecar-client";
+
+export type {
+  MessageBlock,
+  MessageView,
+  ToolCallView,
+  PendingInterrupt,
+} from "../runtime";
+
+export interface UseChatOptions {
+  threadId: string;
+  /** Optional initial history (turn-grouped from /conversations/:id/messages). */
+  initialMessages?: unknown[];
+}
+
+const THREAD_STATUS_KEY = ["thread-statuses"] as const;
+
+/**
+ * Subscribe to one thread's ChatRuntime. Threads are 1-to-1 with runtime
+ * instances; switching threadId tears down + recreates the runtime so the
+ * previous SSE / argsBuffer can't leak across.
+ */
+export function useChat(opts: UseChatOptions) {
+  const qc = useQueryClient();
+  const runtimeRef = useRef<ChatRuntime | null>(null);
+
+  // Create a fresh runtime when threadId changes. We can't pass everything via
+  // a single useMemo because StrictMode mounts effects twice — runtimeRef +
+  // explicit destroy in cleanup handles that path.
+  // initialMessages intentionally NOT in deps: only the first mount uses it;
+  // subsequent threadId switches start with empty history (caller can pass new
+  // initialMessages via key={threadId} on the consumer if they need it).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const runtime = useMemo<ChatRuntime>(() => {
+    runtimeRef.current?.destroy();
+    const invalidateAfterRun = () => {
+      // Sidebar pulse dot + active-run discovery share this query key.
+      void qc.invalidateQueries({ queryKey: THREAD_STATUS_KEY });
+      // Persisted history — server has just appended the final assistant
+      // turn; the next history fetch should pick it up.
+      void qc.invalidateQueries({
+        queryKey: ["conversations", opts.threadId, "messages"],
+      });
+    };
+
+    const rt = createChatRuntime({
+      threadId: opts.threadId,
+      // apiBase blank — authedFetch normalises relative paths.
+      apiBase: "",
+      fetchImpl: authedFetch,
+      initialMessages: opts.initialMessages,
+      onRunFinished: invalidateAfterRun,
+      onRunError: invalidateAfterRun,
+    });
+    runtimeRef.current = rt;
+    return rt;
+  }, [opts.threadId]);
+
+  // Tear down on unmount (StrictMode double-mount: useMemo recomputes, prior
+  // runtime is destroyed inline; the final unmount cleanup handles the last one).
+  useEffect(() => {
+    return () => {
+      runtime.destroy();
+    };
+  }, [runtime]);
+
+  const state = useSyncExternalStore<ChatState>(
+    useCallback((listener) => runtime.subscribe(listener), [runtime]),
+    useCallback(() => runtime.getState(), [runtime]),
+    useCallback(() => runtime.getState(), [runtime]),
+  );
+
+  const send = useCallback(
+    async (text: string) => {
+      await runtime.send(text);
+      // Light up sidebar pulse + active-run derivation immediately. Symmetric
+      // invalidation fires from onRunFinished/Error when the run terminates.
+      void qc.invalidateQueries({ queryKey: THREAD_STATUS_KEY });
+    },
+    [runtime, qc],
+  );
+  const cancel = useCallback(async () => {
+    await runtime.cancel();
+    void qc.invalidateQueries({ queryKey: THREAD_STATUS_KEY });
+  }, [runtime, qc]);
+  const resumeRun = useCallback(
+    async (payload: unknown) => {
+      await runtime.resume(payload);
+      void qc.invalidateQueries({ queryKey: THREAD_STATUS_KEY });
+    },
+    [runtime, qc],
+  );
+  const attachToRun = useCallback(
+    (runId: string, cursor?: string) => runtime.attachToRun(runId, { cursor }),
+    [runtime],
+  );
+  const restoreAwaiting = useCallback(
+    (runId: string, interrupts: PendingInterrupt[], cursor: string) =>
+      runtime.restoreAwaiting(runId, interrupts, cursor),
+    [runtime],
+  );
+  const setHistoricalMessages = useCallback(
+    (turns: unknown[]) => runtime.setHistoricalMessages(turns),
+    [runtime],
+  );
+
+  const viewMessages: MessageView[] = useMemo(
+    () => [...state.historicalMessages, ...state.liveMessages],
+    [state.historicalMessages, state.liveMessages],
+  );
+  const isAwaitingApproval = useMemo(
+    () => state.pendingInterrupts.some((it) => it.reason === "tool_approval"),
+    [state.pendingInterrupts],
+  );
+
+  return {
+    viewMessages,
+    state,
+    isRunning: state.isRunning,
+    isThinking: state.isThinking,
+    error: state.error,
+    activeRunId: state.activeRunId,
+    pendingInterrupts: state.pendingInterrupts,
+    isAwaitingApproval,
+    send,
+    cancel,
+    resumeRun,
+    attachToRun,
+    restoreAwaiting,
+    setHistoricalMessages,
+  };
+}
+
+export const threadStatusKey = THREAD_STATUS_KEY;
