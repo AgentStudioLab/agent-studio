@@ -1,4 +1,5 @@
 import { ChevronDown, Hand } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import {
   PromptInput,
   PromptInputButton,
@@ -9,21 +10,22 @@ import {
 } from "@/components/ai-elements/prompt-input";
 
 export function TaskMessageInput() {
+  const { t } = useTranslation();
   return (
     <div className="w-full">
       <PromptInput onSubmit={() => {}}>
-        <PromptInputTextarea placeholder="Write a message..." rows={2} />
+        <PromptInputTextarea placeholder={t("task.input.placeholder")} rows={2} />
         <PromptInputFooter>
           <PromptInputTools>
             <PromptInputButton>
               <Hand className="size-4" />
-              <span>Ask</span>
+              <span>{t("task.input.ask")}</span>
               <ChevronDown className="size-3" />
             </PromptInputButton>
           </PromptInputTools>
           <PromptInputTools>
             <PromptInputButton>
-              <span>Legacy Model</span>
+              <span>{t("task.input.legacyModel")}</span>
               <ChevronDown className="size-3" />
             </PromptInputButton>
             <PromptInputSubmit />
@@ -31,7 +33,7 @@ export function TaskMessageInput() {
         </PromptInputFooter>
       </PromptInput>
       <p className="mt-2 text-center text-[11.5px] text-muted-foreground">
-        Agent Studio is AI and can make mistakes. Please double-check responses.
+        {t("task.input.disclaimer")}
       </p>
     </div>
   );

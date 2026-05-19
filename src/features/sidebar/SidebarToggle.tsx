@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { PanelLeft } from "lucide-react";
 import {
   HoverCard,
@@ -21,6 +22,7 @@ import { SidebarContent } from "@/features/sidebar/SidebarContent";
  */
 export function SidebarToggle() {
   const { setSidebarCollapsed } = useAppShell();
+  const { t } = useTranslation();
   const [armed, setArmed] = useState(false);
   const [open, setOpen] = useState(false);
 
@@ -38,7 +40,7 @@ export function SidebarToggle() {
       <HoverCardTrigger asChild>
         <button
           type="button"
-          aria-label="Open sidebar"
+          aria-label={t("sidebar.toggle.open")}
           onClick={() => setSidebarCollapsed(false)}
           onMouseLeave={() => {
             if (!armed) setArmed(true);

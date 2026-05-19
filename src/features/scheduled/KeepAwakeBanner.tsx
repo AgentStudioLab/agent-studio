@@ -1,5 +1,6 @@
 import { Info, Sun } from "lucide-react";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 
 interface KeepAwakeBannerProps {
@@ -7,12 +8,13 @@ interface KeepAwakeBannerProps {
 }
 
 export function KeepAwakeBanner({ defaultEnabled = true }: KeepAwakeBannerProps) {
+  const { t } = useTranslation();
   const [enabled, setEnabled] = useState(defaultEnabled);
   return (
     <div className="flex items-center gap-3 rounded-md border border-border bg-card px-4 py-2.5">
       <Info className="size-4 text-muted-foreground" />
       <span className="flex-1 text-sm text-muted-foreground">
-        Scheduled tasks only run while your computer is awake.
+        {t("scheduled.keepAwake.description")}
       </span>
       <button
         type="button"
@@ -26,7 +28,7 @@ export function KeepAwakeBanner({ defaultEnabled = true }: KeepAwakeBannerProps)
         )}
       >
         <Sun className="size-3" />
-        Keep awake
+        {t("scheduled.keepAwake.toggle")}
       </button>
     </div>
   );

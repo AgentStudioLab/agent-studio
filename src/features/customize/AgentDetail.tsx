@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Circle, FolderOpen, MoreHorizontal, Pencil, Plus } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Switch } from "@/components/ui/switch";
 import { InitialsAvatar } from "@/shared/atoms/InitialsAvatar";
 import { cn } from "@/lib/utils";
@@ -13,6 +14,7 @@ interface AgentDetailProps {
 }
 
 export function AgentDetail({ agent }: AgentDetailProps) {
+  const { t } = useTranslation();
   const [enabled, setEnabled] = useState(true);
 
   const projectChips = (() => {
@@ -49,12 +51,12 @@ export function AgentDetail({ agent }: AgentDetailProps) {
           <Switch
             checked={enabled}
             onCheckedChange={setEnabled}
-            aria-label="Enabled"
+            aria-label={t("customize.agents.enabled")}
           />
           <button
             type="button"
             className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-            aria-label="More"
+            aria-label={t("customize.agents.more")}
           >
             <MoreHorizontal className="size-4" />
           </button>
@@ -62,24 +64,30 @@ export function AgentDetail({ agent }: AgentDetailProps) {
       </header>
 
       <dl className="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-1 text-sm">
-        <dt className="text-muted-foreground">Added by</dt>
+        <dt className="text-muted-foreground">
+          {t("customize.agents.addedBy")}
+        </dt>
         <dd className="text-foreground">
-          {agent.category === "my" ? "You" : "Anthropic"}
+          {agent.category === "my"
+            ? t("customize.agents.addedByYou")
+            : t("customize.agents.addedByAnthropic")}
         </dd>
-        <dt className="text-muted-foreground">Trigger</dt>
-        <dd className="text-foreground">Manual + auto-suggest</dd>
+        <dt className="text-muted-foreground">{t("customize.agents.trigger")}</dt>
+        <dd className="text-foreground">
+          {t("customize.agents.triggerValue")}
+        </dd>
       </dl>
 
       <section className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
           <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            System prompt
+            {t("customize.agents.systemPrompt")}
           </h2>
           <button
             type="button"
             className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
           >
-            <Pencil className="size-3" /> Edit
+            <Pencil className="size-3" /> {t("customize.agents.edit")}
           </button>
         </div>
         <p className="font-serif text-sm italic text-foreground">
@@ -88,8 +96,8 @@ export function AgentDetail({ agent }: AgentDetailProps) {
       </section>
 
       <ChipSection
-        title={`Allowed skills (${agent.skills.length})`}
-        action="Add skill"
+        title={`${t("customize.agents.allowedSkills")} (${agent.skills.length})`}
+        action={t("customize.agents.addSkill")}
       >
         {agent.skills.map((skillId) => {
           const skill: MockSkill | undefined = loadedSkills.find(
@@ -114,8 +122,8 @@ export function AgentDetail({ agent }: AgentDetailProps) {
       </ChipSection>
 
       <ChipSection
-        title={`MCP servers (${agent.mcpServers.length})`}
-        action="Add server"
+        title={`${t("customize.agents.mcpServers")} (${agent.mcpServers.length})`}
+        action={t("customize.agents.addServer")}
       >
         {agent.mcpServers.map((serverId) => {
           const server = mcpServers.find((s) => s.id === serverId);
@@ -139,10 +147,13 @@ export function AgentDetail({ agent }: AgentDetailProps) {
         })}
       </ChipSection>
 
-      <ChipSection title="Allowed projects" action="Add project">
+      <ChipSection
+        title={t("customize.agents.allowedProjects")}
+        action={t("customize.agents.addProject")}
+      >
         {projectChips === null ? (
           <span className="text-xs italic text-muted-foreground">
-            All projects (no restriction)
+            {t("customize.agents.allProjects")}
           </span>
         ) : (
           projectChips.map((projectId) => {

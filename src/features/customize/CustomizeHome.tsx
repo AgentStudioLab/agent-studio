@@ -1,5 +1,6 @@
 import { Wrench, Link as LinkIcon, ScrollText, Puzzle } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 export type CustomizeHomeAction = "connect" | "skills" | "plugins";
 
@@ -8,6 +9,7 @@ interface CustomizeHomeProps {
 }
 
 export function CustomizeHome({ onSelectAction }: CustomizeHomeProps) {
+  const { t } = useTranslation();
   return (
     <div className="flex h-full items-center justify-center px-8 py-12">
       <div className="flex max-w-2xl flex-col items-center gap-6 text-center">
@@ -15,28 +17,28 @@ export function CustomizeHome({ onSelectAction }: CustomizeHomeProps) {
           <Wrench className="size-8" />
         </div>
         <h1 className="font-serif text-[28px] font-normal text-foreground">
-          Customize Agent Studio
+          {t("customize.home.title")}
         </h1>
         <p className="text-sm text-muted-foreground">
-          Skills, connectors, and plugins shape how Agent Studio works with you.
+          {t("customize.home.subtitle")}
         </p>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
           <ActionCard
             icon={LinkIcon}
-            title="Connect your apps"
-            description="Let Agent Studio read and write to the tools you already use."
+            title={t("customize.home.connect.title")}
+            description={t("customize.home.connect.description")}
             onClick={() => onSelectAction?.("connect")}
           />
           <ActionCard
             icon={ScrollText}
-            title="Create new skills"
-            description="Teach Agent Studio your processes, team norms, and expertise."
+            title={t("customize.home.skills.title")}
+            description={t("customize.home.skills.description")}
             onClick={() => onSelectAction?.("skills")}
           />
           <ActionCard
             icon={Puzzle}
-            title="Browse plugins"
-            description="Add pre-built knowledge for your field."
+            title={t("customize.home.plugins.title")}
+            description={t("customize.home.plugins.description")}
             onClick={() => onSelectAction?.("plugins")}
           />
         </div>

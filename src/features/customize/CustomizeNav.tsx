@@ -1,5 +1,6 @@
 import { ScrollText, LayoutGrid, Plus } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 
 export type CustomizeNavSection = "home" | "skills" | "agents" | "plugins";
@@ -10,33 +11,34 @@ interface CustomizeNavProps {
 }
 
 export function CustomizeNav({ active, onChange }: CustomizeNavProps) {
+  const { t } = useTranslation();
   return (
     <nav className="flex w-[240px] shrink-0 flex-col gap-1 border-r border-border bg-sidebar px-3 py-4">
       <NavLink
         active={active === "skills"}
         onClick={() => onChange("skills")}
         icon={ScrollText}
-        label="Skills"
+        label={t("customize.nav.skills")}
       />
       <NavLink
         active={active === "agents"}
         onClick={() => onChange("agents")}
         icon={LayoutGrid}
-        label="Agents"
+        label={t("customize.nav.agents")}
       />
       <div className="my-2 h-px bg-border" />
       <div className="flex items-center justify-between px-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        <span>Personal plugins</span>
+        <span>{t("customize.nav.personalPlugins")}</span>
         <button
           type="button"
           className="rounded-md p-0.5 hover:bg-muted hover:text-foreground"
-          aria-label="Add personal plugin"
+          aria-label={t("customize.nav.addPersonalPlugin")}
         >
           <Plus className="size-3.5" />
         </button>
       </div>
       <p className="px-2 text-xs text-muted-foreground">
-        Give Agent Studio role-level expertise with plugins.
+        {t("customize.nav.personalPluginsHint")}
       </p>
       <button
         type="button"
@@ -48,7 +50,7 @@ export function CustomizeNav({ active, onChange }: CustomizeNavProps) {
             : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground",
         )}
       >
-        Browse plugins
+        {t("customize.nav.browsePlugins")}
       </button>
     </nav>
   );

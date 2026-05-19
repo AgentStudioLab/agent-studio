@@ -1,5 +1,7 @@
-import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
-import type { MockFile } from "@/lib/mock/types";
+import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
+import type { MockFile, MockPinnedItem, MockRecentItem } from "@/lib/mock/types";
+import { pinned as pinnedFixtures } from "@/lib/mock/pinned";
+import { recents as recentFixtures } from "@/lib/mock/recents";
 
 type ViewKey =
   | "new-task"
@@ -29,6 +31,20 @@ interface AppShellContextValue {
   preview: PreviewState;
   openPreview: (file: MockFile) => void;
   closePreview: () => void;
+  // Active entity ids: persisted across view switches so that list-view → detail-view
+  // navigation can carry which entity was clicked (without ids, detail views fall back
+  // to the first mock fixture and silently lie about content).
+  activeProjectId: string | null;
+  setActiveProjectId: (id: string | null) => void;
+  activeScheduledId: string | null;
+  setActiveScheduledId: (id: string | null) => void;
+  // Sidebar pinned/recents live on the provider, not inside SidebarContent — collapsing
+  // the sidebar unmounts SidebarContent and the floating popover remounts a fresh
+  // instance. Local state there would discard pin/unpin/delete actions on every collapse.
+  pinned: MockPinnedItem[];
+  setPinned: (next: MockPinnedItem[] | ((prev: MockPinnedItem[]) => MockPinnedItem[])) => void;
+  recents: MockRecentItem[];
+  setRecents: (next: MockRecentItem[] | ((prev: MockRecentItem[]) => MockRecentItem[])) => void;
 }
 
 const AppShellContext = createContext<AppShellContextValue | null>(null);
@@ -44,7 +60,16 @@ export function AppShellProvider({
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [asideOpen, setAsideOpen] = useState(true);
   const [preview, setPreview] = useState<PreviewState>({ file: null, open: false });
-  const value = useMemo(
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+  const [activeScheduledId, setActiveScheduledId] = useState<string | null>(null);
+  const [pinned, setPinned] = useState<MockPinnedItem[]>(pinnedFixtures);
+  const [recents, setRecents] = useState<MockRecentItem[]>(recentFixtures);
+
+  const toggleAside = useCallback(() => setAsideOpen((v) => !v), []);
+  const openPreview = useCallback((file: MockFile) => setPreview({ file, open: true }), []);
+  const closePreview = useCallback(() => setPreview((p) => ({ ...p, open: false })), []);
+
+  const value = useMemo<AppShellContextValue>(
     () => ({
       currentView,
       setView,
@@ -52,12 +77,32 @@ export function AppShellProvider({
       sidebarCollapsed,
       setSidebarCollapsed,
       asideOpen,
-      toggleAside: () => setAsideOpen((v) => !v),
+      toggleAside,
       preview,
-      openPreview: (file: MockFile) => setPreview({ file, open: true }),
-      closePreview: () => setPreview((p) => ({ ...p, open: false })),
+      openPreview,
+      closePreview,
+      activeProjectId,
+      setActiveProjectId,
+      activeScheduledId,
+      setActiveScheduledId,
+      pinned,
+      setPinned,
+      recents,
+      setRecents,
     }),
-    [currentView, sidebarCollapsed, asideOpen, preview],
+    [
+      currentView,
+      sidebarCollapsed,
+      asideOpen,
+      preview,
+      toggleAside,
+      openPreview,
+      closePreview,
+      activeProjectId,
+      activeScheduledId,
+      pinned,
+      recents,
+    ],
   );
   return <AppShellContext.Provider value={value}>{children}</AppShellContext.Provider>;
 }

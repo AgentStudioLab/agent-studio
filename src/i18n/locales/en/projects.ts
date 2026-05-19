@@ -1,0 +1,22 @@
+import type { projects as Zh } from "../zh/projects";
+
+export const projects: typeof Zh = {
+  projects: {
+    title: "Projects",
+    newProject: "New project",
+    sort: "Sort",
+    search: "Search",
+    modal: {
+      title: "New project",
+      name: "Project name",
+      namePlaceholder: "e.g. Weekly blog",
+      instructions: "Instructions",
+      instructionsPlaceholder:
+        "e.g. keep my voice — short sentences, defer technical details to the end.",
+      instructionsHint:
+        "Agent Studio will reference these across all chats inside this project.",
+      cancel: "Cancel",
+      save: "Create",
+    },
+  },
+};

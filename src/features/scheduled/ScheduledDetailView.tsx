@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { ChevronLeft, Clock, Info, Pencil, Play, Trash2 } from "lucide-react";
 import { AppShell } from "@/app/AppShell";
 import { useAppShell } from "@/app/AppShellContext";
@@ -8,8 +10,10 @@ import { scheduledTasks } from "@/lib/mock/scheduled";
 import type { MockScheduledTask } from "@/lib/mock/types";
 
 export function ScheduledDetailView() {
-  const { setView } = useAppShell();
-  const task = scheduledTasks[0]!;
+  const { t } = useTranslation();
+  const { setView, activeScheduledId } = useAppShell();
+  const task =
+    scheduledTasks.find((s) => s.id === activeScheduledId) ?? scheduledTasks[0]!;
   const [active, setActive] = useState(task.active);
 
   return (
@@ -23,7 +27,7 @@ export function ScheduledDetailView() {
               className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
             >
               <ChevronLeft className="size-4" />
-              All scheduled tasks
+              {t("scheduled.detail.back")}
             </button>
           </div>
 
@@ -35,14 +39,14 @@ export function ScheduledDetailView() {
               <button
                 type="button"
                 className="rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
-                aria-label="Edit"
+                aria-label={t("scheduled.detail.edit")}
               >
                 <Pencil className="size-4" />
               </button>
               <button
                 type="button"
                 className="rounded-md p-2 text-destructive hover:bg-destructive/10"
-                aria-label="Delete"
+                aria-label={t("scheduled.detail.delete")}
               >
                 <Trash2 className="size-4" />
               </button>
@@ -50,7 +54,7 @@ export function ScheduledDetailView() {
                 type="button"
                 className="inline-flex items-center gap-1.5 rounded-md bg-foreground px-3 py-1.5 text-sm font-medium text-background hover:bg-foreground/90"
               >
-                <Play className="size-4 fill-current" /> Run now
+                <Play className="size-4 fill-current" /> {t("scheduled.detail.runNow")}
               </button>
             </div>
           </header>
@@ -63,7 +67,7 @@ export function ScheduledDetailView() {
             <Switch
               checked={active}
               onCheckedChange={setActive}
-              aria-label="Active"
+              aria-label={t("scheduled.detail.active")}
             />
             <span
               className={cn(
@@ -74,10 +78,10 @@ export function ScheduledDetailView() {
               )}
             >
               <Clock className="size-3" />
-              {active ? "Active" : "Inactive"}
+              {active ? t("scheduled.detail.active") : t("scheduled.detail.inactive")}
             </span>
             <span className="text-sm text-muted-foreground">
-              Next run: {task.nextRun ?? "—"}
+              {t("scheduled.detail.nextRun", { value: task.nextRun ?? "—" })}
             </span>
           </div>
 
@@ -90,7 +94,7 @@ export function ScheduledDetailView() {
               <div className="flex flex-col gap-10">
                 <section>
                   <h2 className="mb-2 text-sm font-medium text-foreground">
-                    Instructions
+                    {t("scheduled.detail.instructions")}
                   </h2>
                   <p className="text-sm leading-relaxed text-muted-foreground">
                     {task.prompt}
@@ -99,20 +103,20 @@ export function ScheduledDetailView() {
 
                 <section>
                   <h2 className="mb-2 text-sm font-medium text-foreground">
-                    Repeats
+                    {t("scheduled.detail.repeats")}
                   </h2>
                   <p className="text-sm font-medium text-foreground">
-                    {describeFrequency(task)}
+                    {describeFrequency(task, t)}
                   </p>
                 </section>
 
                 <section>
                   <h2 className="mb-2 flex items-center gap-1.5 text-sm font-medium text-foreground">
-                    Always allowed
+                    {t("scheduled.detail.alwaysAllowed")}
                     <Info className="size-3 text-muted-foreground" />
                   </h2>
                   <p className="mb-3 text-sm leading-relaxed text-muted-foreground">
-                    Approvals you grant during a run appear here.
+                    {t("scheduled.detail.alwaysAllowedHint")}
                   </p>
                   {task.alwaysAllowed && task.alwaysAllowed.length > 0 && (
                     <ul className="flex flex-col gap-2">
@@ -136,18 +140,24 @@ export function ScheduledDetailView() {
   );
 }
 
-function describeFrequency(task: MockScheduledTask): string {
-  const time = task.timeOfDay ? ` at ${task.timeOfDay}` : "";
+function describeFrequency(task: MockScheduledTask, t: TFunction): string {
+  const time = task.timeOfDay;
   switch (task.frequency) {
     case "manual":
-      return "Manual — runs only when triggered.";
+      return t("scheduled.detail.repeatsManual");
     case "hourly":
-      return "Every hour.";
+      return t("scheduled.detail.repeatsHourly");
     case "daily":
-      return `Every day${time}.`;
+      return time
+        ? t("scheduled.detail.repeatsDaily", { time })
+        : t("scheduled.detail.repeatsDailyNoTime");
     case "weekdays":
-      return `Weekdays${time}.`;
+      return time
+        ? t("scheduled.detail.repeatsWeekdays", { time })
+        : t("scheduled.detail.repeatsWeekdaysNoTime");
     case "weekly":
-      return `Every week${time}.`;
+      return time
+        ? t("scheduled.detail.repeatsWeekly", { time })
+        : t("scheduled.detail.repeatsWeeklyNoTime");
   }
 }

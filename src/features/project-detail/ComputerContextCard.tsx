@@ -1,4 +1,5 @@
 import { FolderOpen, Plus } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { CollapsibleCard } from "@/features/project-detail/CollapsibleCard";
 
 interface ComputerContextCardProps {
@@ -9,8 +10,9 @@ interface ComputerContextCardProps {
 }
 
 function Body({ context }: { context?: ComputerContextCardProps["context"] }) {
+  const { t } = useTranslation();
   if (!context || context.length === 0) {
-    return <p className="text-sm text-muted-foreground">No folders added.</p>;
+    return <p className="text-sm text-muted-foreground">{t("projectDetail.empty.computerContext")}</p>;
   }
   return (
     <ul className="flex flex-col gap-1.5">
@@ -37,11 +39,12 @@ export function ComputerContextCard({
   onAdd,
   embedded = false,
 }: ComputerContextCardProps) {
+  const { t } = useTranslation();
   if (embedded) {
     return (
       <div className="flex flex-col gap-2">
         <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          On your computer
+          {t("projectDetail.sections.computerContext")}
         </h3>
         <Body context={context} />
       </div>
@@ -49,14 +52,14 @@ export function ComputerContextCard({
   }
   return (
     <CollapsibleCard
-      title="On your computer"
+      title={t("projectDetail.sections.computerContext")}
       action={
         <button
           type="button"
           onClick={onAdd}
           className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
         >
-          <Plus className="size-3" /> Add
+          <Plus className="size-3" /> {t("projectDetail.actions.add")}
         </button>
       }
     >

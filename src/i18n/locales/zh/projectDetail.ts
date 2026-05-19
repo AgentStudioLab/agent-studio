@@ -1,0 +1,34 @@
+export const projectDetail = {
+  projectDetail: {
+    pin: "置顶",
+    more: "更多",
+    promptPlaceholder: "你想在这个项目里做什么？",
+    ask: "提问",
+    legacyModel: "旧版模型",
+    recents: "近期对话",
+    context: "上下文",
+    sections: {
+      instructions: "说明",
+      scheduled: "定时任务",
+      memory: "记忆",
+      computerContext: "本机文件夹",
+    },
+    actions: {
+      edit: "编辑",
+      add: "添加",
+    },
+    empty: {
+      instructions: "暂无说明。",
+      scheduled: "暂无定时任务。",
+      memory: "暂无记忆条目。",
+      computerContext: "暂未添加文件夹。",
+    },
+    frequency: {
+      manual: "手动",
+      hourly: "每小时",
+      daily: "每天",
+      weekdays: "工作日",
+      weekly: "每周",
+    },
+  },
+};

@@ -8,6 +8,7 @@ import {
   Plus,
   Presentation,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import type { MockFile } from "@/lib/mock/types";
 
@@ -44,6 +45,7 @@ export function FilesTab({
   onOpenFile,
   onAddFiles,
 }: FilesTabProps) {
+  const { t } = useTranslation();
   const handleSelect = useCallback(
     (file: MockFile) => {
       onOpenFile?.(file);
@@ -59,7 +61,7 @@ export function FilesTab({
           {folderName}
         </span>
         <span className="ml-auto text-[11px] text-text-400 font-mono">
-          {files.length} files
+          {t("task.filesTab.fileCount", { count: files.length })}
         </span>
       </div>
       <div className="flex flex-col gap-1">
@@ -89,7 +91,7 @@ export function FilesTab({
                     color: "hsl(var(--brand-100))",
                   }}
                 >
-                  new
+                  {t("task.filesTab.newBadge")}
                 </span>
               )}
             </button>
@@ -107,7 +109,7 @@ export function FilesTab({
         style={{ border: "1px dashed hsl(var(--border-300) / 0.2)" }}
       >
         <Plus size={12} />
-        Add files to working tree
+        {t("task.filesTab.addFiles")}
       </button>
     </div>
   );

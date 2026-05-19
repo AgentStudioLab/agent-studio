@@ -1,4 +1,5 @@
 import { Plus } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { CollapsibleCard } from "@/features/project-detail/CollapsibleCard";
 
 interface MemoryCardProps {
@@ -9,8 +10,9 @@ interface MemoryCardProps {
 }
 
 function Body({ memory }: { memory?: string[] }) {
+  const { t } = useTranslation();
   if (!memory || memory.length === 0) {
-    return <p className="text-sm text-muted-foreground">No memory entries.</p>;
+    return <p className="text-sm text-muted-foreground">{t("projectDetail.empty.memory")}</p>;
   }
   return (
     <ul className="flex list-disc flex-col gap-1.5 pl-5">
@@ -24,11 +26,12 @@ function Body({ memory }: { memory?: string[] }) {
 }
 
 export function MemoryCard({ memory, onAdd, embedded = false }: MemoryCardProps) {
+  const { t } = useTranslation();
   if (embedded) {
     return (
       <div className="flex flex-col gap-2">
         <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Memory
+          {t("projectDetail.sections.memory")}
         </h3>
         <Body memory={memory} />
       </div>
@@ -36,14 +39,14 @@ export function MemoryCard({ memory, onAdd, embedded = false }: MemoryCardProps)
   }
   return (
     <CollapsibleCard
-      title="Memory"
+      title={t("projectDetail.sections.memory")}
       action={
         <button
           type="button"
           onClick={onAdd}
           className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
         >
-          <Plus className="size-3" /> Add
+          <Plus className="size-3" /> {t("projectDetail.actions.add")}
         </button>
       }
     >

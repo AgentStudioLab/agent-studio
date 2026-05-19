@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   PluginCategoryChips,
   type Category,
@@ -7,13 +8,19 @@ import { PluginCard } from "@/features/customize/PluginCard";
 import { plugins } from "@/lib/mock/plugins";
 
 export function PluginsBody() {
+  const { t } = useTranslation();
   const [category, setCategory] = useState<Category>("all");
   const [installed, setInstalled] = useState<Set<string>>(
     new Set(plugins.filter((p) => p.installed).map((p) => p.id)),
   );
 
-  const list =
-    category === "all" ? plugins : plugins.filter((p) => p.category === category);
+  const list = useMemo(
+    () =>
+      category === "all"
+        ? plugins
+        : plugins.filter((p) => p.category === category),
+    [category],
+  );
 
   const toggleInstall = (id: string) => {
     setInstalled((prev) => {
@@ -28,11 +35,10 @@ export function PluginsBody() {
     <div className="flex h-full flex-col overflow-y-auto px-12 py-10">
       <header className="mb-6 flex flex-col gap-2">
         <h1 className="font-serif text-[28px] font-normal leading-none text-foreground">
-          Browse plugins
+          {t("customize.plugins.title")}
         </h1>
         <p className="max-w-2xl text-sm text-muted-foreground">
-          Pre-built knowledge bundles authored by Anthropic and community partners.
-          Install one to give Agent Studio role-level expertise instantly.
+          {t("customize.plugins.subtitle")}
         </p>
       </header>
       <div className="mb-6">
@@ -50,7 +56,7 @@ export function PluginsBody() {
       </section>
       {list.length === 0 && (
         <p className="mt-12 text-center text-sm text-muted-foreground">
-          No plugins in this category yet.
+          {t("customize.plugins.empty")}
         </p>
       )}
     </div>

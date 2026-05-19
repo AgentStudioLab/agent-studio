@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { ArrowRight, Leaf } from "lucide-react";
 
 interface UpdateCardProps {
@@ -6,6 +7,7 @@ interface UpdateCardProps {
 }
 
 export function UpdateCard({ version, onClick }: UpdateCardProps) {
+  const { t } = useTranslation();
   return (
     <button
       type="button"
@@ -24,7 +26,7 @@ export function UpdateCard({ version, onClick }: UpdateCardProps) {
       </div>
       <div className="min-w-0 flex-1">
         <div className="text-[13.5px] font-medium leading-tight text-foreground">
-          Relaunch to update
+          {t("sidebar.update.title")}
         </div>
         <div className="mt-0.5 font-mono text-[11px] leading-tight text-muted-foreground">
           {version}

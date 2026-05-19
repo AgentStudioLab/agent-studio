@@ -1,4 +1,5 @@
 import { Star, Check, Download } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { InitialsAvatar } from "@/shared/atoms/InitialsAvatar";
 import type { MockPlugin } from "@/lib/mock/types";
@@ -10,6 +11,7 @@ interface PluginCardProps {
 }
 
 export function PluginCard({ plugin, onInstall, onUninstall }: PluginCardProps) {
+  const { t } = useTranslation();
   const installsLabel =
     plugin.installs >= 1000
       ? `${(plugin.installs / 1000).toFixed(1)}k`
@@ -24,7 +26,8 @@ export function PluginCard({ plugin, onInstall, onUninstall }: PluginCardProps) 
             {plugin.name}
           </h3>
           <p className="truncate text-xs text-muted-foreground">
-            by {plugin.author}
+            {t("customize.plugins.authorPrefix")}
+            {plugin.author}
           </p>
         </div>
       </header>
@@ -40,7 +43,7 @@ export function PluginCard({ plugin, onInstall, onUninstall }: PluginCardProps) 
           </span>
           <span className="inline-flex items-center gap-0.5">
             <Download className="size-3" />
-            {installsLabel} installs
+            {installsLabel} {t("customize.plugins.installsSuffix")}
           </span>
         </div>
         <button
@@ -54,7 +57,9 @@ export function PluginCard({ plugin, onInstall, onUninstall }: PluginCardProps) 
           )}
         >
           {plugin.installed && <Check className="size-3" />}
-          {plugin.installed ? "Installed" : "Install"}
+          {plugin.installed
+            ? t("customize.plugins.installed")
+            : t("customize.plugins.install")}
         </button>
       </footer>
     </article>

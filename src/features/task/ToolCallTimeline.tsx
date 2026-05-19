@@ -9,6 +9,7 @@ import {
   Wrench,
   type LucideIcon,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import type { TimelineIconName, TimelineStep, TimelineSubStep } from "@/lib/mock/types";
 
 const ICON_MAP: Record<TimelineIconName, LucideIcon> = {
@@ -64,6 +65,7 @@ interface ToolCallStepProps {
 }
 
 function ToolCallStep({ step, isLast }: ToolCallStepProps) {
+  const { t } = useTranslation();
   const [subOpen, setSubOpen] = useState(true);
   const hasSub = !!step.subSteps && step.subSteps.length > 0;
 
@@ -109,7 +111,7 @@ function ToolCallStep({ step, isLast }: ToolCallStepProps) {
               className="ml-auto flex items-center gap-1 text-[11.5px] transition-colors"
               style={{ color: "hsl(var(--text-400))" }}
             >
-              {step.subSteps!.length} steps
+              {t("task.timeline.stepsCount", { count: step.subSteps!.length })}
               <ChevronDown
                 size={9}
                 className={
@@ -157,6 +159,7 @@ export function ToolCallTimeline({
   steps,
   defaultOpen = true,
 }: ToolCallTimelineProps) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(defaultOpen);
 
   return (
@@ -203,7 +206,7 @@ export function ToolCallTimeline({
               className="text-[13.5px]"
               style={{ color: "hsl(var(--text-200))" }}
             >
-              Done
+              {t("task.timeline.done")}
             </span>
           </div>
         </div>

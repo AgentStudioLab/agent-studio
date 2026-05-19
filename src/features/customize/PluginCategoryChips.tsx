@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 
 const CATEGORIES = [
@@ -11,22 +12,13 @@ const CATEGORIES = [
 ] as const;
 type Category = (typeof CATEGORIES)[number];
 
-const LABEL: Record<Category, string> = {
-  all: "All",
-  productivity: "Productivity",
-  research: "Research",
-  development: "Development",
-  communication: "Communication",
-  design: "Design",
-  data: "Data",
-};
-
 interface PluginCategoryChipsProps {
   active: Category;
   onChange: (c: Category) => void;
 }
 
 export function PluginCategoryChips({ active, onChange }: PluginCategoryChipsProps) {
+  const { t } = useTranslation();
   return (
     <div className="flex flex-wrap items-center gap-2">
       {CATEGORIES.map((c) => (
@@ -41,7 +33,7 @@ export function PluginCategoryChips({ active, onChange }: PluginCategoryChipsPro
               : "border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground",
           )}
         >
-          {LABEL[c]}
+          {t(`customize.plugins.categories.${c}`)}
         </button>
       ))}
     </div>

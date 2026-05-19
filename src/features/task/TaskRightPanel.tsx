@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { Activity, Folder, Layers } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { ProcessTab } from "@/features/task/ProcessTab";
 import { FilesTab } from "@/features/task/FilesTab";
@@ -53,6 +54,7 @@ export function TaskRightPanel({
   onOpenFile,
 }: TaskRightPanelProps) {
   const [tab, setTab] = useState<TabId>("process");
+  const { t } = useTranslation();
 
   return (
     <div className="flex h-full flex-col">
@@ -66,21 +68,21 @@ export function TaskRightPanel({
         >
           <TabButton
             id="process"
-            label="Process"
+            label={t("task.tabs.process")}
             icon={<Activity size={14} />}
             active={tab === "process"}
             onClick={setTab}
           />
           <TabButton
             id="files"
-            label="Files"
+            label={t("task.tabs.files")}
             icon={<Folder size={14} />}
             active={tab === "files"}
             onClick={setTab}
           />
           <TabButton
             id="context"
-            label="Context"
+            label={t("task.tabs.context")}
             icon={<Layers size={14} />}
             active={tab === "context"}
             onClick={setTab}

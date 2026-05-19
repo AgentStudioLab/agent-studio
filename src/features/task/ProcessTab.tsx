@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Check } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import type { MockTask, PlanStep, StepStatus } from "@/lib/mock/types";
 
@@ -15,11 +16,11 @@ function formatElapsed(seconds: number): string {
   return `${mm}:${ss}`;
 }
 
-const RUNNING_LABEL: Record<MockTask["status"], string> = {
-  running: "Task running",
-  done: "Task complete",
-  failed: "Task failed",
-  paused: "Task paused",
+const STATUS_KEY: Record<MockTask["status"], string> = {
+  running: "task.processTab.status.running",
+  done: "task.processTab.status.done",
+  failed: "task.processTab.status.failed",
+  paused: "task.processTab.status.paused",
 };
 
 interface ProcessStepProps {
@@ -136,6 +137,7 @@ function ProcessStep({ status, name, desc, isLast }: ProcessStepProps) {
 }
 
 export function ProcessTab({ task }: ProcessTabProps) {
+  const { t } = useTranslation();
   const [elapsed, setElapsed] = useState(task.elapsedSeconds);
 
   useEffect(() => {
@@ -155,9 +157,9 @@ export function ProcessTab({ task }: ProcessTabProps) {
   return (
     <div>
       <div className="flex items-center justify-between px-2 pt-3 pb-3">
-        <span className="text-[11px] tracking-wider uppercase text-text-400">Plan</span>
+        <span className="text-[11px] tracking-wider uppercase text-text-400">{t("task.processTab.plan")}</span>
         <span className="text-[11.5px] text-text-300 font-mono">
-          {doneCount} of {totalCount}
+          {t("task.processTab.countOf", { done: doneCount, total: totalCount })}
         </span>
       </div>
       <div className="px-2">
@@ -179,7 +181,7 @@ export function ProcessTab({ task }: ProcessTabProps) {
         }}
       >
         <span className="inline-block w-1.5 h-1.5 rounded-full bg-success-100 pulse-dot mr-2 align-middle" />
-        {RUNNING_LABEL[task.status]} · {formatElapsed(elapsed)} elapsed
+        {t(STATUS_KEY[task.status])} · {t("task.processTab.elapsed", { time: formatElapsed(elapsed) })}
       </div>
     </div>
   );

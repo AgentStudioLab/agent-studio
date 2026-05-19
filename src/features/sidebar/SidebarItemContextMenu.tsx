@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Archive,
   FolderInput,
@@ -50,13 +51,14 @@ export function SidebarItemContextMenu({
   iconSize = 16,
   align = "end",
 }: SidebarItemContextMenuProps) {
+  const { t } = useTranslation();
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         {trigger ?? (
           <button
             type="button"
-            aria-label="More actions"
+            aria-label={t("sidebar.contextMenu.moreActions")}
             onClick={(e) => e.stopPropagation()}
             className={cn(
               "flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-sidebar-accent",
@@ -70,25 +72,27 @@ export function SidebarItemContextMenu({
       <DropdownMenuContent align={align} className="w-44">
         <DropdownMenuItem onSelect={onMoveToProject}>
           <FolderInput className="size-4" />
-          Move to project
+          {t("sidebar.contextMenu.moveToProject")}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={onPinToggle}>
           {pinMode === "pin" ? <Pin className="size-4" /> : <PinOff className="size-4" />}
-          {pinMode === "pin" ? "Pin" : "Unpin"}
+          {pinMode === "pin"
+            ? t("sidebar.contextMenu.pin")
+            : t("sidebar.contextMenu.unpin")}
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={onRename}>
           <Pencil className="size-4" />
-          Rename
+          {t("sidebar.contextMenu.rename")}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={onArchive}>
           <Archive className="size-4" />
-          Archive
+          {t("sidebar.contextMenu.archive")}
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={onDelete} variant="destructive">
           <Trash2 className="size-4" />
-          Delete
+          {t("sidebar.contextMenu.delete")}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

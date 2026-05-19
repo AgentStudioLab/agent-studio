@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ChevronLeft } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { useAppShell } from "@/app/AppShellContext";
 import {
   CustomizeNav,
@@ -19,6 +20,7 @@ interface CustomizeViewProps {
 
 export function CustomizeView({ initialSection = "home" }: CustomizeViewProps) {
   const { setView } = useAppShell();
+  const { t } = useTranslation();
   const [section, setSection] = useState<CustomizeNavSection>(initialSection);
 
   const handleHomeAction = (action: CustomizeHomeAction) => {
@@ -34,11 +36,13 @@ export function CustomizeView({ initialSection = "home" }: CustomizeViewProps) {
           type="button"
           onClick={() => setView("task")}
           className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-          aria-label="Back"
+          aria-label={t("customize.back")}
         >
           <ChevronLeft className="size-4" />
         </button>
-        <h1 className="text-sm font-medium text-foreground">Customize</h1>
+        <h1 className="text-sm font-medium text-foreground">
+          {t("customize.title")}
+        </h1>
       </header>
       <div className="flex min-h-0 flex-1">
         <CustomizeNav active={section} onChange={setSection} />

@@ -1,38 +1,68 @@
+import { useState } from "react";
 import { ArrowUpDown, Search, Plus } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { AppShell } from "@/app/AppShell";
 import { useAppShell } from "@/app/AppShellContext";
 import { ProjectCard } from "@/features/projects/ProjectCard";
-import { projects } from "@/lib/mock/projects";
+import {
+  NewProjectModal,
+  type NewProjectFormData,
+} from "@/features/projects/NewProjectModal";
+import { projects as initialProjects } from "@/lib/mock/projects";
+import type { MockProject } from "@/lib/mock/types";
 
 export function ProjectsView() {
-  const { setView } = useAppShell();
+  const { setView, setActiveProjectId } = useAppShell();
+  const { t } = useTranslation();
+  const [projects, setProjects] = useState<MockProject[]>(initialProjects);
+  const [modalOpen, setModalOpen] = useState(false);
+
+  const handleSave = (data: NewProjectFormData) => {
+    const next: MockProject = {
+      id: `proj-${Date.now()}`,
+      name: data.name,
+      lastActivity: "just now",
+      instructions: data.instructions,
+      memory: [],
+      recentConversations: [],
+    };
+    setProjects((prev) => [next, ...prev]);
+  };
+
+  const openProject = (id: string) => {
+    setActiveProjectId(id);
+    setView("project-detail");
+  };
 
   return (
     <AppShell
       main={
         <div className="flex h-full flex-col overflow-y-auto">
           <header className="flex items-center justify-between gap-4 px-12 pt-12 pb-8">
-            <h1 className="font-serif text-[34px] font-normal leading-none text-foreground">Projects</h1>
+            <h1 className="font-serif text-[34px] font-normal leading-none text-foreground">
+              {t("projects.title")}
+            </h1>
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 className="rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
-                aria-label="Sort"
+                aria-label={t("projects.sort")}
               >
                 <ArrowUpDown className="size-4" />
               </button>
               <button
                 type="button"
                 className="rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
-                aria-label="Search"
+                aria-label={t("projects.search")}
               >
                 <Search className="size-4" />
               </button>
               <button
                 type="button"
+                onClick={() => setModalOpen(true)}
                 className="inline-flex items-center gap-1.5 rounded-md bg-foreground px-3 py-1.5 text-sm font-medium text-background hover:bg-foreground/90"
               >
-                <Plus className="size-4" /> New project
+                <Plus className="size-4" /> {t("projects.newProject")}
               </button>
             </div>
           </header>
@@ -41,10 +71,15 @@ export function ProjectsView() {
               <ProjectCard
                 key={p.id}
                 project={p}
-                onClick={() => setView("project-detail")}
+                onClick={() => openProject(p.id)}
               />
             ))}
           </section>
+          <NewProjectModal
+            open={modalOpen}
+            onOpenChange={setModalOpen}
+            onSave={handleSave}
+          />
         </div>
       }
     />

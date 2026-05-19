@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Briefcase,
   Clock,
@@ -17,8 +18,6 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useAppShell } from "@/app/AppShellContext";
-import { pinned as pinnedFixtures } from "@/lib/mock/pinned";
-import { recents as recentFixtures } from "@/lib/mock/recents";
 import type { MockPinnedItem, MockRecentItem } from "@/lib/mock/types";
 import { NavItem } from "@/features/sidebar/NavItem";
 import { PinnedItem } from "@/features/sidebar/PinnedItem";
@@ -34,10 +33,17 @@ const APP_VERSION = "0.1.0";
  * mini-sidebar popover that appears when the sidebar is collapsed.
  */
 export function SidebarContent() {
-  const { currentView, setView, sidebarCollapsed, setSidebarCollapsed } =
-    useAppShell();
-  const [pinned, setPinned] = useState<MockPinnedItem[]>(pinnedFixtures);
-  const [recents, setRecents] = useState<MockRecentItem[]>(recentFixtures);
+  const {
+    currentView,
+    setView,
+    sidebarCollapsed,
+    setSidebarCollapsed,
+    pinned,
+    setPinned,
+    recents,
+    setRecents,
+  } = useAppShell();
+  const { t } = useTranslation();
   const [searchOpen, setSearchOpen] = useState(false);
 
   const handlePin = (recent: MockRecentItem) => {
@@ -68,7 +74,9 @@ export function SidebarContent() {
   const handleRemovePinned = (id: string) =>
     setPinned((prev) => prev.filter((p) => p.id !== id));
 
-  const toggleLabel = sidebarCollapsed ? "Open sidebar" : "Collapse sidebar";
+  const toggleLabel = sidebarCollapsed
+    ? t("sidebar.toggle.open")
+    : t("sidebar.toggle.collapse");
 
   return (
     <>
@@ -84,7 +92,7 @@ export function SidebarContent() {
         </button>
         <button
           type="button"
-          aria-label="Search (Cmd+K)"
+          aria-label={t("sidebar.search.ariaLabel")}
           onClick={() => setSearchOpen(true)}
           className="rounded-md p-1.5 text-[hsl(var(--text-400))] transition-colors hover:bg-[hsl(var(--bg-100))] hover:text-[hsl(var(--text-200))]"
         >
@@ -96,13 +104,13 @@ export function SidebarContent() {
       <nav className="flex shrink-0 flex-col gap-0.5 px-2 pt-4">
         <NavItem
           icon={Plus}
-          label="New task"
+          label={t("sidebar.nav.newTask")}
           active={currentView === "new-task"}
           onClick={() => setView("new-task")}
         />
         <NavItem
           icon={Briefcase}
-          label="Projects"
+          label={t("sidebar.nav.projects")}
           active={
             currentView === "projects" || currentView === "project-detail"
           }
@@ -110,13 +118,13 @@ export function SidebarContent() {
         />
         <NavItem
           icon={Clock}
-          label="Scheduled"
+          label={t("sidebar.nav.scheduled")}
           active={currentView === "scheduled-list"}
           onClick={() => setView("scheduled-list")}
         />
         <NavItem
           icon={Sparkles}
-          label="Customize"
+          label={t("sidebar.nav.customize")}
           active={currentView === "customize"}
           onClick={() => setView("customize")}
         />
@@ -127,7 +135,7 @@ export function SidebarContent() {
         <>
           <div className="px-3 pb-1 pt-5">
             <div className="px-2 text-[12px] font-medium text-[hsl(var(--text-400))]">
-              Pinned
+              {t("sidebar.sections.pinned")}
             </div>
           </div>
           <div className="flex shrink-0 flex-col gap-0.5 px-2">
@@ -149,7 +157,7 @@ export function SidebarContent() {
       {/* Recents */}
       <div className="px-3 pb-1 pt-4">
         <div className="px-2 text-[12px] font-medium text-[hsl(var(--text-400))]">
-          Recents
+          {t("sidebar.sections.recents")}
         </div>
       </div>
       <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-2">
@@ -182,13 +190,15 @@ export function SidebarContent() {
       <Dialog open={searchOpen} onOpenChange={setSearchOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Search ⌘K</DialogTitle>
+            <DialogTitle>{t("sidebar.search.dialogTitle")}</DialogTitle>
             <DialogDescription>
-              TODO: search across tasks, projects, recents.
+              {t("sidebar.search.dialogDescription")}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button onClick={() => setSearchOpen(false)}>OK</Button>
+            <Button onClick={() => setSearchOpen(false)}>
+              {t("sidebar.search.ok")}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

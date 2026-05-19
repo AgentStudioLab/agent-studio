@@ -6,7 +6,9 @@ import {
   MoreHorizontal,
   Pin,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { AppShell } from "@/app/AppShell";
+import { useAppShell } from "@/app/AppShellContext";
 import { CollapsibleCard } from "@/features/project-detail/CollapsibleCard";
 import { InstructionsCard } from "@/features/project-detail/InstructionsCard";
 import { ScheduledMiniCard } from "@/features/project-detail/ScheduledMiniCard";
@@ -23,7 +25,10 @@ import {
 } from "@/components/ai-elements/prompt-input";
 
 export function ProjectDetailView() {
-  const project = projects.find((p) => p.id === "proj-jay") ?? projects[0]!;
+  const { activeProjectId } = useAppShell();
+  const project =
+    projects.find((p) => p.id === activeProjectId) ?? projects[0]!;
+  const { t } = useTranslation();
 
   return (
     <AppShell
@@ -37,14 +42,14 @@ export function ProjectDetailView() {
               <button
                 type="button"
                 className="rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
-                aria-label="Pin"
+                aria-label={t("projectDetail.pin")}
               >
                 <Pin className="size-4" />
               </button>
               <button
                 type="button"
                 className="rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
-                aria-label="More"
+                aria-label={t("projectDetail.more")}
               >
                 <MoreHorizontal className="size-4" />
               </button>
@@ -54,7 +59,7 @@ export function ProjectDetailView() {
           <section className="flex w-full max-w-[860px] flex-col gap-8 px-12 pb-12">
             <PromptInput onSubmit={() => {}}>
               <PromptInputTextarea
-                placeholder="What would you like to work on in this project?"
+                placeholder={t("projectDetail.promptPlaceholder")}
                 rows={2}
               />
               <PromptInputFooter>
@@ -66,13 +71,13 @@ export function ProjectDetailView() {
                   </PromptInputButton>
                   <PromptInputButton>
                     <Hand className="size-4" />
-                    <span>Ask</span>
+                    <span>{t("projectDetail.ask")}</span>
                     <ChevronDown className="size-3" />
                   </PromptInputButton>
                 </PromptInputTools>
                 <PromptInputTools>
                   <PromptInputButton>
-                    <span>Legacy Model</span>
+                    <span>{t("projectDetail.legacyModel")}</span>
                     <ChevronDown className="size-3" />
                   </PromptInputButton>
                   <PromptInputSubmit />
@@ -82,7 +87,7 @@ export function ProjectDetailView() {
 
             <div>
               <h2 className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Recents
+                {t("projectDetail.recents")}
               </h2>
               <ul className="flex flex-col gap-1">
                 {(project.recentConversations ?? []).map((conv) => (
@@ -115,7 +120,7 @@ export function ProjectDetailView() {
         <div className="flex h-full flex-col gap-3 overflow-y-auto p-3">
           <InstructionsCard instructions={project.instructions} />
           <ScheduledMiniCard scheduledTaskIds={project.scheduledTasks} />
-          <CollapsibleCard title="Context" defaultOpen>
+          <CollapsibleCard title={t("projectDetail.context")} defaultOpen>
             <div className="flex flex-col gap-4">
               <ComputerContextCard context={project.computerContext} embedded />
               <MemoryCard memory={project.memory} embedded />

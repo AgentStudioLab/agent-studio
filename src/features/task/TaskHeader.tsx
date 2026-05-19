@@ -19,6 +19,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuSubContent,
 } from "@/components/ui/dropdown-menu";
+import { useTranslation } from "react-i18next";
 import { useAppShell } from "@/app/AppShellContext";
 import { cn } from "@/lib/utils";
 import { projects as mockProjects } from "@/lib/mock/projects";
@@ -47,6 +48,7 @@ export function TaskHeader({
   onDelete,
 }: TaskHeaderProps) {
   const { toggleAside, sidebarCollapsed } = useAppShell();
+  const { t } = useTranslation();
   return (
     <header
       className={cn(
@@ -58,7 +60,7 @@ export function TaskHeader({
     >
       <DropdownMenu>
         <DropdownMenuTrigger
-          aria-label="Task menu"
+          aria-label={t("task.header.menu")}
           className="inline-flex min-w-0 items-center gap-1.5 rounded-md px-2 py-1 text-[14px] font-medium text-foreground outline-hidden hover:bg-muted focus-visible:ring-1 focus-visible:ring-ring"
         >
           <span className="truncate">{title}</span>
@@ -66,14 +68,14 @@ export function TaskHeader({
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-56">
           <DropdownMenuItem onSelect={onSchedule}>
-            <Calendar /> Schedule
+            <Calendar /> {t("task.header.schedule")}
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={onTurnIntoSkill}>
-            <Wand2 /> Turn into skill
+            <Wand2 /> {t("task.header.turnIntoSkill")}
           </DropdownMenuItem>
           <DropdownMenuSub>
             <DropdownMenuSubTrigger>
-              <FolderInput /> Move to project
+              <FolderInput /> {t("task.header.moveToProject")}
             </DropdownMenuSubTrigger>
             <DropdownMenuSubContent>
               {projects.map((p) => (
@@ -87,17 +89,17 @@ export function TaskHeader({
             </DropdownMenuSubContent>
           </DropdownMenuSub>
           <DropdownMenuItem onSelect={onPin}>
-            <Pin /> Pin
+            <Pin /> {t("task.header.pin")}
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={onRename}>
-            <Pencil /> Rename
+            <Pencil /> {t("task.header.rename")}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onSelect={onArchive}>
-            <Archive /> Archive
+            <Archive /> {t("task.header.archive")}
           </DropdownMenuItem>
           <DropdownMenuItem variant="destructive" onSelect={onDelete}>
-            <Trash2 /> Delete
+            <Trash2 /> {t("task.header.delete")}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -105,7 +107,7 @@ export function TaskHeader({
       <button
         type="button"
         onClick={toggleAside}
-        aria-label="Toggle right panel"
+        aria-label={t("task.header.toggleRightPanel")}
         className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
       >
         <PanelRight className="size-4" />

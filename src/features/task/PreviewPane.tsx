@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { ChevronDown, RotateCw, X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { CodeBlock } from "@/components/ai-elements/code-block";
 import { cn } from "@/lib/utils";
 import type { MockFile } from "@/lib/mock/types";
@@ -38,13 +39,13 @@ const OPENER_BY_TYPE: Record<MockFile["type"], string | null> = {
   generic: null,
 };
 
-const FILE_LABEL_BY_TYPE: Record<MockFile["type"], string> = {
-  markdown: "Markdown",
-  spreadsheet: "XLSX",
-  presentation: "PPTX",
-  code: "Code",
-  image: "Image",
-  generic: "File",
+const FILE_LABEL_KEY_BY_TYPE: Record<MockFile["type"], string> = {
+  markdown: "task.preview.fileLabel.markdown",
+  spreadsheet: "task.preview.fileLabel.spreadsheet",
+  presentation: "task.preview.fileLabel.presentation",
+  code: "task.preview.fileLabel.code",
+  image: "task.preview.fileLabel.image",
+  generic: "task.preview.fileLabel.generic",
 };
 
 // Opener badge (small colored square w/ a letter) — markdown opener is blue,
@@ -60,6 +61,7 @@ function openerBadgeStyle(type: MockFile["type"]): {
 }
 
 export function PreviewPane({ file, onClose }: PreviewPaneProps) {
+  const { t } = useTranslation();
   const [width, setWidth] = useState<number>(DEFAULT_W);
   const [dragging, setDragging] = useState<boolean>(false);
 
@@ -71,7 +73,7 @@ export function PreviewPane({ file, onClose }: PreviewPaneProps) {
       setWidth(clamped);
     };
     const onUp = () => setDragging(false);
-    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mousemove", onMove, { passive: true });
     document.addEventListener("mouseup", onUp);
     document.body.style.cursor = "col-resize";
     document.body.style.userSelect = "none";
@@ -84,7 +86,7 @@ export function PreviewPane({ file, onClose }: PreviewPaneProps) {
   }, [dragging]);
 
   const opener = OPENER_BY_TYPE[file.type];
-  const fileLabel = FILE_LABEL_BY_TYPE[file.type];
+  const fileLabel = t(FILE_LABEL_KEY_BY_TYPE[file.type]);
   const badge = openerBadgeStyle(file.type);
 
   return (
@@ -105,7 +107,7 @@ export function PreviewPane({ file, onClose }: PreviewPaneProps) {
         }}
         role="separator"
         aria-orientation="vertical"
-        aria-label="Resize preview pane"
+        aria-label={t("task.preview.resizeHandle")}
       />
 
       {/* Header */}
@@ -157,7 +159,7 @@ export function PreviewPane({ file, onClose }: PreviewPaneProps) {
         )}
         <button
           type="button"
-          aria-label="Refresh"
+          aria-label={t("task.preview.refresh")}
           className="rounded-md p-1.5 transition hover:bg-muted hover:text-foreground"
           style={{ color: "hsl(var(--text-300))" }}
         >
@@ -165,7 +167,7 @@ export function PreviewPane({ file, onClose }: PreviewPaneProps) {
         </button>
         <button
           type="button"
-          aria-label="Close"
+          aria-label={t("task.preview.close")}
           onClick={onClose}
           className="rounded-md p-1.5 transition hover:bg-muted hover:text-foreground"
           style={{ color: "hsl(var(--text-300))" }}
@@ -200,6 +202,7 @@ export function PreviewPane({ file, onClose }: PreviewPaneProps) {
 }
 
 function PreviewContent({ file }: { file: MockFile }) {
+  const { t } = useTranslation();
   switch (file.type) {
     case "markdown":
       return <MarkdownPreview content={file.content ?? ""} />;
@@ -219,7 +222,7 @@ function PreviewContent({ file }: { file: MockFile }) {
           className="px-4 py-8 text-center text-[13px] italic"
           style={{ color: "hsl(var(--text-400))" }}
         >
-          [Preview for .{file.type} not implemented in this mock]
+          {t("task.preview.notImplemented", { type: file.type })}
         </div>
       );
   }
@@ -303,23 +306,24 @@ function SpreadsheetPreview({ content }: { content: string }) {
   );
 }
 
-const MOCK_SLIDES = [
-  { title: "扫描概览", subtitle: "5 个不活跃项目" },
-  { title: "Top 3", subtitle: "old-project-1 / old-project-2 / archive-x" },
-  { title: "建议", subtitle: "归档 4 个 · 删除 1 个" },
-];
+const MOCK_SLIDE_KEYS = ["overview", "top3", "suggestion"] as const;
 
 function PresentationPreview() {
+  const { t } = useTranslation();
   return (
     <div className="flex flex-col gap-4">
-      {MOCK_SLIDES.map((s, i) => (
+      {MOCK_SLIDE_KEYS.map((key) => (
         <div
-          key={`slide-${i}`}
+          key={key}
           className="rounded-md p-8 text-[hsl(var(--always-white))]"
           style={{ background: "hsl(var(--bg-300))" }}
         >
-          <div className="font-semibold font-serif text-xl">{s.title}</div>
-          <div className="mt-2 text-sm opacity-80">{s.subtitle}</div>
+          <div className="font-semibold font-serif text-xl">
+            {t(`task.preview.slides.${key}.title`)}
+          </div>
+          <div className="mt-2 text-sm opacity-80">
+            {t(`task.preview.slides.${key}.subtitle`)}
+          </div>
         </div>
       ))}
     </div>

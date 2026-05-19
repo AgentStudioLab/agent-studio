@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Info } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Switch } from "@/components/ui/switch";
 import { SkillCard } from "@/features/customize/SkillCard";
 import { loadedSkills } from "@/lib/mock/skills";
@@ -20,6 +21,7 @@ const PERSONAL_SKILLS = loadedSkills.slice(0, 2);
 const BUILTIN_SKILLS = loadedSkills.slice(2);
 
 export function SkillsBody() {
+  const { t } = useTranslation();
   const [activeSkillId, setActiveSkillId] = useState<string | undefined>(
     loadedSkills[0]?.id,
   );
@@ -30,7 +32,7 @@ export function SkillsBody() {
     <div className="flex h-full min-h-0 flex-1">
       <aside className="flex w-[340px] shrink-0 flex-col overflow-y-auto border-r border-border bg-background px-3 py-4">
         <h3 className="mb-2 px-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Personal skills
+          {t("customize.skills.personal")}
         </h3>
         <div className="flex flex-col gap-1">
           {PERSONAL_SKILLS.map((skill) => (
@@ -47,7 +49,7 @@ export function SkillsBody() {
           ))}
         </div>
         <h3 className="mb-2 mt-6 px-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Built-in skills
+          {t("customize.skills.builtIn")}
         </h3>
         <div className="flex flex-col gap-1">
           {BUILTIN_SKILLS.map((skill) => (
@@ -69,7 +71,7 @@ export function SkillsBody() {
           />
         ) : (
           <div className="text-sm text-muted-foreground">
-            Select a skill from the left.
+            {t("customize.skills.empty")}
           </div>
         )}
       </section>
@@ -84,6 +86,7 @@ interface SkillDetailProps {
 }
 
 function SkillDetail({ skill, enabled, onToggle }: SkillDetailProps) {
+  const { t } = useTranslation();
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-start justify-between gap-4">
@@ -94,22 +97,26 @@ function SkillDetail({ skill, enabled, onToggle }: SkillDetailProps) {
           <Switch
             checked={enabled}
             onCheckedChange={onToggle}
-            aria-label="Enabled"
+            aria-label={t("customize.skills.enabled")}
           />
           <button
             type="button"
             className="rounded-md px-2 py-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-            aria-label="More"
+            aria-label={t("customize.skills.more")}
           >
             ⋮
           </button>
         </div>
       </div>
       <dl className="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-1 text-sm">
-        <dt className="text-muted-foreground">Added by</dt>
-        <dd className="text-foreground">You</dd>
-        <dt className="text-muted-foreground">Trigger</dt>
-        <dd className="text-foreground">Manual + auto-suggest</dd>
+        <dt className="text-muted-foreground">
+          {t("customize.skills.addedBy")}
+        </dt>
+        <dd className="text-foreground">{t("customize.skills.addedByYou")}</dd>
+        <dt className="text-muted-foreground">{t("customize.skills.trigger")}</dt>
+        <dd className="text-foreground">
+          {t("customize.skills.triggerValue")}
+        </dd>
       </dl>
       <div className="flex items-start gap-2 rounded-md border border-border bg-muted px-3 py-2 text-xs text-muted-foreground">
         <Info className="mt-0.5 size-3.5 shrink-0" />
@@ -117,12 +124,12 @@ function SkillDetail({ skill, enabled, onToggle }: SkillDetailProps) {
       </div>
       <article className="flex flex-col gap-3 text-sm">
         <h2 className="font-serif text-[22px] font-normal text-foreground">
-          How it works
+          {t("customize.skills.howItWorks")}
         </h2>
         <ul className="ml-4 list-disc text-foreground">
           <li>{skill.description}</li>
-          <li>Triggers automatically when relevant context is detected.</li>
-          <li>Outputs are tagged with the skill name.</li>
+          <li>{t("customize.skills.bullets.autoTrigger")}</li>
+          <li>{t("customize.skills.bullets.tagged")}</li>
         </ul>
       </article>
     </div>

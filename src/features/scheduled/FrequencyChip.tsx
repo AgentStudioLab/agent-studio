@@ -1,14 +1,7 @@
 import { Clock } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import type { Frequency } from "@/lib/mock/types";
-
-const FREQ_LABEL: Record<Frequency, string> = {
-  manual: "Manual",
-  hourly: "Every hour",
-  daily: "Daily",
-  weekdays: "Weekdays",
-  weekly: "Weekly",
-};
 
 interface FrequencyChipProps {
   frequency: Frequency;
@@ -17,10 +10,23 @@ interface FrequencyChipProps {
 }
 
 export function FrequencyChip({ frequency, timeOfDay, className }: FrequencyChipProps) {
-  const label =
-    timeOfDay && frequency !== "manual" && frequency !== "hourly"
-      ? `${FREQ_LABEL[frequency]} at ${timeOfDay}`
-      : FREQ_LABEL[frequency];
+  const { t } = useTranslation();
+  const hasTime =
+    !!timeOfDay && frequency !== "manual" && frequency !== "hourly";
+
+  let label: string;
+  if (hasTime) {
+    const key =
+      frequency === "daily"
+        ? "scheduled.frequencyChip.dailyAt"
+        : frequency === "weekdays"
+          ? "scheduled.frequencyChip.weekdaysAt"
+          : "scheduled.frequencyChip.weeklyAt";
+    label = t(key, { time: timeOfDay });
+  } else {
+    label = t(`scheduled.frequencyChip.${frequency}`);
+  }
+
   return (
     <span
       className={cn(

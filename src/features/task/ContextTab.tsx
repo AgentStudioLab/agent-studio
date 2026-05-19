@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { InitialsAvatar } from "@/shared/atoms/InitialsAvatar";
 import type { MockSkill, MockMcpServer } from "@/lib/mock/types";
@@ -24,13 +25,14 @@ function SectionHeading({ label, count }: SectionHeadingProps) {
 }
 
 export function ContextTab({ skills, mcpServers }: ContextTabProps) {
+  const { t } = useTranslation();
   const onCount = mcpServers.filter((m) => m.connected).length;
 
   return (
     <div>
       <SectionHeading
-        label="Skills"
-        count={`${skills.length} loaded`}
+        label={t("task.contextTab.skills")}
+        count={t("task.contextTab.skillsLoaded", { count: skills.length })}
       />
       <div className="flex flex-col gap-1">
         {skills.map((skill) => (
@@ -58,8 +60,8 @@ export function ContextTab({ skills, mcpServers }: ContextTabProps) {
 
       <div className="pt-2">
         <SectionHeading
-          label="MCP servers"
-          count={`${onCount} / ${mcpServers.length} on`}
+          label={t("task.contextTab.mcpServers")}
+          count={t("task.contextTab.mcpOnCount", { on: onCount, total: mcpServers.length })}
         />
       </div>
       <div className="flex flex-col gap-1">
@@ -77,7 +79,7 @@ export function ContextTab({ skills, mcpServers }: ContextTabProps) {
                 opacity: server.connected ? 1 : 0.4,
               }}
               role="status"
-              aria-label={server.connected ? "connected" : "disconnected"}
+              aria-label={server.connected ? t("task.contextTab.connected") : t("task.contextTab.disconnected")}
             />
             <div className="flex-1 min-w-0">
               <div
@@ -93,7 +95,7 @@ export function ContextTab({ skills, mcpServers }: ContextTabProps) {
               </div>
             </div>
             {!server.connected && (
-              <span className="text-[10px] text-text-400 italic">off</span>
+              <span className="text-[10px] text-text-400 italic">{t("task.contextTab.off")}</span>
             )}
           </div>
         ))}
