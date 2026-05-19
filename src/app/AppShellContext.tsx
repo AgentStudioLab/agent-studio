@@ -69,7 +69,7 @@ const AppShellContext = createContext<AppShellContextValue | null>(null);
 
 export function AppShellProvider({
   children,
-  initialView = "task" as ViewKey,
+  initialView = "new-task" as ViewKey,
 }: {
   children: ReactNode;
   initialView?: ViewKey;
