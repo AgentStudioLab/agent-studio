@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { cors } from "hono/cors";
 import path from "node:path";
 import { openDb } from "./db";
 import { healthRoutes } from "./routes/health";
@@ -44,6 +45,20 @@ const db = openDb(dbAbs);
 const apiKey = createApiKeyState(process.env.ANTHROPIC_API_KEY);
 
 export const app = new Hono();
+
+// CORS 必须在 auth 之前 —— 否则 WKWebView 的 preflight OPTIONS
+// （因为我们发自定义 Authorization header）会被 auth middleware 401，
+// 浏览器拿不到 Access-Control-Allow-* 响应头就拒绝后续真正请求。
+// sidecar 只 listen 127.0.0.1 + Bearer token 校验，origin 放开是安全的。
+app.use(
+  "*",
+  cors({
+    origin: (origin) => origin ?? "*",
+    allowHeaders: ["Authorization", "Content-Type"],
+    allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    maxAge: 600,
+  }),
+);
 
 app.use("*", async (c, next) => {
   const auth = c.req.header("Authorization");
