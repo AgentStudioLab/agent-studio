@@ -1,7 +1,12 @@
 import { Hono } from "hono";
-import { streamSSE } from "hono/streaming";
+import path from "node:path";
+import { openDb } from "./db";
+import { healthRoutes } from "./routes/health";
+import { buildConversationRoutes } from "./routes/conversations";
+import { buildSettingsRoutes } from "./routes/settings";
+import { createApiKeyState } from "./services/apiKey";
 
-type Args = { port: number; token: string };
+type Args = { port: number; token: string; db: string };
 
 function parseArgs(argv: string[]): Args {
   const get = (key: string) => {
@@ -11,8 +16,9 @@ function parseArgs(argv: string[]): Args {
   };
   const portStr = get("port");
   const token = get("token");
-  if (!portStr || !token) {
-    console.error("usage: server --port=<n> --token=<s>");
+  const dbArg = get("db");
+  if (!portStr || !token || !dbArg) {
+    console.error("usage: server --port=<n> --token=<s> --db=<path>");
     process.exit(2);
   }
   const port = Number.parseInt(portStr, 10);
@@ -20,39 +26,40 @@ function parseArgs(argv: string[]): Args {
     console.error(`invalid port: ${portStr}`);
     process.exit(2);
   }
-  return { port, token };
+  return { port, token, db: dbArg };
 }
 
-const { port, token } = parseArgs(process.argv.slice(2));
+const args = parseArgs(process.argv.slice(2));
 
-const app = new Hono();
+// 路径白名单校验：db 必须在父级允许目录内（防 --db=../../etc/foo.db）。
+// 这里只做基础规则：必须以 .db 结尾且 resolved。
+const dbAbs = path.resolve(args.db);
+if (!dbAbs.endsWith(".db")) {
+  console.error(`refusing non-.db path: ${dbAbs}`);
+  process.exit(2);
+}
+
+const db = openDb(dbAbs);
+const apiKey = createApiKeyState(process.env.ANTHROPIC_API_KEY);
+
+export const app = new Hono();
 
 app.use("*", async (c, next) => {
   const auth = c.req.header("Authorization");
-  if (auth !== `Bearer ${token}`) {
+  if (auth !== `Bearer ${args.token}`) {
     return c.json({ error: "unauthorized" }, 401);
   }
   await next();
 });
 
-app.get("/health", (c) => c.json({ ok: true, pid: process.pid }));
+app.route("/", healthRoutes);
+app.route("/", buildConversationRoutes(db));
+app.route("/", buildSettingsRoutes(apiKey));
 
-app.get("/echo/:msg", (c) => c.json({ msg: c.req.param("msg") }));
-
-app.get("/sse/ticks", (c) =>
-  streamSSE(c, async (stream) => {
-    let i = 0;
-    while (!stream.aborted) {
-      await stream.writeSSE({ event: "tick", data: String(i++) });
-      await stream.sleep(1000);
-    }
-  }),
-);
-
-console.log(`[sidecar] listening on http://127.0.0.1:${port}`);
+console.log(`[sidecar] listening on http://127.0.0.1:${args.port} (db=${dbAbs})`);
 
 export default {
-  port,
+  port: args.port,
   hostname: "127.0.0.1",
   fetch: app.fetch,
 };
