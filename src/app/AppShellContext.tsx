@@ -45,6 +45,10 @@ interface AppShellContextValue {
   setActiveProjectId: (id: string | null) => void;
   activeScheduledId: string | null;
   setActiveScheduledId: (id: string | null) => void;
+  activeTaskId: string | null;
+  setActiveTaskId: (id: string | null) => void;
+  pendingFirstPrompt: { conversationId: string; text: string } | null;
+  setPendingFirstPrompt: (v: { conversationId: string; text: string } | null) => void;
   // Sidebar pinned/recents live on the provider, not inside SidebarContent — collapsing
   // the sidebar unmounts SidebarContent and the floating popover remounts a fresh
   // instance. Local state there would discard pin/unpin/delete actions on every collapse.
@@ -72,6 +76,11 @@ export function AppShellProvider({
   const [preview, setPreview] = useState<PreviewState>({ file: null, open: false });
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [activeScheduledId, setActiveScheduledId] = useState<string | null>(null);
+  const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
+  const [pendingFirstPrompt, setPendingFirstPrompt] = useState<{
+    conversationId: string;
+    text: string;
+  } | null>(null);
   const [pinned, setPinned] = useState<MockPinnedItem[]>(pinnedFixtures);
   const [recents, setRecents] = useState<MockRecentItem[]>(recentFixtures);
   const [streamingByConversation, setStreamingByConversation] = useState<Map<string, StreamState>>(
@@ -114,6 +123,10 @@ export function AppShellProvider({
       setActiveProjectId,
       activeScheduledId,
       setActiveScheduledId,
+      activeTaskId,
+      setActiveTaskId,
+      pendingFirstPrompt,
+      setPendingFirstPrompt,
       pinned,
       setPinned,
       recents,
@@ -132,6 +145,8 @@ export function AppShellProvider({
       closePreview,
       activeProjectId,
       activeScheduledId,
+      activeTaskId,
+      pendingFirstPrompt,
       pinned,
       recents,
       streamingByConversation,

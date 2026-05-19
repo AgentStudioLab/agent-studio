@@ -1,4 +1,5 @@
 import { ChevronDown, ExternalLink, FolderOpen, Hand } from "lucide-react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AppShell } from "@/app/AppShell";
 import { useAppShell } from "@/app/AppShellContext";
@@ -10,11 +11,32 @@ import {
   PromptInputSubmit,
   PromptInputTextarea,
   PromptInputTools,
+  type PromptInputMessage,
 } from "@/components/ai-elements/prompt-input";
+import { createConversation } from "@/lib/data/conversations";
 
 export function NewTaskView() {
   const { t } = useTranslation();
-  const { setView } = useAppShell();
+  const { setView, setActiveTaskId, setPendingFirstPrompt } = useAppShell();
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = async ({ text }: PromptInputMessage) => {
+    if (text.trim().length === 0 || submitting) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      const conv = await createConversation({ prompt: text, mode: "ask" });
+      setActiveTaskId(conv.id);
+      setPendingFirstPrompt({ conversationId: conv.id, text });
+      setView("task");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "submit_failed");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <AppShell
       main={
@@ -34,7 +56,7 @@ export function NewTaskView() {
               <ExternalLink className="size-3" />
             </a>
             <div className="w-full">
-              <PromptInput onSubmit={() => setView("task")}>
+              <PromptInput onSubmit={handleSubmit}>
                 <PromptInputTextarea placeholder={t("newTask.input.placeholder")} />
                 <PromptInputFooter>
                   <PromptInputTools>
@@ -58,6 +80,13 @@ export function NewTaskView() {
                   </PromptInputTools>
                 </PromptInputFooter>
               </PromptInput>
+              {error && (
+                <p className="mt-2 text-sm" style={{ color: "hsl(var(--danger-100))" }}>
+                  {error === "api_key_missing"
+                    ? t("newTask.error.apiKeyMissing")
+                    : t("newTask.error.generic", { msg: error })}
+                </p>
+              )}
             </div>
           </div>
         </div>

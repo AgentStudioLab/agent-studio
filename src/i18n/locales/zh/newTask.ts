@@ -10,5 +10,9 @@ export const newTask = {
       ask: "提问",
       legacyModel: "Legacy 模型",
     },
+    error: {
+      apiKeyMissing: "未配置 API key。前往 设置 添加。",
+      generic: "提交失败：{{msg}}",
+    },
   },
 };
