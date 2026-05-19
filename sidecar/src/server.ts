@@ -74,6 +74,11 @@ app.route("/", buildMessageRoutes(db, apiKey));
 app.route("/", buildSettingsRoutes(apiKey));
 
 console.log(`[sidecar] listening on http://127.0.0.1:${args.port} (db=${dbAbs})`);
+console.log(
+  `[sidecar] env presence: ANTHROPIC_API_KEY=${process.env.ANTHROPIC_API_KEY ? "yes" : "NO"} ` +
+    `ANTHROPIC_BASE_URL=${process.env.ANTHROPIC_BASE_URL ?? "NO"} ` +
+    `ANTHROPIC_MODEL=${process.env.ANTHROPIC_MODEL ?? "NO"}`,
+);
 
 export default {
   port: args.port,
