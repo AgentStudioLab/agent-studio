@@ -30,7 +30,9 @@ export async function* mockQuery(opts: {
   yield { type: "message_start" };
   yield { type: "content_block_start" };
   for (const chunk of chunks) {
-    if (opts.signal?.aborted) return;
+    if (opts.signal?.aborted) {
+      throw new DOMException("The operation was aborted.", "AbortError");
+    }
     yield { type: "content_block_delta", delta: { type: "text_delta", text: chunk } };
     await new Promise((r) => setTimeout(r, 10));
   }
