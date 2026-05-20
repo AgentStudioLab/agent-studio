@@ -124,7 +124,13 @@ export function createResumableRun(opts: ResumableRunOptions): { abort: () => vo
             receivedAny = true;
             onEvent(event, c);
             if (TERMINAL.has(event.type)) {
-              return done(event.type === "RUN_FINISHED" ? "finished" : "error");
+              if (event.type === "RUN_FINISHED") return done("finished");
+              // RUN_ERROR with code "CANCELLED" is a user-initiated cancel
+              // (stop button OR reject-during-approval): treat as `aborted`
+              // so the runtime doesn't surface "stream error" to the user.
+              // The "已被用户中止" notice is appended via runWorker.
+              if (event.code === "CANCELLED") return done("aborted");
+              return done("error");
             }
           }
         }

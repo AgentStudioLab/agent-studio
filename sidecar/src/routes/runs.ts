@@ -151,6 +151,16 @@ export function buildRunRoutes(deps: MountRunsDeps): Hono {
     const ok = deps.interruptBus.resolve(runId, first.interruptId, result);
     if (!ok) return c.json({ error: "interrupt_not_pending" }, 409);
 
+    // Deny ≡ terminate the run. Resolving the deferred unblocks the SDK
+    // (it gets `{behavior:"deny"}` and would otherwise re-prompt the model
+    // with the tool error); we don't want that — user said "no" to the
+    // whole thing. Abort the run so the worker's catch path fires and the
+    // run reaches `cancelled`. The runWorker's `cancelAll` covers the
+    // race where the deferred was somehow not yet resolved.
+    if (decision.type === "deny") {
+      aborters.get(runId)?.abort();
+    }
+
     // 202 matches POST /runs — frontend `api.ts:73` checks `!== 202`. The
     // decision has been delivered to the deferred; the SDK continuation
     // happens asynchronously after `canUseTool` resolves.
