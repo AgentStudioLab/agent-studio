@@ -440,9 +440,14 @@ export async function* claudeSdkToAgui(
       runId,
     } as AGUIEvent;
   } catch (err) {
+    // Tag aborts so the frontend doesn't render "stream error" — the worker
+    // appends a "已被用户中止" notice that already conveys the cancellation.
+    // Covers both user-Stop and HITL-deny paths (both flow through aborter.abort()).
+    const isAbort = err instanceof Error && err.name === "AbortError";
     yield {
       type: EventType.RUN_ERROR,
       message: err instanceof Error ? err.message : String(err),
+      ...(isAbort ? { code: "CANCELLED" } : {}),
     } as AGUIEvent;
   }
 }
