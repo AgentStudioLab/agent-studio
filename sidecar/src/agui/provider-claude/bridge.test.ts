@@ -261,6 +261,73 @@ describe("bridge — assistant message persistence", () => {
     expect(toolCallEnds[1]!.parentMessageId).toBe(messageEnds[0]!.id);
   });
 
+  it("streams thinking_delta as REASONING_MESSAGE_CONTENT (live UI fill)", async () => {
+    // Reproduces the bug: bridge used to emit REASONING_START + accumulate
+    // deltas privately into onMessageEnd's reasoning field, leaving the live
+    // UI block empty (only filled in by /messages history GET on refresh).
+    // After fix: each thinking_delta becomes a REASONING_MESSAGE_CONTENT
+    // event on the wire so the reducer can grow the block in place.
+    const sdkStream = (async function* () {
+      yield {
+        type: "stream_event",
+        event: {
+          type: "content_block_start",
+          content_block: { type: "thinking" },
+        },
+      };
+      yield {
+        type: "stream_event",
+        event: {
+          type: "content_block_delta",
+          delta: { type: "thinking_delta", thinking: "Let me " },
+        },
+      };
+      yield {
+        type: "stream_event",
+        event: {
+          type: "content_block_delta",
+          delta: { type: "thinking_delta", thinking: "plan." },
+        },
+      };
+      yield {
+        type: "assistant",
+        message: { content: [{ type: "text", text: "ok" }] },
+      };
+      yield { type: "result", subtype: "success" };
+    })();
+
+    const { callbacks, messageEnds } = makeCallbacks();
+    const events = await drain(
+      claudeSdkToAgui(sdkStream, {
+        threadId: "t",
+        runId: "r",
+        callbacks,
+      }),
+    );
+
+    // REASONING_START + 2x REASONING_MESSAGE_CONTENT + REASONING_END appear
+    // on the wire, in order.
+    const types = events.map((e) => e.type);
+    expect(types).toContain("REASONING_START");
+    expect(types).toContain("REASONING_END");
+
+    const contents = events.filter((e) => e.type === "REASONING_MESSAGE_CONTENT");
+    expect(contents).toHaveLength(2);
+    expect((contents[0] as { delta: string }).delta).toBe("Let me ");
+    expect((contents[1] as { delta: string }).delta).toBe("plan.");
+
+    // All three reasoning events share the SAME messageId (the same block).
+    const reasoningEvents = events.filter((e) =>
+      String(e.type).startsWith("REASONING_"),
+    );
+    const ids = new Set(reasoningEvents.map((e) => (e as { messageId: string }).messageId));
+    expect(ids.size).toBe(1);
+
+    // The persisted reasoning column gets the full accumulated text — that's
+    // what /conversations/:id/messages returns on refresh.
+    expect(messageEnds[0]!.reasoning).toBe("Let me plan.");
+  });
+
   it("error tool_result surfaces status=error in callback", async () => {
     const sdkStream = (async function* () {
       yield {

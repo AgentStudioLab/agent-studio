@@ -50,5 +50,5 @@ export interface RunEventStore {
     signal: AbortSignal,
   ): AsyncIterable<AGUIEventEnvelope>;
   listThreadStatuses(): Promise<ThreadStatus[]>;
-  reconcileOrphans(): Promise<number>;
+  reconcileOrphans(): number;
 }

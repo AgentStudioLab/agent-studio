@@ -26,13 +26,13 @@
     "@tauri-apps/api": "^2.11.0",
     "@tauri-apps/plugin-shell": "~2.3",
     "@tauri-apps/plugin-store": "~2.4",
-    "ai": "^6.0.184",
+    "ai": "^6.0.185",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "i18next": "^26.2.0",
     "lucide-react": "^1.16.0",
-    "motion": "^12.38.0",
+    "motion": "^12.39.0",
     "nanoid": "^5.1.11",
     "radix-ui": "^1.4.3",
     "react": "^19.2.6",
@@ -41,7 +41,8 @@
     "shadcn": "^4.7.0",
     "shiki": "^4.0.2",
     "streamdown": "^2.5.0",
-    "tailwind-merge": "^3.6.0"
+    "tailwind-merge": "^3.6.0",
+    "use-stick-to-bottom": "^1.1.4"
   },
   "devDependencies": {
     "@storybook/addon-a11y": "^10.4.0",

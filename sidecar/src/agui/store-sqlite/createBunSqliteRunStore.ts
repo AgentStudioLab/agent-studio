@@ -187,7 +187,7 @@ export function createBunSqliteRunStore(db: Database): RunEventStore {
       }));
     },
 
-    async reconcileOrphans() {
+    reconcileOrphans() {
       const result = orphanUpdate.run(Date.now());
       return Number(result.changes ?? 0);
     },

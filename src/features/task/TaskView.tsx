@@ -97,10 +97,12 @@ export function TaskView() {
             title={conversationQuery.data?.title ?? "…"}
             onMoveToProject={() => {}}
           />
-          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+          <div className="flex min-h-0 flex-1 flex-col">
             <ChatStream
+              threadId={activeTaskId}
               messages={viewMessages}
               isThinking={isThinking}
+              isRunning={isRunning}
               error={error}
               loading={messagesQuery.isLoading}
             />

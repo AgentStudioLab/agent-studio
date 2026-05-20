@@ -1,26 +1,100 @@
+import { isValidElement, type ReactNode } from "react";
 import { Streamdown } from "streamdown";
-import type { MessageView } from "@/lib/agui/runtime";
+import type { BundledLanguage } from "shiki";
+import type { MessageBlock, MessageView } from "@/lib/agui/runtime";
+import { UserMessage } from "@/features/task/UserMessage";
+import { MessageActions } from "@/features/task/MessageActions";
+import {
+  ProcessGroup,
+  type ProcessStep,
+} from "@/features/task/ProcessGroup";
+import { ThinkingSpinner } from "@/shared/atoms/ThinkingSpinner";
+import {
+  CodeBlock,
+  CodeBlockActions,
+  CodeBlockCopyButton,
+  CodeBlockFilename,
+  CodeBlockHeader,
+  CodeBlockTitle,
+} from "@/components/ai-elements/code-block";
+import {
+  Conversation,
+  ConversationContent,
+  ConversationScrollButton,
+} from "@/components/ai-elements/conversation";
 
 interface ChatStreamProps {
+  threadId: string;
   messages: MessageView[];
   isThinking: boolean;
+  isRunning: boolean;
   error: string | null;
   loading?: boolean;
 }
 
 /**
- * Chat transcript layout per Showcase 1 prototype (Claude Desktop / Cowork):
- *   - user msg: right-aligned bubble, max-w 78%, bg-bg-300
- *   - assistant msg: full-width text content, no "CLAUDE" label
- *   - column max-w 760px centered, generous vertical spacing between turns
+ * Streamdown component overrides: replace the built-in code block renderer
+ * with the project's CodeBlock (shiki + GitHub themes + copy button) so the
+ * code visuals match the rest of the chat surface.
  *
- * Tool-call cards / artifact cards / preset questions land in this column too
- * (each rendered by an assistant block kind); we keep the per-block dispatch
- * minimal here and let future blocks add their own component.
+ * The `pre` element wraps a `<code className="language-foo">` node — we pull
+ * out the language + raw text and forward to <CodeBlock>.
+ */
+function MarkdownCodeBlock({
+  children,
+}: {
+  children?: ReactNode;
+}): ReactNode {
+  let className = "";
+  let code = "";
+  if (isValidElement<{ className?: string; children?: ReactNode }>(children)) {
+    className = children.props.className ?? "";
+    code = String(children.props.children ?? "").replace(/\n$/, "");
+  } else if (typeof children === "string") {
+    code = children;
+  }
+  const lang = (/language-([\w-]+)/.exec(className)?.[1] ?? "text") as
+    | BundledLanguage
+    | "text";
+  return (
+    <CodeBlock
+      code={code}
+      language={lang as BundledLanguage}
+      className="my-3"
+    >
+      <CodeBlockHeader>
+        <CodeBlockTitle>
+          <CodeBlockFilename>{lang}</CodeBlockFilename>
+        </CodeBlockTitle>
+        <CodeBlockActions>
+          <CodeBlockCopyButton />
+        </CodeBlockActions>
+      </CodeBlockHeader>
+    </CodeBlock>
+  );
+}
+
+const STREAMDOWN_COMPONENTS = {
+  pre: MarkdownCodeBlock,
+};
+
+/**
+ * Chat transcript per Showcase 1 prototype.
+ *
+ * Streaming UX contract:
+ *   - MessageActions toolbar only shows on COMPLETED assistant turns. The
+ *     live last assistant turn during isRunning is footer-less so the user
+ *     doesn't try to copy a half-formed answer.
+ *   - "Thinking…" bottom row uses <ThinkingSpinner> (SpriteLoader chase),
+ *     not a plain text label.
+ *   - Code fences inside Streamdown markdown render via the project's
+ *     CodeBlock primitive (consistent shiki + theme + copy treatment).
  */
 export function ChatStream({
+  threadId,
   messages,
   isThinking,
+  isRunning,
   error,
   loading = false,
 }: ChatStreamProps) {
@@ -31,94 +105,129 @@ export function ChatStream({
       </div>
     );
   }
+  // `key={threadId}` re-mounts the StickToBottom container when the user
+  // switches conversations so `initial="instant"` snaps to the bottom of the
+  // new thread (otherwise the container stays mounted across switches and
+  // initial only runs once). During streaming, resize="smooth" + ResizeObserver
+  // keeps the view glued to the bottom unless the user scrolls up.
   return (
-    <div className="flex-1 overflow-y-auto">
-      <div className="mx-auto max-w-[760px] space-y-6 px-8 py-6">
-        {messages.map((m) => (
-          <MessageRow key={m.id} message={m} />
-        ))}
-        {isThinking && (
-          <p className="text-[13px]" style={{ color: "hsl(var(--text-300))" }}>
-            思考中…
-          </p>
-        )}
-        {error && (
-          <p className="text-[13px]" style={{ color: "hsl(var(--danger-100))" }}>
-            错误：{error}
-          </p>
-        )}
-      </div>
-    </div>
+    <Conversation
+      key={threadId}
+      initial="instant"
+      resize="smooth"
+      className="flex-1"
+    >
+      <ConversationContent className="gap-0 p-0">
+        <div className="mx-auto max-w-[760px] space-y-6 px-8 py-6">
+          {messages.map((m, idx) => {
+            const isLive =
+              isRunning &&
+              m.role === "assistant" &&
+              idx === messages.length - 1;
+            return (
+              <MessageRow key={m.id} message={m} showActions={!isLive} />
+            );
+          })}
+          {isRunning && isThinking && (
+            <div
+              className="flex items-center gap-2 text-[13px]"
+              style={{ color: "hsl(var(--text-300))" }}
+            >
+              <ThinkingSpinner size={16} />
+              <span>思考中</span>
+            </div>
+          )}
+          {error && (
+            <p className="text-[13px]" style={{ color: "hsl(var(--danger-100))" }}>
+              错误：{error}
+            </p>
+          )}
+        </div>
+      </ConversationContent>
+      <ConversationScrollButton />
+    </Conversation>
   );
 }
 
-function MessageRow({ message }: { message: MessageView }) {
-  if (message.role === "user") {
-    return (
-      <div className="flex justify-end">
-        <div
-          className="max-w-[78%] whitespace-pre-wrap rounded-2xl px-4 py-2.5 text-[14px] leading-relaxed"
-          style={{
-            background: "hsl(var(--bg-300))",
-            color: "hsl(var(--text-100))",
-          }}
-        >
-          {message.content}
-        </div>
-      </div>
-    );
+/* ---------------- block grouping ---------------- */
+
+/**
+ * Virtual block produced by `groupBlocks` — a run of consecutive process
+ * steps (reasoning + tool_call) collapsed into one timeline group. `done`
+ * is true iff a `text` (or `notice`) block follows; that triggers
+ * auto-collapse + ✓Done. Trailing process group stays `done: false` (live).
+ */
+type GroupedBlock =
+  | Extract<MessageBlock, { kind: "text" } | { kind: "notice" }>
+  | {
+      kind: "process_group";
+      key: string;
+      steps: ProcessStep[];
+      done: boolean;
+    };
+
+function groupBlocks(blocks: MessageBlock[]): GroupedBlock[] {
+  const out: GroupedBlock[] = [];
+  let pending: ProcessStep[] = [];
+
+  const flush = (done: boolean) => {
+    if (pending.length === 0) return;
+    const first = pending[0]!;
+    const key =
+      first.kind === "reasoning" ? `pg_r_${first.id}` : `pg_t_${first.tool.id}`;
+    out.push({ kind: "process_group", key, steps: pending, done });
+    pending = [];
+  };
+
+  for (const b of blocks) {
+    if (b.kind === "reasoning") {
+      pending.push({ kind: "reasoning", id: b.id, content: b.content });
+      continue;
+    }
+    if (b.kind === "tool_call") {
+      pending.push({ kind: "tool_call", tool: b.toolCall });
+      continue;
+    }
+    flush(true);
+    out.push(b);
   }
+  flush(false);
+  return out;
+}
+
+function MessageRow({
+  message,
+  showActions,
+}: {
+  message: MessageView;
+  showActions: boolean;
+}) {
+  if (message.role === "user") {
+    return <UserMessage>{message.content}</UserMessage>;
+  }
+
+  const grouped = groupBlocks(message.blocks);
 
   return (
     <div className="space-y-3">
-      {message.blocks.map((b, i) => {
+      {grouped.map((b, i) => {
+        if (b.kind === "process_group") {
+          return <ProcessGroup key={b.key} steps={b.steps} done={b.done} />;
+        }
         if (b.kind === "text") {
-          // streamdown renders markdown progressively (handles half-open
-          // fences / lists / inline as deltas land) and ships its own CSS
-          // primitives. mode="streaming" enables incomplete-markdown patching.
           return (
             <div
               key={`${b.id}-${i}`}
               className="prose-stream text-[14px] leading-[1.75]"
               style={{ color: "hsl(var(--text-100))" }}
             >
-              <Streamdown mode="streaming" parseIncompleteMarkdown>
+              <Streamdown
+                mode="streaming"
+                parseIncompleteMarkdown
+                components={STREAMDOWN_COMPONENTS}
+              >
                 {b.content}
               </Streamdown>
-            </div>
-          );
-        }
-        if (b.kind === "reasoning") {
-          return (
-            <div
-              key={`${b.id}-${i}`}
-              className="whitespace-pre-wrap text-[13px] leading-[1.7]"
-              style={{ color: "hsl(var(--text-300))" }}
-            >
-              {b.content}
-            </div>
-          );
-        }
-        if (b.kind === "tool_call") {
-          const tc = b.toolCall;
-          return (
-            <div
-              key={tc.id}
-              className="rounded-lg px-3 py-2 text-[12.5px]"
-              style={{
-                border: "1px solid hsl(var(--border-300) / 0.18)",
-                color: "hsl(var(--text-300))",
-              }}
-            >
-              <div
-                className="text-[13px] font-medium"
-                style={{ color: "hsl(var(--text-100))" }}
-              >
-                {tc.toolName}
-              </div>
-              <div className="mt-0.5 text-[11.5px] opacity-70">
-                status: {tc.status}
-              </div>
             </div>
           );
         }
@@ -135,6 +244,7 @@ function MessageRow({ message }: { message: MessageView }) {
         }
         return null;
       })}
+      {showActions && <MessageActions />}
     </div>
   );
 }

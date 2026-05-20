@@ -93,8 +93,25 @@ export async function* claudeSdkToAgui(
 
   // Per-message accumulators. Reset on each SDKAssistantMessage we close.
   let currentTextMsgId: string | null = null;
+  // currentReasoningId tracks the open thinking content block so reducer
+  // events (REASONING_MESSAGE_CONTENT / REASONING_END) can address it.
+  // Without this, START + accumulatedReasoning would land in the DB column
+  // but the live UI block stays empty until a page refresh.
+  let currentReasoningId: string | null = null;
   let accumulatedText = "";
   let accumulatedReasoning = "";
+
+  // Close any open reasoning block. Called before opening a new block of a
+  // different kind (text / tool_use) or when the assistant message arrives.
+  function closeReasoningBlock(): AGUIEvent | null {
+    if (!currentReasoningId) return null;
+    const ev = {
+      type: EventType.REASONING_END,
+      messageId: currentReasoningId,
+    } as AGUIEvent;
+    currentReasoningId = null;
+    return ev;
+  }
 
   // Tool-call tracking. parentMsgId may be null when content_block_start
   // for tool_use fires before any text block opened — finalized in the
@@ -132,6 +149,9 @@ export async function* claudeSdkToAgui(
         if (ev.type === "content_block_start" && ev.content_block) {
           const cb = ev.content_block;
           if (cb.type === "text") {
+            // A non-thinking block is starting — close any open reasoning.
+            const endR = closeReasoningBlock();
+            if (endR) yield endR;
             currentTextMsgId = `msg_${nanoid(10)}`;
             accumulatedText = "";
             yield {
@@ -140,6 +160,8 @@ export async function* claudeSdkToAgui(
               role: "assistant",
             } as AGUIEvent;
           } else if (cb.type === "tool_use" && cb.id && cb.name) {
+            const endR = closeReasoningBlock();
+            if (endR) yield endR;
             toolById.set(cb.id, {
               id: cb.id,
               toolName: cb.name,
@@ -154,10 +176,14 @@ export async function* claudeSdkToAgui(
               parentMessageId: currentTextMsgId ?? undefined,
             } as AGUIEvent;
           } else if (cb.type === "thinking") {
-            const rid = `rsn_${nanoid(8)}`;
+            // If a previous thinking block was still open (rare — model
+            // emits multiple consecutive thinking blocks), close it first.
+            const endR = closeReasoningBlock();
+            if (endR) yield endR;
+            currentReasoningId = `rsn_${nanoid(10)}`;
             yield {
               type: EventType.REASONING_START,
-              messageId: rid,
+              messageId: currentReasoningId,
               parentMessageId: currentTextMsgId ?? undefined,
             } as AGUIEvent;
           }
@@ -175,11 +201,22 @@ export async function* claudeSdkToAgui(
             // here. We rely on the assistant-message handler to emit the
             // full TOOL_CALL_ARGS once `input` parses on the final message.
           } else if (ev.delta.type === "thinking_delta") {
-            accumulatedReasoning += (ev.delta as { thinking?: string }).thinking ?? "";
+            const delta =
+              (ev.delta as { thinking?: string }).thinking ?? "";
+            if (delta && currentReasoningId) {
+              accumulatedReasoning += delta;
+              yield {
+                type: EventType.REASONING_MESSAGE_CONTENT,
+                messageId: currentReasoningId,
+                delta,
+              } as AGUIEvent;
+            }
           }
         } else if (ev.type === "content_block_stop") {
           // No event yet — wait for the SDKAssistantMessage authoritative
-          // pass to close text/tool blocks consistently.
+          // pass to close text/tool blocks consistently. Reasoning blocks
+          // get explicitly closed when the next non-thinking block opens
+          // (above) or when the assistant message arrives (below).
         }
         continue;
       }
@@ -187,6 +224,11 @@ export async function* claudeSdkToAgui(
       // assistant — authoritative end of one AIMessage. This is where we
       // persist (messages row + tool_calls rows) and emit *_END events.
       if (m.type === "assistant") {
+        // Close any still-open reasoning block first — content_block_stop
+        // for thinking doesn't carry the block type, so we wait until the
+        // wrapping assistant message arrives to flush it.
+        const endR = closeReasoningBlock();
+        if (endR) yield endR;
         const am = m as SdkAssistantLike;
         const content = am.message?.content;
         const blocks = Array.isArray(content) ? content : [];
@@ -339,6 +381,10 @@ export async function* claudeSdkToAgui(
       // result — turn finished
       if (m.type === "result") {
         const r = m as SdkResultLike;
+        // Same close-reasoning safety as the assistant handler, in case the
+        // turn ended without ever emitting an SDKAssistantMessage frame.
+        const endR = closeReasoningBlock();
+        if (endR) yield endR;
         // If the last AIMessage didn't close cleanly (no SDKAssistantMessage
         // arrived after stream_event), finalize here to keep persistence
         // contract.
@@ -374,6 +420,8 @@ export async function* claudeSdkToAgui(
     }
 
     // Stream ended without `result` — defensive close.
+    const endRfinal = closeReasoningBlock();
+    if (endRfinal) yield endRfinal;
     if (currentTextMsgId) {
       yield {
         type: EventType.TEXT_MESSAGE_END,

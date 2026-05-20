@@ -84,10 +84,14 @@ export function SidebarContent() {
   const {
     currentView,
     setView,
+    activeTaskId,
     setActiveTaskId,
     sidebarCollapsed,
     setSidebarCollapsed,
   } = useAppShell();
+  // Pulse-dot prototype shows the selected thread with a darker fill
+  // (bg-000) — only counts when the task view is the one in focus.
+  const selectedTaskId = currentView === "task" ? activeTaskId : null;
   const { t } = useTranslation();
   const [searchOpen, setSearchOpen] = useState(false);
 
@@ -191,6 +195,7 @@ export function SidebarContent() {
               <PinnedItem
                 key={item.id}
                 item={item}
+                active={item.kind !== "project" && item.id === selectedTaskId}
                 onClick={() => {
                   if (item.kind !== "project") {
                     setActiveTaskId(item.id);
@@ -218,6 +223,7 @@ export function SidebarContent() {
           <RecentItem
             key={item.id}
             item={item}
+            active={item.id === selectedTaskId}
             onClick={() => {
               setActiveTaskId(item.id);
               setView("task");

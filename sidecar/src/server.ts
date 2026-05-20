@@ -52,8 +52,9 @@ const messages = new MessageService(db);
 const store = createBunSqliteRunStore(db);
 
 // Mark orphan running rows (process crashed mid-stream) as error so the
-// sidebar pulse dot doesn't lie. Returns count.
-const orphans = await store.reconcileOrphans();
+// sidebar pulse dot doesn't lie. Synchronous SQL UPDATE — must stay sync
+// because `bun build --compile --bytecode` does not support top-level await.
+const orphans = store.reconcileOrphans();
 if (orphans > 0) console.log(`[boot] reconciled ${orphans} orphan run(s) → error`);
 
 export const app = new Hono();
