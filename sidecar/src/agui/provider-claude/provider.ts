@@ -18,6 +18,7 @@ import type {
 } from "../core/provider-types";
 import type { AGUIEvent } from "../core/types";
 import type { AGUIInterrupt } from "../core/interrupts";
+import type { InterruptBus } from "./interrupt-bus";
 
 export interface ClaudeProviderOptions {
   /**
@@ -29,8 +30,14 @@ export interface ClaudeProviderOptions {
   baseUrl?: string;
   /** Forwarded to the SDK CLI env. */
   model?: string;
-  /** Disabled tools list. v1 = empty (pure chat). */
+  /** Tools the SDK is allowed to invoke. Each call hits `canUseTool` first. */
   allowedTools?: string[];
+  /**
+   * HITL bus. When provided, the provider wires `canUseTool` to
+   * `bus.requestApproval` so each tool invocation requires explicit user
+   * approval through the existing /runs/:id/resume route.
+   */
+  interruptBus?: InterruptBus;
 }
 
 export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider {
@@ -63,6 +70,27 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
 
     const resumeSessionId = sessionByThread.get(ctx.threadId);
 
+    const bus = opts.interruptBus;
+    const canUseTool = bus
+      ? async (
+          toolName: string,
+          input: Record<string, unknown>,
+          sdkOpts: {
+            toolUseID: string;
+            title?: string;
+            description?: string;
+          },
+        ) => bus.requestApproval({
+          runId: ctx.runId,
+          threadId: ctx.threadId,
+          toolUseID: sdkOpts.toolUseID,
+          toolName,
+          input,
+          title: sdkOpts.title,
+          description: sdkOpts.description,
+        })
+      : undefined;
+
     const sdkStream = sdkQuery({
       prompt,
       options: {
@@ -75,6 +103,13 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
         // SDK only yields the full SDKAssistantMessage at the end of a turn,
         // which collapses the response into a single chunk.
         includePartialMessages: true,
+        // `as never`: our closure types `options` with the three fields the
+        // bus actually reads (toolUseID/title/description); the SDK's
+        // CanUseTool surface is wider (signal, suggestions, blockedPath, …).
+        // The SDK's options.signal abort path is covered downstream by
+        // runWorker calling bus.cancelAll(runId) on terminal — see Task 4
+        // of docs/superpowers/plans/2026-05-20-hitl-tool-approval.md.
+        ...(canUseTool ? { canUseTool: canUseTool as never } : {}),
         ...(resumeSessionId ? { resume: resumeSessionId } : {}),
       },
     });
@@ -111,7 +146,12 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
       _threadId: string,
       _runId: string,
     ): Promise<AGUIInterrupt[]> {
-      // v1: no interrupts (no tools that require approval).
+      // Interrupts are surfaced mid-stream via the InterruptBus
+      // (canUseTool → bus.requestApproval writes a synthetic RUN_FINISHED
+      // event to the store). This end-of-stream path is unused for the
+      // claude-agent-sdk provider; the runLoop's `interrupted` outcome
+      // branch only fires for providers that report interrupts on stream
+      // termination (e.g., LangGraph-style runtimes).
       return [];
     },
 
