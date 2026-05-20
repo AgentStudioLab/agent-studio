@@ -7,6 +7,7 @@ import {
 } from "../agui/core";
 import type { MessageService } from "../services/messages";
 import type { ThreadService } from "../services/threads";
+import type { InterruptBus } from "../agui/provider-claude/interrupt-bus";
 
 export interface RunWorkerInput {
   runId: string;
@@ -16,6 +17,7 @@ export interface RunWorkerInput {
   messages: MessageService;
   threads: ThreadService;
   provider: AgentProvider;
+  interruptBus: InterruptBus;
   abortSignal: AbortSignal;
 }
 
@@ -75,16 +77,20 @@ export async function runWorker(input: RunWorkerInput): Promise<void> {
       callbacks,
       abortSignal,
       onTerminal: async (status) => {
+        // Reject any still-pending HITL approvals for this run so the SDK
+        // unblocks (canUseTool resolves as deny → SDK aborts the tool +
+        // emits its own terminal). Safe to call when no deferreds exist.
+        input.interruptBus.cancelAll(runId);
         messages.cancelPendingToolCallsForThread(threadId);
         if (status === "cancelled") {
           messages.appendSystemNote(threadId, "已被用户中止");
           await provider.notifyCancelled?.(threadId);
         }
-        // bump conversation updated_at
         threads.touch(threadId);
       },
     });
   } catch (err) {
+    input.interruptBus.cancelAll(runId);
     const msg = err instanceof Error ? err.message : String(err);
     await store.appendEvent(runId, {
       type: EventType.RUN_ERROR,
