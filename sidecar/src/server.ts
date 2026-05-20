@@ -11,7 +11,10 @@ import { createApiKeyState } from "./services/apiKey";
 import { ThreadService } from "./services/threads";
 import { MessageService } from "./services/messages";
 import { createBunSqliteRunStore } from "./agui/store-sqlite";
-import { createClaudeProvider } from "./agui/provider-claude";
+import {
+  createClaudeProvider,
+  createInterruptBus,
+} from "./agui/provider-claude";
 
 type Args = { port: number; token: string; db: string };
 
@@ -50,6 +53,7 @@ const apiKey = createApiKeyState(process.env.ANTHROPIC_API_KEY);
 const threads = new ThreadService(db);
 const messages = new MessageService(db);
 const store = createBunSqliteRunStore(db);
+const interruptBus = createInterruptBus({ store });
 
 // Mark orphan running rows (process crashed mid-stream) as error so the
 // sidebar pulse dot doesn't lie. Synchronous SQL UPDATE — must stay sync
@@ -88,7 +92,8 @@ function buildProvider() {
     apiKey: key,
     baseUrl: process.env.ANTHROPIC_BASE_URL,
     model: process.env.ANTHROPIC_MODEL,
-    allowedTools: [],
+    allowedTools: ["Bash"],
+    interruptBus,
   });
 }
 
@@ -119,6 +124,7 @@ app.route(
     messages,
     provider: providerProxy,
     store,
+    interruptBus,
   }),
 );
 

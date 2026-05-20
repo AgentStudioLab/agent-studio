@@ -62,6 +62,7 @@ export function buildRunRoutes(deps: MountRunsDeps): Hono {
       messages: deps.messages,
       threads: deps.threads,
       provider: deps.provider,
+      interruptBus: deps.interruptBus,
       abortSignal: abort.signal,
     }).finally(() => aborters.delete(body.runId!));
 

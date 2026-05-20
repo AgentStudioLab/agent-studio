@@ -30,6 +30,7 @@ export async function runWorker(input: RunWorkerInput): Promise<void> {
     messages,
     threads,
     provider,
+    interruptBus,
     abortSignal,
   } = input;
 
@@ -80,7 +81,7 @@ export async function runWorker(input: RunWorkerInput): Promise<void> {
         // Reject any still-pending HITL approvals for this run so the SDK
         // unblocks (canUseTool resolves as deny → SDK aborts the tool +
         // emits its own terminal). Safe to call when no deferreds exist.
-        input.interruptBus.cancelAll(runId);
+        interruptBus.cancelAll(runId);
         messages.cancelPendingToolCallsForThread(threadId);
         if (status === "cancelled") {
           messages.appendSystemNote(threadId, "已被用户中止");
@@ -90,7 +91,7 @@ export async function runWorker(input: RunWorkerInput): Promise<void> {
       },
     });
   } catch (err) {
-    input.interruptBus.cancelAll(runId);
+    interruptBus.cancelAll(runId);
     const msg = err instanceof Error ? err.message : String(err);
     await store.appendEvent(runId, {
       type: EventType.RUN_ERROR,
