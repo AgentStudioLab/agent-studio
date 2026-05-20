@@ -151,7 +151,10 @@ export function buildRunRoutes(deps: MountRunsDeps): Hono {
     const ok = deps.interruptBus.resolve(runId, first.interruptId, result);
     if (!ok) return c.json({ error: "interrupt_not_pending" }, 409);
 
-    return c.json({ ok: true });
+    // 202 matches POST /runs — frontend `api.ts:73` checks `!== 202`. The
+    // decision has been delivered to the deferred; the SDK continuation
+    // happens asynchronously after `canUseTool` resolves.
+    return c.json({ ok: true }, 202);
   });
 
   return app;
