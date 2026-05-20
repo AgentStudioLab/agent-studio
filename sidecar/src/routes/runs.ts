@@ -4,12 +4,14 @@ import { runWorker } from "../agent/runWorker";
 import type { RunEventStore, AgentProvider } from "../agui/core";
 import type { ThreadService } from "../services/threads";
 import type { MessageService } from "../services/messages";
+import type { InterruptBus } from "../agui/provider-claude/interrupt-bus";
 
 export interface MountRunsDeps {
   threads: ThreadService;
   messages: MessageService;
   provider: AgentProvider;
   store: RunEventStore;
+  interruptBus: InterruptBus;
 }
 
 /**
@@ -111,6 +113,44 @@ export function buildRunRoutes(deps: MountRunsDeps): Hono {
       return c.json({ ok: true });
     }
     return c.json({ ok: false, reason: "not_running" }, 409);
+  });
+
+  app.post("/runs/:runId/resume", async (c) => {
+    const runId = c.req.param("runId");
+    const body = (await c.req.json().catch(() => null)) as
+      | {
+          resumes?: Array<{
+            interruptId?: string;
+            payload?: {
+              decisions?: Array<
+                | { type?: "allow" }
+                | { type?: "deny"; message?: string }
+              >;
+            };
+          }>;
+        }
+      | null;
+
+    const first = body?.resumes?.[0];
+    if (!first?.interruptId || !first.payload) {
+      return c.json({ error: "invalid_body" }, 400);
+    }
+
+    const decision = first.payload.decisions?.[0];
+    if (!decision) return c.json({ error: "missing_decision" }, 400);
+
+    const result =
+      decision.type === "deny"
+        ? {
+            behavior: "deny" as const,
+            message: decision.message ?? "User declined",
+          }
+        : { behavior: "allow" as const };
+
+    const ok = deps.interruptBus.resolve(runId, first.interruptId, result);
+    if (!ok) return c.json({ error: "interrupt_not_pending" }, 409);
+
+    return c.json({ ok: true });
   });
 
   return app;
