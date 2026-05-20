@@ -38,6 +38,8 @@ export function TaskView() {
     cancel,
     attachToRun,
     setHistoricalMessages,
+    pendingInterrupts,
+    resumeRun,
   } = useChat({ threadId: activeTaskId ?? "" });
 
   // Prime runtime once history actually arrives. Skipping `undefined` keeps
@@ -105,6 +107,8 @@ export function TaskView() {
               isRunning={isRunning}
               error={error}
               loading={messagesQuery.isLoading}
+              pendingInterrupts={pendingInterrupts}
+              onResume={resumeRun}
             />
           </div>
           <div className="shrink-0 px-8 pb-6 pt-2">
