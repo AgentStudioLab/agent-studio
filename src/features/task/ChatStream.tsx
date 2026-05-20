@@ -1,7 +1,14 @@
 import { isValidElement, type ReactNode } from "react";
 import { Streamdown } from "streamdown";
 import type { BundledLanguage } from "shiki";
-import type { MessageBlock, MessageView } from "@/lib/agui/runtime";
+import type { MessageBlock, MessageView, PendingInterrupt } from "@/lib/agui/runtime";
+import {
+  Confirmation,
+  ConfirmationActions,
+  ConfirmationAction,
+  ConfirmationRequest,
+  ConfirmationTitle,
+} from "@/components/ai-elements/confirmation";
 import { UserMessage } from "@/features/task/UserMessage";
 import { MessageActions } from "@/features/task/MessageActions";
 import {
@@ -30,6 +37,13 @@ interface ChatStreamProps {
   isRunning: boolean;
   error: string | null;
   loading?: boolean;
+  pendingInterrupts: PendingInterrupt[];
+  onResume: (payload: {
+    decisions: Array<
+      | { type: "allow" }
+      | { type: "deny"; message?: string }
+    >;
+  }) => Promise<void>;
 }
 
 /**
@@ -97,6 +111,8 @@ export function ChatStream({
   isRunning,
   error,
   loading = false,
+  pendingInterrupts,
+  onResume,
 }: ChatStreamProps) {
   if (loading) {
     return (
@@ -142,6 +158,68 @@ export function ChatStream({
               错误：{error}
             </p>
           )}
+          {pendingInterrupts.map((it) => {
+            const payload = it.payload as {
+              toolName?: string;
+              input?: Record<string, unknown>;
+              title?: string;
+              description?: string;
+            };
+            const toolName = payload.toolName ?? "tool";
+            const title = payload.title ?? `Claude wants to run ${toolName}`;
+            const inputPreview = (() => {
+              try {
+                return JSON.stringify(payload.input ?? {}, null, 2);
+              } catch {
+                return String(payload.input);
+              }
+            })();
+            return (
+              <Confirmation
+                key={it.id}
+                approval={{ id: it.id }}
+                state="approval-requested"
+              >
+                <ConfirmationTitle>{title}</ConfirmationTitle>
+                {payload.description && (
+                  <p className="text-[12.5px]" style={{ color: "hsl(var(--text-300))" }}>
+                    {payload.description}
+                  </p>
+                )}
+                <CodeBlock code={inputPreview} language="json" className="my-0">
+                  <CodeBlockHeader>
+                    <CodeBlockTitle>
+                      <CodeBlockFilename>input</CodeBlockFilename>
+                    </CodeBlockTitle>
+                    <CodeBlockActions>
+                      <CodeBlockCopyButton />
+                    </CodeBlockActions>
+                  </CodeBlockHeader>
+                </CodeBlock>
+                <ConfirmationRequest>
+                  <ConfirmationActions>
+                    <ConfirmationAction
+                      variant="outline"
+                      onClick={() =>
+                        void onResume({
+                          decisions: [{ type: "deny", message: "User declined" }],
+                        })
+                      }
+                    >
+                      拒绝
+                    </ConfirmationAction>
+                    <ConfirmationAction
+                      onClick={() =>
+                        void onResume({ decisions: [{ type: "allow" }] })
+                      }
+                    >
+                      允许
+                    </ConfirmationAction>
+                  </ConfirmationActions>
+                </ConfirmationRequest>
+              </Confirmation>
+            );
+          })}
         </div>
       </ConversationContent>
       <ConversationScrollButton />
