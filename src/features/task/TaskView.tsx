@@ -68,6 +68,16 @@ export function TaskView() {
     attachToRun(activeRun.runId);
   }, [activeTaskId, activeRun, attachToRun]);
 
+  // Clear on thread switch. useChat destroys + recreates the runtime per
+  // threadId, but this ref lives on TaskView and survives — without a reset,
+  // returning to a thread whose runId was previously attached gets blocked
+  // by the guard, the fresh runtime never starts SSE, and HITL cards don't
+  // re-render (server-side awaiting_approval state is correct, but frontend
+  // pendingInterrupts stays empty).
+  useEffect(() => {
+    attachedRunFired.current = null;
+  }, [activeTaskId]);
+
   // First-turn handoff from NewTaskView. Defers when an active run is already
   // in flight for this thread (covers the concurrent submit+refresh race).
   const firstPromptFired = useRef<string | null>(null);
