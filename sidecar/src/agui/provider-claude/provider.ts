@@ -11,6 +11,7 @@
 
 import { query as sdkQuery } from "@anthropic-ai/claude-agent-sdk";
 import { claudeSdkToAgui } from "./bridge";
+import { checkWorkspaceSandbox } from "./sandbox";
 import type {
   AgentProvider,
   RunContext,
@@ -71,25 +72,36 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
     const resumeSessionId = sessionByThread.get(ctx.threadId);
 
     const bus = opts.interruptBus;
-    const canUseTool = bus
-      ? async (
-          toolName: string,
-          input: Record<string, unknown>,
-          sdkOpts: {
-            toolUseID: string;
-            title?: string;
-            description?: string;
-          },
-        ) => bus.requestApproval({
-          runId: ctx.runId,
-          threadId: ctx.threadId,
-          toolUseID: sdkOpts.toolUseID,
-          toolName,
-          input,
-          title: sdkOpts.title,
-          description: sdkOpts.description,
-        })
-      : undefined;
+    // canUseTool runs for every tool call. Two gates layered:
+    //   1. Workspace sandbox (sync, policy) — paths outside ctx.cwd are
+    //      auto-denied so the user isn't asked to approve filesystem reads
+    //      outside the directory they explicitly bound to this conversation.
+    //   2. HITL bus (async, user decision) — anything that passes the
+    //      sandbox surfaces an approval card.
+    const canUseTool = async (
+      toolName: string,
+      input: Record<string, unknown>,
+      sdkOpts: {
+        toolUseID: string;
+        title?: string;
+        description?: string;
+      },
+    ) => {
+      const sandboxDeny = checkWorkspaceSandbox(toolName, input, ctx.cwd);
+      if (sandboxDeny) {
+        return { behavior: "deny" as const, message: sandboxDeny };
+      }
+      if (!bus) return { behavior: "allow" as const };
+      return bus.requestApproval({
+        runId: ctx.runId,
+        threadId: ctx.threadId,
+        toolUseID: sdkOpts.toolUseID,
+        toolName,
+        input,
+        title: sdkOpts.title,
+        description: sdkOpts.description,
+      });
+    };
 
     const sdkStream = sdkQuery({
       prompt,
@@ -110,7 +122,9 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
         // The SDK's options.signal abort path is covered downstream by
         // runWorker calling bus.cancelAll(runId) on terminal — see Task 4
         // of docs/superpowers/plans/2026-05-20-hitl-tool-approval.md.
-        ...(canUseTool ? { canUseTool: canUseTool as never } : {}),
+        // Always installed now: even when there's no HITL bus, the sandbox
+        // layer inside canUseTool needs to gate file paths.
+        canUseTool: canUseTool as never,
         ...(resumeSessionId ? { resume: resumeSessionId } : {}),
       },
     });
