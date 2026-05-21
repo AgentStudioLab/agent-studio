@@ -1,4 +1,4 @@
-import { isValidElement, type ReactNode } from "react";
+import { isValidElement, useCallback, useMemo, type ReactNode } from "react";
 import { Streamdown } from "streamdown";
 import type { BundledLanguage } from "shiki";
 import type { MessageBlock, MessageView, PendingInterrupt } from "@/lib/agui/runtime";
@@ -112,6 +112,40 @@ export function ChatStream({
   allowedTools,
   onAllowAlways,
 }: ChatStreamProps) {
+  const interruptsByToolId = useMemo(() => {
+    const m = new Map<string, PendingInterrupt>();
+    for (const it of pendingInterrupts) {
+      const tn = (it.payload as { toolName?: string }).toolName;
+      if (tn && allowedTools.has(tn)) continue;
+      m.set(it.id, it);
+    }
+    return m;
+  }, [pendingInterrupts, allowedTools]);
+
+  const renderApprovalCard = useCallback(
+    (it: PendingInterrupt) => (
+      <ToolApprovalCard
+        key={it.id}
+        interrupt={it}
+        onAllow={() => void onResume({ decisions: [{ type: "allow" }] })}
+        onDeny={() => void onResume({ decisions: [{ type: "deny", message: "User declined" }] })}
+        onAllowAlways={onAllowAlways}
+      />
+    ),
+    [onResume, onAllowAlways],
+  );
+
+  const orphanInterrupts = useMemo(() => {
+    const matchedIds = new Set<string>();
+    for (const m of messages) {
+      if (m.role !== "assistant") continue;
+      for (const b of m.blocks) {
+        if (b.kind === "tool_call") matchedIds.add(b.toolCall.id);
+      }
+    }
+    return [...interruptsByToolId.values()].filter((it) => !matchedIds.has(it.id));
+  }, [messages, interruptsByToolId]);
+
   if (loading) {
     return (
       <div className="flex-1 px-8 py-6 text-sm text-muted-foreground">
@@ -139,7 +173,13 @@ export function ChatStream({
               m.role === "assistant" &&
               idx === messages.length - 1;
             return (
-              <MessageRow key={m.id} message={m} showActions={!isLive} />
+              <MessageRow
+                key={m.id}
+                message={m}
+                showActions={!isLive}
+                interruptsByToolId={interruptsByToolId}
+                renderApprovalCard={renderApprovalCard}
+              />
             );
           })}
           {isRunning && isThinking && (
@@ -156,20 +196,7 @@ export function ChatStream({
               错误：{error}
             </p>
           )}
-          {pendingInterrupts
-            .filter((it) => {
-              const tn = (it.payload as { toolName?: string }).toolName;
-              return !tn || !allowedTools.has(tn);
-            })
-            .map((it) => (
-              <ToolApprovalCard
-                key={it.id}
-                interrupt={it}
-                onAllow={() => void onResume({ decisions: [{ type: "allow" }] })}
-                onDeny={() => void onResume({ decisions: [{ type: "deny", message: "User declined" }] })}
-                onAllowAlways={onAllowAlways}
-              />
-            ))}
+          {orphanInterrupts.map(renderApprovalCard)}
         </div>
       </ConversationContent>
       <ConversationScrollButton />
@@ -226,9 +253,13 @@ function groupBlocks(blocks: MessageBlock[]): GroupedBlock[] {
 function MessageRow({
   message,
   showActions,
+  interruptsByToolId,
+  renderApprovalCard,
 }: {
   message: MessageView;
   showActions: boolean;
+  interruptsByToolId: Map<string, PendingInterrupt>;
+  renderApprovalCard: (it: PendingInterrupt) => ReactNode;
 }) {
   if (message.role === "user") {
     return <UserMessage>{message.content}</UserMessage>;
@@ -240,7 +271,15 @@ function MessageRow({
     <div className="space-y-3">
       {grouped.map((b, i) => {
         if (b.kind === "process_group") {
-          return <ProcessGroup key={b.key} steps={b.steps} done={b.done} />;
+          const matchingInterrupt = b.steps
+            .map((s) => (s.kind === "tool_call" ? interruptsByToolId.get(s.tool.id) : undefined))
+            .find((x): x is PendingInterrupt => Boolean(x));
+          return (
+            <div key={b.key} className="space-y-3">
+              <ProcessGroup steps={b.steps} done={b.done} />
+              {matchingInterrupt && renderApprovalCard(matchingInterrupt)}
+            </div>
+          );
         }
         if (b.kind === "text") {
           return (
