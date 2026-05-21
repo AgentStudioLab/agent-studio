@@ -118,10 +118,15 @@ export function SidebarContent() {
     for (const t of threadStatuses) m.set(t.threadId, t.status);
     return m;
   }, [threadStatuses]);
-  const recents = useMemo(
-    () => recentsData.map((c) => toRecentItem(c, statusByThread)),
-    [recentsData, statusByThread],
-  );
+  // Hide already-pinned conversations from Recents so a single thread doesn't
+  // appear in both sections. /conversations (recents) returns all threads by
+  // updated_at; only the client knows the union state at render time.
+  const recents = useMemo(() => {
+    const pinnedIds = new Set(pinnedData.map((c) => c.id));
+    return recentsData
+      .filter((c) => !pinnedIds.has(c.id))
+      .map((c) => toRecentItem(c, statusByThread));
+  }, [recentsData, pinnedData, statusByThread]);
   const pinned = useMemo(
     () => pinnedData.map((c) => toPinnedItem(c, statusByThread)),
     [pinnedData, statusByThread],
