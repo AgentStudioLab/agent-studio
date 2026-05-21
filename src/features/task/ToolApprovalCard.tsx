@@ -16,7 +16,12 @@ import {
 import type { BundledLanguage } from "shiki";
 import type { PendingInterrupt } from "@/lib/agui/runtime";
 import { Terminal, FileText, Search, Globe, Folder, Wrench } from "lucide-react";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+
+// Long Write/Edit payloads (e.g. writing a 250-line doc) would otherwise
+// either flood the card or get hard-truncated with "+N chars". Show the
+// first PREVIEW_LINES, then offer an inline expand.
+const PREVIEW_LINES = 20;
 
 interface ApprovalPayload {
   toolName?: string;
@@ -95,13 +100,42 @@ function renderTool(name: string, input: Record<string, unknown>, override?: str
 }
 
 function ToolCodeBlock({ code, lang, filename }: { code: string; lang: BundledLanguage | "text"; filename: string }) {
-  return (
-    <CodeBlock code={code} language={lang as BundledLanguage} className="my-0">
+  const lines = code.split("\n");
+  const needsCollapse = lines.length > PREVIEW_LINES;
+  const [expanded, setExpanded] = useState(false);
+
+  const display = !needsCollapse || expanded
+    ? code
+    : lines.slice(0, PREVIEW_LINES).join("\n");
+  const hidden = needsCollapse ? lines.length - PREVIEW_LINES : 0;
+
+  const block = (
+    <CodeBlock code={display} language={lang as BundledLanguage} className="my-0">
       <CodeBlockHeader>
         <CodeBlockTitle><CodeBlockFilename>{filename}</CodeBlockFilename></CodeBlockTitle>
         <CodeBlockActions><CodeBlockCopyButton /></CodeBlockActions>
       </CodeBlockHeader>
     </CodeBlock>
+  );
+
+  return (
+    <div>
+      {expanded ? (
+        <div className="max-h-[60vh] overflow-y-auto rounded-md">{block}</div>
+      ) : (
+        block
+      )}
+      {needsCollapse && (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="mt-1.5 text-[12px] hover:underline"
+          style={{ color: "hsl(var(--text-300))" }}
+        >
+          {expanded ? "收起" : `展开（剩余 ${hidden} 行）`}
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -134,7 +168,11 @@ function renderEdit(input: Record<string, unknown>, title?: string): ToolRender 
   const oldStr = String(input.old_string ?? "");
   const newStr = String(input.new_string ?? "");
   const replaceAll = input.replace_all === true;
-  const preview = `- ${truncate(oldStr, 240)}\n+ ${truncate(newStr, 240)}`;
+  // Multi-line diff: every old line prefixed with `-`, every new with `+`.
+  // ToolCodeBlock handles the collapse if the combined view is long.
+  const oldLines = oldStr.split("\n").map((l) => "- " + l);
+  const newLines = newStr.split("\n").map((l) => "+ " + l);
+  const preview = [...oldLines, ...newLines].join("\n");
   return {
     icon: <FileText size={14} />,
     title: title ?? `编辑 ${filePath}${replaceAll ? "（全部匹配）" : ""}`,
@@ -149,12 +187,8 @@ function renderWrite(input: Record<string, unknown>, title?: string): ToolRender
   return {
     icon: <FileText size={14} />,
     title: title ?? `写入 ${filePath}（${lines} 行）`,
-    body: <ToolCodeBlock code={truncate(content, 600)} lang="text" filename={filePath} />,
+    body: <ToolCodeBlock code={content} lang="text" filename={filePath} />,
   };
-}
-
-function truncate(s: string, n: number): string {
-  return s.length <= n ? s : s.slice(0, n) + `\n…(+${s.length - n} chars)`;
 }
 
 function renderGlob(input: Record<string, unknown>, title?: string): ToolRender {
