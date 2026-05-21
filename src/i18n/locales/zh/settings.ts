@@ -37,7 +37,7 @@ export const settings = {
     },
     apiKey: {
       title: "Anthropic API Key",
-      description: "用于调用 Claude 模型。键值保存在本机 plugin-store 中（明文）。",
+      description: "用于让 Agent Studio 调用模型。键值保存在本机 plugin-store 中（明文）。",
       placeholder: "sk-ant-...",
       save: "保存",
       saved: "已保存",

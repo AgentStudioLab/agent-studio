@@ -40,7 +40,7 @@ export const settings: typeof Zh = {
     },
     apiKey: {
       title: "Anthropic API Key",
-      description: "Required to call Claude. Stored locally in plugin-store (plaintext).",
+      description: "Required for Agent Studio to call the model. Stored locally in plugin-store (plaintext).",
       placeholder: "sk-ant-...",
       save: "Save",
       saved: "Saved",
