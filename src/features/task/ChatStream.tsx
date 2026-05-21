@@ -166,7 +166,7 @@ export function ChatStream({
       className="flex-1"
     >
       <ConversationContent className="gap-0 p-0">
-        <div className="mx-auto max-w-[760px] space-y-6 px-8 py-6">
+        <div className="mx-auto w-full max-w-[760px] space-y-6 px-8 py-6">
           {messages.map((m, idx) => {
             const isLive =
               isRunning &&

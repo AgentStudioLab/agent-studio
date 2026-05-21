@@ -138,7 +138,7 @@ export function TaskView() {
             />
           </div>
           <div className="shrink-0 px-8 pb-6 pt-2">
-            <div className="mx-auto max-w-[760px]">
+            <div className="mx-auto w-full max-w-[760px]">
               <TaskMessageInput
                 onSend={(text) => void send(text)}
                 onStop={() => void cancel()}
