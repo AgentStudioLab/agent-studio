@@ -12,6 +12,10 @@ export const newTask: typeof Zh = {
       ask: "Ask",
       legacyModel: "Legacy Model",
     },
+    workInProject: {
+      chooseFolder: "Choose a different folder",
+      pickerTitle: "Choose working directory for this conversation",
+    },
     error: {
       apiKeyMissing: "API key not configured. Add it in Settings.",
       generic: "Submit failed: {{msg}}",

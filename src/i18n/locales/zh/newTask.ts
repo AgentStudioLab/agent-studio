@@ -10,6 +10,10 @@ export const newTask = {
       ask: "提问",
       legacyModel: "Legacy 模型",
     },
+    workInProject: {
+      chooseFolder: "选择其他目录",
+      pickerTitle: "选择该会话的工作目录",
+    },
     error: {
       apiKeyMissing: "未配置 API key。前往 设置 添加。",
       generic: "提交失败：{{msg}}",

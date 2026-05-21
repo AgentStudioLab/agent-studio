@@ -32,6 +32,8 @@ export interface RunContext {
   userMessage: { role: "user"; content: string };
   abortSignal: AbortSignal;
   callbacks?: ProviderCallbacks;
+  /** Working directory passed to the SDK as `options.cwd`. */
+  cwd: string;
 }
 
 export interface ResumeContext {
@@ -40,6 +42,7 @@ export interface ResumeContext {
   resumePayload: unknown;
   abortSignal: AbortSignal;
   callbacks?: ProviderCallbacks;
+  cwd: string;
 }
 
 /**

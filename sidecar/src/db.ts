@@ -10,9 +10,14 @@ CREATE TABLE IF NOT EXISTS conversations (
   title         TEXT NOT NULL DEFAULT 'New chat',
   project_id    TEXT,
   pinned        INTEGER NOT NULL DEFAULT 0,
+  working_dir   TEXT,
   created_at    INTEGER NOT NULL,
   updated_at    INTEGER NOT NULL
 );
+-- Idempotent column add for DBs created before working_dir was introduced.
+-- SQLite 3.35+ supports IF NOT EXISTS on ADD COLUMN; bun bundles a new
+-- enough sqlite so this is safe.
+ALTER TABLE conversations ADD COLUMN IF NOT EXISTS working_dir TEXT;
 CREATE INDEX IF NOT EXISTS idx_conv_updated ON conversations (updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_conv_pinned  ON conversations (pinned, updated_at DESC);
 

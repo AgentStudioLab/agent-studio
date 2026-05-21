@@ -14,6 +14,19 @@ async function expectJson<T>(res: Response): Promise<T> {
 export interface CreateConversationArgs {
   title?: string;
   projectId?: string | null;
+  workingDir?: string | null;
+}
+
+export async function updateWorkingDir(
+  id: string,
+  workingDir: string | null,
+): Promise<Conversation> {
+  const res = await authedFetch(`/conversations/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ workingDir }),
+  });
+  return expectJson<Conversation>(res);
 }
 
 export async function createConversation(

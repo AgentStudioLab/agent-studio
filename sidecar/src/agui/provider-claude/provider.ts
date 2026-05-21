@@ -95,6 +95,7 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
       prompt,
       options: {
         abortController: ac,
+        cwd: ctx.cwd,
         env: buildEnv() as never,
         allowedTools: opts.allowedTools ?? [],
         // Emit fine-grained SDKPartialAssistantMessage (stream_event) frames so

@@ -99,6 +99,15 @@ export async function runWorker(input: RunWorkerInput): Promise<void> {
     },
   };
 
+  // Resolve the thread's persisted working directory once at run start.
+  // ThreadService.get falls back to ~/.agent-studio when working_dir is NULL,
+  // so cwd is always a real path the SDK can chdir to.
+  const thread = threads.get(threadId);
+  if (!thread) {
+    throw new Error(`thread ${threadId} not found`);
+  }
+  const cwd = thread.workingDir;
+
   try {
     const initialStream = provider.run({
       runId,
@@ -106,6 +115,7 @@ export async function runWorker(input: RunWorkerInput): Promise<void> {
       userMessage,
       abortSignal,
       callbacks,
+      cwd,
     });
 
     await executeRunLoop({

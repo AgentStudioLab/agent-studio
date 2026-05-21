@@ -1,4 +1,7 @@
 import type { Database } from "bun:sqlite";
+import { mkdirSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { nanoid } from "nanoid";
 
 export interface Thread {
@@ -6,6 +9,7 @@ export interface Thread {
   title: string;
   projectId: string | null;
   pinned: boolean;
+  workingDir: string;
   createdAt: number;
   updatedAt: number;
 }
@@ -15,8 +19,24 @@ interface ThreadRow {
   title: string;
   project_id: string | null;
   pinned: number;
+  working_dir: string | null;
   created_at: number;
   updated_at: number;
+}
+
+/**
+ * Per-conversation working directory. Falls back to ~/.agent-studio so the
+ * SDK has a real cwd even for threads the user never picked one for. The
+ * dir is created on first use so the SDK doesn't ENOENT on its first tool.
+ */
+const DEFAULT_WORKING_DIR = join(homedir(), ".agent-studio");
+let defaultDirEnsured = false;
+function ensureDefaultDir(): string {
+  if (!defaultDirEnsured) {
+    mkdirSync(DEFAULT_WORKING_DIR, { recursive: true });
+    defaultDirEnsured = true;
+  }
+  return DEFAULT_WORKING_DIR;
 }
 
 function rowToThread(r: ThreadRow): Thread {
@@ -25,6 +45,7 @@ function rowToThread(r: ThreadRow): Thread {
     title: r.title,
     projectId: r.project_id,
     pinned: r.pinned === 1,
+    workingDir: r.working_dir ?? ensureDefaultDir(),
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -33,15 +54,27 @@ function rowToThread(r: ThreadRow): Thread {
 export class ThreadService {
   constructor(private db: Database) {}
 
-  create(input?: { id?: string; title?: string; projectId?: string | null }): Thread {
+  create(input?: {
+    id?: string;
+    title?: string;
+    projectId?: string | null;
+    workingDir?: string | null;
+  }): Thread {
     const id = input?.id ?? `thr_${nanoid(12)}`;
     const now = Date.now();
     this.db
       .prepare(
-        `INSERT INTO conversations (id, title, project_id, pinned, created_at, updated_at)
-         VALUES (?, ?, ?, 0, ?, ?)`,
+        `INSERT INTO conversations (id, title, project_id, pinned, working_dir, created_at, updated_at)
+         VALUES (?, ?, ?, 0, ?, ?, ?)`,
       )
-      .run(id, input?.title ?? "New chat", input?.projectId ?? null, now, now);
+      .run(
+        id,
+        input?.title ?? "New chat",
+        input?.projectId ?? null,
+        input?.workingDir ?? null,
+        now,
+        now,
+      );
     return this.get(id)!;
   }
 
@@ -82,6 +115,13 @@ export class ThreadService {
     this.db
       .prepare("UPDATE conversations SET pinned = ?, updated_at = ? WHERE id = ?")
       .run(pinned ? 1 : 0, Date.now(), id);
+    return this.get(id)!;
+  }
+
+  updateWorkingDir(id: string, workingDir: string | null): Thread {
+    this.db
+      .prepare("UPDATE conversations SET working_dir = ?, updated_at = ? WHERE id = ?")
+      .run(workingDir, Date.now(), id);
     return this.get(id)!;
   }
 

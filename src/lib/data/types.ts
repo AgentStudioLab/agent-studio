@@ -8,6 +8,10 @@ export interface Conversation {
   title: string;
   projectId: string | null;
   pinned: boolean;
+  /** Resolved working directory used as cwd by the SDK. Server falls back to
+   *  `~/.agent-studio` when the user hasn't picked one, so this is always
+   *  a real path. */
+  workingDir: string;
   createdAt: number;
   updatedAt: number;
 }

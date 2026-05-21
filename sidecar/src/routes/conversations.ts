@@ -13,12 +13,18 @@ export function buildConversationRoutes(deps: MountConversationsDeps): Hono {
 
   app.post("/conversations", async (c) => {
     const body = (await c.req.json().catch(() => null)) as
-      | { id?: string; title?: string; projectId?: string | null }
+      | {
+          id?: string;
+          title?: string;
+          projectId?: string | null;
+          workingDir?: string | null;
+        }
       | null;
     const t = threads.create({
       id: body?.id,
       title: body?.title,
       projectId: body?.projectId ?? null,
+      workingDir: body?.workingDir ?? null,
     });
     return c.json(t, 201);
   });
@@ -47,7 +53,7 @@ export function buildConversationRoutes(deps: MountConversationsDeps): Hono {
     if (!threads.get(id)) return c.json({ error: "not_found" }, 404);
 
     const body = (await c.req.json().catch(() => null)) as
-      | { title?: string; pinned?: boolean }
+      | { title?: string; pinned?: boolean; workingDir?: string | null }
       | null;
     if (body?.title !== undefined) {
       if (typeof body.title !== "string" || body.title.length === 0) {
@@ -57,6 +63,17 @@ export function buildConversationRoutes(deps: MountConversationsDeps): Hono {
     }
     if (body?.pinned !== undefined) {
       threads.updatePin(id, body.pinned);
+    }
+    if (body?.workingDir !== undefined) {
+      // Pass null through to clear (fall back to default); empty string is
+      // rejected to avoid SDK ENOENT on cwd="".
+      if (body.workingDir !== null && typeof body.workingDir !== "string") {
+        return c.json({ error: "invalid_working_dir" }, 400);
+      }
+      if (typeof body.workingDir === "string" && body.workingDir.length === 0) {
+        return c.json({ error: "invalid_working_dir" }, 400);
+      }
+      threads.updateWorkingDir(id, body.workingDir);
     }
     return c.json(threads.get(id));
   });
