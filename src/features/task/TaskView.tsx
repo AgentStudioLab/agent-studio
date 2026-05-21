@@ -40,6 +40,8 @@ export function TaskView() {
     setHistoricalMessages,
     pendingInterrupts,
     resumeRun,
+    allowedTools,
+    addAllowedTool,
   } = useChat({ threadId: activeTaskId ?? "" });
 
   // Prime runtime once history actually arrives. Skipping `undefined` keeps
@@ -86,6 +88,21 @@ export function TaskView() {
     activeRun,
   ]);
 
+  // Auto-allow interrupts whose toolName is on the allowlist. We track which
+  // interrupt IDs we've already fired for to avoid double-resume during the
+  // microtask window before the next render clears the interrupt.
+  const autoAllowFired = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    for (const it of pendingInterrupts) {
+      if (autoAllowFired.current.has(it.id)) continue;
+      const toolName = (it.payload as { toolName?: string }).toolName;
+      if (toolName && allowedTools.has(toolName)) {
+        autoAllowFired.current.add(it.id);
+        void resumeRun({ decisions: [{ type: "allow" }] });
+      }
+    }
+  }, [pendingInterrupts, allowedTools, resumeRun]);
+
   if (!activeTaskId) return null;
   const previewOpen = preview.open && preview.file;
 
@@ -109,6 +126,8 @@ export function TaskView() {
               loading={messagesQuery.isLoading}
               pendingInterrupts={pendingInterrupts}
               onResume={resumeRun}
+              allowedTools={allowedTools}
+              onAllowAlways={addAllowedTool}
             />
           </div>
           <div className="shrink-0 px-8 pb-6 pt-2">

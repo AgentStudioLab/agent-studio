@@ -38,6 +38,8 @@ interface ChatStreamProps {
       | { type: "deny"; message?: string }
     >;
   }) => Promise<void>;
+  allowedTools: ReadonlySet<string>;
+  onAllowAlways: (toolName: string) => void;
 }
 
 /**
@@ -107,6 +109,8 @@ export function ChatStream({
   loading = false,
   pendingInterrupts,
   onResume,
+  allowedTools,
+  onAllowAlways,
 }: ChatStreamProps) {
   if (loading) {
     return (
@@ -152,14 +156,20 @@ export function ChatStream({
               错误：{error}
             </p>
           )}
-          {pendingInterrupts.map((it) => (
-            <ToolApprovalCard
-              key={it.id}
-              interrupt={it}
-              onAllow={() => void onResume({ decisions: [{ type: "allow" }] })}
-              onDeny={() => void onResume({ decisions: [{ type: "deny", message: "User declined" }] })}
-            />
-          ))}
+          {pendingInterrupts
+            .filter((it) => {
+              const tn = (it.payload as { toolName?: string }).toolName;
+              return !tn || !allowedTools.has(tn);
+            })
+            .map((it) => (
+              <ToolApprovalCard
+                key={it.id}
+                interrupt={it}
+                onAllow={() => void onResume({ decisions: [{ type: "allow" }] })}
+                onDeny={() => void onResume({ decisions: [{ type: "deny", message: "User declined" }] })}
+                onAllowAlways={onAllowAlways}
+              />
+            ))}
         </div>
       </ConversationContent>
       <ConversationScrollButton />

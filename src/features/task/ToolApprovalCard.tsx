@@ -29,9 +29,10 @@ export interface ToolApprovalCardProps {
   interrupt: PendingInterrupt;
   onAllow: () => void;
   onDeny: () => void;
+  onAllowAlways?: (toolName: string) => void;
 }
 
-export function ToolApprovalCard({ interrupt, onAllow, onDeny }: ToolApprovalCardProps) {
+export function ToolApprovalCard({ interrupt, onAllow, onDeny, onAllowAlways }: ToolApprovalCardProps) {
   const payload = interrupt.payload as ApprovalPayload;
   const toolName = payload.toolName ?? "tool";
   const input = (payload.input ?? {}) as Record<string, unknown>;
@@ -55,6 +56,17 @@ export function ToolApprovalCard({ interrupt, onAllow, onDeny }: ToolApprovalCar
       <ConfirmationRequest>
         <ConfirmationActions>
           <ConfirmationAction variant="outline" onClick={onDeny}>拒绝</ConfirmationAction>
+          {onAllowAlways && payload.toolName && (
+            <ConfirmationAction
+              variant="outline"
+              onClick={() => {
+                onAllowAlways(payload.toolName!);
+                onAllow();
+              }}
+            >
+              始终允许 {payload.toolName}
+            </ConfirmationAction>
+          )}
           <ConfirmationAction onClick={onAllow}>允许</ConfirmationAction>
         </ConfirmationActions>
       </ConfirmationRequest>

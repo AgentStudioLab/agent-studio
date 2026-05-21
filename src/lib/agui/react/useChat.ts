@@ -2,7 +2,7 @@
 // useSyncExternalStore + memoised commands. The framework adapter is the only
 // React-specific surface; all protocol logic lives in ../runtime/.
 
-import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   createChatRuntime,
@@ -77,6 +77,22 @@ export function useChat(opts: UseChatOptions) {
     };
   }, [runtime]);
 
+  const [allowedTools, setAllowedTools] = useState<ReadonlySet<string>>(() => new Set());
+  const addAllowedTool = useCallback((name: string) => {
+    setAllowedTools((prev) => {
+      if (prev.has(name)) return prev;
+      const next = new Set(prev);
+      next.add(name);
+      return next;
+    });
+  }, []);
+
+  // Reset on threadId change — allowlist is per-thread for now (Task P7 will
+  // promote to cross-session). Mirrors the runtime-recreate pattern above.
+  useEffect(() => {
+    setAllowedTools(new Set());
+  }, [opts.threadId]);
+
   const state = useSyncExternalStore<ChatState>(
     useCallback((listener) => runtime.subscribe(listener), [runtime]),
     useCallback(() => runtime.getState(), [runtime]),
@@ -141,6 +157,8 @@ export function useChat(opts: UseChatOptions) {
     attachToRun,
     restoreAwaiting,
     setHistoricalMessages,
+    allowedTools,
+    addAllowedTool,
   };
 }
 
