@@ -103,6 +103,13 @@ export function TaskView() {
     }
   }, [pendingInterrupts, allowedTools, resumeRun]);
 
+  // Clear the dedup set when switching threads so an interrupt ID reused across
+  // threads (e.g., per-run counters) can still auto-allow. Mirrors the
+  // allowedTools reset in useChat.
+  useEffect(() => {
+    autoAllowFired.current.clear();
+  }, [activeTaskId]);
+
   if (!activeTaskId) return null;
   const previewOpen = preview.open && preview.file;
 
