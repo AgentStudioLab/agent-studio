@@ -46,6 +46,14 @@ export const settings: typeof Zh = {
       saved: "Saved",
       saveError: "Save failed",
     },
+    hitl: {
+      title: "Always-allowed tools",
+      description:
+        "Tools you've marked “always allow” skip the approval card. Remove anytime.",
+      empty:
+        "Nothing yet. When Agent Studio requests approval, click “Always allow X” to add it here.",
+      remove: "Remove",
+    },
     back: "Back",
   },
 };

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useAppShell } from "@/app/AppShellContext";
 import { ProfileForm } from "@/features/settings/ProfileForm";
@@ -7,6 +7,7 @@ import { ThemeSegment } from "@/shared/atoms/ThemeSegment";
 import { LanguageSegment } from "@/shared/atoms/LanguageSegment";
 import { cn } from "@/lib/utils";
 import { setApiKey } from "@/lib/data/settings";
+import { useAllowedTools } from "@/lib/agui/react/useAllowedTools";
 
 export function SettingsView() {
   const { setView } = useAppShell();
@@ -15,6 +16,7 @@ export function SettingsView() {
   const [apiKeyInput, setApiKeyInput] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<"saved" | "error" | null>(null);
+  const { allowedTools, removeAllowedTool } = useAllowedTools();
 
   const handleSaveApiKey = async () => {
     setSaving(true);
@@ -97,6 +99,44 @@ export function SettingsView() {
                 <p className="text-sm" style={{ color: "hsl(var(--danger-100))" }}>
                   {t("settings.apiKey.saveError")}
                 </p>
+              )}
+            </section>
+            <section className="border-t border-border pt-8 space-y-3">
+              <div>
+                <h2 className="text-[18px] font-semibold text-foreground">
+                  {t("settings.hitl.title")}
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  {t("settings.hitl.description")}
+                </p>
+              </div>
+              {allowedTools.size === 0 ? (
+                <p
+                  className="text-sm"
+                  style={{ color: "hsl(var(--text-300))" }}
+                >
+                  {t("settings.hitl.empty")}
+                </p>
+              ) : (
+                <ul className="flex flex-wrap gap-2">
+                  {[...allowedTools].map((name) => (
+                    <li
+                      key={name}
+                      className="inline-flex items-center gap-1.5 rounded-md border border-border bg-bg-200 px-2.5 py-1 text-[13px]"
+                    >
+                      <code className="text-foreground">{name}</code>
+                      <button
+                        type="button"
+                        onClick={() => removeAllowedTool(name)}
+                        aria-label={t("settings.hitl.remove")}
+                        className="rounded p-0.5 hover:bg-muted"
+                        style={{ color: "hsl(var(--text-300))" }}
+                      >
+                        <X size={12} />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
               )}
             </section>
             <section className="border-t border-border pt-8">

@@ -15,9 +15,17 @@ import {
 } from "@/components/ai-elements/code-block";
 import type { BundledLanguage } from "shiki";
 import type { PendingInterrupt } from "@/lib/agui/runtime";
-import { Terminal, FileText, Search, Globe, Folder, Wrench } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { Terminal, FileText, Search, Globe, Folder, Wrench, AlertTriangle } from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
 import { diffLines } from "diff";
+import { assessToolRisk } from "./tool-risk";
+
+// Singleton "first card wins" election. When multiple approval cards are
+// visible (rare but possible during a multi-tool turn), only the first to
+// mount binds the global keydown — pressing Enter shouldn't blindly approve
+// every pending card at once. Mutable on purpose: useEffect cleanup clears
+// it back to null when the active card unmounts so the next card can claim.
+const activeCardId: { current: string | null } = { current: null };
 
 // Long Write/Edit payloads (e.g. writing a 250-line doc) would otherwise
 // either flood the card or get hard-truncated with "+N chars". Show the
@@ -34,7 +42,7 @@ interface ApprovalPayload {
 export interface ToolApprovalCardProps {
   interrupt: PendingInterrupt;
   onAllow: () => void;
-  onDeny: () => void;
+  onDeny: (reason: string) => void;
   onAllowAlways?: (toolName: string) => void;
 }
 
@@ -44,6 +52,66 @@ export function ToolApprovalCard({ interrupt, onAllow, onDeny, onAllowAlways }: 
   const input = (payload.input ?? {}) as Record<string, unknown>;
 
   const { icon, title, body } = renderTool(toolName, input, payload.title);
+  const risk = assessToolRisk(toolName, input);
+
+  const [denyExpanded, setDenyExpanded] = useState(false);
+  const [denyReason, setDenyReason] = useState("");
+
+  const submitDeny = () => onDeny(denyReason.trim() || "User declined");
+
+  const handleDenyClick = () => {
+    if (!denyExpanded) {
+      setDenyExpanded(true);
+      queueMicrotask(() => {
+        document.getElementById(`deny-${interrupt.id}`)?.focus();
+      });
+      return;
+    }
+    submitDeny();
+  };
+
+  // Singleton keydown: Enter = allow, Cmd/Ctrl+Enter = allow-always (if
+  // available), Esc = collapse deny textarea (if open) else deny w/ default.
+  // Skip when focus is in an input/textarea/contentEditable so the user can
+  // type freely inside the deny textarea without triggering allow on Enter.
+  useEffect(() => {
+    if (activeCardId.current === null) activeCardId.current = interrupt.id;
+    if (activeCardId.current !== interrupt.id) return;
+
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      const inField =
+        tag === "INPUT" ||
+        tag === "TEXTAREA" ||
+        (e.target as HTMLElement | null)?.isContentEditable === true;
+      if (inField) return;
+
+      if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+        if (onAllowAlways && payload.toolName) {
+          e.preventDefault();
+          onAllowAlways(payload.toolName);
+          onAllow();
+        }
+        return;
+      }
+      if (e.key === "Enter") {
+        e.preventDefault();
+        onAllow();
+        return;
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        if (denyExpanded) setDenyExpanded(false);
+        else onDeny("User declined");
+      }
+    };
+
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      if (activeCardId.current === interrupt.id) activeCardId.current = null;
+    };
+  }, [interrupt.id, onAllow, onDeny, onAllowAlways, denyExpanded, payload.toolName]);
 
   return (
     <Confirmation approval={{ id: interrupt.id }} state="approval-requested">
@@ -51,12 +119,52 @@ export function ToolApprovalCard({ interrupt, onAllow, onDeny, onAllowAlways }: 
         <span className="inline-flex items-center gap-2">
           {icon}
           {title}
+          {risk.level !== "none" && risk.label && (
+            <span
+              className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px]"
+              style={{
+                background:
+                  risk.level === "high"
+                    ? "hsl(var(--danger-100) / 0.15)"
+                    : "hsl(var(--warning-100) / 0.15)",
+                color:
+                  risk.level === "high"
+                    ? "hsl(var(--danger-100))"
+                    : "hsl(var(--warning-100))",
+              }}
+            >
+              <AlertTriangle size={11} />
+              {risk.label}
+            </span>
+          )}
         </span>
       </ConfirmationTitle>
       {body}
+      {denyExpanded && (
+        <textarea
+          id={`deny-${interrupt.id}`}
+          value={denyReason}
+          onChange={(e) => setDenyReason(e.target.value)}
+          placeholder="（可选）告诉 agent 为什么拒绝，按 ⌘⏎ 确认"
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+              e.preventDefault();
+              submitDeny();
+            }
+          }}
+          className="w-full min-h-[60px] resize-y rounded-md border bg-transparent px-3 py-2 text-[13px] outline-none"
+          style={{
+            borderColor: "hsl(var(--border-300))",
+            color: "hsl(var(--text-100))",
+          }}
+        />
+      )}
       <ConfirmationRequest>
         <ConfirmationActions>
-          <ConfirmationAction variant="outline" onClick={onDeny}>拒绝</ConfirmationAction>
+          <ConfirmationAction variant="outline" onClick={handleDenyClick}>
+            {denyExpanded ? "确认拒绝" : "拒绝"}
+            <kbd className="ml-1 opacity-60">Esc</kbd>
+          </ConfirmationAction>
           {onAllowAlways && payload.toolName && (
             <ConfirmationAction
               variant="outline"
@@ -66,9 +174,13 @@ export function ToolApprovalCard({ interrupt, onAllow, onDeny, onAllowAlways }: 
               }}
             >
               始终允许 {payload.toolName}
+              <kbd className="ml-1 opacity-60">⌘⏎</kbd>
             </ConfirmationAction>
           )}
-          <ConfirmationAction onClick={onAllow}>允许</ConfirmationAction>
+          <ConfirmationAction onClick={onAllow}>
+            允许
+            <kbd className="ml-1 opacity-60">⏎</kbd>
+          </ConfirmationAction>
         </ConfirmationActions>
       </ConfirmationRequest>
     </Confirmation>

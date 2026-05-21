@@ -128,7 +128,7 @@ export function ChatStream({
         key={it.id}
         interrupt={it}
         onAllow={() => void onResume({ decisions: [{ type: "allow" }] })}
-        onDeny={() => void onResume({ decisions: [{ type: "deny", message: "User declined" }] })}
+        onDeny={(reason) => void onResume({ decisions: [{ type: "deny", message: reason }] })}
         onAllowAlways={onAllowAlways}
       />
     ),

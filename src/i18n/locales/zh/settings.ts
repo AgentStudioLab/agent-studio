@@ -43,6 +43,12 @@ export const settings = {
       saved: "已保存",
       saveError: "保存失败",
     },
+    hitl: {
+      title: "已允许的工具",
+      description: "勾选过“始终允许”的工具会跳过审批卡片。可随时移除。",
+      empty: "暂无。当 Agent Studio 请求审批某个工具时，点击“始终允许 X”可加入此列表。",
+      remove: "移除",
+    },
     back: "返回",
   },
 };
