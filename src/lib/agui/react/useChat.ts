@@ -133,10 +133,19 @@ export function useChat(opts: UseChatOptions) {
     [runtime],
   );
 
-  const viewMessages: MessageView[] = useMemo(
-    () => [...state.historicalMessages, ...state.liveMessages],
-    [state.historicalMessages, state.liveMessages],
-  );
+  const viewMessages: MessageView[] = useMemo(() => {
+    // Cross-session resume can land both copies of the in-flight assistant turn
+    // here: /conversations/:id/messages returns the persisted half-written turn
+    // (already in the DB), AND attachToRun's SSE replay rebuilds the same turn
+    // in liveMessages. Both share the same SDK messageId — dedupe by id,
+    // letting the live version win since it carries the most recent stream.
+    if (state.liveMessages.length === 0) return state.historicalMessages;
+    const liveIds = new Set(state.liveMessages.map((m) => m.id));
+    return [
+      ...state.historicalMessages.filter((m) => !liveIds.has(m.id)),
+      ...state.liveMessages,
+    ];
+  }, [state.historicalMessages, state.liveMessages]);
   const isAwaitingApproval = useMemo(
     () => state.pendingInterrupts.some((it) => it.reason === "tool_approval"),
     [state.pendingInterrupts],
