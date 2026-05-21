@@ -17,6 +17,7 @@ import type { BundledLanguage } from "shiki";
 import type { PendingInterrupt } from "@/lib/agui/runtime";
 import { Terminal, FileText, Search, Globe, Folder, Wrench } from "lucide-react";
 import { useState, type ReactNode } from "react";
+import { diffLines } from "diff";
 
 // Long Write/Edit payloads (e.g. writing a 250-line doc) would otherwise
 // either flood the card or get hard-truncated with "+N chars". Show the
@@ -168,16 +169,31 @@ function renderEdit(input: Record<string, unknown>, title?: string): ToolRender 
   const oldStr = String(input.old_string ?? "");
   const newStr = String(input.new_string ?? "");
   const replaceAll = input.replace_all === true;
-  // Multi-line diff: every old line prefixed with `-`, every new with `+`.
-  // ToolCodeBlock handles the collapse if the combined view is long.
-  const oldLines = oldStr.split("\n").map((l) => "- " + l);
-  const newLines = newStr.split("\n").map((l) => "+ " + l);
-  const preview = [...oldLines, ...newLines].join("\n");
   return {
     icon: <FileText size={14} />,
     title: title ?? `编辑 ${filePath}${replaceAll ? "（全部匹配）" : ""}`,
-    body: <ToolCodeBlock code={preview} lang="diff" filename={filePath} />,
+    body: <ToolCodeBlock code={buildLineDiff(oldStr, newStr)} lang="diff" filename={filePath} />,
   };
+}
+
+/**
+ * Render a real line-level diff via jsdiff. Each hunk part is either:
+ *   - added:    every line prefixed `+ ` (the new_string contribution)
+ *   - removed:  every line prefixed `- ` (the old_string contribution)
+ *   - context:  every line prefixed `  ` (unchanged in both)
+ * Trailing empty line from `.split("\n")` is dropped so unchanged blocks
+ * don't render a phantom blank context line.
+ */
+function buildLineDiff(oldStr: string, newStr: string): string {
+  const parts = diffLines(oldStr, newStr);
+  const out: string[] = [];
+  for (const p of parts) {
+    const lines = p.value.split("\n");
+    if (lines.length > 0 && lines[lines.length - 1] === "") lines.pop();
+    const prefix = p.added ? "+ " : p.removed ? "- " : "  ";
+    for (const line of lines) out.push(prefix + line);
+  }
+  return out.join("\n");
 }
 
 function renderWrite(input: Record<string, unknown>, title?: string): ToolRender {
