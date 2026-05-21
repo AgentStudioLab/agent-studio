@@ -20,6 +20,12 @@ export const sidebar = {
       archive: "归档",
       delete: "删除",
     },
+    deleteDialog: {
+      title: "删除对话？",
+      description: "对话及其所有消息、工具调用记录会被永久删除，无法恢复。",
+      cancel: "取消",
+      confirm: "删除",
+    },
     toggle: {
       open: "打开侧边栏",
       collapse: "收起侧边栏",

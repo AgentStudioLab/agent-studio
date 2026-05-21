@@ -22,6 +22,13 @@ export const sidebar: typeof Zh = {
       archive: "Archive",
       delete: "Delete",
     },
+    deleteDialog: {
+      title: "Delete conversation?",
+      description:
+        "The conversation and all its messages and tool calls will be permanently deleted. This action cannot be undone.",
+      cancel: "Cancel",
+      confirm: "Delete",
+    },
     toggle: {
       open: "Open sidebar",
       collapse: "Collapse sidebar",

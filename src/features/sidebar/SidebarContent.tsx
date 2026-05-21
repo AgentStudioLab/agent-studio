@@ -4,7 +4,18 @@ import {
   useRecentConversations,
   usePinnedConversations,
   useTogglePinMutation,
+  useDeleteConversationMutation,
 } from "@/lib/data/queries";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import type { Conversation } from "@/lib/data/types";
 import {
   Briefcase,
@@ -99,6 +110,8 @@ export function SidebarContent() {
   const { data: pinnedData = [] } = usePinnedConversations();
   const { data: threadStatuses = [] } = useThreadStatuses();
   const togglePinMutation = useTogglePinMutation();
+  const deleteMutation = useDeleteConversationMutation();
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   const statusByThread = useMemo(() => {
     const m = new Map<string, ThreadStatusItem["status"]>();
@@ -122,9 +135,22 @@ export function SidebarContent() {
     togglePinMutation.mutate({ id: item.id, pinned: false });
   };
 
-  // v1：本地 "从列表移除" 暂时 no-op（DB 真删需要 mutation；后续 wave 接 deleteConversationMutation）
-  const handleRemoveRecent = (_id: string) => {};
-  const handleRemovePinned = (_id: string) => {};
+  // ContextMenu's onDelete fires immediately on click — we route through an
+  // AlertDialog confirm step rather than mutating in-place. The destructive
+  // action has no undo so a confirm gate is the cheapest safety net.
+  const requestDelete = (id: string) => setPendingDeleteId(id);
+  const confirmDelete = () => {
+    if (!pendingDeleteId) return;
+    // If the deleted thread is the one currently open, leave the task view
+    // before the mutation lands so the task pane doesn't try to fetch a
+    // thread that's about to 404.
+    if (pendingDeleteId === activeTaskId) {
+      setActiveTaskId(null);
+      setView("new-task");
+    }
+    deleteMutation.mutate(pendingDeleteId);
+    setPendingDeleteId(null);
+  };
 
   const toggleLabel = sidebarCollapsed
     ? t("sidebar.toggle.open")
@@ -205,7 +231,7 @@ export function SidebarContent() {
                   }
                 }}
                 onUnpin={() => void handleUnpin(item)}
-                onDelete={() => handleRemovePinned(item.id)}
+                onDelete={() => requestDelete(item.id)}
               />
             ))}
           </div>
@@ -229,7 +255,7 @@ export function SidebarContent() {
               setView("task");
             }}
             onPin={() => void handlePin(item)}
-            onDelete={() => handleRemoveRecent(item.id)}
+            onDelete={() => requestDelete(item.id)}
           />
         ))}
       </div>
@@ -264,6 +290,31 @@ export function SidebarContent() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={pendingDeleteId !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingDeleteId(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("sidebar.deleteDialog.title")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("sidebar.deleteDialog.description")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("sidebar.deleteDialog.cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-[hsl(var(--danger-100))] text-white hover:bg-[hsl(var(--danger-100)/0.9)]"
+            >
+              {t("sidebar.deleteDialog.confirm")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
