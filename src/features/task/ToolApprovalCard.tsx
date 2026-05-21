@@ -69,17 +69,16 @@ interface ToolRender {
 }
 
 function renderTool(name: string, input: Record<string, unknown>, override?: string): ToolRender {
-  const titleFromOverride = override;
   switch (name) {
-    case "Bash":      return renderBash(input, titleFromOverride);
-    case "Read":      return renderRead(input, titleFromOverride);
-    case "Edit":      return renderEdit(input, titleFromOverride);
-    case "Write":     return renderWrite(input, titleFromOverride);
-    case "Glob":      return renderGlob(input, titleFromOverride);
-    case "Grep":      return renderGrep(input, titleFromOverride);
-    case "WebSearch": return renderWebSearch(input, titleFromOverride);
-    case "WebFetch":  return renderWebFetch(input, titleFromOverride);
-    default:          return renderFallback(name, input, titleFromOverride);
+    case "Bash":      return renderBash(input, override);
+    case "Read":      return renderRead(input, override);
+    case "Edit":      return renderEdit(input, override);
+    case "Write":     return renderWrite(input, override);
+    case "Glob":      return renderGlob(input, override);
+    case "Grep":      return renderGrep(input, override);
+    case "WebSearch": return renderWebSearch(input, override);
+    case "WebFetch":  return renderWebFetch(input, override);
+    default:          return renderFallback(name, input, override);
   }
 }
 
@@ -100,16 +99,7 @@ function renderBash(input: Record<string, unknown>, title?: string): ToolRender 
   return {
     icon: <Terminal size={14} />,
     title: title ?? "Agent Studio wants to run a shell command",
-    body: (
-      <>
-        <ToolCodeBlock code={command} lang="bash" filename={cwd ?? "shell"} />
-        {cwd && (
-          <p className="text-[12px]" style={{ color: "hsl(var(--text-300))" }}>
-            cwd: <code>{cwd}</code>
-          </p>
-        )}
-      </>
-    ),
+    body: <ToolCodeBlock code={command} lang="bash" filename={cwd ?? "shell"} />,
   };
 }
 
