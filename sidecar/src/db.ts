@@ -14,10 +14,6 @@ CREATE TABLE IF NOT EXISTS conversations (
   created_at    INTEGER NOT NULL,
   updated_at    INTEGER NOT NULL
 );
--- Idempotent column add for DBs created before working_dir was introduced.
--- SQLite 3.35+ supports IF NOT EXISTS on ADD COLUMN; bun bundles a new
--- enough sqlite so this is safe.
-ALTER TABLE conversations ADD COLUMN IF NOT EXISTS working_dir TEXT;
 CREATE INDEX IF NOT EXISTS idx_conv_updated ON conversations (updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_conv_pinned  ON conversations (pinned, updated_at DESC);
 
@@ -66,8 +62,30 @@ CREATE TABLE IF NOT EXISTS run_events (
 );
 `;
 
+interface ColumnInfo {
+  name: string;
+}
+
+/**
+ * Idempotent column adds for DBs created before a column was introduced.
+ * SQLite 3.35+ has `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`, but Bun's
+ * bundled SQLite (especially in --compile builds) can lag behind. Probing
+ * via PRAGMA table_info works across all versions.
+ */
+function ensureColumn(
+  db: Database,
+  table: string,
+  column: string,
+  type: string,
+): void {
+  const rows = db.prepare(`PRAGMA table_info(${table})`).all() as ColumnInfo[];
+  if (rows.some((r) => r.name === column)) return;
+  db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
+}
+
 export function migrate(db: Database): void {
   db.exec(SCHEMA);
+  ensureColumn(db, "conversations", "working_dir", "TEXT");
 }
 
 export function openDb(path: string): Database {
