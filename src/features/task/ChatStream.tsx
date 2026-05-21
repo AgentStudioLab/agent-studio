@@ -271,9 +271,12 @@ function MessageRow({
     <div className="space-y-3">
       {grouped.map((b, i) => {
         if (b.kind === "process_group") {
-          const matchingInterrupt = b.steps
-            .map((s) => (s.kind === "tool_call" ? interruptsByToolId.get(s.tool.id) : undefined))
-            .find((x): x is PendingInterrupt => Boolean(x));
+          let matchingInterrupt: PendingInterrupt | undefined;
+          for (const s of b.steps) {
+            if (s.kind !== "tool_call") continue;
+            const it = interruptsByToolId.get(s.tool.id);
+            if (it) { matchingInterrupt = it; break; }
+          }
           return (
             <div key={b.key} className="space-y-3">
               <ProcessGroup steps={b.steps} done={b.done} />
