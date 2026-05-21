@@ -90,6 +90,13 @@
     * {
         @apply border-border outline-ring/50;
     }
+    /* Suppress the WebView default focus outline for non-keyboard focus
+     * (e.g. when Popover/Menu auto-focuses the first item on open, or when
+     * the user clicks a button). Keyboard navigation via Tab still shows
+     * the ring because :focus-visible matches in that case. */
+    *:focus:not(:focus-visible) {
+        outline: none;
+    }
     body {
         @apply bg-background text-foreground;
     }
