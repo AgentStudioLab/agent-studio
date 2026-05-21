@@ -172,12 +172,12 @@ function renderGrep(input: Record<string, unknown>, title?: string): ToolRender 
   return {
     icon: <Search size={14} />,
     title: title ?? `搜索：${pattern}`,
-    body: (
+    body: (path || glob) ? (
       <p className="text-[12px]" style={{ color: "hsl(var(--text-300))" }}>
         {path && <>at <code>{path}</code> </>}
         {glob && <>filter <code>{glob}</code></>}
       </p>
-    ),
+    ) : null,
   };
 }
 
