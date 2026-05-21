@@ -53,11 +53,6 @@ export function ToolApprovalCard({ interrupt, onAllow, onDeny, onAllowAlways }: 
           {title}
         </span>
       </ConfirmationTitle>
-      {payload.description && (
-        <p className="text-[12.5px]" style={{ color: "hsl(var(--text-300))" }}>
-          {payload.description}
-        </p>
-      )}
       {body}
       <ConfirmationRequest>
         <ConfirmationActions>
