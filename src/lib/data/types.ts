@@ -15,3 +15,12 @@ export interface Conversation {
   createdAt: number;
   updatedAt: number;
 }
+
+export interface UsageSummary {
+  inputTokens: number;
+  outputTokens: number;
+  cacheCreationTokens: number;
+  cacheReadTokens: number;
+  totalCostUsd: number;
+  runCount: number;
+}
