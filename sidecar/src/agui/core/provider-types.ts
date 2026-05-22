@@ -4,6 +4,7 @@
 
 import type { AGUIEvent } from "./types";
 import type { AGUIInterrupt } from "./interrupts";
+import type { SDKPermissionDenial } from "@anthropic-ai/claude-agent-sdk";
 
 export interface ProviderCallbacks {
   onMessageEnd?: (msg: {
@@ -23,6 +24,21 @@ export interface ProviderCallbacks {
     result: unknown;
     status: "success" | "error";
     errorMsg?: string;
+  }) => void | Promise<void>;
+  /**
+   * Fired once per SDKResultMessage (success and error). runWorker uses this
+   * to write the runs table usage columns + append a usage_ledger row.
+   */
+  onRunUsage?: (u: {
+    runId: string;
+    threadId: string;
+    inputTokens: number;
+    outputTokens: number;
+    cacheCreationTokens: number;
+    cacheReadTokens: number;
+    totalCostUsd: number;
+    permissionDenials: SDKPermissionDenial[];
+    model?: string;
   }) => void | Promise<void>;
 }
 
