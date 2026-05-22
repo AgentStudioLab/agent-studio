@@ -18,6 +18,7 @@ import type {
   ReasoningMessageContentEvent,
   ReasoningMessageEndEvent,
   ReasoningEndEvent,
+  CustomEvent,
 } from "@ag-ui/core";
 
 export type AGUIEvent =
@@ -39,4 +40,5 @@ export type AGUIEvent =
   | ReasoningMessageStartEvent
   | ReasoningMessageContentEvent
   | ReasoningMessageEndEvent
-  | ReasoningEndEvent;
+  | ReasoningEndEvent
+  | CustomEvent;

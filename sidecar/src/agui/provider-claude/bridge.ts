@@ -93,10 +93,7 @@ export async function* claudeSdkToAgui(
 
       // system.init — capture session id once; api_retry — surface to UI
       if (m.type === "system") {
-        const sys = m as unknown as { subtype?: string; session_id?: string };
-        if (sys.subtype === "init" && typeof sys.session_id === "string") {
-          onSessionId?.(sys.session_id);
-        } else if (sys.subtype === "api_retry") {
+        if ((m as SDKAPIRetryMessage).subtype === "api_retry") {
           const r = m as SDKAPIRetryMessage;
           yield {
             type: EventType.CUSTOM,
@@ -108,7 +105,12 @@ export async function* claudeSdkToAgui(
               errorStatus: r.error_status,
               error: r.error,
             },
-          } as unknown as AGUIEvent;
+          } as AGUIEvent;
+        } else {
+          const sys = m as SDKSystemMessage;
+          if (typeof sys.session_id === "string") {
+            onSessionId?.(sys.session_id);
+          }
         }
         continue;
       }
@@ -199,6 +201,17 @@ export async function* claudeSdkToAgui(
       if (m.type === "assistant") {
         const am = m as SDKAssistantMessage;
         if (am.error) {
+          // Close any in-flight reasoning/text blocks before surfacing the
+          // error — stream_events may have already opened them before the
+          // assistant message arrived carrying an error field.
+          const endR = closeReasoningBlock();
+          if (endR) yield endR;
+          if (currentTextMsgId) {
+            yield {
+              type: EventType.TEXT_MESSAGE_END,
+              messageId: currentTextMsgId,
+            } as AGUIEvent;
+          }
           yield {
             type: EventType.RUN_ERROR,
             code: mapAssistantError(am.error),
@@ -387,11 +400,14 @@ export async function* claudeSdkToAgui(
           accumulatedReasoning = "";
         }
         if (r.is_error) {
-          const subtype = (r as { subtype?: string }).subtype ?? "";
+          // r.is_error means r is SDKResultError — subtype is one of the
+          // error_* literals and errors[] carries the detail strings.
+          const re = r as { subtype: string; errors?: string[] };
+          const subtype = re.subtype;
           yield {
             type: EventType.RUN_ERROR,
             code: mapResultErrorSubtype(subtype),
-            message: subtype === "success" ? ((r as { result?: string }).result ?? "agent error") : ((r as { errors?: string[] }).errors?.[0] ?? subtype ?? "agent error"),
+            message: re.errors?.[0] ?? subtype,
           } as AGUIEvent;
         } else {
           yield {

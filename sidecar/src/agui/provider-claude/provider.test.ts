@@ -30,8 +30,14 @@ describe("provider sandbox config", () => {
     for await (const _ of stream) { /* ignore */ }
 
     expect(querySpy).toHaveBeenCalled();
-    const lastCall = querySpy.mock.calls.at(-1)![0] as { options: { sandbox?: { enabled: boolean; filesystem?: { allowWrite?: string[] } } } };
-    expect(lastCall.options.sandbox?.enabled).toBe(true);
-    expect(lastCall.options.sandbox?.filesystem?.allowWrite).toEqual(["/tmp/proj"]);
+    const calls = querySpy.mock.calls as unknown[];
+    expect(calls.length).toBeGreaterThan(0);
+    const lastCallArgs = calls[calls.length - 1] as unknown[];
+    const lastCall = lastCallArgs[0] as unknown;
+    const options = (lastCall as Record<string, unknown>)?.options as Record<string, unknown>;
+    const sandbox = options?.sandbox as Record<string, unknown>;
+    expect(sandbox?.enabled).toBe(true);
+    const filesystem = sandbox?.filesystem as Record<string, unknown>;
+    expect(filesystem?.allowWrite).toEqual(["/tmp/proj"]);
   });
 });

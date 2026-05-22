@@ -423,4 +423,36 @@ describe("bridge — retry + error events", () => {
     const err = events.find((e) => e.type === "RUN_ERROR");
     expect((err as unknown as { code: string }).code).toBe("MAX_TURNS");
   });
+
+  it("closes in-flight text block before emitting RUN_ERROR on assistant error", async () => {
+    // Reproduces: stream_event opened a text block, then the assistant message
+    // arrives with an error field. The bridge must emit TEXT_MESSAGE_END before
+    // RUN_ERROR so the frontend reducer doesn't have an unclosed text block.
+    const sdkStream = (async function* () {
+      yield { type: "system", subtype: "init", session_id: "s1" };
+      yield {
+        type: "stream_event",
+        event: { type: "content_block_start", content_block: { type: "text" } },
+      };
+      yield {
+        type: "stream_event",
+        event: { type: "content_block_delta", delta: { type: "text_delta", text: "partial" } },
+      };
+      yield {
+        type: "assistant",
+        message: { content: [] },
+        error: "rate_limit",
+      };
+    })();
+    const events = await drain(
+      claudeSdkToAgui(sdkStream as never, { threadId: "t", runId: "r" }),
+    );
+    const types = events.map((e) => e.type);
+    // TEXT_MESSAGE_END must precede RUN_ERROR
+    const endIdx = types.indexOf("TEXT_MESSAGE_END");
+    const errIdx = types.indexOf("RUN_ERROR");
+    expect(endIdx).toBeGreaterThan(-1);
+    expect(errIdx).toBeGreaterThan(endIdx);
+    expect((events[errIdx] as unknown as { code: string }).code).toBe("RATE_LIMIT");
+  });
 });
