@@ -5,6 +5,7 @@ import type { RunEventStore, AgentProvider } from "../agui/core";
 import type { ThreadService } from "../services/threads";
 import type { MessageService } from "../services/messages";
 import type { InterruptBus } from "../agui/provider-claude/interrupt-bus";
+import type { UsageService } from "../services/usage";
 
 export interface MountRunsDeps {
   threads: ThreadService;
@@ -12,6 +13,7 @@ export interface MountRunsDeps {
   provider: AgentProvider;
   store: RunEventStore;
   interruptBus: InterruptBus;
+  usage: UsageService;
 }
 
 /**
@@ -64,6 +66,7 @@ export function buildRunRoutes(deps: MountRunsDeps): Hono {
       provider: deps.provider,
       interruptBus: deps.interruptBus,
       abortSignal: abort.signal,
+      usage: deps.usage,
     }).finally(() => aborters.delete(body.runId!));
 
     return c.json({ runId: body.runId }, 202);

@@ -8,6 +8,7 @@ import {
 import type { MessageService } from "../services/messages";
 import type { ThreadService } from "../services/threads";
 import type { InterruptBus } from "../agui/provider-claude/interrupt-bus";
+import type { UsageService } from "../services/usage";
 
 export interface RunWorkerInput {
   runId: string;
@@ -19,6 +20,7 @@ export interface RunWorkerInput {
   provider: AgentProvider;
   interruptBus: InterruptBus;
   abortSignal: AbortSignal;
+  usage: UsageService;
 }
 
 export async function runWorker(input: RunWorkerInput): Promise<void> {
@@ -32,6 +34,7 @@ export async function runWorker(input: RunWorkerInput): Promise<void> {
     provider,
     interruptBus,
     abortSignal,
+    usage,
   } = input;
 
   // Buffer the structured messages/tool_calls writes until the run reaches a
@@ -95,6 +98,19 @@ export async function runWorker(input: RunWorkerInput): Promise<void> {
         result: tc.result,
         status: tc.status,
         errorMsg: tc.errorMsg,
+      });
+    },
+    onRunUsage(u) {
+      usage.recordRun({
+        runId: u.runId,
+        threadId: u.threadId,
+        inputTokens: u.inputTokens,
+        outputTokens: u.outputTokens,
+        cacheCreationTokens: u.cacheCreationTokens,
+        cacheReadTokens: u.cacheReadTokens,
+        totalCostUsd: u.totalCostUsd,
+        permissionDenials: u.permissionDenials,
+        model: u.model,
       });
     },
   };
