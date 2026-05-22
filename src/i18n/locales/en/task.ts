@@ -102,5 +102,11 @@ export const task: typeof Zh = {
     retry: {
       attempt: "Retrying {{attempt}}/{{max}}",
     },
+    toolsPanel: {
+      title: "Tools",
+      followGlobal: "Following global default",
+      customize: "Customize for this thread",
+      restore: "Reset to global default",
+    },
   },
 };

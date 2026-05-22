@@ -164,7 +164,7 @@ export function TaskView() {
         previewOpen ? (
           <PreviewPane file={preview.file!} onClose={closePreview} />
         ) : (
-          <TaskRightPanel onOpenFile={openPreview} />
+          <TaskRightPanel threadId={activeTaskId} onOpenFile={openPreview} />
         )
       }
     />

@@ -99,5 +99,11 @@ export const task = {
     retry: {
       attempt: "正在重试 {{attempt}}/{{max}}",
     },
+    toolsPanel: {
+      title: "工具集",
+      followGlobal: "跟随全局默认",
+      customize: "为此对话自定义",
+      restore: "恢复全局默认",
+    },
   },
 };
