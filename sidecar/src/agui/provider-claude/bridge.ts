@@ -19,6 +19,7 @@ import type {
   SDKSystemMessage,
   SDKPartialAssistantMessage,
 } from "@anthropic-ai/claude-agent-sdk";
+import type { BetaToolUseBlock } from "@anthropic-ai/sdk/resources/beta/messages";
 import type { AGUIEvent } from "../core/types";
 import type { ProviderCallbacks } from "../core/provider-types";
 
@@ -191,7 +192,7 @@ export async function* claudeSdkToAgui(
         const blocks = Array.isArray(content) ? content : [];
         const textBlock = blocks.find((b) => b.type === "text");
         const toolUseBlocks = blocks.filter(
-          (b): b is Extract<typeof b, { type: "tool_use" }> => b.type === "tool_use",
+          (b): b is BetaToolUseBlock => b.type === "tool_use",
         );
 
         // Allocate a stable message id for THIS AIMessage. Reuse the
@@ -254,7 +255,7 @@ export async function* claudeSdkToAgui(
         // Tool-use blocks: synthesize START (if streaming didn't), emit ARGS
         // + END, then persist the tool_calls row keyed to messageId.
         for (const block of toolUseBlocks) {
-          let st = toolById.get(block.id!);
+          let st = toolById.get(block.id);
           if (!st) {
             yield {
               type: EventType.TOOL_CALL_START,
@@ -263,13 +264,13 @@ export async function* claudeSdkToAgui(
               parentMessageId: messageId,
             } as AGUIEvent;
             st = {
-              id: block.id!,
-              toolName: block.name!,
+              id: block.id,
+              toolName: block.name,
               argsBuf: "",
               parentMsgId: messageId,
               ended: false,
             };
-            toolById.set(block.id!, st);
+            toolById.set(block.id, st);
           } else if (!st.parentMsgId) {
             // Stream_event captured the tool_use before any text block was
             // open; bind it to this AIMessage's id now.
@@ -291,8 +292,8 @@ export async function* claudeSdkToAgui(
           st.ended = true;
 
           await callbacks?.onToolCallEnd?.({
-            id: block.id!,
-            toolName: block.name!,
+            id: block.id,
+            toolName: block.name,
             args: block.input,
             parentMessageId: st.parentMsgId ?? messageId,
           });
@@ -365,7 +366,7 @@ export async function* claudeSdkToAgui(
         if (r.is_error) {
           yield {
             type: EventType.RUN_ERROR,
-            message: r.subtype === "success" ? "agent error" : (r.errors[0] ?? "agent error"),
+            message: r.subtype === "success" ? (r.result ?? "agent error") : (r.errors[0] ?? "agent error"),
           } as AGUIEvent;
         } else {
           yield {
