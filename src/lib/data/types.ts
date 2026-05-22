@@ -24,3 +24,10 @@ export interface UsageSummary {
   totalCostUsd: number;
   runCount: number;
 }
+
+export interface ThreadAllowedTools {
+  /** Resolved: per-thread override OR global default. */
+  tools: string[];
+  /** "global" = no override; "custom" = thread has its own list. */
+  overrideMode: "global" | "custom";
+}
