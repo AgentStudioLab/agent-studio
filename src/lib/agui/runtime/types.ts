@@ -85,6 +85,24 @@ export interface ChatState {
   error: string | null;
   /** SSE 最后收到的事件游标，续连/恢复时用 */
   lastCursor: string | null;
+  /** RUN_ERROR 携带的归一化错误码 */
+  errorCode?: RunErrorCode;
+  /** 最近一次 retry 状态 */
+  retry?: RetryState;
+}
+
+export type RunErrorCode =
+  | "AUTH_FAILED" | "RATE_LIMIT" | "UPSTREAM_5XX" | "BILLING_ERROR"
+  | "MODEL_ERROR" | "MAX_TURNS" | "MAX_BUDGET" | "EXECUTION_ERROR"
+  | "WORKER_ERROR" | "CANCELLED";
+
+export interface RetryState {
+  attempt: number;
+  maxRetries: number;
+  retryDelayMs: number;
+  errorStatus: number | null;
+  error: string;
+  ts: number;
 }
 
 /**

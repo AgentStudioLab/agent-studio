@@ -106,9 +106,35 @@ export function applyEvent(
     case "RUN_FINISHED":
       next = handleRunFinished(next, event);
       break;
-    case "RUN_ERROR":
-      next = { ...next, liveMessages: sweepPendingToolCalls(next.liveMessages) };
+    case "RUN_ERROR": {
+      const code = (event as { code?: string }).code;
+      const message = (event as { message?: string }).message;
+      next = {
+        ...next,
+        liveMessages: sweepPendingToolCalls(next.liveMessages),
+        error: message ?? next.error ?? null,
+        errorCode: typeof code === "string" ? (code as never) : next.errorCode,
+      };
       break;
+    }
+    case "CUSTOM": {
+      const name = (event as { name?: string }).name;
+      if (name === "agent.retry") {
+        const value = (event as { value?: Record<string, unknown> }).value ?? {};
+        next = {
+          ...next,
+          retry: {
+            attempt: Number(value.attempt ?? 0),
+            maxRetries: Number(value.maxRetries ?? 0),
+            retryDelayMs: Number(value.retryDelayMs ?? 0),
+            errorStatus: (value.errorStatus as number | null) ?? null,
+            error: String(value.error ?? ""),
+            ts: Date.now(),
+          },
+        };
+      }
+      break;
+    }
     // REASONING_MESSAGE_START / REASONING_MESSAGE_END / STEP_STARTED /
     // STEP_FINISHED 是协议层的薄记，不影响客户端状态。
     default:
@@ -238,10 +264,11 @@ function handleRunFinished(state: ChatState, ev: AGUIEventLike): ChatState {
     return {
       ...state,
       pendingInterrupts: ev.interrupts as PendingInterrupt[],
+      retry: undefined,
     };
   }
-  // 正常结束：清扫 pending 工具调用
-  return { ...state, liveMessages: sweepPendingToolCalls(state.liveMessages) };
+  // 正常结束：清扫 pending 工具调用，清除 retry 状态
+  return { ...state, liveMessages: sweepPendingToolCalls(state.liveMessages), retry: undefined };
 }
 
 // ============ 通用更新工具 ============

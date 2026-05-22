@@ -6,6 +6,8 @@
 import { describe, expect, it, mock } from "bun:test";
 import { createChatRuntime } from "./runtime";
 import type { AGUIEventLike } from "./types";
+import { applyEvent } from "./reducer";
+import { createInitialState } from "./types";
 
 function makeFakeSse(frames: string[]) {
   return mock(async (url: string | URL | Request) => {
@@ -214,5 +216,45 @@ describe("createChatRuntime — replay idempotency", () => {
     expect(callCount).toBe(1);
 
     rt.destroy();
+  });
+});
+
+describe("reducer — error code + retry", () => {
+  it("RUN_ERROR with code sets errorCode", () => {
+    const s = applyEvent(
+      createInitialState(),
+      { type: "RUN_ERROR", code: "AUTH_FAILED", message: "authentication_failed" },
+      new Map(),
+    );
+    expect(s.errorCode).toBe("AUTH_FAILED");
+    expect(s.error).toBe("authentication_failed");
+  });
+
+  it("CUSTOM agent.retry sets retry state", () => {
+    const s = applyEvent(
+      createInitialState(),
+      {
+        type: "CUSTOM",
+        name: "agent.retry",
+        value: { attempt: 2, maxRetries: 5, retryDelayMs: 1500, errorStatus: 503, error: "server_error" },
+      },
+      new Map(),
+    );
+    expect(s.retry?.attempt).toBe(2);
+    expect(s.retry?.retryDelayMs).toBe(1500);
+  });
+
+  it("RUN_FINISHED clears retry", () => {
+    let s = applyEvent(
+      createInitialState(),
+      {
+        type: "CUSTOM",
+        name: "agent.retry",
+        value: { attempt: 1, maxRetries: 5, retryDelayMs: 1000, errorStatus: 503, error: "server_error" },
+      },
+      new Map(),
+    );
+    s = applyEvent(s, { type: "RUN_FINISHED", threadId: "t", runId: "r" }, new Map());
+    expect(s.retry).toBeUndefined();
   });
 });
