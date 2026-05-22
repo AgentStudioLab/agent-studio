@@ -1,9 +1,10 @@
 // Claude Agent SDK adapter for AgentProvider.
 //
-// Multi-turn strategy: capture session_id from each turn's `system.init`
-// event and pass it as `options.resume` on the next turn. This delegates
-// transcript persistence to the Claude SDK itself (it writes JSONL session
-// files); we just remember which session_id belongs to which threadId.
+// Multi-turn strategy: each turn's system.init carries a session_id.
+// We tag it with threadId via SDK tagSession; the next turn's runTurn
+// calls listSessions to recover the sessionId for resume. The SDK's
+// JSONL store is the sole source of truth — sidecar restart preserves
+// multi-turn context, unlike the previous in-memory Map.
 //
 // Per-turn abort: each turn spawns a fresh `query()` with its own
 // AbortController. Cancelling a turn does NOT lose multi-turn context,
@@ -123,6 +124,8 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
       runId: ctx.runId,
       callbacks: ctx.callbacks,
       onSessionId: (sid) => {
+        // First turn allocates a fresh session_id; subsequent turns echo the
+        // resumed one. Either way, tag idempotently so resume lookup works.
         void tagThreadSession(sid, ctx.threadId, ctx.cwd);
       },
     });
