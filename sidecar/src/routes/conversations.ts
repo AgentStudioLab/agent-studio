@@ -83,5 +83,21 @@ export function buildConversationRoutes(deps: MountConversationsDeps): Hono {
     return c.json({ ok: true });
   });
 
+  app.patch("/conversations/:id/allowed-tools", async (c) => {
+    const id = c.req.param("id");
+    const body = (await c.req.json()) as { tools: string[] | null };
+    if (body.tools !== null && !Array.isArray(body.tools)) {
+      return c.json({ error: "tools must be array or null" }, 400);
+    }
+    threads.setAllowedTools(id, body.tools);
+    return c.json({ ok: true });
+  });
+
+  app.get("/conversations/:id/allowed-tools", (c) => {
+    const id = c.req.param("id");
+    const tools = threads.getAllowedTools(id);
+    return c.json({ tools });
+  });
+
   return app;
 }

@@ -14,6 +14,8 @@ import { ThreadService } from "./services/threads";
 import { MessageService } from "./services/messages";
 import { AuditService } from "./services/audit";
 import { UsageService } from "./services/usage";
+import { SettingsToolsService } from "./services/settings-tools";
+import { buildSettingsToolsRoutes } from "./routes/settings-tools";
 import { createBunSqliteRunStore } from "./agui/store-sqlite";
 import {
   createClaudeProvider,
@@ -60,6 +62,7 @@ const store = createBunSqliteRunStore(db);
 const interruptBus = createInterruptBus({ store });
 const audit = new AuditService(db);
 const usage = new UsageService(db);
+const settingsTools = new SettingsToolsService(db);
 
 // Mark orphan running rows (process crashed mid-stream) as error so the
 // sidebar pulse dot doesn't lie. Synchronous SQL UPDATE — must stay sync
@@ -76,7 +79,7 @@ app.use(
   cors({
     origin: (origin) => origin ?? "*",
     allowHeaders: ["Authorization", "Content-Type"],
-    allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     maxAge: 600,
   }),
 );
@@ -137,6 +140,7 @@ app.route(
 );
 app.route("/", buildAuditRoutes(audit));
 app.route("/", buildUsageRoutes(usage));
+app.route("/", buildSettingsToolsRoutes(settingsTools));
 
 console.log(`[sidecar] listening on http://127.0.0.1:${args.port} (db=${dbAbs})`);
 console.log(

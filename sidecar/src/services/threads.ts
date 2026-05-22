@@ -134,4 +134,23 @@ export class ThreadService {
   delete(id: string): void {
     this.db.prepare("DELETE FROM conversations WHERE id = ?").run(id);
   }
+
+  getAllowedTools(threadId: string): string[] | null {
+    const row = this.db
+      .prepare("SELECT allowed_tools_json AS j FROM conversations WHERE id = ?")
+      .get(threadId) as { j?: string | null } | undefined;
+    if (!row?.j) return null;
+    try {
+      const parsed = JSON.parse(row.j);
+      return Array.isArray(parsed) ? parsed : null;
+    } catch {
+      return null;
+    }
+  }
+
+  setAllowedTools(threadId: string, tools: string[] | null): void {
+    this.db
+      .prepare("UPDATE conversations SET allowed_tools_json = ? WHERE id = ?")
+      .run(tools === null ? null : JSON.stringify(tools), threadId);
+  }
 }
