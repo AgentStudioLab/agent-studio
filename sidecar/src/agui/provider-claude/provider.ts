@@ -115,6 +115,17 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
         // Always installed: even when there's no HITL bus, the sandbox
         // layer inside canUseTool needs to gate file paths.
         canUseTool,
+        sandbox: {
+          enabled: true,
+          failIfUnavailable: true,
+          autoAllowBashIfSandboxed: true,
+          allowUnsandboxedCommands: false,
+          excludedCommands: [],
+          filesystem: {
+            allowWrite: [ctx.cwd],
+          },
+          // network 不限——本 phase 决策"仅写限"
+        },
         ...(resumeSessionId ? { resume: resumeSessionId } : {}),
       },
     });

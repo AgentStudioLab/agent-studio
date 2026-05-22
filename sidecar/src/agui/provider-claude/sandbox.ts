@@ -1,17 +1,17 @@
-// Workspace path sandbox.
+// Workspace path sandbox —— UX 层，**不是**安全边界。
 //
-// The Claude Agent SDK's `cwd` option is just the working directory; built-in
-// file tools (Read/Write/Edit/...) happily accept absolute paths anywhere on
-// disk. We enforce the "this conversation only sees its workspace" promise in
-// the canUseTool gate by inspecting the tool input and rejecting any path
-// that resolves outside `root` before the user even sees an approval card.
+// 安全边界由 SDK 的 OS-level sandbox（macOS Seatbelt / Linux bwrap）在
+// provider.ts 注入；本文件做的只是字符串路径 fast-deny，目的：
+//   - 让模型拿到具体的 deny 原因（OS deny 的消息对模型不够友好）
+//   - 避免不必要的 HITL 卡片闪现
 //
-// Scope decisions:
-//   - Bash is intentionally NOT sandboxed here. A command like `cd /elsewhere`
-//     can't be detected by inspecting its arg shape, and Bash is already
-//     gated by HITL approval (user reads the command before allow).
-//   - Web tools (WebFetch / WebSearch) and Task (subagent) don't touch the
-//     local filesystem via path args, so they pass through.
+// 当 OS sandbox 关闭（如未来加 dev mode 开关），这一层就退化为唯一防线，
+// 但生产构建中 SDK sandbox 永远 enabled: true。
+//
+// 范围决策（不变）：
+//   - Bash 不在此处沙箱。命令包含 `cd /elsewhere` 之类无法静态检测；
+//     OS sandbox + HITL 双保险已足够。
+//   - Web 工具 / Task 不走本地路径，pass through。
 
 import { resolve, relative, isAbsolute, sep } from "node:path";
 
