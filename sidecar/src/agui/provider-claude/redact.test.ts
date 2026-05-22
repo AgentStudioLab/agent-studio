@@ -34,4 +34,28 @@ describe("redactSecrets", () => {
     expect(redactSecrets(true)).toBe(true);
     expect(redactSecrets(null)).toBe(null);
   });
+
+  it("does NOT mask innocuous fields whose names contain a secret substring", () => {
+    const out = redactSecrets({
+      secretary_email: "alice@example.com",
+      tokenizer_config: { vocab_size: 50000 },
+      password_policy_url: "https://example.com/policy",
+    }) as Record<string, unknown>;
+    expect(out.secretary_email).toBe("alice@example.com");
+    expect(out.tokenizer_config).toEqual({ vocab_size: 50000 });
+    expect(out.password_policy_url).toBe("https://example.com/policy");
+  });
+
+  it("masks AWS-style and private key field names", () => {
+    const out = redactSecrets({
+      aws_access_key_id: "AKIAIOSFODNN7EXAMPLE",
+      aws_secret_access_key: "abc/+abc/+abc/+abc/+abc/",
+      private_key: "-----BEGIN RSA PRIVATE KEY-----",
+      bearer: "tk-1234",
+    }) as Record<string, unknown>;
+    expect(out.aws_access_key_id).toBe("***");
+    expect(out.aws_secret_access_key).toBe("***");
+    expect(out.private_key).toBe("***");
+    expect(out.bearer).toBe("***");
+  });
 });
