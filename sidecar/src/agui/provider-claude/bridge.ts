@@ -377,6 +377,36 @@ export async function* claudeSdkToAgui(
       // result — turn finished
       if (m.type === "result") {
         const r = m as SDKResultMessage;
+        // Usage callback — fired for both success and error results so that
+        // cost and permission_denials are captured even on failed runs.
+        if (callbacks?.onRunUsage) {
+          const usage = (r as unknown as {
+            usage?: {
+              input_tokens?: number;
+              output_tokens?: number;
+              cache_creation_input_tokens?: number;
+              cache_read_input_tokens?: number;
+            };
+          }).usage;
+          const rExt = r as unknown as {
+            total_cost_usd?: number;
+            permission_denials?: unknown[];
+            modelUsage?: Record<string, unknown>;
+          };
+          await callbacks.onRunUsage({
+            runId,
+            threadId,
+            inputTokens: usage?.input_tokens ?? 0,
+            outputTokens: usage?.output_tokens ?? 0,
+            cacheCreationTokens: usage?.cache_creation_input_tokens ?? 0,
+            cacheReadTokens: usage?.cache_read_input_tokens ?? 0,
+            totalCostUsd: rExt.total_cost_usd ?? 0,
+            permissionDenials: (rExt.permission_denials ?? []) as Parameters<NonNullable<typeof callbacks.onRunUsage>>[0]["permissionDenials"],
+            model: rExt.modelUsage
+              ? Object.keys(rExt.modelUsage)[0]
+              : undefined,
+          });
+        }
         // Same close-reasoning safety as the assistant handler, in case the
         // turn ended without ever emitting an SDKAssistantMessage frame.
         const endR = closeReasoningBlock();

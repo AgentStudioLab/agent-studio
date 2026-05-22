@@ -370,6 +370,47 @@ describe("bridge — assistant message persistence", () => {
   });
 });
 
+describe("bridge — usage callback", () => {
+  it("invokes onRunUsage with totals from result.usage", async () => {
+    const sdkStream = (async function* () {
+      yield { type: "system", subtype: "init", session_id: "s1" };
+      yield {
+        type: "result",
+        subtype: "success",
+        is_error: false,
+        result: "done",
+        session_id: "s1",
+        usage: {
+          input_tokens: 100,
+          output_tokens: 200,
+          cache_creation_input_tokens: 0,
+          cache_read_input_tokens: 50,
+        },
+        total_cost_usd: 0.0123,
+        permission_denials: [{ tool_name: "Bash", input: {} }],
+      };
+    })();
+
+    const usageCalls: unknown[] = [];
+    const events = await drain(
+      claudeSdkToAgui(sdkStream as never, {
+        threadId: "t",
+        runId: "r",
+        callbacks: {
+          onRunUsage: (u) => { usageCalls.push(u); },
+        },
+      }),
+    );
+
+    expect(usageCalls).toHaveLength(1);
+    const call = usageCalls[0] as { inputTokens: number; outputTokens: number; cacheReadTokens: number; totalCostUsd: number };
+    expect(call.inputTokens).toBe(100);
+    expect(call.outputTokens).toBe(200);
+    expect(call.cacheReadTokens).toBe(50);
+    expect(call.totalCostUsd).toBe(0.0123);
+  });
+});
+
 describe("bridge — retry + error events", () => {
   it("emits CUSTOM agent.retry on api_retry system message", async () => {
     const sdkStream = (async function* () {
