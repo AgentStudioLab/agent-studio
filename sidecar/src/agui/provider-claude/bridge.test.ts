@@ -8,6 +8,7 @@
 
 import { describe, expect, it } from "bun:test";
 import { claudeSdkToAgui } from "./bridge";
+import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 import type { ProviderCallbacks } from "../core/provider-types";
 
 interface OnMessageEndArg {
@@ -85,7 +86,7 @@ describe("bridge — assistant message persistence", () => {
 
     const { callbacks, messageEnds, toolCallEnds } = makeCallbacks();
     const events = await drain(
-      claudeSdkToAgui(sdkStream, {
+      claudeSdkToAgui(sdkStream as AsyncIterable<SDKMessage>, {
         threadId: "t",
         runId: "r",
         callbacks,
@@ -158,7 +159,7 @@ describe("bridge — assistant message persistence", () => {
 
     const { callbacks, messageEnds, toolCallEnds } = makeCallbacks();
     await drain(
-      claudeSdkToAgui(sdkStream, {
+      claudeSdkToAgui(sdkStream as AsyncIterable<SDKMessage>, {
         threadId: "t",
         runId: "r",
         callbacks,
@@ -207,7 +208,7 @@ describe("bridge — assistant message persistence", () => {
 
     const { callbacks, toolCallResults } = makeCallbacks();
     const events = await drain(
-      claudeSdkToAgui(sdkStream, {
+      claudeSdkToAgui(sdkStream as AsyncIterable<SDKMessage>, {
         threadId: "t",
         runId: "r",
         callbacks,
@@ -248,7 +249,7 @@ describe("bridge — assistant message persistence", () => {
 
     const { callbacks, messageEnds, toolCallEnds } = makeCallbacks();
     await drain(
-      claudeSdkToAgui(sdkStream, {
+      claudeSdkToAgui(sdkStream as AsyncIterable<SDKMessage>, {
         threadId: "t",
         runId: "r",
         callbacks,
@@ -298,7 +299,7 @@ describe("bridge — assistant message persistence", () => {
 
     const { callbacks, messageEnds } = makeCallbacks();
     const events = await drain(
-      claudeSdkToAgui(sdkStream, {
+      claudeSdkToAgui(sdkStream as AsyncIterable<SDKMessage>, {
         threadId: "t",
         runId: "r",
         callbacks,
@@ -313,14 +314,14 @@ describe("bridge — assistant message persistence", () => {
 
     const contents = events.filter((e) => e.type === "REASONING_MESSAGE_CONTENT");
     expect(contents).toHaveLength(2);
-    expect((contents[0] as { delta: string }).delta).toBe("Let me ");
-    expect((contents[1] as { delta: string }).delta).toBe("plan.");
+    expect((contents[0] as unknown as { delta: string }).delta).toBe("Let me ");
+    expect((contents[1] as unknown as { delta: string }).delta).toBe("plan.");
 
     // All three reasoning events share the SAME messageId (the same block).
     const reasoningEvents = events.filter((e) =>
       String(e.type).startsWith("REASONING_"),
     );
-    const ids = new Set(reasoningEvents.map((e) => (e as { messageId: string }).messageId));
+    const ids = new Set(reasoningEvents.map((e) => (e as unknown as { messageId: string }).messageId));
     expect(ids.size).toBe(1);
 
     // The persisted reasoning column gets the full accumulated text — that's
@@ -357,7 +358,7 @@ describe("bridge — assistant message persistence", () => {
 
     const { callbacks, toolCallResults } = makeCallbacks();
     await drain(
-      claudeSdkToAgui(sdkStream, {
+      claudeSdkToAgui(sdkStream as AsyncIterable<SDKMessage>, {
         threadId: "t",
         runId: "r",
         callbacks,

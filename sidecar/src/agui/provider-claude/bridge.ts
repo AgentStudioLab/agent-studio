@@ -190,7 +190,9 @@ export async function* claudeSdkToAgui(
         const content = am.message?.content;
         const blocks = Array.isArray(content) ? content : [];
         const textBlock = blocks.find((b) => b.type === "text");
-        const toolUseBlocks = blocks.filter((b) => b.type === "tool_use" && b.id && b.name);
+        const toolUseBlocks = blocks.filter(
+          (b): b is Extract<typeof b, { type: "tool_use" }> => b.type === "tool_use",
+        );
 
         // Allocate a stable message id for THIS AIMessage. Reuse the
         // stream_event text id when there was one; otherwise synthesize a
@@ -363,7 +365,7 @@ export async function* claudeSdkToAgui(
         if (r.is_error) {
           yield {
             type: EventType.RUN_ERROR,
-            message: r.result ?? "agent error",
+            message: r.subtype === "success" ? "agent error" : (r.errors[0] ?? "agent error"),
           } as AGUIEvent;
         } else {
           yield {

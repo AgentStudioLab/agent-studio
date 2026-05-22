@@ -10,6 +10,7 @@
 // because session_id is captured on the next successful turn's init.
 
 import { query as sdkQuery } from "@anthropic-ai/claude-agent-sdk";
+import type { CanUseTool } from "@anthropic-ai/claude-agent-sdk";
 import { claudeSdkToAgui } from "./bridge";
 import { checkWorkspaceSandbox } from "./sandbox";
 import type {
@@ -78,14 +79,10 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
     //      outside the directory they explicitly bound to this conversation.
     //   2. HITL bus (async, user decision) — anything that passes the
     //      sandbox surfaces an approval card.
-    const canUseTool = async (
+    const canUseTool: CanUseTool = async (
       toolName: string,
       input: Record<string, unknown>,
-      sdkOpts: {
-        toolUseID: string;
-        title?: string;
-        description?: string;
-      },
+      sdkOpts,
     ) => {
       const sandboxDeny = checkWorkspaceSandbox(toolName, input, ctx.cwd);
       if (sandboxDeny) {
@@ -108,7 +105,7 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
       options: {
         abortController: ac,
         cwd: ctx.cwd,
-        env: buildEnv() as never,
+        env: buildEnv(),
         allowedTools: opts.allowedTools ?? [],
         // Emit fine-grained SDKPartialAssistantMessage (stream_event) frames so
         // the bridge can turn them into per-token TEXT_MESSAGE_CONTENT events
@@ -116,15 +113,9 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
         // SDK only yields the full SDKAssistantMessage at the end of a turn,
         // which collapses the response into a single chunk.
         includePartialMessages: true,
-        // `as never`: our closure types `options` with the three fields the
-        // bus actually reads (toolUseID/title/description); the SDK's
-        // CanUseTool surface is wider (signal, suggestions, blockedPath, …).
-        // The SDK's options.signal abort path is covered downstream by
-        // runWorker calling bus.cancelAll(runId) on terminal — see Task 4
-        // of docs/superpowers/plans/2026-05-20-hitl-tool-approval.md.
-        // Always installed now: even when there's no HITL bus, the sandbox
+        // Always installed: even when there's no HITL bus, the sandbox
         // layer inside canUseTool needs to gate file paths.
-        canUseTool: canUseTool as never,
+        canUseTool,
         ...(resumeSessionId ? { resume: resumeSessionId } : {}),
       },
     });
