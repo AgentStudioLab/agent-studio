@@ -10,6 +10,7 @@ import { buildRunRoutes } from "./routes/runs";
 import { createApiKeyState } from "./services/apiKey";
 import { ThreadService } from "./services/threads";
 import { MessageService } from "./services/messages";
+import { AuditService } from "./services/audit";
 import { createBunSqliteRunStore } from "./agui/store-sqlite";
 import {
   createClaudeProvider,
@@ -54,6 +55,7 @@ const threads = new ThreadService(db);
 const messages = new MessageService(db);
 const store = createBunSqliteRunStore(db);
 const interruptBus = createInterruptBus({ store });
+const audit = new AuditService(db);
 
 // Mark orphan running rows (process crashed mid-stream) as error so the
 // sidebar pulse dot doesn't lie. Synchronous SQL UPDATE — must stay sync
@@ -94,6 +96,7 @@ function buildProvider() {
     model: process.env.ANTHROPIC_MODEL,
     allowedTools: ["Bash"],
     interruptBus,
+    audit,
   });
 }
 

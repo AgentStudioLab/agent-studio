@@ -15,6 +15,7 @@ import type { CanUseTool } from "@anthropic-ai/claude-agent-sdk";
 import { claudeSdkToAgui } from "./bridge";
 import { getResumeSessionId, tagThreadSession } from "./session-tag";
 import { checkWorkspaceSandbox } from "./sandbox";
+import { createAuditHooks } from "./audit-hook";
 import type {
   AgentProvider,
   RunContext,
@@ -23,6 +24,7 @@ import type {
 import type { AGUIEvent } from "../core/types";
 import type { AGUIInterrupt } from "../core/interrupts";
 import type { InterruptBus } from "./interrupt-bus";
+import type { AuditService } from "../../services/audit";
 
 export interface ClaudeProviderOptions {
   /**
@@ -42,6 +44,8 @@ export interface ClaudeProviderOptions {
    * approval through the existing /runs/:id/resume route.
    */
   interruptBus?: InterruptBus;
+  /** Optional audit sink. When omitted, no hooks installed. */
+  audit?: AuditService;
 }
 
 export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider {
@@ -99,6 +103,10 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
       });
     };
 
+    const auditHooks = opts.audit
+      ? createAuditHooks(opts.audit, { threadId: ctx.threadId, runId: ctx.runId })
+      : null;
+
     const sdkStream = sdkQuery({
       prompt,
       options: {
@@ -115,6 +123,12 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
         // Always installed: even when there's no HITL bus, the sandbox
         // layer inside canUseTool needs to gate file paths.
         canUseTool,
+        ...(auditHooks ? {
+          hooks: {
+            PreToolUse:  [{ hooks: [auditHooks.pre], timeout: 2 }],
+            PostToolUse: [{ hooks: [auditHooks.post], timeout: 2 }],
+          },
+        } : {}),
         sandbox: {
           enabled: true,
           failIfUnavailable: true,
