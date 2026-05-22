@@ -369,3 +369,58 @@ describe("bridge — assistant message persistence", () => {
     expect(toolCallResults[0]!.errorMsg).toBe("command not found");
   });
 });
+
+describe("bridge — retry + error events", () => {
+  it("emits CUSTOM agent.retry on api_retry system message", async () => {
+    const sdkStream = (async function* () {
+      yield { type: "system", subtype: "init", session_id: "s1" };
+      yield {
+        type: "system",
+        subtype: "api_retry",
+        attempt: 2,
+        max_retries: 5,
+        retry_delay_ms: 1500,
+        error_status: 503,
+        error: "server_error",
+      };
+      yield { type: "result", subtype: "success", is_error: false, result: "ok", session_id: "s1" };
+    })();
+    const events = await drain(
+      claudeSdkToAgui(sdkStream as never, { threadId: "t", runId: "r" }),
+    );
+    const retry = events.find((e) => e.type === "CUSTOM" && (e as { name?: string }).name === "agent.retry");
+    expect(retry).toBeDefined();
+    expect((retry as unknown as { value: { attempt: number } }).value.attempt).toBe(2);
+    expect((retry as unknown as { value: { retryDelayMs: number } }).value.retryDelayMs).toBe(1500);
+  });
+
+  it("emits RUN_ERROR with AUTH_FAILED on assistant message error", async () => {
+    const sdkStream = (async function* () {
+      yield { type: "system", subtype: "init", session_id: "s1" };
+      yield {
+        type: "assistant",
+        message: { content: [] },
+        error: "authentication_failed",
+      };
+      yield { type: "result", subtype: "error_during_execution", is_error: true, result: "" };
+    })();
+    const events = await drain(
+      claudeSdkToAgui(sdkStream as never, { threadId: "t", runId: "r" }),
+    );
+    const err = events.find((e) => e.type === "RUN_ERROR");
+    expect(err).toBeDefined();
+    expect((err as unknown as { code: string }).code).toBe("AUTH_FAILED");
+  });
+
+  it("emits RUN_ERROR with MAX_TURNS on result error_max_turns", async () => {
+    const sdkStream = (async function* () {
+      yield { type: "system", subtype: "init", session_id: "s1" };
+      yield { type: "result", subtype: "error_max_turns", is_error: true, result: "" };
+    })();
+    const events = await drain(
+      claudeSdkToAgui(sdkStream as never, { threadId: "t", runId: "r" }),
+    );
+    const err = events.find((e) => e.type === "RUN_ERROR");
+    expect((err as unknown as { code: string }).code).toBe("MAX_TURNS");
+  });
+});

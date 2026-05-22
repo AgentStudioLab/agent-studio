@@ -18,7 +18,9 @@ import type {
   SDKResultMessage,
   SDKSystemMessage,
   SDKPartialAssistantMessage,
+  SDKAPIRetryMessage,
 } from "@anthropic-ai/claude-agent-sdk";
+import { mapAssistantError, mapResultErrorSubtype } from "./error-map";
 import type { BetaToolUseBlock } from "@anthropic-ai/sdk/resources/beta/messages";
 import type { AGUIEvent } from "../core/types";
 import type { ProviderCallbacks } from "../core/provider-types";
@@ -89,11 +91,24 @@ export async function* claudeSdkToAgui(
     for await (const m of sdkStream) {
       if (!m || !m.type) continue;
 
-      // system.init — capture session id once
+      // system.init — capture session id once; api_retry — surface to UI
       if (m.type === "system") {
-        const sys = m as SDKSystemMessage;
+        const sys = m as unknown as { subtype?: string; session_id?: string };
         if (sys.subtype === "init" && typeof sys.session_id === "string") {
           onSessionId?.(sys.session_id);
+        } else if (sys.subtype === "api_retry") {
+          const r = m as SDKAPIRetryMessage;
+          yield {
+            type: EventType.CUSTOM,
+            name: "agent.retry",
+            value: {
+              attempt: r.attempt,
+              maxRetries: r.max_retries,
+              retryDelayMs: r.retry_delay_ms,
+              errorStatus: r.error_status,
+              error: r.error,
+            },
+          } as unknown as AGUIEvent;
         }
         continue;
       }
@@ -182,12 +197,20 @@ export async function* claudeSdkToAgui(
       // assistant — authoritative end of one AIMessage. This is where we
       // persist (messages row + tool_calls rows) and emit *_END events.
       if (m.type === "assistant") {
+        const am = m as SDKAssistantMessage;
+        if (am.error) {
+          yield {
+            type: EventType.RUN_ERROR,
+            code: mapAssistantError(am.error),
+            message: am.error,
+          } as AGUIEvent;
+          return;
+        }
         // Close any still-open reasoning block first — content_block_stop
         // for thinking doesn't carry the block type, so we wait until the
         // wrapping assistant message arrives to flush it.
         const endR = closeReasoningBlock();
         if (endR) yield endR;
-        const am = m as SDKAssistantMessage;
         const content = am.message?.content;
         const blocks = Array.isArray(content) ? content : [];
         const textBlock = blocks.find((b) => b.type === "text");
@@ -364,9 +387,11 @@ export async function* claudeSdkToAgui(
           accumulatedReasoning = "";
         }
         if (r.is_error) {
+          const subtype = (r as { subtype?: string }).subtype ?? "";
           yield {
             type: EventType.RUN_ERROR,
-            message: r.subtype === "success" ? (r.result ?? "agent error") : (r.errors[0] ?? "agent error"),
+            code: mapResultErrorSubtype(subtype),
+            message: subtype === "success" ? ((r as { result?: string }).result ?? "agent error") : ((r as { errors?: string[] }).errors?.[0] ?? subtype ?? "agent error"),
           } as AGUIEvent;
         } else {
           yield {
