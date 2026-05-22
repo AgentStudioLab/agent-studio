@@ -97,11 +97,15 @@ app.use("*", async (c, next) => {
 function buildProvider() {
   const key = apiKey.get();
   if (!key) throw new Error("api_key_missing");
+  const resolveAllowedTools = (threadId: string): string[] => {
+    const override = threads.getAllowedTools(threadId);
+    return override ?? settingsTools.getDefault();
+  };
   return createClaudeProvider({
     apiKey: key,
     baseUrl: process.env.ANTHROPIC_BASE_URL,
     model: process.env.ANTHROPIC_MODEL,
-    allowedTools: ["Bash"],
+    resolveAllowedTools,
     interruptBus,
     audit,
   });

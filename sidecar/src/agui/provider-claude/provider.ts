@@ -36,8 +36,16 @@ export interface ClaudeProviderOptions {
   baseUrl?: string;
   /** Forwarded to the SDK CLI env. */
   model?: string;
-  /** Tools the SDK is allowed to invoke. Each call hits `canUseTool` first. */
+  /**
+   * @deprecated Use `resolveAllowedTools` instead. Kept for backwards compatibility.
+   * Tools the SDK is allowed to invoke. Each call hits `canUseTool` first.
+   */
   allowedTools?: string[];
+  /**
+   * Called per-turn with threadId; returns the effective allowedTools for that thread.
+   * If provided, takes precedence over the deprecated `allowedTools` field.
+   */
+  resolveAllowedTools?: (threadId: string) => string[];
   /**
    * HITL bus. When provided, the provider wires `canUseTool` to
    * `bus.requestApproval` so each tool invocation requires explicit user
@@ -74,6 +82,10 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
     }
 
     const resumeSessionId = await getResumeSessionId(ctx.threadId, ctx.cwd);
+
+    const allowedTools = opts.resolveAllowedTools
+      ? opts.resolveAllowedTools(ctx.threadId)
+      : opts.allowedTools ?? [];
 
     const bus = opts.interruptBus;
     // canUseTool runs for every tool call. Two gates layered:
@@ -113,7 +125,7 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
         abortController: ac,
         cwd: ctx.cwd,
         env: buildEnv(),
-        allowedTools: opts.allowedTools ?? [],
+        allowedTools,
         // Emit fine-grained SDKPartialAssistantMessage (stream_event) frames so
         // the bridge can turn them into per-token TEXT_MESSAGE_CONTENT events
         // and the UI shows characters arriving in real time. Without this, the
