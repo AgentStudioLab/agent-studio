@@ -60,6 +60,44 @@ CREATE TABLE IF NOT EXISTS run_events (
   created_at  INTEGER NOT NULL,
   PRIMARY KEY (run_id, seq)
 );
+
+CREATE TABLE IF NOT EXISTS tool_audit (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  ts              INTEGER NOT NULL,
+  phase           TEXT NOT NULL CHECK (phase IN ('pre','post','denied')),
+  session_id      TEXT,
+  thread_id       TEXT,
+  run_id          TEXT,
+  tool_name       TEXT NOT NULL,
+  tool_use_id     TEXT,
+  input_json      TEXT,
+  duration_ms     INTEGER,
+  is_error        INTEGER NOT NULL DEFAULT 0,
+  cwd             TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_audit_ts ON tool_audit (ts DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_thread ON tool_audit (thread_id, ts DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_tool ON tool_audit (tool_name, ts DESC);
+
+CREATE TABLE IF NOT EXISTS usage_ledger (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  ts            INTEGER NOT NULL,
+  run_id        TEXT NOT NULL,
+  thread_id     TEXT NOT NULL,
+  model         TEXT,
+  input_tokens  INTEGER NOT NULL DEFAULT 0,
+  output_tokens INTEGER NOT NULL DEFAULT 0,
+  cache_creation_tokens INTEGER NOT NULL DEFAULT 0,
+  cache_read_tokens     INTEGER NOT NULL DEFAULT 0,
+  cost_usd      REAL NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_ledger_ts ON usage_ledger (ts DESC);
+CREATE INDEX IF NOT EXISTS idx_ledger_thread ON usage_ledger (thread_id, ts DESC);
+
+CREATE TABLE IF NOT EXISTS settings (
+  key   TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
 `;
 
 interface ColumnInfo {
@@ -86,6 +124,14 @@ function ensureColumn(
 export function migrate(db: Database): void {
   db.exec(SCHEMA);
   ensureColumn(db, "conversations", "working_dir", "TEXT");
+  ensureColumn(db, "conversations", "allowed_tools_json", "TEXT");
+  ensureColumn(db, "runs", "input_tokens", "INTEGER");
+  ensureColumn(db, "runs", "output_tokens", "INTEGER");
+  ensureColumn(db, "runs", "cache_creation_tokens", "INTEGER");
+  ensureColumn(db, "runs", "cache_read_tokens", "INTEGER");
+  ensureColumn(db, "runs", "total_cost_usd", "REAL");
+  ensureColumn(db, "runs", "permission_denials", "TEXT");
+  ensureColumn(db, "runs", "model_used", "TEXT");
 }
 
 export function openDb(path: string): Database {
