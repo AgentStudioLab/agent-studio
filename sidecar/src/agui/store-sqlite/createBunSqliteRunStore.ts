@@ -1,5 +1,6 @@
 import { EventEmitter } from "node:events";
 import type { Database } from "bun:sqlite";
+import { EventType } from "@ag-ui/core";
 import type { AGUIEvent } from "../core/types";
 import type {
   AGUIEventEnvelope,
@@ -46,6 +47,12 @@ export function createBunSqliteRunStore(db: Database): RunEventStore {
   );
   const orphanUpdate = db.prepare(
     "UPDATE runs SET status = 'error', error_msg = 'process restart', ended_at = ? WHERE status = 'running'",
+  );
+  const selectAwaitingOrphans = db.prepare(
+    "SELECT id FROM runs WHERE status = 'awaiting_approval'",
+  );
+  const awaitingOrphanUpdate = db.prepare(
+    "UPDATE runs SET status = 'cancelled', error_msg = 'process restart', ended_at = ? WHERE id = ?",
   );
   const latestRunPerThread = db.prepare(`
     SELECT c.id AS threadId, c.title AS title, r.id AS lastRunId, r.status,
@@ -188,8 +195,26 @@ export function createBunSqliteRunStore(db: Database): RunEventStore {
     },
 
     reconcileOrphans() {
-      const result = orphanUpdate.run(Date.now());
-      return Number(result.changes ?? 0);
+      const now = Date.now();
+      const result = orphanUpdate.run(now);
+      const runningCount = Number(result.changes ?? 0);
+
+      // Also reconcile awaiting_approval orphans — their in-memory HITL deferreds
+      // were wiped on process restart, so the user's deny click would 409.
+      // Append a synthetic RUN_ERROR(CANCELLED) event so SSE replay terminates
+      // the frontend's awaiting state cleanly.
+      const awaitingRows = selectAwaitingOrphans.all() as Array<{ id: string }>;
+      for (const row of awaitingRows) {
+        appendTx(
+          row.id,
+          EventType.RUN_ERROR,
+          JSON.stringify({ type: EventType.RUN_ERROR, code: "CANCELLED", message: "process restart" }),
+          now,
+        );
+        awaitingOrphanUpdate.run(now, row.id);
+      }
+
+      return runningCount + awaitingRows.length;
     },
   };
 }
