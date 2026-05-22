@@ -2,9 +2,15 @@ import { isValidElement, useCallback, useMemo, type ReactNode } from "react";
 import { Streamdown } from "streamdown";
 import type { BundledLanguage } from "shiki";
 import type { MessageBlock, MessageView, PendingInterrupt } from "@/lib/agui/runtime";
+import type { ChatRuntime } from "@/lib/agui/runtime/runtime";
+import { useRunStatus } from "@/lib/agui/react/useRunStatus";
+import { useAppShell } from "@/app/AppShellContext";
 import { ToolApprovalCard } from "@/features/task/ToolApprovalCard";
 import { UserMessage } from "@/features/task/UserMessage";
 import { MessageActions } from "@/features/task/MessageActions";
+import { ApiKeyMissingBanner } from "@/features/task/ApiKeyMissingBanner";
+import { RetryHint } from "@/features/task/RetryHint";
+import { RetryingPill } from "@/features/task/RetryingPill";
 import {
   ProcessGroup,
   type ProcessStep,
@@ -26,6 +32,7 @@ import {
 
 interface ChatStreamProps {
   threadId: string;
+  runtime: ChatRuntime;
   messages: MessageView[];
   isThinking: boolean;
   isRunning: boolean;
@@ -102,6 +109,7 @@ const STREAMDOWN_COMPONENTS = {
  */
 export function ChatStream({
   threadId,
+  runtime,
   messages,
   isThinking,
   isRunning,
@@ -112,6 +120,10 @@ export function ChatStream({
   allowedTools,
   onAllowAlways,
 }: ChatStreamProps) {
+  const { setView } = useAppShell();
+  // cast: ChatRuntime.subscribe takes (state) => void; RuntimeLike expects () => void.
+  // The wrapper in useRunStatus discards the state arg, so this is safe at runtime.
+  const status = useRunStatus(runtime as never);
   const interruptsByToolId = useMemo(() => {
     const m = new Map<string, PendingInterrupt>();
     for (const it of pendingInterrupts) {
@@ -167,6 +179,17 @@ export function ChatStream({
     >
       <ConversationContent className="gap-0 p-0">
         <div className="mx-auto w-full max-w-[760px] space-y-6 px-8 py-6">
+          {status.isAuthError && (
+            <ApiKeyMissingBanner onConfigureClick={() => setView("settings")} />
+          )}
+          {status.errorCode === "RATE_LIMIT" && status.retry && (
+            <RetryHint delayMs={status.retry.retryDelayMs} />
+          )}
+          {status.retry && status.status === "running" && (
+            <div className="px-4 pt-2">
+              <RetryingPill attempt={status.retry.attempt} maxRetries={status.retry.maxRetries} />
+            </div>
+          )}
           {messages.map((m, idx) => {
             const isLive =
               isRunning &&

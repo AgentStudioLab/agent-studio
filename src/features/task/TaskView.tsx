@@ -31,6 +31,7 @@ export function TaskView() {
   // ChatRuntime per threadId. send/cancel/state come from here.
   const {
     viewMessages,
+    runtime,
     isRunning,
     isThinking,
     error,
@@ -136,6 +137,7 @@ export function TaskView() {
           <div className="flex min-h-0 flex-1 flex-col">
             <ChatStream
               threadId={activeTaskId}
+              runtime={runtime}
               messages={viewMessages}
               isThinking={isThinking}
               isRunning={isRunning}

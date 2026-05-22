@@ -144,6 +144,7 @@ export function useChat(opts: UseChatOptions) {
   return {
     viewMessages,
     state,
+    runtime,
     isRunning: state.isRunning,
     isThinking: state.isThinking,
     error: state.error,

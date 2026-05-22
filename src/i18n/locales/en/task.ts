@@ -91,5 +91,16 @@ export const task: typeof Zh = {
       disclaimer:
         "Agent Studio is AI and can make mistakes. Please double-check responses.",
     },
+    error: {
+      authFailed: "API key invalid or missing",
+      configureKey: "Configure API key",
+      rateLimit: "Rate limited — retrying in {{sec}}s",
+      generic: "Agent error: {{msg}}",
+      maxTurns: "Hit max turns — please start a new thread",
+      maxBudget: "Hit cost cap",
+    },
+    retry: {
+      attempt: "Retrying {{attempt}}/{{max}}",
+    },
   },
 };

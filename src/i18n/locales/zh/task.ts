@@ -88,5 +88,16 @@ export const task = {
       legacyModel: "Legacy 模型",
       disclaimer: "Agent Studio 是 AI，可能会出错。请仔细核对回复。",
     },
+    error: {
+      authFailed: "API key 失效或未配置",
+      configureKey: "配置 API key",
+      rateLimit: "已被限流，{{sec}} 秒后自动重试",
+      generic: "agent 错误：{{msg}}",
+      maxTurns: "达到最大轮次上限，请新开 thread",
+      maxBudget: "达到费用上限",
+    },
+    retry: {
+      attempt: "正在重试 {{attempt}}/{{max}}",
+    },
   },
 };
