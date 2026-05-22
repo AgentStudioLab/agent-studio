@@ -53,4 +53,13 @@ describe("db migrate — Phase 1 SDK leverage schema", () => {
     expect(hasColumn(db, "settings", "key")).toBe(true);
     expect(hasColumn(db, "settings", "value")).toBe(true);
   });
+
+  it("is idempotent — calling migrate twice does not error or duplicate columns", () => {
+    const db = new Database(":memory:");
+    migrate(db);
+    expect(() => migrate(db)).not.toThrow();
+    const cols = db.prepare(`PRAGMA table_info(runs)`).all() as Array<{ name: string }>;
+    const names = cols.map((c) => c.name);
+    expect(new Set(names).size).toBe(names.length); // no duplicates
+  });
 });

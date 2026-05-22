@@ -61,6 +61,8 @@ CREATE TABLE IF NOT EXISTS run_events (
   PRIMARY KEY (run_id, seq)
 );
 
+-- tool_audit: append-only compliance log. Intentionally NO foreign keys —
+-- audit rows must survive deletion of runs / threads / conversations.
 CREATE TABLE IF NOT EXISTS tool_audit (
   id              INTEGER PRIMARY KEY AUTOINCREMENT,
   ts              INTEGER NOT NULL,
@@ -78,7 +80,10 @@ CREATE TABLE IF NOT EXISTS tool_audit (
 CREATE INDEX IF NOT EXISTS idx_audit_ts ON tool_audit (ts DESC);
 CREATE INDEX IF NOT EXISTS idx_audit_thread ON tool_audit (thread_id, ts DESC);
 CREATE INDEX IF NOT EXISTS idx_audit_tool ON tool_audit (tool_name, ts DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_run ON tool_audit (run_id, ts DESC);
 
+-- usage_ledger: per-run token/cost time series. Intentionally NO foreign keys —
+-- ledger rows are append-only and must survive run deletion.
 CREATE TABLE IF NOT EXISTS usage_ledger (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,
   ts            INTEGER NOT NULL,
