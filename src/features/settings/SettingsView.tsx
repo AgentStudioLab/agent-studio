@@ -8,6 +8,7 @@ import { LanguageSegment } from "@/shared/atoms/LanguageSegment";
 import { cn } from "@/lib/utils";
 import { setApiKey } from "@/lib/data/settings";
 import { useAllowedTools } from "@/lib/agui/react/useAllowedTools";
+import { useDefaultAllowedTools } from "@/lib/data/thread-tools-queries";
 
 export function SettingsView() {
   const { setView } = useAppShell();
@@ -17,6 +18,16 @@ export function SettingsView() {
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<"saved" | "error" | null>(null);
   const { allowedTools, removeAllowedTool } = useAllowedTools();
+  const { tools: defaultTools, setTools: setDefaults } = useDefaultAllowedTools();
+
+  const ALL_TOOLS = ["Bash", "Read", "Write", "Edit", "Glob", "Grep", "WebFetch", "WebSearch", "Task"] as const;
+
+  const toggleDefault = (tool: string) => {
+    const next = defaultTools.includes(tool)
+      ? defaultTools.filter((t) => t !== tool)
+      : [...defaultTools, tool];
+    setDefaults(next);
+  };
 
   const handleSaveApiKey = async () => {
     setSaving(true);
@@ -138,6 +149,29 @@ export function SettingsView() {
                   ))}
                 </ul>
               )}
+            </section>
+            <section className="border-t border-border pt-8 space-y-3">
+              <div>
+                <h2 className="text-[18px] font-semibold text-foreground">
+                  {t("settings.defaultTools.title")}
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  {t("settings.defaultTools.description")}
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {ALL_TOOLS.map((tool) => (
+                  <label key={tool} className="flex items-center gap-2 cursor-pointer text-sm">
+                    <input
+                      type="checkbox"
+                      checked={defaultTools.includes(tool)}
+                      onChange={() => toggleDefault(tool)}
+                      className="h-4 w-4 rounded border border-[var(--border-200)] accent-[var(--brand-100)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-100)]"
+                    />
+                    <span>{t(`settings.defaultTools.toolName.${tool}` as never)}</span>
+                  </label>
+                ))}
+              </div>
             </section>
             <section className="border-t border-border pt-8">
               <h2 className="mb-4 text-[18px] font-semibold text-foreground">

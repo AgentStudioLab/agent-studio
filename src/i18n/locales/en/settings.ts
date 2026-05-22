@@ -54,6 +54,21 @@ export const settings: typeof Zh = {
         "Nothing yet. When Agent Studio requests approval, click “Always allow X” to add it here.",
       remove: "Remove",
     },
+    defaultTools: {
+      title: "Default tools",
+      description: "Tools agents are allowed to use by default in new conversations. HITL still approves each call.",
+      toolName: {
+        Bash: "Bash command",
+        Read: "Read file",
+        Write: "Write file",
+        Edit: "Edit file",
+        Glob: "Glob",
+        Grep: "Grep",
+        WebFetch: "Fetch web page",
+        WebSearch: "Web search",
+        Task: "Subagent (Task)",
+      },
+    },
     back: "Back",
   },
 };

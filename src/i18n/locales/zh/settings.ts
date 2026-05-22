@@ -49,6 +49,21 @@ export const settings = {
       empty: "暂无。当 Agent Studio 请求审批某个工具时，点击“始终允许 X”可加入此列表。",
       remove: "移除",
     },
+    defaultTools: {
+      title: "默认工具集",
+      description: "新建对话默认允许 agent 使用的工具。HITL 仍会逐次审批。",
+      toolName: {
+        Bash: "Bash 命令",
+        Read: "读文件",
+        Write: "写文件",
+        Edit: "编辑文件",
+        Glob: "文件名匹配",
+        Grep: "内容搜索",
+        WebFetch: "网页抓取",
+        WebSearch: "网页搜索",
+        Task: "子任务（subagent）",
+      },
+    },
     back: "返回",
   },
 };
