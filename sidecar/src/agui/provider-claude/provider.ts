@@ -12,6 +12,7 @@
 import { query as sdkQuery } from "@anthropic-ai/claude-agent-sdk";
 import type { CanUseTool } from "@anthropic-ai/claude-agent-sdk";
 import { claudeSdkToAgui } from "./bridge";
+import { getResumeSessionId, tagThreadSession } from "./session-tag";
 import { checkWorkspaceSandbox } from "./sandbox";
 import type {
   AgentProvider,
@@ -43,9 +44,6 @@ export interface ClaudeProviderOptions {
 }
 
 export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider {
-  // Per-thread session_id memo. v1 keeps in memory (sidecar restart → fresh).
-  const sessionByThread = new Map<string, string>();
-
   function buildEnv(): Record<string, string> {
     const env: Record<string, string> = { ...(process.env as Record<string, string>) };
     env.ANTHROPIC_API_KEY = opts.apiKey;
@@ -54,10 +52,10 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
     return env;
   }
 
-  function runTurn(
+  async function runTurn(
     ctx: RunContext | ResumeContext,
     prompt: string,
-  ): AsyncIterable<AGUIEvent> {
+  ): Promise<AsyncIterable<AGUIEvent>> {
     const ac = new AbortController();
     // Bridge external signal → SDK's controller.
     if (ctx.abortSignal.aborted) {
@@ -70,7 +68,7 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
       );
     }
 
-    const resumeSessionId = sessionByThread.get(ctx.threadId);
+    const resumeSessionId = await getResumeSessionId(ctx.threadId, ctx.cwd);
 
     const bus = opts.interruptBus;
     // canUseTool runs for every tool call. Two gates layered:
@@ -125,10 +123,7 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
       runId: ctx.runId,
       callbacks: ctx.callbacks,
       onSessionId: (sid) => {
-        // Capture each turn's session_id; the resume path returns the SAME
-        // id we passed in, but the no-resume first turn allocates a fresh
-        // one that we MUST remember for turn 2.
-        sessionByThread.set(ctx.threadId, sid);
+        void tagThreadSession(sid, ctx.threadId, ctx.cwd);
       },
     });
   }
@@ -137,15 +132,12 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
     name: "claude-agent-sdk",
 
     run(ctx: RunContext) {
-      return runTurn(ctx, ctx.userMessage.content);
+      return asyncIterableFromPromise(runTurn(ctx, ctx.userMessage.content));
     },
 
     resume(ctx: ResumeContext) {
-      // v1: no HITL interrupts surface in our run loop (tools:[] means no
-      // tool_approval). Provide a no-op resume that yields a synthetic
-      // RUN_FINISHED so the loop terminates cleanly if ever called.
       const payload = ctx.resumePayload as { text?: string } | null;
-      return runTurn(ctx, payload?.text ?? "");
+      return asyncIterableFromPromise(runTurn(ctx, payload?.text ?? ""));
     },
 
     async getPendingInterrupts(
@@ -165,6 +157,22 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
       // No-op for SDK provider. The next user message will land via resume
       // sessionId, and the cancelled assistant message stays in the SDK's
       // session transcript (it's recorded by the CLI before kill).
+    },
+  };
+}
+
+function asyncIterableFromPromise<T>(
+  p: Promise<AsyncIterable<T>>,
+): AsyncIterable<T> {
+  return {
+    [Symbol.asyncIterator]() {
+      let inner: AsyncIterator<T> | null = null;
+      return {
+        async next() {
+          if (!inner) inner = (await p)[Symbol.asyncIterator]();
+          return inner.next();
+        },
+      };
     },
   };
 }
