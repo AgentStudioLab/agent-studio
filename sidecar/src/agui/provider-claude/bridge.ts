@@ -11,57 +11,16 @@
 
 import { nanoid } from "nanoid";
 import { EventType } from "@ag-ui/core";
+import type {
+  SDKMessage,
+  SDKAssistantMessage,
+  SDKUserMessage,
+  SDKResultMessage,
+  SDKSystemMessage,
+  SDKPartialAssistantMessage,
+} from "@anthropic-ai/claude-agent-sdk";
 import type { AGUIEvent } from "../core/types";
 import type { ProviderCallbacks } from "../core/provider-types";
-
-interface SdkContentBlock {
-  type: string;
-  text?: string;
-  id?: string;
-  name?: string;
-  input?: unknown;
-  thinking?: string;
-  tool_use_id?: string;
-  content?: unknown;
-  is_error?: boolean;
-}
-
-interface SdkAssistantLike {
-  type: "assistant";
-  message: { content?: SdkContentBlock[] | string; id?: string };
-  session_id?: string;
-  uuid?: string;
-}
-
-interface SdkUserLike {
-  type: "user";
-  message: { content?: SdkContentBlock[] | string; role?: string };
-  parent_tool_use_id?: string | null;
-}
-
-interface SdkResultLike {
-  type: "result";
-  subtype: "success" | string;
-  is_error?: boolean;
-  result?: string;
-  session_id?: string;
-}
-
-interface SdkSystemInitLike {
-  type: "system";
-  subtype: "init";
-  session_id: string;
-}
-
-interface SdkStreamEventLike {
-  type: "stream_event";
-  event: {
-    type: string;
-    index?: number;
-    delta?: { type?: string; text?: string; partial_json?: string };
-    content_block?: { type?: string; id?: string; name?: string; text?: string };
-  };
-}
 
 export interface BridgeOptions {
   threadId: string;
@@ -80,7 +39,7 @@ export interface BridgeOptions {
  * runWorker) and they vanish after page refresh.
  */
 export async function* claudeSdkToAgui(
-  sdkStream: AsyncIterable<unknown>,
+  sdkStream: AsyncIterable<SDKMessage>,
   opts: BridgeOptions,
 ): AsyncIterable<AGUIEvent> {
   const { threadId, runId, callbacks, onSessionId } = opts;
@@ -126,15 +85,14 @@ export async function* claudeSdkToAgui(
   const toolById = new Map<string, ToolState>();
 
   try {
-    for await (const raw of sdkStream) {
-      const m = raw as { type?: string };
+    for await (const m of sdkStream) {
       if (!m || !m.type) continue;
 
       // system.init — capture session id once
       if (m.type === "system") {
-        const init = m as Partial<SdkSystemInitLike>;
-        if (init.subtype === "init" && typeof init.session_id === "string") {
-          onSessionId?.(init.session_id);
+        const sys = m as SDKSystemMessage;
+        if (sys.subtype === "init" && typeof sys.session_id === "string") {
+          onSessionId?.(sys.session_id);
         }
         continue;
       }
@@ -143,7 +101,7 @@ export async function* claudeSdkToAgui(
       // Fires UI events early so the user sees text appearing per-token; the
       // authoritative SDKAssistantMessage handler below does the persistence.
       if (m.type === "stream_event") {
-        const ev = (m as SdkStreamEventLike).event;
+        const ev = (m as SDKPartialAssistantMessage).event;
         if (!ev) continue;
 
         if (ev.type === "content_block_start" && ev.content_block) {
@@ -201,8 +159,7 @@ export async function* claudeSdkToAgui(
             // here. We rely on the assistant-message handler to emit the
             // full TOOL_CALL_ARGS once `input` parses on the final message.
           } else if (ev.delta.type === "thinking_delta") {
-            const delta =
-              (ev.delta as { thinking?: string }).thinking ?? "";
+            const delta = ev.delta.thinking;
             if (delta && currentReasoningId) {
               accumulatedReasoning += delta;
               yield {
@@ -229,7 +186,7 @@ export async function* claudeSdkToAgui(
         // wrapping assistant message arrives to flush it.
         const endR = closeReasoningBlock();
         if (endR) yield endR;
-        const am = m as SdkAssistantLike;
+        const am = m as SDKAssistantMessage;
         const content = am.message?.content;
         const blocks = Array.isArray(content) ? content : [];
         const textBlock = blocks.find((b) => b.type === "text");
@@ -346,7 +303,7 @@ export async function* claudeSdkToAgui(
       // tool_result entries. Emit TOOL_CALL_RESULT so the UI flips the
       // spinner to a checkmark + the tool_calls row gets `result`/`status`.
       if (m.type === "user") {
-        const um = m as SdkUserLike;
+        const um = m as SDKUserMessage;
         const content = um.message?.content;
         if (!Array.isArray(content)) continue;
         for (const block of content) {
@@ -380,7 +337,7 @@ export async function* claudeSdkToAgui(
 
       // result — turn finished
       if (m.type === "result") {
-        const r = m as SdkResultLike;
+        const r = m as SDKResultMessage;
         // Same close-reasoning safety as the assistant handler, in case the
         // turn ended without ever emitting an SDKAssistantMessage frame.
         const endR = closeReasoningBlock();

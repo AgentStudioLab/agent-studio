@@ -128,6 +128,7 @@ Project skills live under `.claude/skills/`:
 - `design-tokens` — **always invoke before any styling change.** Enforces the 3-tier token discipline (primitives / semantic / components) and gates new token decisions.
 - `ai-elements` (vercel/ai-elements) — UI primitives for AI chat/agent UX. Required reading before installing or reconciling any ai-elements component.
 - `vercel-react-best-practices` (vercel-labs/agent-skills) — React performance rules.
+- `claude-agent-sdk-reference` — authoritative TypeScript reference for `@anthropic-ai/claude-agent-sdk` (query/startup/tool, sandbox, hooks, canUseTool, sessions, MCP, all message + tool schemas, plus usage recipes). Consult before writing or modifying code that touches the SDK — especially anything in `sidecar/src/agui/provider-claude/`.
 - `skill-creator` (anthropics/skills) — meta-skill for authoring new skills.
 
 Consult these when relevant; they are part of the project's documented context.
