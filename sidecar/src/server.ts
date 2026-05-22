@@ -67,8 +67,27 @@ const settingsTools = new SettingsToolsService(db);
 // Mark orphan running rows (process crashed mid-stream) as error so the
 // sidebar pulse dot doesn't lie. Synchronous SQL UPDATE — must stay sync
 // because `bun build --compile --bytecode` does not support top-level await.
-const orphans = store.reconcileOrphans();
-if (orphans > 0) console.log(`[boot] reconciled ${orphans} orphan run(s) → error`);
+const reconcile = store.reconcileOrphans();
+// For each awaiting_approval orphan, drop a system note so the user sees a
+// "继续上次任务" affordance on next reload. The note's distinct content prefix
+// is how groupIntoTurns assigns `reason: "process_restart"` to the notice
+// block — no DB migration needed.
+for (const o of reconcile.awaitingOrphans) {
+  try {
+    messages.appendSystemNote(
+      o.threadId,
+      "[process_restart] 上次审批未完成时应用被关闭，agent 已停止",
+    );
+  } catch (err) {
+    console.warn("[boot] failed to append process_restart note", o, err);
+  }
+}
+const totalOrphans = reconcile.runningCount + reconcile.awaitingOrphans.length;
+if (totalOrphans > 0) {
+  console.log(
+    `[boot] reconciled ${reconcile.runningCount} running + ${reconcile.awaitingOrphans.length} awaiting orphan(s)`,
+  );
+}
 
 export const app = new Hono();
 

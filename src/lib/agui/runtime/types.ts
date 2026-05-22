@@ -26,11 +26,27 @@ export interface ToolCallView {
  * notice 块是客户端注入的（如用户主动取消时插入"已被用户中止"）。
  * streaming 标记仅 reasoning 在用，配合 shimmer 动效。
  */
+/**
+ * Notice block reasons drive the UI affordance attached to "已被用户中止":
+ *   - "user"            (default): user pressed Stop / denied a tool. No CTA.
+ *   - "process_restart": the sidecar process exited while an HITL approval
+ *     was pending — the in-memory deferred is gone and the run was reconciled
+ *     to cancelled on next boot. Frontend renders a "继续上次任务" button so
+ *     the user can resume via a fresh prompt (SDK session id replays context).
+ */
+export type NoticeReason = "user" | "process_restart";
+
 export type MessageBlock =
   | { kind: "text"; id: string; content: string }
   | { kind: "reasoning"; id: string; content: string; streaming?: boolean }
   | { kind: "tool_call"; toolCall: ToolCallView }
-  | { kind: "notice"; id: string; level: "interrupted"; content: string };
+  | {
+      kind: "notice";
+      id: string;
+      level: "interrupted";
+      content: string;
+      reason?: NoticeReason;
+    };
 
 /**
  * 一条对话回合。

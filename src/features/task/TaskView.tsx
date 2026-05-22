@@ -172,6 +172,7 @@ export function TaskView() {
               onResume={resumeRun}
               allowedTools={allowedTools}
               onAllowAlways={addAllowedTool}
+              onContinueAfterRestart={() => void send("继续上次未完成的任务")}
             />
           </div>
           <div className="shrink-0 px-8 pb-6 pt-2">

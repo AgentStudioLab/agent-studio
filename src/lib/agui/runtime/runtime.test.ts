@@ -262,6 +262,33 @@ describe("reducer — error code + retry", () => {
     }
   });
 
+  // Process restart (sidecar exited while HITL was pending) → reconcile
+  // emits RUN_ERROR with reason=process_restart. The reducer must tag the
+  // notice block with that reason so ChatStream renders the "继续上次任务" CTA.
+  it("RUN_ERROR CANCELLED with reason=process_restart tags the notice block", () => {
+    let s = applyEvent(
+      createInitialState(),
+      { type: "TEXT_MESSAGE_START", messageId: "m1", role: "assistant" },
+      new Map(),
+    );
+    s = applyEvent(
+      s,
+      {
+        type: "RUN_ERROR",
+        code: "CANCELLED",
+        reason: "process_restart",
+        message: "process restart",
+      },
+      new Map(),
+    );
+    const lastTurn = s.liveMessages[s.liveMessages.length - 1];
+    if (!lastTurn || lastTurn.role !== "assistant") throw new Error("expected assistant turn");
+    const notice = lastTurn.blocks[lastTurn.blocks.length - 1];
+    if (!notice || notice.kind !== "notice") throw new Error("expected notice block");
+    expect(notice.reason).toBe("process_restart");
+    expect(notice.content).toContain("应用被关闭");
+  });
+
   it("appendInterruptedNotice is idempotent (double-fire safe)", () => {
     let s = applyEvent(
       createInitialState(),

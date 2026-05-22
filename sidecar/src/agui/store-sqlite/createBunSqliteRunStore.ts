@@ -49,7 +49,7 @@ export function createBunSqliteRunStore(db: Database): RunEventStore {
     "UPDATE runs SET status = 'error', error_msg = 'process restart', ended_at = ? WHERE status = 'running'",
   );
   const selectAwaitingOrphans = db.prepare(
-    "SELECT id FROM runs WHERE status = 'awaiting_approval'",
+    "SELECT id, thread_id FROM runs WHERE status = 'awaiting_approval'",
   );
   const awaitingOrphanUpdate = db.prepare(
     "UPDATE runs SET status = 'cancelled', error_msg = 'process restart', ended_at = ? WHERE id = ?",
@@ -201,20 +201,37 @@ export function createBunSqliteRunStore(db: Database): RunEventStore {
 
       // Also reconcile awaiting_approval orphans — their in-memory HITL deferreds
       // were wiped on process restart, so the user's deny click would 409.
-      // Append a synthetic RUN_ERROR(CANCELLED) event so SSE replay terminates
-      // the frontend's awaiting state cleanly.
-      const awaitingRows = selectAwaitingOrphans.all() as Array<{ id: string }>;
+      // Append a synthetic RUN_ERROR(CANCELLED, reason: process_restart) event so
+      // SSE replay terminates the frontend's awaiting state cleanly. The caller
+      // (server.ts) persists a system note in each affected thread so the user
+      // sees a "继续上次任务" affordance on next reload — without the note the
+      // page would silently swap the HITL card for nothing.
+      const awaitingRows = selectAwaitingOrphans.all() as Array<{
+        id: string;
+        thread_id: string;
+      }>;
       for (const row of awaitingRows) {
         appendTx(
           row.id,
           EventType.RUN_ERROR,
-          JSON.stringify({ type: EventType.RUN_ERROR, code: "CANCELLED", message: "process restart" }),
+          JSON.stringify({
+            type: EventType.RUN_ERROR,
+            code: "CANCELLED",
+            reason: "process_restart",
+            message: "process restart",
+          }),
           now,
         );
         awaitingOrphanUpdate.run(now, row.id);
       }
 
-      return runningCount + awaitingRows.length;
+      return {
+        runningCount,
+        awaitingOrphans: awaitingRows.map((r) => ({
+          runId: r.id,
+          threadId: r.thread_id,
+        })),
+      };
     },
   };
 }

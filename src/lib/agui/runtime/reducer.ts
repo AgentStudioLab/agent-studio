@@ -16,6 +16,7 @@ import type {
   ChatState,
   MessageBlock,
   MessageView,
+  NoticeReason,
   PendingInterrupt,
 } from "./types";
 import { sweepPendingToolCalls } from "./sweep";
@@ -56,42 +57,52 @@ function replaceLastTurn(
   return out;
 }
 
-/**
- * Append a "已被用户中止" notice block to the current assistant turn — or
- * push a new assistant turn carrying just that notice when none is open.
- * Idempotent: if the last block is already an `interrupted` notice, the
- * input array is returned unchanged so optimistic (resume-deny) + reactive
- * (RUN_ERROR(CANCELLED) replay) paths can both call this safely.
- */
-export function appendInterruptedNotice(live: MessageView[]): MessageView[] {
-  const last = live[live.length - 1];
-  if (last && last.role === "assistant") {
-    const lastBlock = last.blocks[last.blocks.length - 1];
-    if (lastBlock?.kind === "notice" && lastBlock.level === "interrupted") {
-      return live;
-    }
-    const notice: MessageBlock = {
-      kind: "notice",
-      id: `notice_${nanoid(8)}`,
-      level: "interrupted",
-      content: "已被用户中止",
-    };
-    const out = [...live];
-    out[out.length - 1] = { ...last, blocks: [...last.blocks, notice] };
-    return out;
-  }
-  const notice: MessageBlock = {
+const NOTICE_CONTENT: Record<NoticeReason, string> = {
+  user: "已被用户中止",
+  process_restart: "上次审批未完成时应用被关闭，agent 已停止",
+};
+
+function makeNoticeBlock(reason: NoticeReason): MessageBlock {
+  return {
     kind: "notice",
     id: `notice_${nanoid(8)}`,
     level: "interrupted",
-    content: "已被用户中止",
+    content: NOTICE_CONTENT[reason],
+    reason,
   };
+}
+
+/**
+ * Append an interrupted notice to the current assistant turn — or push a new
+ * assistant turn carrying just that notice when none is open. Idempotent for
+ * the same reason: if the last block is already an `interrupted` notice with
+ * the same `reason`, the input array is returned unchanged. Different reasons
+ * stack (rare but defensive — e.g., user denied during a process_restart card).
+ */
+export function appendInterruptedNotice(
+  live: MessageView[],
+  reason: NoticeReason = "user",
+): MessageView[] {
+  const last = live[live.length - 1];
+  if (last && last.role === "assistant") {
+    const lastBlock = last.blocks[last.blocks.length - 1];
+    if (
+      lastBlock?.kind === "notice" &&
+      lastBlock.level === "interrupted" &&
+      (lastBlock.reason ?? "user") === reason
+    ) {
+      return live;
+    }
+    const out = [...live];
+    out[out.length - 1] = { ...last, blocks: [...last.blocks, makeNoticeBlock(reason)] };
+    return out;
+  }
   return [
     ...live,
     {
       id: `msg_${nanoid(10)}`,
       role: "assistant",
-      blocks: [notice],
+      blocks: [makeNoticeBlock(reason)],
     },
   ];
 }
@@ -160,9 +171,12 @@ export function applyEvent(
       //     so the live view matches the persisted view that the user sees
       //     after switching threads + coming back (system-note row).
       const isCancelled = code === "CANCELLED";
+      const reasonField = (event as { reason?: unknown }).reason;
+      const noticeReason: NoticeReason =
+        reasonField === "process_restart" ? "process_restart" : "user";
       let live = sweepPendingToolCalls(next.liveMessages);
       if (isCancelled) {
-        live = appendInterruptedNotice(live);
+        live = appendInterruptedNotice(live, noticeReason);
       }
       next = {
         ...next,

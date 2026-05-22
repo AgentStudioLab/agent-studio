@@ -65,7 +65,7 @@ export function buildViewMessages(raw: unknown[]): MessageView[] {
     | { kind: "text"; id?: string; content?: string }
     | { kind: "reasoning"; id?: string; content?: string }
     | { kind: "tool_call"; toolCall?: Record<string, unknown> }
-    | { kind: "notice"; id?: string; level?: string; content?: string };
+    | { kind: "notice"; id?: string; level?: string; content?: string; reason?: string };
   const list = (raw ?? []) as AnyTurn[];
 
   const out: MessageView[] = [];
@@ -113,6 +113,9 @@ export function buildViewMessages(raw: unknown[]): MessageView[] {
           id: b.id ?? `notice_${nanoid(8)}`,
           level: "interrupted",
           content: b.content ?? "",
+          ...(b.reason === "process_restart" || b.reason === "user"
+            ? { reason: b.reason }
+            : {}),
         });
       }
     }

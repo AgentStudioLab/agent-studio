@@ -50,5 +50,16 @@ export interface RunEventStore {
     signal: AbortSignal,
   ): AsyncIterable<AGUIEventEnvelope>;
   listThreadStatuses(): Promise<ThreadStatus[]>;
-  reconcileOrphans(): number;
+  reconcileOrphans(): ReconcileResult;
+}
+
+/**
+ * Boot-time reconcile output. The server uses `awaitingOrphans` to persist
+ * a system note ("上次审批未完成时应用被关闭…") in each affected thread, so
+ * the user sees a "继续上次任务" affordance on next reload instead of an
+ * empty silence where the HITL card used to be.
+ */
+export interface ReconcileResult {
+  runningCount: number;
+  awaitingOrphans: { runId: string; threadId: string }[];
 }

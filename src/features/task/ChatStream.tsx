@@ -47,6 +47,13 @@ interface ChatStreamProps {
   }) => Promise<void>;
   allowedTools: ReadonlySet<string>;
   onAllowAlways: (toolName: string) => void;
+  /**
+   * Called when the user clicks "继续上次任务" on a process_restart notice.
+   * Sends a follow-up prompt that resumes the previously interrupted turn —
+   * the SDK session id replays the prior context so the agent picks up where
+   * it left off.
+   */
+  onContinueAfterRestart: () => void;
 }
 
 /**
@@ -119,6 +126,7 @@ export function ChatStream({
   onResume,
   allowedTools,
   onAllowAlways,
+  onContinueAfterRestart,
 }: ChatStreamProps) {
   const { setView } = useAppShell();
   // cast: ChatRuntime.subscribe takes (state) => void; RuntimeLike expects () => void.
@@ -202,6 +210,7 @@ export function ChatStream({
                 showActions={!isLive}
                 interruptsByToolId={interruptsByToolId}
                 renderApprovalCard={renderApprovalCard}
+                onContinueAfterRestart={onContinueAfterRestart}
               />
             );
           })}
@@ -278,11 +287,13 @@ function MessageRow({
   showActions,
   interruptsByToolId,
   renderApprovalCard,
+  onContinueAfterRestart,
 }: {
   message: MessageView;
   showActions: boolean;
   interruptsByToolId: Map<string, PendingInterrupt>;
   renderApprovalCard: (it: PendingInterrupt) => ReactNode;
+  onContinueAfterRestart: () => void;
 }) {
   if (message.role === "user") {
     return <UserMessage>{message.content}</UserMessage>;
@@ -325,14 +336,28 @@ function MessageRow({
           );
         }
         if (b.kind === "notice") {
+          const isProcessRestart = b.reason === "process_restart";
           return (
-            <p
+            <div
               key={`${b.id}-${i}`}
-              className="text-[12.5px]"
+              className="flex flex-wrap items-center gap-2 text-[12.5px]"
               style={{ color: "hsl(var(--text-300))" }}
             >
-              {b.content}
-            </p>
+              <span>{b.content}</span>
+              {isProcessRestart && (
+                <button
+                  type="button"
+                  onClick={onContinueAfterRestart}
+                  className="rounded-md border px-2 py-0.5 text-[12px] transition-colors"
+                  style={{
+                    borderColor: "hsl(var(--brand-100) / 0.5)",
+                    color: "hsl(var(--brand-100))",
+                  }}
+                >
+                  继续上次任务
+                </button>
+              )}
+            </div>
           );
         }
         return null;

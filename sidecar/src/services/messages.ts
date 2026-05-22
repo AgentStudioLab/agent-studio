@@ -26,11 +26,36 @@ export type TurnDTO =
   | { id: string; role: "user"; content: string; createdAt: number }
   | { id: string; role: "assistant"; blocks: AssistantBlock[]; createdAt: number };
 
+export type NoticeReason = "user" | "process_restart";
+
 export type AssistantBlock =
   | { kind: "text"; id: string; content: string }
   | { kind: "reasoning"; id: string; content: string }
   | { kind: "tool_call"; toolCall: ToolCallDTO }
-  | { kind: "notice"; id: string; level: "interrupted"; content: string };
+  | {
+      kind: "notice";
+      id: string;
+      level: "interrupted";
+      content: string;
+      reason?: NoticeReason;
+    };
+
+/**
+ * System notes carry a `[reason]` content prefix (currently `[process_restart]`).
+ * `appendSystemNote` stays plain text, but `groupIntoTurns` parses the prefix
+ * back into a structured `reason` field on the notice block so the UI doesn't
+ * have to string-match. No DB migration needed; old "已被用户中止" rows have
+ * no prefix → reason undefined (defaults to user in the frontend).
+ */
+const PREFIX_PATTERN = /^\[(user|process_restart)\]\s*/;
+function parseNoticeReason(content: string): {
+  reason: NoticeReason | undefined;
+  display: string;
+} {
+  const m = PREFIX_PATTERN.exec(content);
+  if (!m) return { reason: undefined, display: content };
+  return { reason: m[1] as NoticeReason, display: content.slice(m[0].length) };
+}
 
 interface MessageRow {
   id: string;
@@ -228,11 +253,13 @@ export function groupIntoTurns(rows: MessageDTO[]): TurnDTO[] {
         };
         out.push(activeAssistant);
       }
+      const { reason, display } = parseNoticeReason(r.content);
       activeAssistant.blocks.push({
         kind: "notice",
         id: r.id,
         level: "interrupted",
-        content: r.content,
+        content: display,
+        ...(reason ? { reason } : {}),
       });
       continue;
     }
