@@ -10,8 +10,10 @@ import type { ResumeRequest } from "./api";
 interface ResumeInterpretation {
   /** 直接喂给 http.resumeRun 的请求体。 */
   request: ResumeRequest;
-  /** 是否需要预清扫 live 里 pending 的工具调用（reject 路径）。 */
+  /** 是否需要预清扫 live 里 pending 的工具调用（deny 路径）。 */
   needsSweep: boolean;
+  /** decisions 中是否含 deny — 用于在 deny 时乐观追加"已被用户中止" notice。 */
+  isDeny: boolean;
 }
 
 /**
@@ -47,12 +49,14 @@ export function buildResumeRequest(
     ((resumePayload as { decisions?: { type?: string }[] } | null)?.decisions ?? []) as {
       type?: string;
     }[];
-  const needsSweep = decisions.some((d) => d?.type === "reject");
+  // Server contract is `type: "deny"` (see routes/runs.ts resume handler);
+  // legacy "reject" kept for any historical caller still using the old word.
+  const isDeny = decisions.some((d) => d?.type === "deny" || d?.type === "reject");
 
   const request: ResumeRequest = {
     resumes: [{ interruptId, payload: resumePayload }],
     ...(alwaysAllowIndices?.length ? { alwaysAllowIndices } : {}),
   };
 
-  return { request, needsSweep };
+  return { request, needsSweep: isDeny, isDeny };
 }

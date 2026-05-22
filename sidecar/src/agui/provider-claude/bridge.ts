@@ -47,6 +47,20 @@ export async function* claudeSdkToAgui(
 ): AsyncIterable<AGUIEvent> {
   const { threadId, runId, callbacks, onSessionId } = opts;
 
+  // Defer onSessionId until the SDK CLI has actually written the session
+  // JSONL to disk. The CLI emits `system.init` carrying session_id BEFORE
+  // flushing the file, so calling tagSession at init races with the write
+  // and produces "Session not found in project directory" errors. Holding
+  // the id and firing on the first persisted message (assistant or result)
+  // sidesteps the race: by then the CLI has appended messages to the file.
+  let pendingSessionId: string | null = null;
+  let sessionIdEmitted = false;
+  const flushSessionId = (): void => {
+    if (sessionIdEmitted || !pendingSessionId) return;
+    sessionIdEmitted = true;
+    onSessionId?.(pendingSessionId);
+  };
+
   yield {
     type: EventType.RUN_STARTED,
     threadId,
@@ -109,7 +123,7 @@ export async function* claudeSdkToAgui(
         } else {
           const sys = m as SDKSystemMessage;
           if (typeof sys.session_id === "string") {
-            onSessionId?.(sys.session_id);
+            pendingSessionId = sys.session_id;
           }
         }
         continue;
@@ -199,6 +213,10 @@ export async function* claudeSdkToAgui(
       // assistant — authoritative end of one AIMessage. This is where we
       // persist (messages row + tool_calls rows) and emit *_END events.
       if (m.type === "assistant") {
+        // By the time an assistant message arrives, the SDK has already
+        // appended the user prompt to the session JSONL, so the file is
+        // safe to tag. See pendingSessionId/flushSessionId above.
+        flushSessionId();
         const am = m as SDKAssistantMessage;
         if (am.error) {
           // Close any in-flight reasoning/text blocks before surfacing the
@@ -376,6 +394,10 @@ export async function* claudeSdkToAgui(
 
       // result — turn finished
       if (m.type === "result") {
+        // Fallback flush — covers turns that end without ever emitting an
+        // assistant message (errors, abort before first token). By result
+        // the JSONL has at minimum the user prompt persisted.
+        flushSessionId();
         const r = m as SDKResultMessage;
         // Usage callback — fired for both success and error results so that
         // cost and permission_denials are captured even on failed runs.

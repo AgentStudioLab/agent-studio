@@ -56,6 +56,46 @@ function replaceLastTurn(
   return out;
 }
 
+/**
+ * Append a "已被用户中止" notice block to the current assistant turn — or
+ * push a new assistant turn carrying just that notice when none is open.
+ * Idempotent: if the last block is already an `interrupted` notice, the
+ * input array is returned unchanged so optimistic (resume-deny) + reactive
+ * (RUN_ERROR(CANCELLED) replay) paths can both call this safely.
+ */
+export function appendInterruptedNotice(live: MessageView[]): MessageView[] {
+  const last = live[live.length - 1];
+  if (last && last.role === "assistant") {
+    const lastBlock = last.blocks[last.blocks.length - 1];
+    if (lastBlock?.kind === "notice" && lastBlock.level === "interrupted") {
+      return live;
+    }
+    const notice: MessageBlock = {
+      kind: "notice",
+      id: `notice_${nanoid(8)}`,
+      level: "interrupted",
+      content: "已被用户中止",
+    };
+    const out = [...live];
+    out[out.length - 1] = { ...last, blocks: [...last.blocks, notice] };
+    return out;
+  }
+  const notice: MessageBlock = {
+    kind: "notice",
+    id: `notice_${nanoid(8)}`,
+    level: "interrupted",
+    content: "已被用户中止",
+  };
+  return [
+    ...live,
+    {
+      id: `msg_${nanoid(10)}`,
+      role: "assistant",
+      blocks: [notice],
+    },
+  ];
+}
+
 // ============ Reducer 主体 ============
 
 /**
@@ -109,11 +149,27 @@ export function applyEvent(
     case "RUN_ERROR": {
       const code = (event as { code?: string }).code;
       const message = (event as { message?: string }).message;
+      // Clear pendingInterrupts: the run is dead, server's HITL deferred Map
+      // entries are either resolved/rejected or wiped (process restart). A
+      // stale approval card pointing at this run would POST /resume → 409.
+      // Symmetric to the c4f18e1 server-side reconcile of awaiting_approval.
+      //
+      // CANCELLED is a user action (stop button OR HITL deny), not a fault:
+      //   - suppress the error banner (no "错误：xxx" text)
+      //   - append a "已被用户中止" notice to the current assistant turn
+      //     so the live view matches the persisted view that the user sees
+      //     after switching threads + coming back (system-note row).
+      const isCancelled = code === "CANCELLED";
+      let live = sweepPendingToolCalls(next.liveMessages);
+      if (isCancelled) {
+        live = appendInterruptedNotice(live);
+      }
       next = {
         ...next,
-        liveMessages: sweepPendingToolCalls(next.liveMessages),
-        error: message ?? next.error ?? null,
+        liveMessages: live,
+        error: isCancelled ? null : message ?? next.error ?? null,
         errorCode: typeof code === "string" ? (code as never) : next.errorCode,
+        pendingInterrupts: [],
       };
       break;
     }
@@ -267,8 +323,17 @@ function handleRunFinished(state: ChatState, ev: AGUIEventLike): ChatState {
       retry: undefined,
     };
   }
-  // 正常结束：清扫 pending 工具调用，清除 retry 状态
-  return { ...state, liveMessages: sweepPendingToolCalls(state.liveMessages), retry: undefined };
+  // 正常结束：清扫 pending 工具调用，清除 retry 状态，并清空 pendingInterrupts
+  // —— 跨会话 SSE 重放时，会先吃到 RUN_FINISHED(interrupt) 把卡片填上，
+  // 紧接着如果再吃到一个 RUN_FINISHED(success) 或后续的终止事件，必须把
+  // 残留的 interrupt 清掉；否则用户点 Allow 会向已经清空 deferred 的 server
+  // 发 resume，得到 409。
+  return {
+    ...state,
+    liveMessages: sweepPendingToolCalls(state.liveMessages),
+    retry: undefined,
+    pendingInterrupts: [],
+  };
 }
 
 // ============ 通用更新工具 ============

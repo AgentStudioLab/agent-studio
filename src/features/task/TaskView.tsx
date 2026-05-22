@@ -7,7 +7,11 @@ import { TaskMessageInput } from "@/features/task/TaskMessageInput";
 import { TaskRightPanel } from "@/features/task/TaskRightPanel";
 import { PreviewPane } from "@/features/task/PreviewPane";
 import { useChat } from "@/lib/agui/react/useChat";
-import { useActiveRunForThread } from "@/lib/agui/react/useThreadStatuses";
+import {
+  useActiveRunForThread,
+  useThreadStatuses,
+} from "@/lib/agui/react/useThreadStatuses";
+import { useThreadUnread } from "@/lib/agui/react/useThreadUnread";
 import { useConversation, useMessages } from "@/lib/data/queries";
 
 export function TaskView() {
@@ -120,6 +124,27 @@ export function TaskView() {
   useEffect(() => {
     autoAllowFired.current.clear();
   }, [activeTaskId]);
+
+  // Mark the open thread as read whenever its last run reaches a terminal
+  // state (completed/error/cancelled). Sidebar's onClick handler covers the
+  // "user just opened a stale thread" case; this effect covers the "user is
+  // already watching when the run finishes" case (very common: send prompt,
+  // watch streaming, run completes → should never appear unread).
+  // Idempotent — same runId no-ops in markThreadRead.
+  const { data: threadStatuses = [] } = useThreadStatuses();
+  const { markRead } = useThreadUnread();
+  useEffect(() => {
+    if (!activeTaskId) return;
+    const entry = threadStatuses.find((t) => t.threadId === activeTaskId);
+    if (!entry?.lastRunId) return;
+    if (
+      entry.status === "completed" ||
+      entry.status === "error" ||
+      entry.status === "cancelled"
+    ) {
+      markRead(activeTaskId, entry.lastRunId);
+    }
+  }, [activeTaskId, threadStatuses, markRead]);
 
   if (!activeTaskId) return null;
   const previewOpen = preview.open && preview.file;

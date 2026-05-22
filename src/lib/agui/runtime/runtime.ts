@@ -11,11 +11,10 @@ import {
   createInitialState,
   type AGUIEventLike,
   type ChatState,
-  type MessageBlock,
   type MessageView,
   type PendingInterrupt,
 } from "./types";
-import { applyEvent, type ArgsBuffer } from "./reducer";
+import { applyEvent, appendInterruptedNotice, type ArgsBuffer } from "./reducer";
 import { sweepPendingToolCalls, buildViewMessages } from "./sweep";
 import { ThinkingTimer } from "./thinking";
 import { createResumableRun } from "./sse";
@@ -206,29 +205,9 @@ export function createChatRuntime(opts: ChatRuntimeOptions): ChatRuntime {
   async function cancel(): Promise<void> {
     if (!state.activeRunId) return;
     await http.cancelRun(state.activeRunId);
-    // 乐观 UI：在 live 尾部插一条 notice，无需等 SSE 关闭。
-    // 刷新页面后服务端持久化的 system note 会通过 turn transform 重生
-    // 等价的 notice —— 不会重复因为 live 只 merge 一次。
-    setState((s) => {
-      const live = [...s.liveMessages];
-      const last = live[live.length - 1];
-      const noticeBlock: MessageBlock = {
-        kind: "notice",
-        id: `notice_${nanoid(8)}`,
-        level: "interrupted",
-        content: "已被用户中止",
-      };
-      if (last && last.role === "assistant") {
-        live[live.length - 1] = { ...last, blocks: [...last.blocks, noticeBlock] };
-      } else {
-        live.push({
-          id: `msg_${nanoid(10)}`,
-          role: "assistant",
-          blocks: [noticeBlock],
-        });
-      }
-      return { ...s, liveMessages: live };
-    });
+    // 乐观 UI：立刻插 notice，避免等 SSE 终态事件回来的延迟。helper 幂等，
+    // 后续 RUN_ERROR(CANCELLED) 走 reducer 同一路径不会重复加。
+    setState((s) => ({ ...s, liveMessages: appendInterruptedNotice(s.liveMessages) }));
   }
 
   async function resume(payload: unknown): Promise<void> {
@@ -248,15 +227,18 @@ export function createChatRuntime(opts: ChatRuntimeOptions): ChatRuntime {
     const interruptId = state.pendingInterrupts[0]!.id;
     const cursor = state.lastCursor ?? undefined;
 
-    const { request, needsSweep } = buildResumeRequest(payload, interruptId);
+    const { request, needsSweep, isDeny } = buildResumeRequest(payload, interruptId);
 
-    // reject 决定下，预先清扫 live 里的 pending 工具调用
-    // —— 因为 LangChain HITL middleware 不会发 on_tool_end。
-    setState((s) => ({
-      ...s,
-      pendingInterrupts: [],
-      liveMessages: needsSweep ? sweepPendingToolCalls(s.liveMessages) : s.liveMessages,
-    }));
+    // Deny 路径：(1) 预清扫 pending 工具调用（spinner 不能继续转），
+    // (2) 立刻插"已被用户中止" notice —— 用户一点拒绝就要看到反馈，
+    // 不能等 server abort 信号经过 SDK→bridge→SSE 一圈再到 reducer。
+    // 双触发保护：reducer 的 RUN_ERROR(CANCELLED) 也调同一个幂等 helper。
+    setState((s) => {
+      let live = s.liveMessages;
+      if (needsSweep) live = sweepPendingToolCalls(live);
+      if (isDeny) live = appendInterruptedNotice(live);
+      return { ...s, pendingInterrupts: [], liveMessages: live };
+    });
 
     try {
       await http.resumeRun(runId, request);

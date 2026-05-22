@@ -37,9 +37,17 @@ export async function consumeAguiStream(
       return { outcome: "completed" };
     }
 
-    await store.appendEvent(runId, ev);
-
     if (ev.type === EventType.RUN_ERROR) {
+      // Authoritatively tag user-cancelled runs with code=CANCELLED before
+      // persisting, so SSE on the client treats them as `aborted` (silent)
+      // instead of `error` (which would render "stream error"). The bridge
+      // can only tag what it recognises as AbortError; deny + abort races
+      // can surface as wrapped/native errors with no recognisable name.
+      const evWithCode = ev as { code?: string };
+      if (abortSignal.aborted && !evWithCode.code) {
+        evWithCode.code = "CANCELLED";
+      }
+      await store.appendEvent(runId, ev);
       const err = (ev as { message?: string }).message ?? "run error";
       return {
         outcome: "errored",
@@ -47,6 +55,8 @@ export async function consumeAguiStream(
         cancelled: abortSignal.aborted,
       };
     }
+
+    await store.appendEvent(runId, ev);
   }
 
   if (abortSignal.aborted) {

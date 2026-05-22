@@ -497,3 +497,50 @@ describe("bridge — retry + error events", () => {
     expect((events[errIdx] as unknown as { code: string }).code).toBe("RATE_LIMIT");
   });
 });
+
+describe("bridge — onSessionId timing", () => {
+  // Regression: tagSession at system/init races with SDK CLI's JSONL flush,
+  // producing "Session not found in project directory" warnings. The fix
+  // defers onSessionId until the first persisted message (assistant or
+  // result), by which time the CLI has written the file.
+  it("defers onSessionId until first assistant message", async () => {
+    const fires: { at: string; sid: string }[] = [];
+    const sdkStream = (async function* () {
+      yield { type: "system", subtype: "init", session_id: "s1" };
+      fires.push({ at: "after-init", sid: "(none yet)" });
+      yield {
+        type: "assistant",
+        message: { content: [{ type: "text", text: "hi" }] },
+      };
+      yield { type: "result", subtype: "success", is_error: false, result: "ok", session_id: "s1" };
+    })();
+    await drain(
+      claudeSdkToAgui(sdkStream as never, {
+        threadId: "t",
+        runId: "r",
+        onSessionId: (sid) => fires.push({ at: "callback", sid }),
+      }),
+    );
+    // The callback must fire AFTER the after-init checkpoint and exactly once.
+    expect(fires).toEqual([
+      { at: "after-init", sid: "(none yet)" },
+      { at: "callback", sid: "s1" },
+    ]);
+  });
+
+  it("fires onSessionId at result when no assistant arrives", async () => {
+    const fires: string[] = [];
+    const sdkStream = (async function* () {
+      yield { type: "system", subtype: "init", session_id: "s1" };
+      yield { type: "result", subtype: "error_max_turns", is_error: true, result: "" };
+    })();
+    await drain(
+      claudeSdkToAgui(sdkStream as never, {
+        threadId: "t",
+        runId: "r",
+        onSessionId: (sid) => fires.push(sid),
+      }),
+    );
+    expect(fires).toEqual(["s1"]);
+  });
+});

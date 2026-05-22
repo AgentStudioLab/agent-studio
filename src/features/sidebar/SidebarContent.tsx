@@ -37,6 +37,7 @@ import { Button } from "@/components/ui/button";
 import { useAppShell } from "@/app/AppShellContext";
 import type { MockPinnedItem, MockRecentItem } from "@/lib/mock/types";
 import { useThreadStatuses } from "@/lib/agui/react/useThreadStatuses";
+import { useThreadUnread } from "@/lib/agui/react/useThreadUnread";
 import { NavItem } from "@/features/sidebar/NavItem";
 import { PinnedItem } from "@/features/sidebar/PinnedItem";
 import { RecentItem } from "@/features/sidebar/RecentItem";
@@ -46,41 +47,61 @@ import { UserBar } from "@/features/sidebar/UserBar";
 import type { Status } from "@/lib/mock/types";
 import type { ThreadStatusItem } from "@/lib/agui/react/useThreadStatuses";
 
-function aguiToMockStatus(status: ThreadStatusItem["status"] | undefined): Status {
+/**
+ * `completed` is the only status that participates in the unread/read split:
+ *   - unread (user hasn't opened this thread since the run finished) → "done"
+ *     → green ✓
+ *   - read → "pending" → gray hollow circle (the same visual as idle threads,
+ *     which is intentional: "nothing here demanding your attention").
+ * Other terminal states keep their distinctive icon regardless of read state
+ * (failed = red ✗, cancelled = gray −) so the user always notices errors and
+ * remembers their own stops.
+ */
+function aguiToMockStatus(
+  status: ThreadStatusItem["status"] | undefined,
+  isUnread: boolean,
+): Status {
   switch (status) {
     case "running":
-    case "awaiting_approval":
       return "active";
+    case "awaiting_approval":
+      return "awaiting";
     case "error":
-    case "cancelled":
       return "failed";
+    case "cancelled":
+      return "cancelled";
+    case "completed":
+      return isUnread ? "done" : "pending";
+    case "idle":
     default:
-      return "done";
+      return "pending";
   }
 }
 
 function toRecentItem(
   c: Conversation,
-  statusByThread: Map<string, ThreadStatusItem["status"]>,
+  entry: ThreadStatusItem | undefined,
+  isUnread: (threadId: string, lastRunId: string | null | undefined) => boolean,
 ): MockRecentItem {
   return {
     id: c.id,
     kind: "conversation",
     title: c.title,
-    status: aguiToMockStatus(statusByThread.get(c.id)),
+    status: aguiToMockStatus(entry?.status, isUnread(c.id, entry?.lastRunId)),
     time: new Date(c.updatedAt).toLocaleString(),
   };
 }
 
 function toPinnedItem(
   c: Conversation,
-  statusByThread: Map<string, ThreadStatusItem["status"]>,
+  entry: ThreadStatusItem | undefined,
+  isUnread: (threadId: string, lastRunId: string | null | undefined) => boolean,
 ): MockPinnedItem {
   return {
     id: c.id,
     kind: "task",
     name: c.title,
-    status: aguiToMockStatus(statusByThread.get(c.id)),
+    status: aguiToMockStatus(entry?.status, isUnread(c.id, entry?.lastRunId)),
   };
 }
 
@@ -113,9 +134,11 @@ export function SidebarContent() {
   const deleteMutation = useDeleteConversationMutation();
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
-  const statusByThread = useMemo(() => {
-    const m = new Map<string, ThreadStatusItem["status"]>();
-    for (const t of threadStatuses) m.set(t.threadId, t.status);
+  const { isUnread, markRead } = useThreadUnread();
+
+  const entryByThread = useMemo(() => {
+    const m = new Map<string, ThreadStatusItem>();
+    for (const t of threadStatuses) m.set(t.threadId, t);
     return m;
   }, [threadStatuses]);
   // Hide already-pinned conversations from Recents so a single thread doesn't
@@ -125,11 +148,11 @@ export function SidebarContent() {
     const pinnedIds = new Set(pinnedData.map((c) => c.id));
     return recentsData
       .filter((c) => !pinnedIds.has(c.id))
-      .map((c) => toRecentItem(c, statusByThread));
-  }, [recentsData, pinnedData, statusByThread]);
+      .map((c) => toRecentItem(c, entryByThread.get(c.id), isUnread));
+  }, [recentsData, pinnedData, entryByThread, isUnread]);
   const pinned = useMemo(
-    () => pinnedData.map((c) => toPinnedItem(c, statusByThread)),
-    [pinnedData, statusByThread],
+    () => pinnedData.map((c) => toPinnedItem(c, entryByThread.get(c.id), isUnread)),
+    [pinnedData, entryByThread, isUnread],
   );
 
   const handlePin = (recent: MockRecentItem) => {
@@ -229,6 +252,8 @@ export function SidebarContent() {
                 active={item.kind !== "project" && item.id === selectedTaskId}
                 onClick={() => {
                   if (item.kind !== "project") {
+                    const runId = entryByThread.get(item.id)?.lastRunId;
+                    if (runId) markRead(item.id, runId);
                     setActiveTaskId(item.id);
                     setView("task");
                   } else {
@@ -256,6 +281,8 @@ export function SidebarContent() {
             item={item}
             active={item.id === selectedTaskId}
             onClick={() => {
+              const runId = entryByThread.get(item.id)?.lastRunId;
+              if (runId) markRead(item.id, runId);
               setActiveTaskId(item.id);
               setView("task");
             }}

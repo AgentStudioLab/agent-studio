@@ -16,7 +16,7 @@ import {
 import type { BundledLanguage } from "shiki";
 import type { PendingInterrupt } from "@/lib/agui/runtime";
 import { Terminal, FileText, Search, Globe, Folder, Wrench, AlertTriangle } from "lucide-react";
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { diffLines } from "diff";
 import { assessToolRisk } from "./tool-risk";
 
@@ -54,26 +54,31 @@ export function ToolApprovalCard({ interrupt, onAllow, onDeny, onAllowAlways }: 
   const { icon, title, body } = renderTool(toolName, input, payload.title);
   const risk = assessToolRisk(toolName, input);
 
-  const [denyExpanded, setDenyExpanded] = useState(false);
-  const [denyReason, setDenyReason] = useState("");
-
-  const submitDeny = () => onDeny(denyReason.trim() || "User declined");
-
-  const handleDenyClick = () => {
-    if (!denyExpanded) {
-      setDenyExpanded(true);
-      queueMicrotask(() => {
-        document.getElementById(`deny-${interrupt.id}`)?.focus();
-      });
-      return;
-    }
-    submitDeny();
-  };
+  // Guard against keyboard + click both firing onDeny/onAllow for the same
+  // interrupt — useChat/runtime.resume early-returns when pendingInterrupts
+  // is empty, but a double-fire still races on the closure check, and a 2nd
+  // call to onAllow/onDeny is wasted work either way.
+  const [acted, setActed] = useState(false);
+  const fireDeny = useCallback(() => {
+    if (acted) return;
+    setActed(true);
+    onDeny("User declined");
+  }, [acted, onDeny]);
+  const fireAllow = useCallback(() => {
+    if (acted) return;
+    setActed(true);
+    onAllow();
+  }, [acted, onAllow]);
+  const fireAllowAlways = useCallback(() => {
+    if (acted || !payload.toolName || !onAllowAlways) return;
+    setActed(true);
+    onAllowAlways(payload.toolName);
+    onAllow();
+  }, [acted, onAllow, onAllowAlways, payload.toolName]);
 
   // Singleton keydown: Enter = allow, Cmd/Ctrl+Enter = allow-always (if
-  // available), Esc = collapse deny textarea (if open) else deny w/ default.
-  // Skip when focus is in an input/textarea/contentEditable so the user can
-  // type freely inside the deny textarea without triggering allow on Enter.
+  // available), Esc = deny. Skip when focus is in an input/textarea so the
+  // user can type freely without triggering shortcuts.
   useEffect(() => {
     if (activeCardId.current === null) activeCardId.current = interrupt.id;
     if (activeCardId.current !== interrupt.id) return;
@@ -89,20 +94,18 @@ export function ToolApprovalCard({ interrupt, onAllow, onDeny, onAllowAlways }: 
       if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
         if (onAllowAlways && payload.toolName) {
           e.preventDefault();
-          onAllowAlways(payload.toolName);
-          onAllow();
+          fireAllowAlways();
         }
         return;
       }
       if (e.key === "Enter") {
         e.preventDefault();
-        onAllow();
+        fireAllow();
         return;
       }
       if (e.key === "Escape") {
         e.preventDefault();
-        if (denyExpanded) setDenyExpanded(false);
-        else onDeny("User declined");
+        fireDeny();
       }
     };
 
@@ -111,7 +114,7 @@ export function ToolApprovalCard({ interrupt, onAllow, onDeny, onAllowAlways }: 
       document.removeEventListener("keydown", onKey);
       if (activeCardId.current === interrupt.id) activeCardId.current = null;
     };
-  }, [interrupt.id, onAllow, onDeny, onAllowAlways, denyExpanded, payload.toolName]);
+  }, [interrupt.id, fireAllow, fireDeny, fireAllowAlways, onAllowAlways, payload.toolName]);
 
   return (
     <Confirmation approval={{ id: interrupt.id }} state="approval-requested">
@@ -140,44 +143,19 @@ export function ToolApprovalCard({ interrupt, onAllow, onDeny, onAllowAlways }: 
         </span>
       </ConfirmationTitle>
       {body}
-      {denyExpanded && (
-        <textarea
-          id={`deny-${interrupt.id}`}
-          value={denyReason}
-          onChange={(e) => setDenyReason(e.target.value)}
-          placeholder="（可选）告诉 agent 为什么拒绝，按 ⌘⏎ 确认"
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-              e.preventDefault();
-              submitDeny();
-            }
-          }}
-          className="w-full min-h-[60px] resize-y rounded-md border bg-transparent px-3 py-2 text-[13px] outline-none"
-          style={{
-            borderColor: "hsl(var(--border-300))",
-            color: "hsl(var(--text-100))",
-          }}
-        />
-      )}
       <ConfirmationRequest>
         <ConfirmationActions>
-          <ConfirmationAction variant="outline" onClick={handleDenyClick}>
-            {denyExpanded ? "确认拒绝" : "拒绝"}
+          <ConfirmationAction variant="outline" onClick={fireDeny} disabled={acted}>
+            拒绝
             <kbd className="ml-1 opacity-60">Esc</kbd>
           </ConfirmationAction>
           {onAllowAlways && payload.toolName && (
-            <ConfirmationAction
-              variant="outline"
-              onClick={() => {
-                onAllowAlways(payload.toolName!);
-                onAllow();
-              }}
-            >
+            <ConfirmationAction variant="outline" onClick={fireAllowAlways} disabled={acted}>
               始终允许 {payload.toolName}
               <kbd className="ml-1 opacity-60">⌘⏎</kbd>
             </ConfirmationAction>
           )}
-          <ConfirmationAction onClick={onAllow}>
+          <ConfirmationAction onClick={fireAllow} disabled={acted}>
             允许
             <kbd className="ml-1 opacity-60">⏎</kbd>
           </ConfirmationAction>

@@ -6,7 +6,7 @@
 import { describe, expect, it, mock } from "bun:test";
 import { createChatRuntime } from "./runtime";
 import type { AGUIEventLike } from "./types";
-import { applyEvent } from "./reducer";
+import { applyEvent, appendInterruptedNotice } from "./reducer";
 import { createInitialState } from "./types";
 
 function makeFakeSse(frames: string[]) {
@@ -230,6 +230,52 @@ describe("reducer — error code + retry", () => {
     expect(s.error).toBe("authentication_failed");
   });
 
+  // User-cancelled run (stop button or HITL deny → server abort) must NOT
+  // surface "错误：xxx" — the "已被用户中止" notice is the only UI affordance.
+  it("RUN_ERROR CANCELLED suppresses error banner and appends notice", () => {
+    let s = applyEvent(
+      createInitialState(),
+      { type: "TEXT_MESSAGE_START", messageId: "m1", role: "assistant" },
+      new Map(),
+    );
+    s = applyEvent(
+      s,
+      { type: "TEXT_MESSAGE_CONTENT", messageId: "m1", delta: "thinking..." },
+      new Map(),
+    );
+
+    s = applyEvent(
+      s,
+      { type: "RUN_ERROR", code: "CANCELLED", message: "This operation was aborted" },
+      new Map(),
+    );
+
+    expect(s.error).toBeNull();
+    expect(s.errorCode).toBe("CANCELLED");
+    const lastTurn = s.liveMessages[s.liveMessages.length - 1];
+    if (!lastTurn || lastTurn.role !== "assistant") throw new Error("expected assistant turn");
+    const lastBlock = lastTurn.blocks[lastTurn.blocks.length - 1];
+    expect(lastBlock?.kind).toBe("notice");
+    if (lastBlock?.kind === "notice") {
+      expect(lastBlock.content).toBe("已被用户中止");
+      expect(lastBlock.level).toBe("interrupted");
+    }
+  });
+
+  it("appendInterruptedNotice is idempotent (double-fire safe)", () => {
+    let s = applyEvent(
+      createInitialState(),
+      { type: "TEXT_MESSAGE_START", messageId: "m1", role: "assistant" },
+      new Map(),
+    );
+    s = { ...s, liveMessages: appendInterruptedNotice(s.liveMessages) };
+    const blocksAfter1 = s.liveMessages[s.liveMessages.length - 1]!.blocks.length;
+    s = { ...s, liveMessages: appendInterruptedNotice(s.liveMessages) };
+    const blocksAfter2 = s.liveMessages[s.liveMessages.length - 1]!.blocks.length;
+    expect(blocksAfter2).toBe(blocksAfter1);
+  });
+
+
   it("CUSTOM agent.retry sets retry state", () => {
     const s = applyEvent(
       createInitialState(),
@@ -242,6 +288,70 @@ describe("reducer — error code + retry", () => {
     );
     expect(s.retry?.attempt).toBe(2);
     expect(s.retry?.retryDelayMs).toBe(1500);
+  });
+
+  // c4f18e1 (server) reconciles awaiting_approval orphans → status=cancelled +
+  // synthetic RUN_ERROR(CANCELLED). On SSE replay, the reducer first applies
+  // RUN_FINISHED(outcome:"interrupt") → pendingInterrupts populated, then the
+  // RUN_ERROR. Without this clear, the stale card stays clickable and the next
+  // Allow click POSTs /resume against an empty deferred Map → 409.
+  it("RUN_ERROR clears stale pendingInterrupts (post-restart replay)", () => {
+    let s = applyEvent(
+      createInitialState(),
+      {
+        type: "RUN_FINISHED",
+        threadId: "t",
+        runId: "r",
+        outcome: "interrupt",
+        interrupts: [
+          {
+            id: "tool_1",
+            reason: "tool_approval",
+            payload: { toolName: "Bash", input: { command: "ls" } },
+          },
+        ],
+      } as AGUIEventLike,
+      new Map(),
+    );
+    expect(s.pendingInterrupts.length).toBe(1);
+
+    s = applyEvent(
+      s,
+      { type: "RUN_ERROR", code: "CANCELLED", message: "process restart" },
+      new Map(),
+    );
+    expect(s.pendingInterrupts).toEqual([]);
+    expect(s.errorCode).toBe("CANCELLED");
+  });
+
+  // Same shape, but the terminating event is a non-interrupt RUN_FINISHED
+  // (e.g. the run actually completed between the interrupt and the replay).
+  it("RUN_FINISHED non-interrupt clears stale pendingInterrupts", () => {
+    let s = applyEvent(
+      createInitialState(),
+      {
+        type: "RUN_FINISHED",
+        threadId: "t",
+        runId: "r",
+        outcome: "interrupt",
+        interrupts: [
+          {
+            id: "tool_1",
+            reason: "tool_approval",
+            payload: { toolName: "Bash" },
+          },
+        ],
+      } as AGUIEventLike,
+      new Map(),
+    );
+    expect(s.pendingInterrupts.length).toBe(1);
+
+    s = applyEvent(
+      s,
+      { type: "RUN_FINISHED", threadId: "t", runId: "r" } as AGUIEventLike,
+      new Map(),
+    );
+    expect(s.pendingInterrupts).toEqual([]);
   });
 
   it("RUN_FINISHED clears retry", () => {

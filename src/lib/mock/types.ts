@@ -1,7 +1,18 @@
 /** Full status union supported by StatusDot — used by recent/pinned task rows. */
-export type Status = "done" | "active" | "pending" | "failed" | "scheduled";
-/** PlanStep subset (a step can't be "scheduled"). */
-export type StepStatus = Exclude<Status, "scheduled">;
+export type Status =
+  | "done"
+  | "active"
+  | "awaiting"
+  | "pending"
+  | "failed"
+  | "scheduled"
+  | "cancelled";
+/**
+ * PlanStep subset: a step can't be "scheduled"/"cancelled"/"awaiting".
+ * Those are thread-level outcomes, not per-step states — keeping them out
+ * of StepStatus lets StepIndicator stay focused on running/done/failed/pending.
+ */
+export type StepStatus = Exclude<Status, "scheduled" | "cancelled" | "awaiting">;
 
 export interface PlanStep {
   id: string;
