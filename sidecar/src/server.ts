@@ -8,6 +8,7 @@ import { buildMessageRoutes } from "./routes/messages";
 import { buildSettingsRoutes } from "./routes/settings";
 import { buildRunRoutes } from "./routes/runs";
 import { buildAuditRoutes } from "./routes/audit";
+import { buildUsageRoutes } from "./routes/usage";
 import { createApiKeyState } from "./services/apiKey";
 import { ThreadService } from "./services/threads";
 import { MessageService } from "./services/messages";
@@ -135,6 +136,7 @@ app.route(
   }),
 );
 app.route("/", buildAuditRoutes(audit));
+app.route("/", buildUsageRoutes(usage));
 
 console.log(`[sidecar] listening on http://127.0.0.1:${args.port} (db=${dbAbs})`);
 console.log(
