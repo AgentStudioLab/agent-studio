@@ -144,13 +144,32 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
         sandbox: {
           enabled: true,
           failIfUnavailable: true,
-          autoAllowBashIfSandboxed: true,
+          // Disabled so Bash is not auto-allowed; HITL bus handles approval.
+          autoAllowBashIfSandboxed: false,
           allowUnsandboxedCommands: false,
           excludedCommands: [],
           filesystem: {
             allowWrite: [ctx.cwd],
           },
           // network 不限——本 phase 决策"仅写限"
+        },
+        // Force every mutation tool through canUseTool (HITL bus) even when
+        // sandbox.allowWrite / autoAllowBashIfSandboxed would otherwise
+        // auto-approve them. Read-only tools (Read/Glob/Grep/WebSearch) are
+        // intentionally omitted — the workspace path check in canUseTool still
+        // rejects out-of-cwd reads without surfacing a noisy approval card.
+        settings: {
+          permissions: {
+            ask: [
+              "Bash(*)",
+              "Write(*)",
+              "Edit(*)",
+              "MultiEdit(*)",
+              "NotebookEdit(*)",
+              "Task(*)",
+              "WebFetch(*)",
+            ],
+          },
         },
         ...(resumeSessionId ? { resume: resumeSessionId } : {}),
       },

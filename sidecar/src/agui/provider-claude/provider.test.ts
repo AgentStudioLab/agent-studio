@@ -40,4 +40,30 @@ describe("provider sandbox config", () => {
     const filesystem = sandbox?.filesystem as Record<string, unknown>;
     expect(filesystem?.allowWrite).toEqual(["/tmp/proj"]);
   });
+
+  it("forces mutation tools through canUseTool via permissions.ask", async () => {
+    const provider = createClaudeProvider({ apiKey: "k", allowedTools: ["Bash"] });
+    const ac = new AbortController();
+    const stream = provider.run({
+      runId: "r2",
+      threadId: "t2",
+      userMessage: { role: "user", content: "hi" },
+      abortSignal: ac.signal,
+      cwd: "/tmp/proj",
+    });
+    for await (const _ of stream) { /* ignore */ }
+
+    const calls = querySpy.mock.calls as unknown[];
+    const lastCallArgs = calls[calls.length - 1] as unknown[];
+    const lastCall = lastCallArgs[0] as unknown;
+    const options = (lastCall as Record<string, unknown>)?.options as Record<string, unknown>;
+    const sandbox = options?.sandbox as Record<string, unknown>;
+    expect(sandbox?.autoAllowBashIfSandboxed).toBe(false);
+    const settings = options?.settings as { permissions?: { ask?: string[] } };
+    expect(settings?.permissions?.ask).toContain("Write(*)");
+    expect(settings?.permissions?.ask).toContain("Bash(*)");
+    expect(settings?.permissions?.ask).toContain("Edit(*)");
+    expect(settings?.permissions?.ask).toContain("MultiEdit(*)");
+    expect(settings?.permissions?.ask).toContain("WebFetch(*)");
+  });
 });
