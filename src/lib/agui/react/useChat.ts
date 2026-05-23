@@ -54,6 +54,12 @@ export function useChat(opts: UseChatOptions) {
       void qc.invalidateQueries({
         queryKey: ["conversations", opts.threadId, "messages"],
       });
+      // Context Tab caches per-thread SDK capabilities (skills + MCP servers).
+      // Each Run starts with system.init that may carry a different set
+      // (e.g. an MCP came online); invalidate so the next read re-fetches.
+      void qc.invalidateQueries({
+        queryKey: ["thread-context", opts.threadId],
+      });
     };
 
     const rt = createChatRuntime({

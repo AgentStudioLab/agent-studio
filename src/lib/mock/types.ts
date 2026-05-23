@@ -7,22 +7,6 @@ export type Status =
   | "failed"
   | "scheduled"
   | "cancelled";
-/**
- * PlanStep subset: a step can't be "scheduled"/"cancelled"/"awaiting".
- * Those are thread-level outcomes, not per-step states — keeping them out
- * of StepStatus lets StepIndicator stay focused on running/done/failed/pending.
- */
-export type StepStatus = Exclude<Status, "scheduled" | "cancelled" | "awaiting">;
-
-export interface PlanStep {
-  id: string;
-  status: StepStatus;
-  /** Step name shown as the primary label. */
-  description: string;
-  /** Optional secondary line — prototype HTML 1120-1124 uses this for live
-   *  details on the active step (e.g. "scanning 9 / 14 ..."). */
-  detail?: string;
-}
 
 export interface ToolCall {
   id: string;
@@ -100,14 +84,6 @@ export interface ChatMessage {
   artifacts?: Artifact[];
 }
 
-export interface MockTask {
-  id: string;
-  title: string;
-  plan: PlanStep[];
-  messages: ChatMessage[];
-  elapsedSeconds: number;
-  status: "running" | "done" | "failed" | "paused";
-}
 
 export interface MockFile {
   name: string;
@@ -200,7 +176,7 @@ export interface MockRecentItem {
   kind: "task" | "conversation";
   title: string;
   /** Prototype HTML 636-645 uses "running" / "scheduled" / "done" / "failed".
-   *  We use "active" for "running" (same visual) for parity with PlanStep. */
+   *  We use "active" for "running" (same visual) for parity with Status. */
   status?: Status;
   time: string;
 }

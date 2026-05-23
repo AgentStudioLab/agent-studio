@@ -30,7 +30,7 @@ function metaForPath(path: string): IconMeta {
   if (lower.endsWith(".pptx") || lower.endsWith(".key")) {
     return { Icon: Presentation, color: "hsl(15 75% 55%)" };
   }
-  if (lower.endsWith(".png") || lower.endsWith(".jpg") || lower.endsWith(".jpeg") || lower.endsWith(".gif") || lower.endsWith(".svg")) {
+  if (lower.endsWith(".png") || lower.endsWith(".jpg") || lower.endsWith(".jpeg") || lower.endsWith(".gif") || lower.endsWith(".svg") || lower.endsWith(".webp")) {
     return { Icon: ImageIcon, color: "hsl(var(--text-400))" };
   }
   if (lower.endsWith(".md") || lower.endsWith(".markdown")) {
