@@ -24,7 +24,11 @@ export function ContextTab({ threadId }: ContextTabProps) {
   const { context, isLoading } = useThreadContext(threadId);
   const { skills, mcpServers } = context;
 
-  if (isLoading) {
+  // No active thread OR query in-flight → "waiting for agent" state. We can't
+  // gate on isLoading alone — TanStack Query v5 reports isLoading=false when
+  // the query is disabled (threadId null), so the null path would otherwise
+  // fall through to "noCapabilities" instead of the correct "notStarted".
+  if (!threadId || isLoading) {
     return (
       <div className="px-6 py-12 text-center text-sm" style={{ color: "hsl(var(--text-300))" }}>
         {t("task.contextTab.empty.notStarted")}

@@ -138,7 +138,11 @@ export function ProcessTab({ state }: ProcessTabProps) {
       </div>
       <div className="px-2">
         {todos.map((todo, i) => (
-          <ProcessStep key={i} todo={todo} isLast={i === todos.length - 1} />
+          <ProcessStep
+            key={`${todo.content.slice(0, 64)}-${i}`}
+            todo={todo}
+            isLast={i === todos.length - 1}
+          />
         ))}
       </div>
       {isRunning && (
