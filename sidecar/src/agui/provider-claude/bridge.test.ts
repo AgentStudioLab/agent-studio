@@ -544,3 +544,58 @@ describe("bridge — onSessionId timing", () => {
     expect(fires).toEqual(["s1"]);
   });
 });
+
+describe("claudeSdkToAgui — onInitMetadata", () => {
+  it("invokes onInitMetadata when system.init carries mcp_servers + tools", async () => {
+    const seenMeta: Array<{ mcpServers: unknown; tools: unknown }> = [];
+    const stream = (async function* () {
+      yield {
+        type: "system",
+        subtype: "init",
+        session_id: "sess_1",
+        mcp_servers: [
+          { name: "github", status: "connected" },
+          { name: "slack", status: "disconnected" },
+        ],
+        tools: ["Read", "Write", "mcp__github__list_issues"],
+      } as never;
+      yield { type: "result", subtype: "success", is_error: false } as never;
+    })();
+
+    const events: unknown[] = [];
+    for await (const ev of claudeSdkToAgui(stream, {
+      threadId: "t",
+      runId: "r",
+      onInitMetadata: (m) => seenMeta.push(m),
+    })) {
+      events.push(ev);
+    }
+
+    expect(seenMeta).toHaveLength(1);
+    expect(seenMeta[0]!.mcpServers).toEqual([
+      { name: "github", status: "connected" },
+      { name: "slack", status: "disconnected" },
+    ]);
+    expect(seenMeta[0]!.tools).toEqual([
+      "Read",
+      "Write",
+      "mcp__github__list_issues",
+    ]);
+  });
+
+  it("does not invoke onInitMetadata when fields are missing", async () => {
+    const seenMeta: unknown[] = [];
+    const stream = (async function* () {
+      yield { type: "system", session_id: "sess_1" } as never;
+      yield { type: "result", subtype: "success", is_error: false } as never;
+    })();
+    for await (const _ev of claudeSdkToAgui(stream, {
+      threadId: "t",
+      runId: "r",
+      onInitMetadata: (m) => seenMeta.push(m),
+    })) {
+      // drain
+    }
+    expect(seenMeta).toHaveLength(0);
+  });
+});

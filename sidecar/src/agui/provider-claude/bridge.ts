@@ -30,6 +30,15 @@ export interface BridgeOptions {
   runId: string;
   callbacks?: ProviderCallbacks;
   onSessionId?: (sessionId: string) => void;
+  /**
+   * Fires once per turn when SDK's system.init carries mcp_servers + tools.
+   * Used by sidecar to populate SessionMetadataStore so the GET /threads/:id/
+   * context route can answer with what the SDK actually loaded for this run.
+   */
+  onInitMetadata?: (meta: {
+    mcpServers: Array<{ name: string; status: string }>;
+    tools: string[];
+  }) => void;
 }
 
 /**
@@ -45,7 +54,7 @@ export async function* claudeSdkToAgui(
   sdkStream: AsyncIterable<SDKMessage>,
   opts: BridgeOptions,
 ): AsyncIterable<AGUIEvent> {
-  const { threadId, runId, callbacks, onSessionId } = opts;
+  const { threadId, runId, callbacks, onSessionId, onInitMetadata } = opts;
 
   // Defer onSessionId until the SDK CLI has actually written the session
   // JSONL to disk. The CLI emits `system.init` carrying session_id BEFORE
@@ -124,6 +133,26 @@ export async function* claudeSdkToAgui(
           const sys = m as SDKSystemMessage;
           if (typeof sys.session_id === "string") {
             pendingSessionId = sys.session_id;
+          }
+          // SDK init also carries the active capability surface for this turn:
+          // mcp_servers + tools. Cast to a permissive shape — SDK.d.ts doesn't
+          // expose these on SDKSystemMessage, but the wire format does.
+          const sysExt = sys as unknown as {
+            mcp_servers?: Array<{ name?: unknown; status?: unknown }>;
+            tools?: unknown[];
+          };
+          const hasMcp = Array.isArray(sysExt.mcp_servers);
+          const hasTools = Array.isArray(sysExt.tools);
+          if (hasMcp || hasTools) {
+            const mcpServers = (sysExt.mcp_servers ?? [])
+              .filter((s) => typeof s?.name === "string")
+              .map((s) => ({
+                name: String(s.name),
+                status: typeof s.status === "string" ? s.status : "unknown",
+              }));
+            const tools = (sysExt.tools ?? [])
+              .filter((t): t is string => typeof t === "string");
+            onInitMetadata?.({ mcpServers, tools });
           }
         }
         continue;
