@@ -8,6 +8,8 @@ import { TaskMessageInput } from "@/features/task/TaskMessageInput";
 import { TaskRightPanel } from "@/features/task/TaskRightPanel";
 import { PreviewPane } from "@/features/task/PreviewPane";
 import { useChat } from "@/lib/agui/react/useChat";
+import type { TouchedFile } from "@/lib/agui/runtime/derivations";
+import type { MockFile } from "@/lib/mock/types";
 import {
   useActiveRunForThread,
   useThreadStatuses,
@@ -19,6 +21,22 @@ import { useThreadPermissionMode } from "@/lib/agui/react/useThreadPermissionMod
 import { useThreadModel } from "@/lib/agui/react/useThreadModel";
 import { useAvailableModels } from "@/lib/models";
 import { useConversation, useMessages } from "@/lib/data/queries";
+
+function touchedFileToPreview(f: TouchedFile): MockFile {
+  const lower = f.relativePath.toLowerCase();
+  let type: MockFile["type"] = "generic";
+  if (lower.endsWith(".md") || lower.endsWith(".markdown")) type = "markdown";
+  else if (lower.endsWith(".xlsx") || lower.endsWith(".csv")) type = "spreadsheet";
+  else if (lower.endsWith(".pptx") || lower.endsWith(".key")) type = "presentation";
+  else if (/\.(png|jpe?g|gif|svg|webp)$/.test(lower)) type = "image";
+  else if (/\.(ts|tsx|js|jsx|py|rs|go|java|c|cpp|h|hpp)$/.test(lower)) type = "code";
+  return {
+    name: f.relativePath.split("/").pop() ?? f.relativePath,
+    path: f.absolutePath,
+    type,
+    isNew: f.firstTool === "Write",
+  };
+}
 
 export function TaskView() {
   const { threadId: activeTaskId = null } = useParams<{ threadId: string }>();
@@ -41,6 +59,7 @@ export function TaskView() {
   // ChatRuntime per threadId. send/cancel/state come from here.
   const {
     viewMessages,
+    state,
     runtime,
     isRunning,
     isThinking,
@@ -264,7 +283,12 @@ export function TaskView() {
         previewOpen ? (
           <PreviewPane file={preview.file!} onClose={closePreview} />
         ) : (
-          <TaskRightPanel onOpenFile={openPreview} />
+          <TaskRightPanel
+            state={state}
+            threadId={activeTaskId}
+            workingDir={cwd}
+            onOpenFile={(file) => openPreview(touchedFileToPreview(file))}
+          />
         )
       }
     />

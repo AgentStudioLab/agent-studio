@@ -5,21 +5,20 @@ import { cn } from "@/lib/utils";
 import { ProcessTab } from "@/features/task/ProcessTab";
 import { FilesTab } from "@/features/task/FilesTab";
 import { ContextTab } from "@/features/task/ContextTab";
-import type { MockTask, MockFile, MockSkill, MockMcpServer } from "@/lib/mock/types";
+import type { TouchedFile } from "@/lib/agui/runtime/derivations";
+import type { ChatState } from "@/lib/agui/runtime/types";
 
-// Tool-allowlist UI removed by design: defaults are global (Settings → 已允许的工具
-// + Settings → 默认工具集), and per-call permission is granted in-flow via the
-// HITL approval card ("始终允许 X" writes to the workspace allowlist). The per-thread
-// override was confusing for users — three sources of truth for "can the agent
-// run Bash now?" wasn't worth the flexibility.
 type TabId = "process" | "files" | "context";
 
 interface TaskRightPanelProps {
-  task?: MockTask | null;
-  files?: MockFile[];
-  skills?: MockSkill[];
-  mcpServers?: MockMcpServer[];
-  onOpenFile?: (file: MockFile) => void;
+  /** ChatState from TaskView's useChat — drives Process/Files derivations. */
+  state: ChatState | null;
+  /** threadId for ContextTab (TanStack Query-backed, doesn't need state). */
+  threadId: string | null;
+  /** Conversation working directory — drives Files Tab cwd filter + header. */
+  workingDir: string | null;
+  /** Called when a Files Tab entry is clicked — opens PreviewPane. */
+  onOpenFile?: (file: TouchedFile) => void;
 }
 
 interface TabButtonProps {
@@ -40,7 +39,7 @@ function TabButton({ id, label, icon, active, onClick }: TabButtonProps) {
         "flex items-center justify-center gap-1.5 px-2 py-1.5 rounded transition",
         active
           ? "bg-bg-000 text-text-100 shadow-sm flex-[1.6]"
-          : "text-text-300 hover:text-text-100 flex-1"
+          : "text-text-300 hover:text-text-100 flex-1",
       )}
     >
       {icon}
@@ -49,13 +48,10 @@ function TabButton({ id, label, icon, active, onClick }: TabButtonProps) {
   );
 }
 
-// AppShell already wraps `aside` slot in a 320px-wide column with the
-// border-left + bg. We render the tab bar + tab body inside that.
 export function TaskRightPanel({
-  task,
-  files = [],
-  skills = [],
-  mcpServers = [],
+  state,
+  threadId,
+  workingDir,
   onOpenFile,
 }: TaskRightPanelProps) {
   const [tab, setTab] = useState<TabId>("process");
@@ -95,11 +91,15 @@ export function TaskRightPanel({
         </div>
       </div>
       <div className="flex-1 overflow-y-auto px-3 pb-3">
-        {tab === "process" && <ProcessTab task={task} />}
-        {tab === "files" && <FilesTab files={files} onOpenFile={onOpenFile} />}
-        {tab === "context" && (
-          <ContextTab skills={skills} mcpServers={mcpServers} />
+        {tab === "process" && <ProcessTab state={state} />}
+        {tab === "files" && (
+          <FilesTab
+            state={state}
+            workingDir={workingDir}
+            onOpenFile={onOpenFile}
+          />
         )}
+        {tab === "context" && <ContextTab threadId={threadId} />}
       </div>
     </div>
   );
