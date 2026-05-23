@@ -134,25 +134,25 @@ export async function* claudeSdkToAgui(
           if (typeof sys.session_id === "string") {
             pendingSessionId = sys.session_id;
           }
-          // SDK init also carries the active capability surface for this turn:
-          // mcp_servers + tools. Cast to a permissive shape — SDK.d.ts doesn't
-          // expose these on SDKSystemMessage, but the wire format does.
-          const sysExt = sys as unknown as {
-            mcp_servers?: Array<{ name?: unknown; status?: unknown }>;
-            tools?: unknown[];
-          };
-          const hasMcp = Array.isArray(sysExt.mcp_servers);
-          const hasTools = Array.isArray(sysExt.tools);
-          if (hasMcp || hasTools) {
-            const mcpServers = (sysExt.mcp_servers ?? [])
-              .filter((s) => typeof s?.name === "string")
-              .map((s) => ({
-                name: String(s.name),
-                status: typeof s.status === "string" ? s.status : "unknown",
-              }));
-            const tools = (sysExt.tools ?? [])
-              .filter((t): t is string => typeof t === "string");
-            onInitMetadata?.({ mcpServers, tools });
+          // SDK init carries the active capability surface for this turn:
+          // mcp_servers + tools. Fire the callback whenever the SDK reports
+          // init — an empty list is a valid signal (no MCPs / no tools) for
+          // Task 4's GET /threads/:id/context. We still defensive-default
+          // missing arrays to `[]` because test mocks and partial wire payloads
+          // occasionally omit them; the SDK .d.ts declares them as required but
+          // the wire format is external data we don't fully control.
+          if (onInitMetadata) {
+            const rawServers = Array.isArray(sys.mcp_servers) ? sys.mcp_servers : [];
+            const rawTools = Array.isArray(sys.tools) ? sys.tools : [];
+            onInitMetadata({
+              mcpServers: rawServers
+                .filter((s) => typeof s?.name === "string")
+                .map((s) => ({
+                  name: String(s.name),
+                  status: typeof s.status === "string" ? s.status : "unknown",
+                })),
+              tools: rawTools.filter((t): t is string => typeof t === "string"),
+            });
           }
         }
         continue;

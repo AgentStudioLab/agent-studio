@@ -562,13 +562,12 @@ describe("claudeSdkToAgui — onInitMetadata", () => {
       yield { type: "result", subtype: "success", is_error: false } as never;
     })();
 
-    const events: unknown[] = [];
-    for await (const ev of claudeSdkToAgui(stream, {
+    for await (const _ev of claudeSdkToAgui(stream, {
       threadId: "t",
       runId: "r",
       onInitMetadata: (m) => seenMeta.push(m),
     })) {
-      events.push(ev);
+      // drain
     }
 
     expect(seenMeta).toHaveLength(1);
@@ -583,8 +582,8 @@ describe("claudeSdkToAgui — onInitMetadata", () => {
     ]);
   });
 
-  it("does not invoke onInitMetadata when fields are missing", async () => {
-    const seenMeta: unknown[] = [];
+  it("invokes onInitMetadata with empty arrays when fields are missing", async () => {
+    const seenMeta: Array<{ mcpServers: unknown; tools: unknown }> = [];
     const stream = (async function* () {
       yield { type: "system", session_id: "sess_1" } as never;
       yield { type: "result", subtype: "success", is_error: false } as never;
@@ -596,6 +595,40 @@ describe("claudeSdkToAgui — onInitMetadata", () => {
     })) {
       // drain
     }
-    expect(seenMeta).toHaveLength(0);
+    expect(seenMeta).toHaveLength(1);
+    expect(seenMeta[0]!.mcpServers).toEqual([]);
+    expect(seenMeta[0]!.tools).toEqual([]);
+  });
+
+  it("filters malformed mcp_servers entries and defaults missing status", async () => {
+    const seenMeta: Array<{ mcpServers: unknown; tools: unknown }> = [];
+    const stream = (async function* () {
+      yield {
+        type: "system",
+        subtype: "init",
+        session_id: "sess_1",
+        mcp_servers: [
+          { name: "good", status: "connected" },
+          { name: 42 }, // bad: name not a string — should be dropped
+          { name: "no-status" }, // missing status — should default to "unknown"
+          { status: "connected" }, // bad: no name field — should be dropped
+        ],
+        tools: ["Read", 99, "Write"], // 99 should be filtered out
+      } as never;
+      yield { type: "result", subtype: "success", is_error: false } as never;
+    })();
+    for await (const _ev of claudeSdkToAgui(stream, {
+      threadId: "t",
+      runId: "r",
+      onInitMetadata: (m) => seenMeta.push(m),
+    })) {
+      // drain
+    }
+    expect(seenMeta).toHaveLength(1);
+    expect(seenMeta[0]!.mcpServers).toEqual([
+      { name: "good", status: "connected" },
+      { name: "no-status", status: "unknown" },
+    ]);
+    expect(seenMeta[0]!.tools).toEqual(["Read", "Write"]);
   });
 });
