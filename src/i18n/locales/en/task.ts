@@ -49,6 +49,11 @@ export const task: typeof Zh = {
       off: "off",
       connected: "connected",
       disconnected: "disconnected",
+      empty: {
+        notStarted: "Waiting for agent to start…",
+        noCapabilities: "No skills or MCP servers loaded",
+        goToCustomize: "Open Customize",
+      },
     },
     preview: {
       refresh: "Refresh",

@@ -47,6 +47,11 @@ export const task = {
       off: "未开启",
       connected: "已连接",
       disconnected: "未连接",
+      empty: {
+        notStarted: "等待 agent 启动…",
+        noCapabilities: "未加载任何 skill 或 MCP server",
+        goToCustomize: "前往自定义",
+      },
     },
     preview: {
       refresh: "刷新",
