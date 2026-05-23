@@ -12,7 +12,6 @@ import {
   type PendingInterrupt,
 } from "../runtime";
 import { authedFetch } from "@/lib/sidecar-client";
-import { useAllowedTools } from "./useAllowedTools";
 
 export type {
   MessageBlock,
@@ -78,10 +77,11 @@ export function useChat(opts: UseChatOptions) {
     };
   }, [runtime]);
 
-  // Allowlist now lives in a module-level store with tauri-plugin-store
-  // persistence — survives sidecar restarts, reboots, and thread switches.
-  // The hook is shared with the Settings management UI.
-  const { allowedTools, addAllowedTool } = useAllowedTools();
+  // HITL allowlist composition is NOT useChat's concern anymore — TaskView
+  // owns the union of (global manual) + (workspace cwd-scoped) lists, both
+  // persisted via tauri-plugin-store. Keeping the runtime hook free of that
+  // policy lets non-chat surfaces (e.g. Settings) read/write the same stores
+  // without going through ChatRuntime.
 
   const state = useSyncExternalStore<ChatState>(
     useCallback((listener) => runtime.subscribe(listener), [runtime]),
@@ -90,8 +90,11 @@ export function useChat(opts: UseChatOptions) {
   );
 
   const send = useCallback(
-    async (text: string) => {
-      await runtime.send(text);
+    async (
+      text: string,
+      sendOpts?: { permissionMode?: "ask" | "act-without-asking" },
+    ) => {
+      await runtime.send(text, sendOpts);
       // Light up sidebar pulse + active-run derivation immediately. Symmetric
       // invalidation fires from onRunFinished/Error when the run terminates.
       void qc.invalidateQueries({ queryKey: THREAD_STATUS_KEY });
@@ -157,8 +160,6 @@ export function useChat(opts: UseChatOptions) {
     attachToRun,
     restoreAwaiting,
     setHistoricalMessages,
-    allowedTools,
-    addAllowedTool,
   };
 }
 

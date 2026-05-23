@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 import { ArrowUpDown, CalendarDays, ChevronDown, Coffee, Plus, Search } from "lucide-react";
 import { AppShell } from "@/app/AppShell";
-import { useAppShell } from "@/app/AppShellContext";
 import { ScheduledCard } from "@/features/scheduled/ScheduledCard";
 import { KeepAwakeBanner } from "@/features/scheduled/KeepAwakeBanner";
 import {
@@ -14,13 +14,12 @@ import type { MockScheduledTask } from "@/lib/mock/types";
 
 export function ScheduledListView() {
   const { t } = useTranslation();
-  const { setView, setActiveScheduledId } = useAppShell();
+  const navigate = useNavigate();
   const [tasks, setTasks] = useState<MockScheduledTask[]>(initialTasks);
   const [modalOpen, setModalOpen] = useState(false);
 
   const openTask = (id: string) => {
-    setActiveScheduledId(id);
-    setView("scheduled-detail");
+    navigate(`/scheduled/${id}`);
   };
 
   const moreIdeas = [

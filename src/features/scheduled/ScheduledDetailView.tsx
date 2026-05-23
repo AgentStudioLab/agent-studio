@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
+import { useNavigate, useParams } from "react-router-dom";
 import { ChevronLeft, Clock, Info, Pencil, Play, Trash2 } from "lucide-react";
 import { AppShell } from "@/app/AppShell";
-import { useAppShell } from "@/app/AppShellContext";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { scheduledTasks } from "@/lib/mock/scheduled";
@@ -11,9 +11,10 @@ import type { MockScheduledTask } from "@/lib/mock/types";
 
 export function ScheduledDetailView() {
   const { t } = useTranslation();
-  const { setView, activeScheduledId } = useAppShell();
+  const navigate = useNavigate();
+  const { scheduledId } = useParams<{ scheduledId: string }>();
   const task =
-    scheduledTasks.find((s) => s.id === activeScheduledId) ?? scheduledTasks[0]!;
+    scheduledTasks.find((s) => s.id === scheduledId) ?? scheduledTasks[0]!;
   const [active, setActive] = useState(task.active);
 
   return (
@@ -23,7 +24,7 @@ export function ScheduledDetailView() {
           <div className="px-12 pt-10">
             <button
               type="button"
-              onClick={() => setView("scheduled-list")}
+              onClick={() => navigate("/scheduled")}
               className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
             >
               <ChevronLeft className="size-4" />

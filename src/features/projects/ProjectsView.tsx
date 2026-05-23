@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { ArrowUpDown, Search, Plus } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 import { AppShell } from "@/app/AppShell";
-import { useAppShell } from "@/app/AppShellContext";
 import { ProjectCard } from "@/features/projects/ProjectCard";
 import {
   NewProjectModal,
@@ -12,7 +12,7 @@ import { projects as initialProjects } from "@/lib/mock/projects";
 import type { MockProject } from "@/lib/mock/types";
 
 export function ProjectsView() {
-  const { setView, setActiveProjectId } = useAppShell();
+  const navigate = useNavigate();
   const { t } = useTranslation();
   const [projects, setProjects] = useState<MockProject[]>(initialProjects);
   const [modalOpen, setModalOpen] = useState(false);
@@ -30,8 +30,7 @@ export function ProjectsView() {
   };
 
   const openProject = (id: string) => {
-    setActiveProjectId(id);
-    setView("project-detail");
+    navigate(`/projects/${id}`);
   };
 
   return (

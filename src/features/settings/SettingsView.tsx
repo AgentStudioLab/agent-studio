@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { ChevronLeft, X } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { useAppShell } from "@/app/AppShellContext";
+import { useNavigate } from "react-router-dom";
 import { ProfileForm } from "@/features/settings/ProfileForm";
 import { ThemeSegment } from "@/shared/atoms/ThemeSegment";
 import { LanguageSegment } from "@/shared/atoms/LanguageSegment";
@@ -11,13 +11,13 @@ import { useAllowedTools } from "@/lib/agui/react/useAllowedTools";
 import { useDefaultAllowedTools } from "@/lib/data/thread-tools-queries";
 
 export function SettingsView() {
-  const { setView } = useAppShell();
+  const navigate = useNavigate();
   const { t } = useTranslation();
 
   const [apiKeyInput, setApiKeyInput] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<"saved" | "error" | null>(null);
-  const { allowedTools, removeAllowedTool } = useAllowedTools();
+  const { allowedTools, addAllowedTool, removeAllowedTool } = useAllowedTools();
   const { tools: defaultTools, setTools: setDefaults } = useDefaultAllowedTools();
 
   const ALL_TOOLS = ["Bash", "Read", "Write", "Edit", "Glob", "Grep", "WebFetch", "WebSearch", "Task"] as const;
@@ -27,6 +27,16 @@ export function SettingsView() {
       ? defaultTools.filter((t) => t !== tool)
       : [...defaultTools, tool];
     setDefaults(next);
+  };
+
+  // The global HITL allow list used to auto-populate from the chat's
+  // "始终允许 X" button. After the W1 split, that button writes only to the
+  // per-workspace list (so trusting Edit in /project-a doesn't leak to
+  // /project-b). This Settings checkbox grid is the only place to seed the
+  // GLOBAL list — toggling here applies to every workspace.
+  const toggleGlobalHitl = (tool: string) => {
+    if (allowedTools.has(tool)) removeAllowedTool(tool);
+    else addAllowedTool(tool);
   };
 
   const handleSaveApiKey = async () => {
@@ -47,7 +57,7 @@ export function SettingsView() {
       <header className="flex items-center gap-3 border-b border-border px-4 py-3">
         <button
           type="button"
-          onClick={() => setView("task")}
+          onClick={() => navigate(-1)}
           className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
           aria-label={t("settings.back")}
         >
@@ -121,34 +131,19 @@ export function SettingsView() {
                   {t("settings.hitl.description")}
                 </p>
               </div>
-              {allowedTools.size === 0 ? (
-                <p
-                  className="text-sm"
-                  style={{ color: "hsl(var(--text-300))" }}
-                >
-                  {t("settings.hitl.empty")}
-                </p>
-              ) : (
-                <ul className="flex flex-wrap gap-2">
-                  {[...allowedTools].map((name) => (
-                    <li
-                      key={name}
-                      className="inline-flex items-center gap-1.5 rounded-md border border-border bg-bg-200 px-2.5 py-1 text-[13px]"
-                    >
-                      <code className="text-foreground">{name}</code>
-                      <button
-                        type="button"
-                        onClick={() => removeAllowedTool(name)}
-                        aria-label={t("settings.hitl.remove")}
-                        className="rounded p-0.5 hover:bg-muted"
-                        style={{ color: "hsl(var(--text-300))" }}
-                      >
-                        <X size={12} />
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
+              <div className="grid grid-cols-2 gap-2">
+                {ALL_TOOLS.map((tool) => (
+                  <label key={tool} className="flex items-center gap-2 cursor-pointer text-sm">
+                    <input
+                      type="checkbox"
+                      checked={allowedTools.has(tool)}
+                      onChange={() => toggleGlobalHitl(tool)}
+                      className="h-4 w-4 rounded border border-[var(--border-200)] accent-[var(--brand-100)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-100)]"
+                    />
+                    <span>{t(`settings.defaultTools.toolName.${tool}` as never)}</span>
+                  </label>
+                ))}
+              </div>
             </section>
             <section className="border-t border-border pt-8 space-y-3">
               <div>

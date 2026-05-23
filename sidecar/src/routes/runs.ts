@@ -36,7 +36,12 @@ export function buildRunRoutes(deps: MountRunsDeps): Hono {
 
   app.post("/runs", async (c) => {
     const body = (await c.req.json().catch(() => null)) as
-      | { threadId?: string; runId?: string; message?: { role?: string; content?: string } }
+      | {
+          threadId?: string;
+          runId?: string;
+          message?: { role?: string; content?: string };
+          permissionMode?: "ask" | "act-without-asking";
+        }
       | null;
     if (
       !body?.threadId ||
@@ -46,6 +51,9 @@ export function buildRunRoutes(deps: MountRunsDeps): Hono {
     ) {
       return c.json({ error: "invalid_body" }, 400);
     }
+    // Unknown / missing permissionMode → default to "ask" (the safe choice).
+    const permissionMode: "ask" | "act-without-asking" =
+      body.permissionMode === "act-without-asking" ? "act-without-asking" : "ask";
 
     deps.threads.upsert(body.threadId);
     deps.messages.appendUser(body.threadId, body.message.content);
@@ -67,6 +75,7 @@ export function buildRunRoutes(deps: MountRunsDeps): Hono {
       interruptBus: deps.interruptBus,
       abortSignal: abort.signal,
       usage: deps.usage,
+      permissionMode,
     }).finally(() => aborters.delete(body.runId!));
 
     return c.json({ runId: body.runId }, 202);
@@ -152,22 +161,21 @@ export function buildRunRoutes(deps: MountRunsDeps): Hono {
         : { behavior: "allow" as const };
 
     const ok = deps.interruptBus.resolve(runId, first.interruptId, result);
-    if (!ok) return c.json({ error: "interrupt_not_pending" }, 409);
-
-    // Deny ≡ terminate the run. Resolving the deferred unblocks the SDK
-    // (it gets `{behavior:"deny"}` and would otherwise re-prompt the model
-    // with the tool error); we don't want that — user said "no" to the
-    // whole thing. Abort the run so the worker's catch path fires and the
-    // run reaches `cancelled`. The runWorker's `cancelAll` covers the
-    // race where the deferred was somehow not yet resolved.
-    if (decision.type === "deny") {
+    // Treat "deferred not found" as IDEMPOTENT SUCCESS, not 409. The bus's
+    // in-memory map is the only source-of-truth for "is this HITL still
+    // open"; once a decision lands, the entry is gone. Returning 409 would
+    // surface as a scary "错误: ... 409" banner whenever:
+    //   - the client re-tries / replays the same resume after sidecar restart
+    //   - the autoAllow effect races (legacy interrupt id reused across runs)
+    //   - cancelAll already rejected the deferred (run terminated server-side)
+    // None of these are user-actionable errors — the HITL is already decided.
+    // We still need to abort the run for deny, but only on the FIRST resolve
+    // (otherwise we'd abort a run that has already moved past this point).
+    if (decision.type === "deny" && ok) {
       aborters.get(runId)?.abort();
     }
 
-    // 202 matches POST /runs — frontend `api.ts:73` checks `!== 202`. The
-    // decision has been delivered to the deferred; the SDK continuation
-    // happens asynchronously after `canUseTool` resolves.
-    return c.json({ ok: true }, 202);
+    return c.json({ ok: true, alreadyResolved: !ok }, 202);
   });
 
   return app;

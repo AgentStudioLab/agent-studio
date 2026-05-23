@@ -90,6 +90,19 @@ export const task: typeof Zh = {
       legacyModel: "Legacy Model",
       disclaimer:
         "Agent Studio is AI and can make mistakes. Please double-check responses.",
+      permissionMode: {
+        askShort: "Ask",
+        actShort: "Auto",
+        askTitle: "Ask before acting",
+        askDesc: "Agent pauses so you can approve each action.",
+        actTitle: "Act without asking",
+        actDesc: "Agent works without pausing for approval.",
+        confirmTitle: "Act without asking?",
+        confirmDesc:
+          "Agent will work without pausing for approval. This can put your data or system at risk.",
+        cancel: "Cancel",
+        confirm: "Yes, continue",
+      },
     },
     error: {
       authFailed: "API key invalid or missing",

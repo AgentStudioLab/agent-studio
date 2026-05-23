@@ -1,17 +1,18 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
+import { useLocation } from "react-router-dom";
 import type { MockFile } from "@/lib/mock/types";
 
-type ViewKey =
-  | "new-task"
-  | "task"
-  | "projects"
-  | "project-detail"
-  | "scheduled-list"
-  | "scheduled-detail"
-  | "customize"
-  | "settings";
-
-const FULLSCREEN_VIEWS: ViewKey[] = ["customize", "settings"];
+// Routes that render their own full-bleed layout — Sidebar should NOT show.
+// Kept as a Set for O(1) membership checks; pathname comparison handles
+// nested URLs (e.g. /customize/skills) via .startsWith.
+const FULLSCREEN_ROUTES = ["/customize", "/settings"];
 
 interface PreviewState {
   file: MockFile | null;
@@ -19,8 +20,6 @@ interface PreviewState {
 }
 
 interface AppShellContextValue {
-  currentView: ViewKey;
-  setView: (v: ViewKey) => void;
   hideSidebar: boolean;
   sidebarCollapsed: boolean;
   setSidebarCollapsed: (collapsed: boolean) => void;
@@ -29,38 +28,22 @@ interface AppShellContextValue {
   preview: PreviewState;
   openPreview: (file: MockFile) => void;
   closePreview: () => void;
-  // Active entity ids: persisted across view switches so that list-view → detail-view
-  // navigation can carry which entity was clicked.
-  activeProjectId: string | null;
-  setActiveProjectId: (id: string | null) => void;
-  activeScheduledId: string | null;
-  setActiveScheduledId: (id: string | null) => void;
-  activeTaskId: string | null;
-  setActiveTaskId: (id: string | null) => void;
   // NewTaskView → TaskView handoff: NewTaskView creates a thread, drops the
   // prompt here + navigates. TaskView reads it once and POST /ag-ui/run, clears.
   pendingFirstPrompt: { conversationId: string; text: string } | null;
   setPendingFirstPrompt: (v: { conversationId: string; text: string } | null) => void;
   // Streaming state lives in the per-thread AG-UI ChatRuntime (see useChat),
-  // not here.
+  // not here. Entity ids (threadId, projectId, scheduledId) live in the URL
+  // — consume them via `useParams` in the corresponding view.
 }
 
 const AppShellContext = createContext<AppShellContextValue | null>(null);
 
-export function AppShellProvider({
-  children,
-  initialView = "new-task" as ViewKey,
-}: {
-  children: ReactNode;
-  initialView?: ViewKey;
-}) {
-  const [currentView, setView] = useState<ViewKey>(initialView);
+export function AppShellProvider({ children }: { children: ReactNode }) {
+  const location = useLocation();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [asideOpen, setAsideOpen] = useState(true);
   const [preview, setPreview] = useState<PreviewState>({ file: null, open: false });
-  const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
-  const [activeScheduledId, setActiveScheduledId] = useState<string | null>(null);
-  const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
   const [pendingFirstPrompt, setPendingFirstPrompt] = useState<{
     conversationId: string;
     text: string;
@@ -76,11 +59,16 @@ export function AppShellProvider({
     [],
   );
 
+  // Sidebar visibility is now derived from the route, not from a context
+  // setting — eliminates the "set view + forget to also set hideSidebar"
+  // class of bug.
+  const hideSidebar = FULLSCREEN_ROUTES.some((p) =>
+    location.pathname.startsWith(p),
+  );
+
   const value = useMemo<AppShellContextValue>(
     () => ({
-      currentView,
-      setView,
-      hideSidebar: FULLSCREEN_VIEWS.includes(currentView),
+      hideSidebar,
       sidebarCollapsed,
       setSidebarCollapsed,
       asideOpen,
@@ -88,26 +76,17 @@ export function AppShellProvider({
       preview,
       openPreview,
       closePreview,
-      activeProjectId,
-      setActiveProjectId,
-      activeScheduledId,
-      setActiveScheduledId,
-      activeTaskId,
-      setActiveTaskId,
       pendingFirstPrompt,
       setPendingFirstPrompt,
     }),
     [
-      currentView,
+      hideSidebar,
       sidebarCollapsed,
       asideOpen,
-      preview,
       toggleAside,
+      preview,
       openPreview,
       closePreview,
-      activeProjectId,
-      activeScheduledId,
-      activeTaskId,
       pendingFirstPrompt,
     ],
   );

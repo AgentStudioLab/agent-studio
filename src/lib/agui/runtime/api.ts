@@ -17,6 +17,13 @@ export interface PostRunRequest {
   threadId: string;
   runId: string;
   message: { role: "user"; content: string };
+  /**
+   * "ask" (default) — every mutation tool surfaces an HITL card.
+   * "act-without-asking" — bypass approval for this run; provider's
+   *  `canUseTool` short-circuits to allow. Sent per-run so the user can
+   *  toggle mid-thread; the sidecar doesn't persist this server-side.
+   */
+  permissionMode?: "ask" | "act-without-asking";
 }
 
 export interface ResumeRequest {

@@ -4,7 +4,7 @@ import type { BundledLanguage } from "shiki";
 import type { MessageBlock, MessageView, PendingInterrupt } from "@/lib/agui/runtime";
 import type { ChatRuntime } from "@/lib/agui/runtime/runtime";
 import { useRunStatus } from "@/lib/agui/react/useRunStatus";
-import { useAppShell } from "@/app/AppShellContext";
+import { useNavigate } from "react-router-dom";
 import { ToolApprovalCard } from "@/features/task/ToolApprovalCard";
 import { UserMessage } from "@/features/task/UserMessage";
 import { MessageActions } from "@/features/task/MessageActions";
@@ -128,7 +128,7 @@ export function ChatStream({
   onAllowAlways,
   onContinueAfterRestart,
 }: ChatStreamProps) {
-  const { setView } = useAppShell();
+  const navigate = useNavigate();
   // cast: ChatRuntime.subscribe takes (state) => void; RuntimeLike expects () => void.
   // The wrapper in useRunStatus discards the state arg, so this is safe at runtime.
   const status = useRunStatus(runtime as never);
@@ -188,7 +188,7 @@ export function ChatStream({
       <ConversationContent className="gap-0 p-0">
         <div className="mx-auto w-full max-w-[760px] space-y-6 px-8 py-6">
           {status.isAuthError && (
-            <ApiKeyMissingBanner onConfigureClick={() => setView("settings")} />
+            <ApiKeyMissingBanner onConfigureClick={() => navigate("/settings")} />
           )}
           {status.errorCode === "RATE_LIMIT" && status.retry && (
             <RetryHint delayMs={status.retry.retryDelayMs} />
@@ -203,11 +203,13 @@ export function ChatStream({
               isRunning &&
               m.role === "assistant" &&
               idx === messages.length - 1;
+            const isLastMessage = idx === messages.length - 1;
             return (
               <MessageRow
                 key={m.id}
                 message={m}
                 showActions={!isLive}
+                isLastMessage={isLastMessage}
                 interruptsByToolId={interruptsByToolId}
                 renderApprovalCard={renderApprovalCard}
                 onContinueAfterRestart={onContinueAfterRestart}
@@ -285,12 +287,14 @@ function groupBlocks(blocks: MessageBlock[]): GroupedBlock[] {
 function MessageRow({
   message,
   showActions,
+  isLastMessage,
   interruptsByToolId,
   renderApprovalCard,
   onContinueAfterRestart,
 }: {
   message: MessageView;
   showActions: boolean;
+  isLastMessage: boolean;
   interruptsByToolId: Map<string, PendingInterrupt>;
   renderApprovalCard: (it: PendingInterrupt) => ReactNode;
   onContinueAfterRestart: () => void;
@@ -336,7 +340,14 @@ function MessageRow({
           );
         }
         if (b.kind === "notice") {
-          const isProcessRestart = b.reason === "process_restart";
+          // "继续上次任务" CTA only on the last message AND last block of that
+          // message. Once the user has sent a new prompt (or the notice was
+          // followed by any further content), the recovery opportunity has
+          // passed — leaving the button visible mid-history would invite
+          // duplicate sends + confuse the reading flow.
+          const isLastBlock = i === grouped.length - 1;
+          const showContinueCta =
+            b.reason === "process_restart" && isLastMessage && isLastBlock;
           return (
             <div
               key={`${b.id}-${i}`}
@@ -344,7 +355,7 @@ function MessageRow({
               style={{ color: "hsl(var(--text-300))" }}
             >
               <span>{b.content}</span>
-              {isProcessRestart && (
+              {showContinueCta && (
                 <button
                   type="button"
                   onClick={onContinueAfterRestart}

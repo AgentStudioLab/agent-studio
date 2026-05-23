@@ -1,4 +1,5 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
+import { useParams } from "react-router-dom";
 import { AppShell } from "@/app/AppShell";
 import { useAppShell } from "@/app/AppShellContext";
 import { TaskHeader } from "@/features/task/TaskHeader";
@@ -12,11 +13,14 @@ import {
   useThreadStatuses,
 } from "@/lib/agui/react/useThreadStatuses";
 import { useThreadUnread } from "@/lib/agui/react/useThreadUnread";
+import { useAllowedTools } from "@/lib/agui/react/useAllowedTools";
+import { useWorkspaceAllowedTools } from "@/lib/agui/react/useWorkspaceAllowedTools";
+import { useThreadPermissionMode } from "@/lib/agui/react/useThreadPermissionMode";
 import { useConversation, useMessages } from "@/lib/data/queries";
 
 export function TaskView() {
+  const { threadId: activeTaskId = null } = useParams<{ threadId: string }>();
   const {
-    activeTaskId,
     pendingFirstPrompt,
     setPendingFirstPrompt,
     preview,
@@ -44,10 +48,29 @@ export function TaskView() {
     attachToRun,
     setHistoricalMessages,
     pendingInterrupts,
+    activeRunId,
     resumeRun,
-    allowedTools,
-    addAllowedTool,
   } = useChat({ threadId: activeTaskId ?? "" });
+
+  // HITL allowlist composition (W1 design):
+  //   - global: manually populated via Settings, applies everywhere
+  //   - workspace (per cwd): populated by the "始终允许" button on the
+  //     approval card; scope-limited so trusting Edit in one project doesn't
+  //     leak to another project on the same machine
+  // Auto-allow checks the union. The button writes ONLY to the workspace set.
+  const cwd = conversationQuery.data?.workingDir ?? null;
+  const { allowedTools: globalAllowed } = useAllowedTools();
+  const { allowedTools: workspaceAllowed, addAllowedTool: addWorkspaceTool } =
+    useWorkspaceAllowedTools(cwd);
+  const allowedTools = useMemo<ReadonlySet<string>>(() => {
+    const merged = new Set<string>(globalAllowed);
+    for (const t of workspaceAllowed) merged.add(t);
+    return merged;
+  }, [globalAllowed, workspaceAllowed]);
+  // Permission mode (per-thread). Read here so every send/first-prompt path
+  // converges on a single source — the dropdown writes to the same store the
+  // useThreadPermissionMode hook subscribes to.
+  const { mode: permissionMode } = useThreadPermissionMode(activeTaskId);
 
   // Prime runtime once history actually arrives. Skipping `undefined` keeps
   // the effect quiet during the loading window; once data is resolved
@@ -94,35 +117,42 @@ export function TaskView() {
     firstPromptFired.current = activeTaskId;
     const text = pendingFirstPrompt.text;
     setPendingFirstPrompt(null);
-    void send(text);
+    void send(text, { permissionMode });
   }, [
     activeTaskId,
     pendingFirstPrompt,
     setPendingFirstPrompt,
+    permissionMode,
     send,
     activeRun,
   ]);
 
-  // Auto-allow interrupts whose toolName is on the allowlist. We track which
-  // interrupt IDs we've already fired for to avoid double-resume during the
-  // microtask window before the next render clears the interrupt.
-  const autoAllowFired = useRef<Set<string>>(new Set());
+  // Auto-allow interrupts whose toolName is on the allowlist. The dedup set
+  // is **scoped by runId** — different runs use independent fired sets, so
+  // even if the SDK reuses a tool_use ID across resumed sessions we never
+  // confuse one run's "already fired" with another's "fresh".
+  const autoAllowFiredByRun = useRef<Map<string, Set<string>>>(new Map());
   useEffect(() => {
+    if (!activeRunId) return;
+    let fired = autoAllowFiredByRun.current.get(activeRunId);
+    if (!fired) {
+      fired = new Set();
+      autoAllowFiredByRun.current.set(activeRunId, fired);
+    }
     for (const it of pendingInterrupts) {
-      if (autoAllowFired.current.has(it.id)) continue;
+      if (fired.has(it.id)) continue;
       const toolName = (it.payload as { toolName?: string }).toolName;
       if (toolName && allowedTools.has(toolName)) {
-        autoAllowFired.current.add(it.id);
+        fired.add(it.id);
         void resumeRun({ decisions: [{ type: "allow" }] });
       }
     }
-  }, [pendingInterrupts, allowedTools, resumeRun]);
+  }, [pendingInterrupts, allowedTools, resumeRun, activeRunId]);
 
-  // Clear the dedup set when switching threads so an interrupt ID reused across
-  // threads (e.g., per-run counters) can still auto-allow. Mirrors the
-  // allowedTools reset in useChat.
+  // Drop the entire run→fired map on thread switch — keeps memory bounded
+  // and means returning to a thread starts fresh (no stale per-run sets).
   useEffect(() => {
-    autoAllowFired.current.clear();
+    autoAllowFiredByRun.current.clear();
   }, [activeTaskId]);
 
   // Mark the open thread as read whenever its last run reaches a terminal
@@ -171,14 +201,28 @@ export function TaskView() {
               pendingInterrupts={pendingInterrupts}
               onResume={resumeRun}
               allowedTools={allowedTools}
-              onAllowAlways={addAllowedTool}
-              onContinueAfterRestart={() => void send("继续上次未完成的任务")}
+              onAllowAlways={addWorkspaceTool}
+              onContinueAfterRestart={() => {
+                // Resend the last user message verbatim — gives the model the
+                // identical context it had at interrupt time, so it most likely
+                // proposes the same tool and the HITL flow replays cleanly.
+                // Beats a fuzzy "继续上次未完成的任务" prompt that drifted the
+                // model into "现在继续完成精简版的写入" in past sessions.
+                for (let i = viewMessages.length - 1; i >= 0; i--) {
+                  const m = viewMessages[i]!;
+                  if (m.role === "user") {
+                    void send(m.content, { permissionMode });
+                    return;
+                  }
+                }
+              }}
             />
           </div>
           <div className="shrink-0 px-8 pb-6 pt-2">
             <div className="mx-auto w-full max-w-[760px]">
               <TaskMessageInput
-                onSend={(text) => void send(text)}
+                threadId={activeTaskId}
+                onSend={(text) => void send(text, { permissionMode })}
                 onStop={() => void cancel()}
                 streaming={isRunning}
               />
@@ -190,7 +234,7 @@ export function TaskView() {
         previewOpen ? (
           <PreviewPane file={preview.file!} onClose={closePreview} />
         ) : (
-          <TaskRightPanel threadId={activeTaskId} onOpenFile={openPreview} />
+          <TaskRightPanel onOpenFile={openPreview} />
         )
       }
     />

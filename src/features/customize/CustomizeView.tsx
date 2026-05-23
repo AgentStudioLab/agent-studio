@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ChevronLeft } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { useAppShell } from "@/app/AppShellContext";
+import { useNavigate } from "react-router-dom";
 import {
   CustomizeNav,
   type CustomizeNavSection,
@@ -19,7 +19,7 @@ interface CustomizeViewProps {
 }
 
 export function CustomizeView({ initialSection = "home" }: CustomizeViewProps) {
-  const { setView } = useAppShell();
+  const navigate = useNavigate();
   const { t } = useTranslation();
   const [section, setSection] = useState<CustomizeNavSection>(initialSection);
 
@@ -34,7 +34,7 @@ export function CustomizeView({ initialSection = "home" }: CustomizeViewProps) {
       <header className="flex items-center gap-3 border-b border-border px-4 py-3">
         <button
           type="button"
-          onClick={() => setView("task")}
+          onClick={() => navigate(-1)}
           className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
           aria-label={t("customize.back")}
         >

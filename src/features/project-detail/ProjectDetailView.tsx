@@ -7,8 +7,8 @@ import {
   Pin,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { useParams } from "react-router-dom";
 import { AppShell } from "@/app/AppShell";
-import { useAppShell } from "@/app/AppShellContext";
 import { CollapsibleCard } from "@/features/project-detail/CollapsibleCard";
 import { InstructionsCard } from "@/features/project-detail/InstructionsCard";
 import { ScheduledMiniCard } from "@/features/project-detail/ScheduledMiniCard";
@@ -25,9 +25,9 @@ import {
 } from "@/components/ai-elements/prompt-input";
 
 export function ProjectDetailView() {
-  const { activeProjectId } = useAppShell();
+  const { projectId } = useParams<{ projectId: string }>();
   const project =
-    projects.find((p) => p.id === activeProjectId) ?? projects[0]!;
+    projects.find((p) => p.id === projectId) ?? projects[0]!;
   const { t } = useTranslation();
 
   return (

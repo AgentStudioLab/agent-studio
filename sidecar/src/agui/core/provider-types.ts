@@ -42,6 +42,14 @@ export interface ProviderCallbacks {
   }) => void | Promise<void>;
 }
 
+/**
+ * Per-run HITL policy. "ask" surfaces every mutation tool through canUseTool;
+ * "act-without-asking" short-circuits canUseTool to allow so the SDK runs
+ * tools without the round-trip. Sent per-run (not stored sidecar-side), so
+ * the user can flip mid-thread.
+ */
+export type PermissionMode = "ask" | "act-without-asking";
+
 export interface RunContext {
   threadId: string;
   runId: string;
@@ -50,6 +58,7 @@ export interface RunContext {
   callbacks?: ProviderCallbacks;
   /** Working directory passed to the SDK as `options.cwd`. */
   cwd: string;
+  permissionMode?: PermissionMode;
 }
 
 export interface ResumeContext {
@@ -59,6 +68,7 @@ export interface ResumeContext {
   abortSignal: AbortSignal;
   callbacks?: ProviderCallbacks;
   cwd: string;
+  permissionMode?: PermissionMode;
 }
 
 /**

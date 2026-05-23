@@ -46,6 +46,7 @@
     "react-dom": "^19.2.6",
     "react-i18next": "^17.0.8",
     "react-jsx-parser": "^2.4.1",
+    "react-router-dom": "^7.15.1",
     "shadcn": "^4.7.0",
     "shiki": "^4.1.0",
     "streamdown": "^2.5.0",

@@ -39,7 +39,7 @@ export interface ChatRuntime {
   subscribe(listener: (state: ChatState) => void): () => void;
 
   // —— 命令 ——
-  send(text: string): Promise<void>;
+  send(text: string, opts?: { permissionMode?: "ask" | "act-without-asking" }): Promise<void>;
   cancel(): Promise<void>;
   resume(payload: unknown): Promise<void>;
   attachToRun(runId: string, opts?: { cursor?: string; preserveLive?: boolean }): void;
@@ -158,7 +158,10 @@ export function createChatRuntime(opts: ChatRuntimeOptions): ChatRuntime {
     });
   }
 
-  async function send(text: string): Promise<void> {
+  async function send(
+    text: string,
+    sendOpts?: { permissionMode?: "ask" | "act-without-asking" },
+  ): Promise<void> {
     if (state.isRunning) return;
     if (state.pendingInterrupts.some((it) => it.reason === "tool_approval")) return;
 
@@ -190,6 +193,9 @@ export function createChatRuntime(opts: ChatRuntimeOptions): ChatRuntime {
         threadId: opts.threadId,
         runId,
         message: { role: "user", content: text },
+        ...(sendOpts?.permissionMode
+          ? { permissionMode: sendOpts.permissionMode }
+          : {}),
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -211,22 +217,23 @@ export function createChatRuntime(opts: ChatRuntimeOptions): ChatRuntime {
   }
 
   async function resume(payload: unknown): Promise<void> {
+    // Snapshot the state we depend on at call entry. Without this, an await
+    // here can race with another setState (e.g., a stray RUN_FINISHED replay
+    // populating new interrupts) and we'd POST against an inconsistent
+    // {runId, interruptId} pair — symptom: spurious 409 on a fresh run.
     const runId = state.activeRunId;
-    if (!runId || state.pendingInterrupts.length === 0) return;
+    const pending = state.pendingInterrupts;
+    const cursor = state.lastCursor ?? undefined;
+    if (!runId || pending.length === 0) return;
 
-    // LangGraph 的并行 interrupt batch resume 在 LangChain JS 1.3.x 没暴露完整语义
-    // —— 多个 pending interrupt 时只 forward 第一个。此前是静默吞掉，这里加一个
-    // 警告让消费方至少能感知到。详见 CLAUDE.md "多 interrupt 批处理是半残的"。
-    if (state.pendingInterrupts.length > 1) {
+    if (pending.length > 1) {
       console.warn(
-        `[agui-vue] resume() forwards only the first of ${state.pendingInterrupts.length} pending interrupts; ` +
+        `[agui-vue] resume() forwards only the first of ${pending.length} pending interrupts; ` +
           `LangGraph batch resume is not supported.`,
       );
     }
 
-    const interruptId = state.pendingInterrupts[0]!.id;
-    const cursor = state.lastCursor ?? undefined;
-
+    const interruptId = pending[0]!.id;
     const { request, needsSweep, isDeny } = buildResumeRequest(payload, interruptId);
 
     // Deny 路径：(1) 预清扫 pending 工具调用（spinner 不能继续转），

@@ -36,6 +36,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useAppShell } from "@/app/AppShellContext";
 import type { MockPinnedItem, MockRecentItem } from "@/lib/mock/types";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useThreadStatuses } from "@/lib/agui/react/useThreadStatuses";
 import { useThreadUnread } from "@/lib/agui/react/useThreadUnread";
 import { NavItem } from "@/features/sidebar/NavItem";
@@ -113,17 +114,17 @@ const APP_VERSION = "0.1.0";
  * mini-sidebar popover that appears when the sidebar is collapsed.
  */
 export function SidebarContent() {
-  const {
-    currentView,
-    setView,
-    activeTaskId,
-    setActiveTaskId,
-    sidebarCollapsed,
-    setSidebarCollapsed,
-  } = useAppShell();
+  const { sidebarCollapsed, setSidebarCollapsed } = useAppShell();
+  const navigate = useNavigate();
+  const location = useLocation();
+  // URL is the source of truth for "which view is active". useMatch would
+  // also work but a single useParams + a substring check on pathname is
+  // enough for the few sidebar slots we light up.
+  const { threadId: routeThreadId } = useParams<{ threadId: string }>();
+  const pathname = location.pathname;
   // Pulse-dot prototype shows the selected thread with a darker fill
   // (bg-000) — only counts when the task view is the one in focus.
-  const selectedTaskId = currentView === "task" ? activeTaskId : null;
+  const selectedTaskId = routeThreadId ?? null;
   const { t } = useTranslation();
   const [searchOpen, setSearchOpen] = useState(false);
 
@@ -172,9 +173,8 @@ export function SidebarContent() {
     // If the deleted thread is the one currently open, leave the task view
     // before the mutation lands so the task pane doesn't try to fetch a
     // thread that's about to 404.
-    if (pendingDeleteId === activeTaskId) {
-      setActiveTaskId(null);
-      setView("new-task");
+    if (pendingDeleteId === routeThreadId) {
+      navigate("/");
     }
     deleteMutation.mutate(pendingDeleteId);
     setPendingDeleteId(null);
@@ -211,28 +211,26 @@ export function SidebarContent() {
         <NavItem
           icon={Plus}
           label={t("sidebar.nav.newTask")}
-          active={currentView === "new-task"}
-          onClick={() => setView("new-task")}
+          active={pathname === "/"}
+          onClick={() => navigate("/")}
         />
         <NavItem
           icon={Briefcase}
           label={t("sidebar.nav.projects")}
-          active={
-            currentView === "projects" || currentView === "project-detail"
-          }
-          onClick={() => setView("projects")}
+          active={pathname.startsWith("/projects")}
+          onClick={() => navigate("/projects")}
         />
         <NavItem
           icon={Clock}
           label={t("sidebar.nav.scheduled")}
-          active={currentView === "scheduled-list"}
-          onClick={() => setView("scheduled-list")}
+          active={pathname.startsWith("/scheduled")}
+          onClick={() => navigate("/scheduled")}
         />
         <NavItem
           icon={Sparkles}
           label={t("sidebar.nav.customize")}
-          active={currentView === "customize"}
-          onClick={() => setView("customize")}
+          active={pathname === "/customize"}
+          onClick={() => navigate("/customize")}
         />
       </nav>
 
@@ -254,10 +252,9 @@ export function SidebarContent() {
                   if (item.kind !== "project") {
                     const runId = entryByThread.get(item.id)?.lastRunId;
                     if (runId) markRead(item.id, runId);
-                    setActiveTaskId(item.id);
-                    setView("task");
+                    navigate(`/task/${item.id}`);
                   } else {
-                    setView("project-detail");
+                    navigate(`/projects/${item.id}`);
                   }
                 }}
                 onUnpin={() => void handleUnpin(item)}
@@ -283,8 +280,7 @@ export function SidebarContent() {
             onClick={() => {
               const runId = entryByThread.get(item.id)?.lastRunId;
               if (runId) markRead(item.id, runId);
-              setActiveTaskId(item.id);
-              setView("task");
+              navigate(`/task/${item.id}`);
             }}
             onPin={() => void handlePin(item)}
             onDelete={() => requestDelete(item.id)}
@@ -301,7 +297,7 @@ export function SidebarContent() {
           <UpdateCard version={`v${APP_VERSION}`} />
         </div>
         <UserBar
-          onSettings={() => setView("settings")}
+          onSettings={() => navigate("/settings")}
           onLogout={() => console.log("logout")}
         />
       </div>

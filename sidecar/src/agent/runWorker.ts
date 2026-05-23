@@ -21,6 +21,8 @@ export interface RunWorkerInput {
   interruptBus: InterruptBus;
   abortSignal: AbortSignal;
   usage: UsageService;
+  /** "ask" (default) or "act-without-asking" (skip HITL approvals). */
+  permissionMode?: "ask" | "act-without-asking";
 }
 
 export async function runWorker(input: RunWorkerInput): Promise<void> {
@@ -35,6 +37,7 @@ export async function runWorker(input: RunWorkerInput): Promise<void> {
     interruptBus,
     abortSignal,
     usage,
+    permissionMode = "ask",
   } = input;
 
   // Buffer the structured messages/tool_calls writes until the run reaches a
@@ -132,6 +135,7 @@ export async function runWorker(input: RunWorkerInput): Promise<void> {
       abortSignal,
       callbacks,
       cwd,
+      permissionMode,
     });
 
     await executeRunLoop({

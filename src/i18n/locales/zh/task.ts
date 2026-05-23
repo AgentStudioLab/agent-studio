@@ -87,6 +87,19 @@ export const task = {
       ask: "提问",
       legacyModel: "Legacy 模型",
       disclaimer: "Agent Studio 是 AI，可能会出错。请仔细核对回复。",
+      permissionMode: {
+        askShort: "提问",
+        actShort: "直接执行",
+        askTitle: "执行前提问",
+        askDesc: "agent 会暂停以等待你审批每一个动作。",
+        actTitle: "无需审批直接执行",
+        actDesc: "agent 不会暂停审批，直接执行所有动作。",
+        confirmTitle: "无需审批直接执行？",
+        confirmDesc:
+          "agent 将无需审批直接执行所有动作。这可能将你的数据或系统置于风险之中。",
+        cancel: "取消",
+        confirm: "确认开启",
+      },
     },
     error: {
       authFailed: "API key 失效或未配置",

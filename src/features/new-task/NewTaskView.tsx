@@ -1,6 +1,7 @@
 import { ChevronDown, ExternalLink, FolderOpen, FolderPlus, Hand } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { AppShell } from "@/app/AppShell";
 import { useAppShell } from "@/app/AppShellContext";
@@ -30,7 +31,8 @@ function basename(p: string): string {
 
 export function NewTaskView() {
   const { t } = useTranslation();
-  const { setView, setActiveTaskId, setPendingFirstPrompt } = useAppShell();
+  const navigate = useNavigate();
+  const { setPendingFirstPrompt } = useAppShell();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // `null` = use the server default (~/.agent-studio).
@@ -62,10 +64,10 @@ export function NewTaskView() {
         title: text.slice(0, 60),
         workingDir,
       });
-      setActiveTaskId(conv.id);
       // TaskView reads this and immediately POST /ag-ui/run with the prompt.
+      // The threadId is part of the URL — `useParams` in TaskView picks it up.
       setPendingFirstPrompt({ conversationId: conv.id, text });
-      setView("task");
+      navigate(`/task/${conv.id}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "submit_failed");
     } finally {

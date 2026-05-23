@@ -103,8 +103,23 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
       if (sandboxDeny) {
         return { behavior: "deny" as const, message: sandboxDeny };
       }
-      if (!bus) return { behavior: "allow" as const };
-      return bus.requestApproval({
+      // SDK 0.3.144's zod runtime schema requires `updatedInput: Record` on
+      // every allow result — even though sdk.d.ts marks it optional. Returning
+      // `{ behavior: "allow" }` bare yields:
+      //   ZodError: path: ["updatedInput"], expected: "record", received undefined
+      // We echo `input` back unmodified on the allow branch as the default.
+      //
+      // act-without-asking short-circuits BEFORE the bus — the user has
+      // explicitly opted into autopilot for this thread, so we don't even
+      // ask the bus (would have surfaced a card the user told us to skip).
+      // Sandbox still applies (workspace policy is not negotiable).
+      if (ctx.permissionMode === "act-without-asking") {
+        return { behavior: "allow" as const, updatedInput: input };
+      }
+      if (!bus) {
+        return { behavior: "allow" as const, updatedInput: input };
+      }
+      const result = await bus.requestApproval({
         runId: ctx.runId,
         threadId: ctx.threadId,
         toolUseID: sdkOpts.toolUseID,
@@ -113,6 +128,10 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
         title: sdkOpts.title,
         description: sdkOpts.description,
       });
+      if (result.behavior === "allow") {
+        return { behavior: "allow" as const, updatedInput: input };
+      }
+      return result;
     };
 
     const auditHooks = opts.audit
