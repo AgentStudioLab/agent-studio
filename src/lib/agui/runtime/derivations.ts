@@ -143,12 +143,9 @@ export function deriveTouchedFiles(
   if (!workingDir) return [];
   const cwdPrefix = workingDir.endsWith("/") ? workingDir : workingDir + "/";
   const historicalCalls = fileCallsInOrder(state.historicalMessages, 0);
-  // Continue the seq counter from where historical left off so live calls
-  // are guaranteed to have STRICTLY GREATER seq than any historical call.
-  // The +1 ensures live's seq starts above the last historical block index
-  // even when historical had no file-tool calls (last fileCall.seq might
-  // not equal the last block index seen — use a conservative starting
-  // point that's safely above all historical block indices).
+  // Live seqStart = last historical FILE-call seq. Inside fileCallsInOrder,
+  // seq is incremented before each push, so the first live file call gets
+  // lastHistoricalSeq + 1 — strictly above every historical file-call seq.
   const lastHistoricalSeq =
     historicalCalls.length > 0
       ? historicalCalls[historicalCalls.length - 1]!.seq
