@@ -34,7 +34,7 @@ export function CustomizeView({ initialSection = "home" }: CustomizeViewProps) {
       <header className="flex items-center gap-3 border-b border-border px-4 py-3">
         <button
           type="button"
-          onClick={() => navigate(-1)}
+          onClick={() => navigate("/")}
           className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
           aria-label={t("customize.back")}
         >

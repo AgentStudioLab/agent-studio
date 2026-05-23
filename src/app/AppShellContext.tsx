@@ -30,8 +30,23 @@ interface AppShellContextValue {
   closePreview: () => void;
   // NewTaskView → TaskView handoff: NewTaskView creates a thread, drops the
   // prompt here + navigates. TaskView reads it once and POST /ag-ui/run, clears.
-  pendingFirstPrompt: { conversationId: string; text: string } | null;
-  setPendingFirstPrompt: (v: { conversationId: string; text: string } | null) => void;
+  // permissionMode is carried so the first turn honors the dropdown choice the
+  // user made on the home screen (no separate "ask/act" picker on TaskView's
+  // input is needed before the first send).
+  pendingFirstPrompt: {
+    conversationId: string;
+    text: string;
+    permissionMode?: "ask" | "act-without-asking";
+    model?: string;
+  } | null;
+  setPendingFirstPrompt: (
+    v: {
+      conversationId: string;
+      text: string;
+      permissionMode?: "ask" | "act-without-asking";
+      model?: string;
+    } | null,
+  ) => void;
   // Streaming state lives in the per-thread AG-UI ChatRuntime (see useChat),
   // not here. Entity ids (threadId, projectId, scheduledId) live in the URL
   // — consume them via `useParams` in the corresponding view.
@@ -47,6 +62,8 @@ export function AppShellProvider({ children }: { children: ReactNode }) {
   const [pendingFirstPrompt, setPendingFirstPrompt] = useState<{
     conversationId: string;
     text: string;
+    permissionMode?: "ask" | "act-without-asking";
+    model?: string;
   } | null>(null);
 
   const toggleAside = useCallback(() => setAsideOpen((v) => !v), []);

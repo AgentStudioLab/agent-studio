@@ -24,6 +24,12 @@ export interface PostRunRequest {
    *  toggle mid-thread; the sidecar doesn't persist this server-side.
    */
   permissionMode?: "ask" | "act-without-asking";
+  /**
+   * Model id (e.g. "claude-opus-4-7"). Forwarded to the SDK as
+   * `options.model` for this run. If omitted, sidecar falls back to its
+   * ANTHROPIC_MODEL env (and ultimately the SDK's own default).
+   */
+  model?: string;
 }
 
 export interface ResumeRequest {

@@ -9,7 +9,10 @@ import { buildSettingsRoutes } from "./routes/settings";
 import { buildRunRoutes } from "./routes/runs";
 import { buildAuditRoutes } from "./routes/audit";
 import { buildUsageRoutes } from "./routes/usage";
-import { createApiKeyState } from "./services/apiKey";
+import { buildModelsRoutes } from "./routes/models";
+import { createProviderSettings } from "./services/providerSettings";
+import { createUserProfileSettings } from "./services/userProfileSettings";
+import { composeAppendPrompt } from "./lib/composeAppendPrompt";
 import { ThreadService } from "./services/threads";
 import { MessageService } from "./services/messages";
 import { AuditService } from "./services/audit";
@@ -54,7 +57,15 @@ if (!dbAbs.endsWith(".db")) {
 }
 
 const db = openDb(dbAbs);
-const apiKey = createApiKeyState(process.env.ANTHROPIC_API_KEY);
+// Provider state is DB-backed. Env vars only seed the very first boot
+// (when the settings row doesn't exist yet) — after the user saves once,
+// the DB row wins. Lets a single binary serve different keys/baseUrls
+// across machines without env juggling.
+const providerSettings = createProviderSettings(db, {
+  apiKey: process.env.ANTHROPIC_API_KEY,
+  baseUrl: process.env.ANTHROPIC_BASE_URL,
+});
+const userProfileSettings = createUserProfileSettings(db);
 
 const threads = new ThreadService(db);
 const messages = new MessageService(db);
@@ -111,32 +122,40 @@ app.use("*", async (c, next) => {
   await next();
 });
 
-// Build provider lazily on each /ag-ui/run? No — single instance is fine
-// (sessions are tracked inside). Throws if no API key by the time first run hits.
+// Build provider lazily — single instance per (apiKey, baseUrl) tuple.
+// Sessions live inside the provider, so we cache. When the user changes
+// provider config via /settings/provider, providerSettings.onChange fires
+// and we invalidate the cache so the next run picks up the new endpoint.
 function buildProvider() {
-  const key = apiKey.get();
-  if (!key) throw new Error("api_key_missing");
+  const current = providerSettings.current();
+  if (!current.apiKey) throw new Error("api_key_missing");
   const resolveAllowedTools = (threadId: string): string[] => {
     const override = threads.getAllowedTools(threadId);
     return override ?? settingsTools.getDefault();
   };
   return createClaudeProvider({
-    apiKey: key,
-    baseUrl: process.env.ANTHROPIC_BASE_URL,
+    apiKey: current.apiKey,
+    baseUrl: current.baseUrl || undefined,
     model: process.env.ANTHROPIC_MODEL,
     resolveAllowedTools,
     interruptBus,
     audit,
+    resolveAppendPrompt: () =>
+      composeAppendPrompt(userProfileSettings.current()),
   });
 }
 
-// Build once at boot — sessionByThread map lives across requests.
-// If api key is missing, defer creation: build on first run() and store.
 let providerInstance: ReturnType<typeof createClaudeProvider> | null = null;
 function getProvider() {
   if (!providerInstance) providerInstance = buildProvider();
   return providerInstance;
 }
+// Drop the cache on any provider settings change. Next /runs builds a fresh
+// instance with the new baseUrl / apiKey. In-flight runs continue against
+// the old instance — that's intentional, we don't yank a running session.
+providerSettings.onChange(() => {
+  providerInstance = null;
+});
 // Lazy proxy so routes can wire it as a stable reference.
 const providerProxy = {
   get name() { return "claude-agent-sdk"; },
@@ -149,7 +168,7 @@ const providerProxy = {
 app.route("/", healthRoutes);
 app.route("/", buildConversationRoutes({ threads, store }));
 app.route("/", buildMessageRoutes(messages));
-app.route("/", buildSettingsRoutes(apiKey));
+app.route("/", buildSettingsRoutes(providerSettings, userProfileSettings));
 app.route(
   "/",
   buildRunRoutes({
@@ -164,13 +183,16 @@ app.route(
 app.route("/", buildAuditRoutes(audit));
 app.route("/", buildUsageRoutes(usage));
 app.route("/", buildSettingsToolsRoutes(settingsTools));
+app.route("/", buildModelsRoutes(providerSettings));
 
 console.log(`[sidecar] listening on http://127.0.0.1:${args.port} (db=${dbAbs})`);
-console.log(
-  `[sidecar] env presence: ANTHROPIC_API_KEY=${process.env.ANTHROPIC_API_KEY ? "yes" : "NO"} ` +
-    `ANTHROPIC_BASE_URL=${process.env.ANTHROPIC_BASE_URL ?? "NO"} ` +
-    `ANTHROPIC_MODEL=${process.env.ANTHROPIC_MODEL ?? "NO"}`,
-);
+{
+  const cur = providerSettings.current();
+  console.log(
+    `[sidecar] provider: profile=${cur.profileId} baseUrl=${cur.baseUrl || "(default)"} ` +
+      `apiKey=${cur.apiKey ? "yes" : "NO"} models=${cur.models.length}`,
+  );
+}
 
 export default {
   port: args.port,

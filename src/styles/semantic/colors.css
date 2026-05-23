@@ -10,10 +10,14 @@
     --always-white: var(--color-pure-white);
     --always-black: var(--color-pure-black);
 
-    /* Surfaces */
+    /* Surfaces — bg-100 is the MAIN CANVAS, bg-200 is the LIFTED layer
+     * (sidebar, cards). bg-100 is intentionally a shade DARKER than
+     * bg-200 (and the scale continues darker through bg-300+), so the
+     * focal work area sits visually deeper than the chrome around it.
+     * This matches the Anthropic / Cowork reference look. */
     --bg-000: var(--color-pure-white);
-    --bg-100: var(--color-stone-50);
-    --bg-200: var(--color-stone-75);
+    --bg-100: var(--color-stone-75);
+    --bg-200: var(--color-stone-50);
     --bg-300: var(--color-stone-100);
     --bg-400: var(--color-stone-200);
     --bg-500: var(--color-stone-200);
@@ -84,9 +88,12 @@
 }
 
 :root[data-mode="dark"] {
+    /* Mirror of light-mode depth: bg-100 (main canvas) is darker than
+     * bg-200 (sidebar / cards). Keeps sidebar floating visually above
+     * the focal work area in dark mode too. */
     --bg-000: var(--color-stone-800);
-    --bg-100: var(--color-stone-850);
-    --bg-200: var(--color-stone-900);
+    --bg-100: var(--color-stone-900);
+    --bg-200: var(--color-stone-850);
     --bg-300: var(--color-stone-950);
     --bg-400: var(--color-pure-black);
     --bg-500: var(--color-pure-black);

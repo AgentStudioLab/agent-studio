@@ -11,6 +11,24 @@ export const newTask: typeof Zh = {
       workInProject: "Work in a project",
       ask: "Ask",
       legacyModel: "Legacy Model",
+      models: {
+        opus: { displayName: "Opus 4.7", description: "Most capable for ambitious work" },
+        sonnet: { displayName: "Sonnet 4.6", description: "Responsive everyday work" },
+        haiku: { displayName: "Haiku 4.5", description: "Fastest, most efficient" },
+      },
+      permissionMode: {
+        askShort: "Ask",
+        actShort: "Act without asking",
+        askTitle: "Ask before acting",
+        askDesc: "Agent pauses for you to approve every action.",
+        actTitle: "Act without asking",
+        actDesc: "Agent runs all actions without pausing for approval.",
+        confirmTitle: "Act without asking?",
+        confirmDesc:
+          "Agent will run all actions without asking. This may put your data or system at risk.",
+        cancel: "Cancel",
+        confirm: "Enable",
+      },
     },
     workInProject: {
       chooseFolder: "Choose a different folder",

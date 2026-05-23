@@ -39,7 +39,13 @@ export interface ChatRuntime {
   subscribe(listener: (state: ChatState) => void): () => void;
 
   // —— 命令 ——
-  send(text: string, opts?: { permissionMode?: "ask" | "act-without-asking" }): Promise<void>;
+  send(
+    text: string,
+    opts?: {
+      permissionMode?: "ask" | "act-without-asking";
+      model?: string;
+    },
+  ): Promise<void>;
   cancel(): Promise<void>;
   resume(payload: unknown): Promise<void>;
   attachToRun(runId: string, opts?: { cursor?: string; preserveLive?: boolean }): void;
@@ -160,7 +166,10 @@ export function createChatRuntime(opts: ChatRuntimeOptions): ChatRuntime {
 
   async function send(
     text: string,
-    sendOpts?: { permissionMode?: "ask" | "act-without-asking" },
+    sendOpts?: {
+      permissionMode?: "ask" | "act-without-asking";
+      model?: string;
+    },
   ): Promise<void> {
     if (state.isRunning) return;
     if (state.pendingInterrupts.some((it) => it.reason === "tool_approval")) return;
@@ -196,6 +205,7 @@ export function createChatRuntime(opts: ChatRuntimeOptions): ChatRuntime {
         ...(sendOpts?.permissionMode
           ? { permissionMode: sendOpts.permissionMode }
           : {}),
+        ...(sendOpts?.model ? { model: sendOpts.model } : {}),
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);

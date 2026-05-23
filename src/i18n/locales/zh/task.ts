@@ -87,6 +87,11 @@ export const task = {
       ask: "提问",
       legacyModel: "Legacy 模型",
       disclaimer: "Agent Studio 是 AI，可能会出错。请仔细核对回复。",
+      models: {
+        opus: { displayName: "Opus 4.7", description: "最强能力，应对硬核任务" },
+        sonnet: { displayName: "Sonnet 4.6", description: "响应迅速的日常工作" },
+        haiku: { displayName: "Haiku 4.5", description: "最快、最经济" },
+      },
       permissionMode: {
         askShort: "提问",
         actShort: "直接执行",

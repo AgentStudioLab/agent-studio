@@ -1,0 +1,47 @@
+/* ============================================================
+ * Components · Dot Grid
+ * ----------
+ * Subtle tiled-dot background used on NewTaskView. 14×14 grid of
+ * 1px radial dots — matches the Cowork prototype.
+ *
+ * Animation is an opacity **breathe**: the whole layer fades
+ * between low and full alpha on a slow cycle. We tried diagonal
+ * drift via `background-position` first; in practice Chromium
+ * repaints the gradient on every frame which stutters on
+ * full-viewport elements. `opacity` animates on the compositor
+ * thread and stays buttery.
+ *
+ * The pattern is uniform across the viewport — we do NOT mask it.
+ * Foreground elements that must stay clean (the prompt card,
+ * dropdowns) need their own solid background to occlude.
+ *
+ * `prefers-reduced-motion: reduce` disables the breathing.
+ * ============================================================ */
+
+.bg-dot-grid {
+    background-image: radial-gradient(
+        circle,
+        hsl(var(--text-400) / 0.08) 1px,
+        transparent 1.5px
+    );
+    background-size: 14px 14px;
+    /* opacity animates on the GPU compositor — no repaint cost. */
+    will-change: opacity;
+    animation: dot-grid-breathe 6s ease-in-out infinite;
+}
+
+@keyframes dot-grid-breathe {
+    0%,
+    100% {
+        opacity: 0.4;
+    }
+    50% {
+        opacity: 1;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .bg-dot-grid {
+        animation: none;
+    }
+}

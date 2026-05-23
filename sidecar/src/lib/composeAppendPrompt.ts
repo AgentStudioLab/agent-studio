@@ -1,0 +1,46 @@
+import type { UserProfile } from "../services/userProfileSettings";
+
+// Map of work-key (matches the Select options on the frontend ProfileForm)
+// to a short English phrase. Localizing the agent's system prompt to the
+// user's UI locale would be nice, but the model itself responds well in
+// either language regardless — English keeps tokens tight.
+const WORK_LABEL: Record<string, string> = {
+  engineer: "Software engineer",
+  designer: "Designer",
+  pm: "Product manager",
+  researcher: "Researcher",
+  writer: "Writer",
+  operations: "Operations",
+  other: "Generalist",
+};
+
+/**
+ * Compose the per-user prompt addition fed to `options.systemPrompt.append`.
+ *
+ * Each profile field is optional. We skip any empty section so the final
+ * string contains only the parts the user actually filled in. If everything
+ * is empty, returns `null` and the caller should drop the `append` field
+ * entirely (so the SDK uses the unmodified preset prompt).
+ */
+export function composeAppendPrompt(profile: UserProfile): string | null {
+  const parts: string[] = [];
+
+  const callMe = profile.callMe.trim();
+  if (callMe.length > 0) {
+    parts.push(`Address the user as "${callMe}".`);
+  }
+
+  const work = profile.work.trim();
+  if (work.length > 0) {
+    const label = WORK_LABEL[work] ?? work;
+    parts.push(`The user's role: ${label}.`);
+  }
+
+  const instructions = profile.instructions.trim();
+  if (instructions.length > 0) {
+    parts.push(`Additional user instructions:\n${instructions}`);
+  }
+
+  if (parts.length === 0) return null;
+  return parts.join("\n\n");
+}

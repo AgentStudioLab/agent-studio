@@ -59,6 +59,12 @@ export interface RunContext {
   /** Working directory passed to the SDK as `options.cwd`. */
   cwd: string;
   permissionMode?: PermissionMode;
+  /**
+   * Per-run model override. When set, takes precedence over the provider's
+   * default model (which falls back to ANTHROPIC_MODEL). Forwarded to the SDK
+   * as `options.model`.
+   */
+  model?: string;
 }
 
 export interface ResumeContext {
@@ -69,6 +75,7 @@ export interface ResumeContext {
   callbacks?: ProviderCallbacks;
   cwd: string;
   permissionMode?: PermissionMode;
+  model?: string;
 }
 
 /**

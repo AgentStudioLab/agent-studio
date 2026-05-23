@@ -3,7 +3,12 @@ export const settings = {
     title: "设置",
     nav: {
       general: "通用",
+      account: "账号",
+      model: "模型",
+      permissions: "权限",
+      appearance: "外观",
     },
+    saveButton: "保存",
     profile: {
       title: "个人资料",
       fullName: "姓名",
@@ -42,6 +47,29 @@ export const settings = {
       save: "保存",
       saved: "已保存",
       saveError: "保存失败",
+    },
+    provider: {
+      title: "模型供应商",
+      description: "选择 anthropic 协议兼容的 endpoint。改动后下一次请求生效。",
+      profileLabel: "供应商",
+      profile: {
+        anthropic: "Anthropic（官方）",
+        deepseek: "DeepSeek",
+        custom: "自定义（anthropic 兼容）",
+      },
+      baseUrlLabel: "Base URL",
+      baseUrlPlaceholder: "https://api.example.com",
+      baseUrlHint: "留空则使用所选供应商默认地址。",
+      apiKeyLabel: "API Key",
+      customModelsLabel: "自定义模型列表 (JSON)",
+      customModelsPlaceholder:
+        '[{"id":"model-id","displayName":"显示名","description":"简短描述"}]',
+      customModelsHint:
+        "JSON 数组，每项必须包含 id / displayName / description 三个字符串字段。",
+      save: "保存",
+      saved: "已保存",
+      saveError: "保存失败",
+      invalidJson: "JSON 解析失败，请检查格式。",
     },
     hitl: {
       title: "已允许的工具",

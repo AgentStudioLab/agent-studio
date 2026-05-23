@@ -92,7 +92,10 @@ export function useChat(opts: UseChatOptions) {
   const send = useCallback(
     async (
       text: string,
-      sendOpts?: { permissionMode?: "ask" | "act-without-asking" },
+      sendOpts?: {
+        permissionMode?: "ask" | "act-without-asking";
+        model?: string;
+      },
     ) => {
       await runtime.send(text, sendOpts);
       // Light up sidebar pulse + active-run derivation immediately. Symmetric

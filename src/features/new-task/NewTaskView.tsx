@@ -1,4 +1,4 @@
-import { ChevronDown, ExternalLink, FolderOpen, FolderPlus, Hand } from "lucide-react";
+import { ChevronDown, ExternalLink, FastForward, FolderOpen, FolderPlus, Hand } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
@@ -20,7 +20,25 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { createConversation } from "@/lib/data/conversations";
+import { useAvailableModels } from "@/lib/models";
+import { ModelPicker } from "@/features/task/ModelPicker";
 
 /** Take just the last segment of a /-separated path for a compact button label. */
 function basename(p: string): string {
@@ -38,6 +56,18 @@ export function NewTaskView() {
   // `null` = use the server default (~/.agent-studio).
   const [workingDir, setWorkingDir] = useState<string | null>(null);
   const [popoverOpen, setPopoverOpen] = useState(false);
+  // Local-only mode: the thread doesn't exist yet, so we can't write to the
+  // per-thread store. We carry it through pendingFirstPrompt and TaskView
+  // persists it once the thread is opened.
+  const [permissionMode, setPermissionMode] = useState<
+    "ask" | "act-without-asking"
+  >("ask");
+  const [confirmAct, setConfirmAct] = useState(false);
+  // Pre-thread model selection — same handoff pattern as permissionMode.
+  // Default null = "use the fetched list's first id"; TaskView resolves and
+  // persists into per-thread store once the thread is opened.
+  const [model, setModel] = useState<string | null>(null);
+  const { defaultModelId } = useAvailableModels();
 
   const handlePickFolder = async () => {
     setPopoverOpen(false);
@@ -66,7 +96,12 @@ export function NewTaskView() {
       });
       // TaskView reads this and immediately POST /ag-ui/run with the prompt.
       // The threadId is part of the URL — `useParams` in TaskView picks it up.
-      setPendingFirstPrompt({ conversationId: conv.id, text });
+      setPendingFirstPrompt({
+        conversationId: conv.id,
+        text,
+        permissionMode,
+        model: model ?? defaultModelId ?? undefined,
+      });
       navigate(`/task/${conv.id}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "submit_failed");
@@ -76,9 +111,10 @@ export function NewTaskView() {
   };
 
   return (
+    <>
     <AppShell
       main={
-        <div className="flex h-full flex-col items-center overflow-y-auto px-12 pt-[18%]">
+        <div className="bg-dot-grid flex h-full flex-col items-center overflow-y-auto px-12 pt-[18%]">
           <div className="flex w-full max-w-[760px] flex-col items-start">
             <div className="mb-3 flex items-center gap-4">
               <BrandStar size={28} />
@@ -94,8 +130,14 @@ export function NewTaskView() {
               <ExternalLink className="size-3" />
             </a>
             <div className="w-full">
-              <PromptInput onSubmit={handleSubmit}>
-                <PromptInputTextarea placeholder={t("newTask.input.placeholder")} />
+              {/* Solid backplate occludes the dot-grid behind the prompt
+                  card. The InputGroup (rendered by PromptInput) uses a
+                  semi-transparent dark bg, so without this layer the dots
+                  bleed through. Matching the form's rounded-2xl keeps the
+                  silhouette clean. */}
+              <div className="rounded-2xl bg-background">
+                <PromptInput onSubmit={handleSubmit}>
+                  <PromptInputTextarea placeholder={t("newTask.input.placeholder")} />
                 <PromptInputFooter>
                   <PromptInputTools>
                     <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
@@ -135,21 +177,61 @@ export function NewTaskView() {
                         </button>
                       </PopoverContent>
                     </Popover>
-                    <PromptInputButton>
-                      <Hand className="size-4" />
-                      <span>{t("newTask.input.ask")}</span>
-                      <ChevronDown className="size-3" />
-                    </PromptInputButton>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <PromptInputButton>
+                          {permissionMode === "act-without-asking" ? (
+                            <FastForward className="size-4" />
+                          ) : (
+                            <Hand className="size-4" />
+                          )}
+                          <span>
+                            {permissionMode === "act-without-asking"
+                              ? t("newTask.input.permissionMode.actShort")
+                              : t("newTask.input.permissionMode.askShort")}
+                          </span>
+                          <ChevronDown className="size-3" />
+                        </PromptInputButton>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" className="w-[320px]">
+                        <DropdownMenuItem
+                          onSelect={() => setPermissionMode("ask")}
+                          className="flex flex-col items-start gap-0.5 py-2"
+                        >
+                          <div className="flex items-center gap-2">
+                            <Hand className="size-4" />
+                            <span className="text-[13px] font-medium">
+                              {t("newTask.input.permissionMode.askTitle")}
+                            </span>
+                          </div>
+                          <span className="pl-6 text-[12px] text-muted-foreground">
+                            {t("newTask.input.permissionMode.askDesc")}
+                          </span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onSelect={() => setConfirmAct(true)}
+                          className="flex flex-col items-start gap-0.5 py-2"
+                        >
+                          <div className="flex items-center gap-2">
+                            <FastForward className="size-4" />
+                            <span className="text-[13px] font-medium">
+                              {t("newTask.input.permissionMode.actTitle")}
+                            </span>
+                          </div>
+                          <span className="pl-6 text-[12px] text-muted-foreground">
+                            {t("newTask.input.permissionMode.actDesc")}
+                          </span>
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </PromptInputTools>
                   <PromptInputTools>
-                    <PromptInputButton>
-                      <span>{t("newTask.input.legacyModel")}</span>
-                      <ChevronDown className="size-3" />
-                    </PromptInputButton>
+                    <ModelPicker value={model} onChange={setModel} />
                     <PromptInputSubmit />
                   </PromptInputTools>
                 </PromptInputFooter>
-              </PromptInput>
+                </PromptInput>
+              </div>
               {error && (
                 <p className="mt-2 text-sm" style={{ color: "hsl(var(--danger-100))" }}>
                   {error === "api_key_missing"
@@ -162,5 +244,31 @@ export function NewTaskView() {
         </div>
       }
     />
+    <AlertDialog open={confirmAct} onOpenChange={setConfirmAct}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>
+            {t("newTask.input.permissionMode.confirmTitle")}
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            {t("newTask.input.permissionMode.confirmDesc")}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>
+            {t("newTask.input.permissionMode.cancel")}
+          </AlertDialogCancel>
+          <AlertDialogAction
+            onClick={() => {
+              setPermissionMode("act-without-asking");
+              setConfirmAct(false);
+            }}
+          >
+            {t("newTask.input.permissionMode.confirm")}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }

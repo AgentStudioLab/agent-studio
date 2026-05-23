@@ -21,3 +21,86 @@ export async function setApiKey(key: string): Promise<void> {
   });
   if (!res.ok) throw new Error(`api_key_sidecar_${res.status}`);
 }
+
+export type ProfileId = "anthropic" | "deepseek" | "custom";
+
+export interface ProfileModel {
+  id: string;
+  displayName: string;
+  description: string;
+}
+
+export interface ProviderConfig {
+  profileId: ProfileId;
+  label: string;
+  baseUrl: string;
+  apiKey: string;
+  models: ProfileModel[];
+}
+
+export interface BuiltInProfile {
+  id: ProfileId;
+  label: string;
+  baseUrl: string;
+  models: ProfileModel[];
+}
+
+export interface ProviderState {
+  current: ProviderConfig;
+  builtIn: BuiltInProfile[];
+}
+
+export async function getProvider(): Promise<ProviderState> {
+  const res = await fetchSidecar("/settings/provider");
+  if (!res.ok) throw new Error(`provider_get_${res.status}`);
+  return (await res.json()) as ProviderState;
+}
+
+/**
+ * Partial update — omit a field to leave it unchanged. apiKey strings of
+ * length 0 clear the stored key.
+ */
+export async function setProvider(patch: {
+  profileId?: ProfileId;
+  baseUrl?: string;
+  apiKey?: string;
+  customModels?: ProfileModel[];
+}): Promise<ProviderConfig> {
+  const res = await fetchSidecar("/settings/provider", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+  if (!res.ok) throw new Error(`provider_set_${res.status}`);
+  const json = (await res.json()) as { current: ProviderConfig };
+  return json.current;
+}
+
+// User profile — what the agent calls the user, role, custom instructions.
+// Composed sidecar-side into the SDK's systemPrompt.append on every turn.
+
+export interface UserProfile {
+  callMe: string;
+  work: string;
+  instructions: string;
+}
+
+export async function getProfile(): Promise<UserProfile> {
+  const res = await fetchSidecar("/settings/profile");
+  if (!res.ok) throw new Error(`profile_get_${res.status}`);
+  const json = (await res.json()) as { current: UserProfile };
+  return json.current;
+}
+
+export async function setProfile(
+  patch: Partial<UserProfile>,
+): Promise<UserProfile> {
+  const res = await fetchSidecar("/settings/profile", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+  if (!res.ok) throw new Error(`profile_set_${res.status}`);
+  const json = (await res.json()) as { current: UserProfile };
+  return json.current;
+}

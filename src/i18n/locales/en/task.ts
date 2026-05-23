@@ -90,6 +90,11 @@ export const task: typeof Zh = {
       legacyModel: "Legacy Model",
       disclaimer:
         "Agent Studio is AI and can make mistakes. Please double-check responses.",
+      models: {
+        opus: { displayName: "Opus 4.7", description: "Most capable for ambitious work" },
+        sonnet: { displayName: "Sonnet 4.6", description: "Responsive everyday work" },
+        haiku: { displayName: "Haiku 4.5", description: "Fastest, most efficient" },
+      },
       permissionMode: {
         askShort: "Ask",
         actShort: "Auto",

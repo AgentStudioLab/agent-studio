@@ -27,6 +27,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useThreadPermissionMode } from "@/lib/agui/react/useThreadPermissionMode";
+import { useThreadModel } from "@/lib/agui/react/useThreadModel";
+import { ModelPicker } from "@/features/task/ModelPicker";
 
 interface TaskMessageInputProps {
   threadId: string;
@@ -44,6 +46,7 @@ export function TaskMessageInput({
 }: TaskMessageInputProps) {
   const { t } = useTranslation();
   const { mode, setMode } = useThreadPermissionMode(threadId);
+  const { model, setModel } = useThreadModel(threadId);
   // Confirmation dialog is the safety gate between the dropdown click and the
   // mode flip. We do NOT change mode optimistically — only after the user
   // explicitly clicks "Yes, continue" in the dialog.
@@ -115,10 +118,7 @@ export function TaskMessageInput({
             </DropdownMenu>
           </PromptInputTools>
           <PromptInputTools>
-            <PromptInputButton>
-              <span>{t("task.input.legacyModel")}</span>
-              <ChevronDown className="size-3" />
-            </PromptInputButton>
+            <ModelPicker value={model} onChange={setModel} />
             <PromptInputSubmit
               status={streaming ? "streaming" : undefined}
               onStop={onStop}

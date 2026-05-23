@@ -16,6 +16,8 @@ import { useThreadUnread } from "@/lib/agui/react/useThreadUnread";
 import { useAllowedTools } from "@/lib/agui/react/useAllowedTools";
 import { useWorkspaceAllowedTools } from "@/lib/agui/react/useWorkspaceAllowedTools";
 import { useThreadPermissionMode } from "@/lib/agui/react/useThreadPermissionMode";
+import { useThreadModel } from "@/lib/agui/react/useThreadModel";
+import { useAvailableModels } from "@/lib/models";
 import { useConversation, useMessages } from "@/lib/data/queries";
 
 export function TaskView() {
@@ -70,7 +72,16 @@ export function TaskView() {
   // Permission mode (per-thread). Read here so every send/first-prompt path
   // converges on a single source — the dropdown writes to the same store the
   // useThreadPermissionMode hook subscribes to.
-  const { mode: permissionMode } = useThreadPermissionMode(activeTaskId);
+  const { mode: permissionMode, setMode: setPermissionMode } =
+    useThreadPermissionMode(activeTaskId);
+  const { model: threadModel, setModel: setThreadModel } =
+    useThreadModel(activeTaskId);
+  const { defaultModelId } = useAvailableModels();
+  // Per-thread store returns `null` until the user picks once. Fall back to
+  // the live default from /models (first id in the active profile's list).
+  // If /models hasn't resolved yet, leave undefined so send() omits the field
+  // and the sidecar falls back to its own default.
+  const effectiveModel = threadModel ?? defaultModelId ?? undefined;
 
   // Prime runtime once history actually arrives. Skipping `undefined` keeps
   // the effect quiet during the loading window; once data is resolved
@@ -108,6 +119,9 @@ export function TaskView() {
 
   // First-turn handoff from NewTaskView. Defers when an active run is already
   // in flight for this thread (covers the concurrent submit+refresh race).
+  // The mode chosen on the home screen (pendingFirstPrompt.permissionMode)
+  // takes precedence over the per-thread default — and we persist it so
+  // subsequent turns on this thread inherit the same choice.
   const firstPromptFired = useRef<string | null>(null);
   useEffect(() => {
     if (!activeTaskId || !pendingFirstPrompt) return;
@@ -116,13 +130,24 @@ export function TaskView() {
     if (firstPromptFired.current === activeTaskId) return;
     firstPromptFired.current = activeTaskId;
     const text = pendingFirstPrompt.text;
+    const firstMode = pendingFirstPrompt.permissionMode ?? permissionMode;
+    const firstModel = pendingFirstPrompt.model ?? effectiveModel;
     setPendingFirstPrompt(null);
-    void send(text, { permissionMode });
+    if (pendingFirstPrompt.permissionMode) {
+      setPermissionMode(pendingFirstPrompt.permissionMode);
+    }
+    if (pendingFirstPrompt.model) {
+      setThreadModel(pendingFirstPrompt.model);
+    }
+    void send(text, { permissionMode: firstMode, model: firstModel });
   }, [
     activeTaskId,
     pendingFirstPrompt,
     setPendingFirstPrompt,
     permissionMode,
+    setPermissionMode,
+    effectiveModel,
+    setThreadModel,
     send,
     activeRun,
   ]);
@@ -211,7 +236,10 @@ export function TaskView() {
                 for (let i = viewMessages.length - 1; i >= 0; i--) {
                   const m = viewMessages[i]!;
                   if (m.role === "user") {
-                    void send(m.content, { permissionMode });
+                    void send(m.content, {
+                      permissionMode,
+                      model: effectiveModel,
+                    });
                     return;
                   }
                 }
@@ -222,7 +250,9 @@ export function TaskView() {
             <div className="mx-auto w-full max-w-[760px]">
               <TaskMessageInput
                 threadId={activeTaskId}
-                onSend={(text) => void send(text, { permissionMode })}
+                onSend={(text) =>
+                  void send(text, { permissionMode, model: effectiveModel })
+                }
                 onStop={() => void cancel()}
                 streaming={isRunning}
               />

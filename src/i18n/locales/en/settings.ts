@@ -5,7 +5,12 @@ export const settings: typeof Zh = {
     title: "Settings",
     nav: {
       general: "General",
+      account: "Account",
+      model: "Model",
+      permissions: "Permissions",
+      appearance: "Appearance",
     },
+    saveButton: "Save",
     profile: {
       title: "Profile",
       fullName: "Full name",
@@ -45,6 +50,30 @@ export const settings: typeof Zh = {
       save: "Save",
       saved: "Saved",
       saveError: "Save failed",
+    },
+    provider: {
+      title: "Model Provider",
+      description:
+        "Pick an Anthropic-compatible endpoint. Changes take effect on the next request.",
+      profileLabel: "Provider",
+      profile: {
+        anthropic: "Anthropic",
+        deepseek: "DeepSeek",
+        custom: "Custom (Anthropic-compatible)",
+      },
+      baseUrlLabel: "Base URL",
+      baseUrlPlaceholder: "https://api.example.com",
+      baseUrlHint: "Leave empty to use the selected provider's default.",
+      apiKeyLabel: "API Key",
+      customModelsLabel: "Custom Model List (JSON)",
+      customModelsPlaceholder:
+        '[{"id":"model-id","displayName":"Display Name","description":"Short blurb"}]',
+      customModelsHint:
+        "JSON array. Each item must include string fields: id, displayName, description.",
+      save: "Save",
+      saved: "Saved",
+      saveError: "Save failed",
+      invalidJson: "JSON parse failed — please check the syntax.",
     },
     hitl: {
       title: "Always-allowed tools",

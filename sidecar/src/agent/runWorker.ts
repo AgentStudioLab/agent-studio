@@ -23,6 +23,8 @@ export interface RunWorkerInput {
   usage: UsageService;
   /** "ask" (default) or "act-without-asking" (skip HITL approvals). */
   permissionMode?: "ask" | "act-without-asking";
+  /** Per-run model id override (e.g. "claude-opus-4-7"). */
+  model?: string;
 }
 
 export async function runWorker(input: RunWorkerInput): Promise<void> {
@@ -38,6 +40,7 @@ export async function runWorker(input: RunWorkerInput): Promise<void> {
     abortSignal,
     usage,
     permissionMode = "ask",
+    model,
   } = input;
 
   // Buffer the structured messages/tool_calls writes until the run reaches a
@@ -136,6 +139,7 @@ export async function runWorker(input: RunWorkerInput): Promise<void> {
       callbacks,
       cwd,
       permissionMode,
+      model,
     });
 
     await executeRunLoop({

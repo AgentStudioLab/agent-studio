@@ -54,6 +54,13 @@ export interface ClaudeProviderOptions {
   interruptBus?: InterruptBus;
   /** Optional audit sink. When omitted, no hooks installed. */
   audit?: AuditService;
+  /**
+   * Called per-turn; returns the per-user prompt addition to feed into the
+   * SDK's `systemPrompt.append`. Return `null` to skip (uses bare preset).
+   * Read lazily so the latest profile state is reflected on each turn
+   * without rebuilding the provider.
+   */
+  resolveAppendPrompt?: () => string | null;
 }
 
 export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider {
@@ -138,6 +145,15 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
       ? createAuditHooks(opts.audit, { threadId: ctx.threadId, runId: ctx.runId })
       : null;
 
+    // Per-run model override > provider's default (ANTHROPIC_MODEL env). When
+    // neither is set, the SDK picks its own default (currently latest Sonnet).
+    const effectiveModel = ctx.model ?? opts.model;
+
+    // User profile prompt addition — composed from {callMe, work, instructions}
+    // per the profile settings. Resolved fresh each turn so a Settings save
+    // takes effect on the very next /runs without provider rebuild.
+    const appendPrompt = opts.resolveAppendPrompt?.() ?? null;
+
     const sdkStream = sdkQuery({
       prompt,
       options: {
@@ -145,6 +161,21 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
         cwd: ctx.cwd,
         env: buildEnv(),
         allowedTools,
+        ...(effectiveModel ? { model: effectiveModel } : {}),
+        // Per-user system prompt addition (callMe / work / instructions).
+        // We always opt into the claude_code preset — bare-string systemPrompt
+        // would replace SDK's tool-use guidance. `append` extends, doesn't
+        // override. When the user hasn't filled anything in, drop append so
+        // the preset prompt runs untouched.
+        ...(appendPrompt
+          ? {
+              systemPrompt: {
+                type: "preset" as const,
+                preset: "claude_code" as const,
+                append: appendPrompt,
+              },
+            }
+          : {}),
         // Emit fine-grained SDKPartialAssistantMessage (stream_event) frames so
         // the bridge can turn them into per-token TEXT_MESSAGE_CONTENT events
         // and the UI shows characters arriving in real time. Without this, the

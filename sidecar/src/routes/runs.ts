@@ -41,6 +41,7 @@ export function buildRunRoutes(deps: MountRunsDeps): Hono {
           runId?: string;
           message?: { role?: string; content?: string };
           permissionMode?: "ask" | "act-without-asking";
+          model?: string;
         }
       | null;
     if (
@@ -54,6 +55,13 @@ export function buildRunRoutes(deps: MountRunsDeps): Hono {
     // Unknown / missing permissionMode → default to "ask" (the safe choice).
     const permissionMode: "ask" | "act-without-asking" =
       body.permissionMode === "act-without-asking" ? "act-without-asking" : "ask";
+    // model: light validation only — SDK echoes a clear error if the id is
+    // unknown. Empty string or non-string → undefined (provider falls back to
+    // ANTHROPIC_MODEL env).
+    const model =
+      typeof body.model === "string" && body.model.length > 0
+        ? body.model
+        : undefined;
 
     deps.threads.upsert(body.threadId);
     deps.messages.appendUser(body.threadId, body.message.content);
@@ -76,6 +84,7 @@ export function buildRunRoutes(deps: MountRunsDeps): Hono {
       abortSignal: abort.signal,
       usage: deps.usage,
       permissionMode,
+      model,
     }).finally(() => aborters.delete(body.runId!));
 
     return c.json({ runId: body.runId }, 202);
