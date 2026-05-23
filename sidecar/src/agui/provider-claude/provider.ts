@@ -61,6 +61,19 @@ export interface ClaudeProviderOptions {
    * without rebuilding the provider.
    */
   resolveAppendPrompt?: () => string | null;
+  /**
+   * Called when the SDK reports session capabilities (mcp_servers + tools)
+   * via system.init. Sidecar writes these into SessionMetadataStore so the
+   * Context Tab can query them via GET /threads/:id/context. Resolved per
+   * turn so a reconnected MCP becomes visible on the next Run.
+   */
+  onInitMetadata?: (
+    threadId: string,
+    meta: {
+      mcpServers: Array<{ name: string; status: string }>;
+      tools: string[];
+    },
+  ) => void;
 }
 
 export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider {
@@ -234,6 +247,9 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
         // resumed one. Either way, tag idempotently so resume lookup works.
         void tagThreadSession(sid, ctx.threadId, ctx.cwd);
       },
+      onInitMetadata: opts.onInitMetadata
+        ? (meta) => opts.onInitMetadata!(ctx.threadId, meta)
+        : undefined,
     });
   }
 
