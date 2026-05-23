@@ -39,7 +39,7 @@ export const task: typeof Zh = {
     filesTab: {
       fileCount: "{{count}} files",
       newBadge: "new",
-      addFiles: "Add files to working tree",
+      empty: "Agent hasn't touched any files yet",
     },
     contextTab: {
       skills: "Skills",

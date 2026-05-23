@@ -37,7 +37,7 @@ export const task = {
     filesTab: {
       fileCount: "{{count}} 个文件",
       newBadge: "新",
-      addFiles: "添加文件到工作目录",
+      empty: "agent 还没读写文件",
     },
     contextTab: {
       skills: "技能",
