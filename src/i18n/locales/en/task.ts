@@ -26,6 +26,9 @@ export const task: typeof Zh = {
       plan: "Plan",
       countOf: "{{done}} of {{total}}",
       elapsed: "{{time}} elapsed",
+      empty: {
+        notStarted: "Waiting for agent to share a plan…",
+      },
       status: {
         running: "Task running",
         done: "Task complete",

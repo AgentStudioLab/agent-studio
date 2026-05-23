@@ -1,37 +1,23 @@
-import { useEffect, useState } from "react";
-import { Check } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { MockTask, PlanStep, StepStatus } from "@/lib/mock/types";
+import { useThreadPlan } from "@/lib/agui/react/useThreadPlan";
+import { useThreadRunMeta } from "@/lib/agui/react/useThreadRunMeta";
+import type { TodoEntry, TodoStatus } from "@/lib/agui/runtime/derivations";
+import type { ChatState } from "@/lib/agui/runtime/types";
 
 interface ProcessTabProps {
-  task?: MockTask | null;
+  state: ChatState | null;
 }
 
 function formatElapsed(seconds: number): string {
-  const mm = Math.floor(seconds / 60)
-    .toString()
-    .padStart(2, "0");
+  const mm = Math.floor(seconds / 60).toString().padStart(2, "0");
   const ss = (seconds % 60).toString().padStart(2, "0");
   return `${mm}:${ss}`;
 }
 
-const STATUS_KEY: Record<MockTask["status"], string> = {
-  running: "task.processTab.status.running",
-  done: "task.processTab.status.done",
-  failed: "task.processTab.status.failed",
-  paused: "task.processTab.status.paused",
-};
-
-interface ProcessStepProps {
-  status: StepStatus;
-  name: string;
-  desc?: string;
-  isLast: boolean;
-}
-
-function StepIndicator({ status }: { status: StepStatus }) {
-  if (status === "done") {
+function StepIndicator({ status }: { status: TodoStatus }) {
+  if (status === "completed") {
     return (
       <span
         className="w-6 h-6 rounded-full flex items-center justify-center shrink-0"
@@ -41,7 +27,7 @@ function StepIndicator({ status }: { status: StepStatus }) {
       </span>
     );
   }
-  if (status === "active") {
+  if (status === "in_progress") {
     return (
       <span
         className="relative w-6 h-6 rounded-full flex items-center justify-center shrink-0"
@@ -58,29 +44,6 @@ function StepIndicator({ status }: { status: StepStatus }) {
       </span>
     );
   }
-  if (status === "failed") {
-    return (
-      <span
-        className="w-6 h-6 rounded-full flex items-center justify-center shrink-0"
-        style={{ background: "hsl(var(--danger-100))" }}
-      >
-        <svg
-          width="9"
-          height="9"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="hsl(var(--oncolor-100))"
-          strokeWidth={3}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <line x1="18" y1="6" x2="6" y2="18" />
-          <line x1="6" y1="6" x2="18" y2="18" />
-        </svg>
-      </span>
-    );
-  }
-  // pending
   return (
     <span
       className="w-6 h-6 rounded-full shrink-0"
@@ -89,17 +52,25 @@ function StepIndicator({ status }: { status: StepStatus }) {
   );
 }
 
-function ProcessStep({ status, name, desc, isLast }: ProcessStepProps) {
+function ProcessStep({
+  todo,
+  isLast,
+}: {
+  todo: TodoEntry;
+  isLast: boolean;
+}) {
+  const label =
+    todo.status === "in_progress" && todo.activeForm ? todo.activeForm : todo.content;
   return (
     <div className="relative flex gap-3">
       <div className="flex flex-col items-center shrink-0">
-        <StepIndicator status={status} />
+        <StepIndicator status={todo.status} />
         {!isLast && (
           <div
             className="flex-1 w-px mt-1 mb-1 min-h-[18px]"
             style={{
               background:
-                status === "done"
+                todo.status === "completed"
                   ? "hsl(var(--success-100) / 0.5)"
                   : "hsl(var(--border-300) / 0.2)",
             }}
@@ -110,79 +81,67 @@ function ProcessStep({ status, name, desc, isLast }: ProcessStepProps) {
         <div
           className={cn(
             "text-[13px] leading-snug",
-            status === "active" && "text-text-100 font-medium",
-            status === "done" && "text-text-200",
-            status === "failed" && "text-danger-100",
-            status === "pending" && "text-text-400"
+            todo.status === "in_progress" && "text-text-100 font-medium",
+            todo.status === "completed" && "text-text-200",
+            todo.status === "pending" && "text-text-400",
           )}
         >
-          {name}
+          {label}
         </div>
-        {desc && (
-          <div
-            className={cn(
-              "text-[11.5px] mt-1 leading-relaxed",
-              status === "active" ? "text-text-300" : "text-text-400"
-            )}
-          >
-            {status === "active" && (
-              <span className="inline-flex w-1 h-1 rounded-full bg-brand-100 pulse-dot mr-1.5 align-middle" />
-            )}
-            {desc}
-          </div>
-        )}
       </div>
     </div>
   );
 }
 
-export function ProcessTab({ task }: ProcessTabProps) {
+export function ProcessTab({ state }: ProcessTabProps) {
   const { t } = useTranslation();
-  const [elapsed, setElapsed] = useState(task?.elapsedSeconds ?? 0);
+  const { todos } = useThreadPlan(state);
+  const { elapsedSeconds, isRunning } = useThreadRunMeta(state);
 
-  useEffect(() => {
-    setElapsed(task?.elapsedSeconds ?? 0);
-  }, [task?.elapsedSeconds]);
+  const doneCount = todos.filter((s) => s.status === "completed").length;
+  const totalCount = todos.length;
 
-  useEffect(() => {
-    if (task?.status !== "running") return;
-    const id = setInterval(() => setElapsed((s) => s + 1), 1000);
-    return () => clearInterval(id);
-  }, [task?.status]);
-
-  const steps: PlanStep[] = task?.plan ?? [];
-
-  if (steps.length === 0) {
+  if (totalCount === 0) {
+    // No TodoWrite yet — show empty state. If a run is active, still
+    // render the elapsed banner so users see something is happening.
     return (
-      <div className="px-6 py-12 text-center text-sm" style={{ color: "hsl(var(--text-300))" }}>
-        {t("task.rightPanel.empty")}
+      <div>
+        <div className="px-6 py-12 text-center text-sm" style={{ color: "hsl(var(--text-300))" }}>
+          {t("task.processTab.empty.notStarted")}
+        </div>
+        {isRunning && (
+          <div
+            className="mt-3 mx-2 px-3 py-2 rounded-md text-[11.5px] text-text-400 leading-relaxed"
+            style={{
+              background: "hsl(var(--bg-200) / 0.4)",
+              border: "1px solid hsl(var(--border-300) / 0.08)",
+            }}
+          >
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-success-100 pulse-dot mr-2 align-middle" />
+            {t("task.processTab.status.running")} ·{" "}
+            {t("task.processTab.elapsed", { time: formatElapsed(elapsedSeconds) })}
+          </div>
+        )}
       </div>
     );
   }
 
-  const doneCount = steps.filter((s) => s.status === "done").length;
-  const totalCount = steps.length;
-
   return (
     <div>
       <div className="flex items-center justify-between px-2 pt-3 pb-3">
-        <span className="text-[11px] tracking-wider uppercase text-text-400">{t("task.processTab.plan")}</span>
+        <span className="text-[11px] tracking-wider uppercase text-text-400">
+          {t("task.processTab.plan")}
+        </span>
         <span className="text-[11.5px] text-text-300 font-mono">
           {t("task.processTab.countOf", { done: doneCount, total: totalCount })}
         </span>
       </div>
       <div className="px-2">
-        {steps.map((step, i) => (
-          <ProcessStep
-            key={step.id}
-            status={step.status}
-            name={step.description}
-            desc={step.detail}
-            isLast={i === steps.length - 1}
-          />
+        {todos.map((todo, i) => (
+          <ProcessStep key={i} todo={todo} isLast={i === todos.length - 1} />
         ))}
       </div>
-      {task && (
+      {isRunning && (
         <div
           className="mt-3 mx-2 px-3 py-2 rounded-md text-[11.5px] text-text-400 leading-relaxed"
           style={{
@@ -191,7 +150,8 @@ export function ProcessTab({ task }: ProcessTabProps) {
           }}
         >
           <span className="inline-block w-1.5 h-1.5 rounded-full bg-success-100 pulse-dot mr-2 align-middle" />
-          {t(STATUS_KEY[task.status])} · {t("task.processTab.elapsed", { time: formatElapsed(elapsed) })}
+          {t("task.processTab.status.running")} ·{" "}
+          {t("task.processTab.elapsed", { time: formatElapsed(elapsedSeconds) })}
         </div>
       )}
     </div>

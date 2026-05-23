@@ -24,6 +24,9 @@ export const task = {
       plan: "计划",
       countOf: "{{done}} / {{total}}",
       elapsed: "已用 {{time}}",
+      empty: {
+        notStarted: "等待 agent 制定计划…",
+      },
       status: {
         running: "任务运行中",
         done: "任务完成",
