@@ -29,9 +29,11 @@ function extractTodosFromArgs(args: unknown): TodoEntry[] | null {
   const todos = (args as { todos?: unknown }).todos;
   if (!Array.isArray(todos)) return null;
   const valid = todos.filter(isTodoEntry);
-  // Return [] (empty array, NOT null) when TodoWrite was called with an
-  // empty list — still counts as "newest call" so older calls don't bleed.
-  return valid.length === todos.length || valid.length > 0 ? valid : null;
+  // Return null only when an args-shaped TodoWrite produced ZERO valid
+  // entries from a NON-EMPTY input list — that's a malformed call we want
+  // to skip backward past. Empty input list returns [] (counts as "newest
+  // call wins") and any-valid returns the filtered subset.
+  return todos.length === 0 || valid.length > 0 ? valid : null;
 }
 
 function todoCallsInTurns(messages: MessageView[]): ToolCallView[] {

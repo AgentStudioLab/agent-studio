@@ -101,4 +101,24 @@ describe("deriveTodos", () => {
       { content: "valid", status: "pending" },
     ]);
   });
+
+  it("falls back to previous call when latest TodoWrite has all-malformed entries", () => {
+    const state = withMessages([
+      todoToolCallBlock("tc-good", [
+        { content: "good", status: "pending" },
+      ]),
+      todoToolCallBlock("tc-bad", [
+        // @ts-expect-error — all malformed
+        { status: "pending" },
+        // @ts-expect-error — all malformed
+        { content: "wrong-status", status: "weird" },
+      ]),
+    ]);
+    // tc-bad is more recent but produces null from extractTodosFromArgs
+    // (all entries fail isTodoEntry on a non-empty input). The selector
+    // must scan backward and return tc-good's todos.
+    expect(deriveTodos(state)).toEqual([
+      { content: "good", status: "pending" },
+    ]);
+  });
 });
