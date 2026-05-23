@@ -154,6 +154,9 @@ export function applyEvent(
     case "REASONING_END":
       next = handleReasoningEnd(next, event);
       break;
+    case "RUN_STARTED":
+      next = { ...next, runStartedAt: Date.now() };
+      break;
     case "RUN_FINISHED":
       next = handleRunFinished(next, event);
       break;
@@ -184,6 +187,7 @@ export function applyEvent(
         error: isCancelled ? null : message ?? next.error ?? null,
         errorCode: typeof code === "string" ? (code as never) : next.errorCode,
         pendingInterrupts: [],
+        runStartedAt: null,
       };
       break;
     }
@@ -347,6 +351,7 @@ function handleRunFinished(state: ChatState, ev: AGUIEventLike): ChatState {
     liveMessages: sweepPendingToolCalls(state.liveMessages),
     retry: undefined,
     pendingInterrupts: [],
+    runStartedAt: null,
   };
 }
 

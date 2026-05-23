@@ -101,6 +101,9 @@ export interface ChatState {
   error: string | null;
   /** SSE 最后收到的事件游标，续连/恢复时用 */
   lastCursor: string | null;
+  /** RUN_STARTED 写入的 epoch ms 时间戳；RUN_FINISHED / RUN_ERROR 清空。
+   *  UI 用来计算每秒刷新的 elapsed 显示。 */
+  runStartedAt: number | null;
   /** RUN_ERROR 携带的归一化错误码 */
   errorCode?: RunErrorCode;
   /** 最近一次 retry 状态 */
@@ -135,5 +138,6 @@ export function createInitialState(): ChatState {
     pendingInterrupts: [],
     error: null,
     lastCursor: null,
+    runStartedAt: null,
   };
 }
