@@ -24,6 +24,8 @@ import {
   createClaudeProvider,
   createInterruptBus,
 } from "./agui/provider-claude";
+import { SessionMetadataStore } from "./services/sessionMetadata";
+import { buildThreadContextRoutes } from "./routes/threadContext";
 
 type Args = { port: number; token: string; db: string };
 
@@ -74,6 +76,7 @@ const interruptBus = createInterruptBus({ store });
 const audit = new AuditService(db);
 const usage = new UsageService(db);
 const settingsTools = new SettingsToolsService(db);
+const sessionMetadata = new SessionMetadataStore();
 
 // Mark orphan running rows (process crashed mid-stream) as error so the
 // sidebar pulse dot doesn't lie. Synchronous SQL UPDATE — must stay sync
@@ -142,6 +145,7 @@ function buildProvider() {
     audit,
     resolveAppendPrompt: () =>
       composeAppendPrompt(userProfileSettings.current()),
+    onInitMetadata: (threadId, meta) => sessionMetadata.upsert(threadId, meta),
   });
 }
 
@@ -184,6 +188,7 @@ app.route("/", buildAuditRoutes(audit));
 app.route("/", buildUsageRoutes(usage));
 app.route("/", buildSettingsToolsRoutes(settingsTools));
 app.route("/", buildModelsRoutes(providerSettings));
+app.route("/", buildThreadContextRoutes(sessionMetadata));
 
 console.log(`[sidecar] listening on http://127.0.0.1:${args.port} (db=${dbAbs})`);
 {
