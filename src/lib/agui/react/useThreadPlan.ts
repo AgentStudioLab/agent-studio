@@ -1,19 +1,24 @@
+// src/lib/agui/react/useThreadPlan.ts
 import { useMemo } from "react";
-import { useChat } from "./useChat";
 import { deriveTodos, type TodoEntry } from "../runtime/derivations";
+import type { ChatState } from "../runtime/types";
 
 /**
- * Subscribe to a thread's ChatRuntime and derive the latest TodoWrite plan.
- * Memoised: only recomputes when the underlying state reference changes
- * (which is fine — runtime returns new state objects on every event).
+ * Derive the latest TodoWrite plan from a ChatState snapshot.
  *
- * Returns `{ todos: [] }` while the thread has no TodoWrite calls yet — UI
- * components render the "等待 agent 制定计划…" empty state.
+ * Caller responsibility: pass the SAME `state` object that TaskView's
+ * `useChat` returned. We do NOT call `useChat` here — that would create
+ * an independent runtime with empty messages. Pure useMemo wrapper.
+ *
+ * Returns `{ todos: [] }` when state is null (no thread active) or when
+ * no TodoWrite has been called yet.
  */
-export function useThreadPlan(threadId: string | null | undefined): {
+export function useThreadPlan(state: ChatState | null): {
   todos: TodoEntry[];
 } {
-  const { state } = useChat({ threadId: threadId ?? "" });
-  const todos = useMemo(() => deriveTodos(state), [state]);
+  const todos = useMemo(
+    () => (state ? deriveTodos(state) : []),
+    [state],
+  );
   return { todos };
 }

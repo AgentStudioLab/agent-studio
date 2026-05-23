@@ -1,22 +1,25 @@
+// src/lib/agui/react/useThreadRunMeta.ts
 import { useEffect, useState } from "react";
-import { useChat } from "./useChat";
+import type { ChatState } from "../runtime/types";
 
 /**
- * Per-thread run timing. `runStartedAt` is set by RUN_STARTED, cleared by
- * RUN_FINISHED / RUN_ERROR. `elapsedSeconds` ticks every 1s while the run
- * is active so the UI status pill stays live without re-rendering the
- * entire ChatStream.
+ * Per-thread run timing derived from a ChatState snapshot. `runStartedAt`
+ * comes directly from the state; `elapsedSeconds` ticks every 1s via
+ * setInterval so the UI elapsed pill stays live without re-rendering the
+ * whole ChatStream.
  *
- * Components reading this should expect `elapsedSeconds` to be 0 when the
- * thread is idle.
+ * Caller responsibility: pass the SAME `state` that TaskView's `useChat`
+ * returned. Pass null when there is no active thread.
+ *
+ * Returns `elapsedSeconds: 0` when the thread is idle (runStartedAt null).
  */
-export function useThreadRunMeta(threadId: string | null | undefined): {
+export function useThreadRunMeta(state: ChatState | null): {
   runStartedAt: number | null;
   elapsedSeconds: number;
   isRunning: boolean;
 } {
-  const { state, isRunning } = useChat({ threadId: threadId ?? "" });
-  const runStartedAt = state.runStartedAt;
+  const runStartedAt = state?.runStartedAt ?? null;
+  const isRunning = state?.isRunning ?? false;
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   useEffect(() => {
