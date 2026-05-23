@@ -182,7 +182,7 @@ describe("deriveTouchedFiles", () => {
     expect(files[0]!.lastTool).toBe("Edit");
   });
 
-  it("first-seen Write marks file new=true; first-seen Read marks new=false", () => {
+  it("firstTool is Write for new files; firstTool is Read for files only read", () => {
     const state = withMessages([
       fileToolCall("a", "Write", { file_path: "/work/proj/new.ts" }),
       fileToolCall("b", "Read", { file_path: "/work/proj/old.ts" }),
@@ -210,5 +210,45 @@ describe("deriveTouchedFiles", () => {
       fileToolCall("a", "Read", { file_path: "/work/proj/a.ts" }),
     ]);
     expect(deriveTouchedFiles(state, null)).toEqual([]);
+  });
+
+  it("ranks live-only file above historical-only file in sort", () => {
+    // Even if the historical file's intra-history block index is higher
+    // than the live file's intra-live block index, live should win.
+    const state: ChatState = {
+      ...createInitialState(),
+      historicalMessages: [
+        fileToolCall("h1", "Read", { file_path: "/work/proj/old.ts" }),
+        fileToolCall("h2", "Read", { file_path: "/work/proj/older.ts" }),
+        fileToolCall("h3", "Read", { file_path: "/work/proj/oldest.ts" }),
+      ],
+      liveMessages: [
+        fileToolCall("l1", "Read", { file_path: "/work/proj/fresh.ts" }),
+      ],
+    };
+    const order = deriveTouchedFiles(state, CWD).map((f) => f.relativePath);
+    // fresh.ts (live) must rank above any historical file
+    expect(order[0]).toBe("fresh.ts");
+  });
+
+  it("dedupes same file across historical+live; firstSeenAt from historical, lastTouched from live", () => {
+    const state: ChatState = {
+      ...createInitialState(),
+      historicalMessages: [
+        fileToolCall("h1", "Read", { file_path: "/work/proj/shared.ts" }),
+      ],
+      liveMessages: [
+        fileToolCall("l1", "Edit", { file_path: "/work/proj/shared.ts" }),
+      ],
+    };
+    const files = deriveTouchedFiles(state, CWD);
+    expect(files).toHaveLength(1);
+    const f = files[0]!;
+    expect(f.relativePath).toBe("shared.ts");
+    expect(f.firstTool).toBe("Read");
+    expect(f.lastTool).toBe("Edit");
+    // lastTouched (set in live) must be strictly greater than firstSeenAt
+    // (set in historical) — the offset mechanism guarantees this.
+    expect(f.lastTouched).toBeGreaterThan(f.firstSeenAt);
   });
 });
