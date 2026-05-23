@@ -67,3 +67,103 @@ export function deriveTodos(state: ChatState): TodoEntry[] {
   }
   return [];
 }
+
+export type FileTool =
+  | "Read"
+  | "Write"
+  | "Edit"
+  | "MultiEdit"
+  | "NotebookEdit";
+
+const FILE_TOOLS: ReadonlySet<string> = new Set<FileTool>([
+  "Read",
+  "Write",
+  "Edit",
+  "MultiEdit",
+  "NotebookEdit",
+]);
+
+export interface TouchedFile {
+  absolutePath: string;
+  relativePath: string;
+  firstTool: FileTool;
+  lastTool: FileTool;
+  firstSeenAt: number;
+  lastTouched: number;
+}
+
+function extractFilePath(toolName: string, args: unknown): string | null {
+  if (typeof args !== "object" || args === null) return null;
+  const o = args as Record<string, unknown>;
+  if (toolName === "NotebookEdit") {
+    return typeof o.notebook_path === "string" ? o.notebook_path : null;
+  }
+  return typeof o.file_path === "string" ? o.file_path : null;
+}
+
+function fileCallsInOrder(
+  messages: MessageView[],
+): Array<{ tool: FileTool; path: string; seq: number }> {
+  const out: Array<{ tool: FileTool; path: string; seq: number }> = [];
+  let seq = 0;
+  for (const m of messages) {
+    if (m.role !== "assistant") continue;
+    for (const block of m.blocks) {
+      seq++;
+      if (block.kind !== "tool_call") continue;
+      const toolName = block.toolCall.toolName;
+      if (!FILE_TOOLS.has(toolName)) continue;
+      const path = extractFilePath(toolName, block.toolCall.args);
+      if (!path) continue;
+      out.push({ tool: toolName as FileTool, path, seq });
+    }
+  }
+  return out;
+}
+
+/**
+ * Cross-Run aggregate of files this thread's agent has touched via
+ * Read / Write / Edit / MultiEdit / NotebookEdit. Paths outside
+ * `workingDir` are dropped (system files like ~/.zshrc shouldn't
+ * pollute the project file list).
+ *
+ * `seq` is a synthetic per-state ordinal — block index across messages —
+ * used in place of real timestamps which we don't carry through the
+ * reducer. It only needs to be monotonic within one derivation pass.
+ *
+ * Returns files sorted by lastTouched descending (most-recent action first).
+ */
+export function deriveTouchedFiles(
+  state: ChatState,
+  workingDir: string | null,
+): TouchedFile[] {
+  if (!workingDir) return [];
+  const cwdPrefix = workingDir.endsWith("/") ? workingDir : workingDir + "/";
+  const calls = [
+    ...fileCallsInOrder(state.historicalMessages),
+    ...fileCallsInOrder(state.liveMessages),
+  ];
+  const map = new Map<string, TouchedFile>();
+  for (const call of calls) {
+    if (!call.path.startsWith(cwdPrefix)) continue;
+    const relative = call.path.slice(cwdPrefix.length);
+    const existing = map.get(call.path);
+    if (existing) {
+      map.set(call.path, {
+        ...existing,
+        lastTool: call.tool,
+        lastTouched: call.seq,
+      });
+    } else {
+      map.set(call.path, {
+        absolutePath: call.path,
+        relativePath: relative,
+        firstTool: call.tool,
+        lastTool: call.tool,
+        firstSeenAt: call.seq,
+        lastTouched: call.seq,
+      });
+    }
+  }
+  return [...map.values()].sort((a, b) => b.lastTouched - a.lastTouched);
+}

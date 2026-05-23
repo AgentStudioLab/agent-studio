@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { deriveTodos } from "./derivations";
+import { deriveTodos, deriveTouchedFiles } from "./derivations";
 import type { ChatState, MessageView } from "./types";
 import { createInitialState } from "./types";
 
@@ -120,5 +120,95 @@ describe("deriveTodos", () => {
     expect(deriveTodos(state)).toEqual([
       { content: "good", status: "pending" },
     ]);
+  });
+});
+
+function fileToolCall(
+  id: string,
+  toolName: string,
+  args: Record<string, unknown>,
+): MessageView {
+  return {
+    id: `msg_${id}`,
+    role: "assistant",
+    blocks: [
+      {
+        kind: "tool_call",
+        toolCall: { id, toolName, args, result: null, status: "success" },
+      },
+    ],
+  };
+}
+
+describe("deriveTouchedFiles", () => {
+  const CWD = "/work/proj";
+
+  it("returns empty when no file tool calls", () => {
+    expect(deriveTouchedFiles(createInitialState(), CWD)).toEqual([]);
+  });
+
+  it("collects Read/Write/Edit/MultiEdit/NotebookEdit, ignores others", () => {
+    const state = withMessages([
+      fileToolCall("a", "Read", { file_path: "/work/proj/a.ts" }),
+      fileToolCall("b", "Write", { file_path: "/work/proj/b.ts" }),
+      fileToolCall("c", "Edit", { file_path: "/work/proj/c.ts" }),
+      fileToolCall("d", "MultiEdit", { file_path: "/work/proj/d.ts" }),
+      fileToolCall("e", "NotebookEdit", { notebook_path: "/work/proj/e.ipynb" }),
+      fileToolCall("f", "Bash", { command: "ls" }),
+      fileToolCall("g", "Glob", { pattern: "*" }),
+    ]);
+    const got = deriveTouchedFiles(state, CWD).map((f) => f.relativePath).sort();
+    expect(got).toEqual(["a.ts", "b.ts", "c.ts", "d.ts", "e.ipynb"]);
+  });
+
+  it("filters out paths outside cwd", () => {
+    const state = withMessages([
+      fileToolCall("a", "Read", { file_path: "/work/proj/a.ts" }),
+      fileToolCall("b", "Read", { file_path: "/home/user/.zshrc" }),
+      fileToolCall("c", "Read", { file_path: "/work/other-proj/x.ts" }),
+    ]);
+    const paths = deriveTouchedFiles(state, CWD).map((f) => f.relativePath);
+    expect(paths).toEqual(["a.ts"]);
+  });
+
+  it("dedupes by path; lastTool reflects most recent action", () => {
+    const state = withMessages([
+      fileToolCall("a1", "Read", { file_path: "/work/proj/x.ts" }),
+      fileToolCall("a2", "Edit", { file_path: "/work/proj/x.ts" }),
+    ]);
+    const files = deriveTouchedFiles(state, CWD);
+    expect(files).toHaveLength(1);
+    expect(files[0]!.firstTool).toBe("Read");
+    expect(files[0]!.lastTool).toBe("Edit");
+  });
+
+  it("first-seen Write marks file new=true; first-seen Read marks new=false", () => {
+    const state = withMessages([
+      fileToolCall("a", "Write", { file_path: "/work/proj/new.ts" }),
+      fileToolCall("b", "Read", { file_path: "/work/proj/old.ts" }),
+    ]);
+    const files = deriveTouchedFiles(state, CWD);
+    const newOne = files.find((f) => f.relativePath === "new.ts");
+    const oldOne = files.find((f) => f.relativePath === "old.ts");
+    expect(newOne?.firstTool).toBe("Write");
+    expect(oldOne?.firstTool).toBe("Read");
+  });
+
+  it("sorts by lastTouched descending (most-recent-action first)", () => {
+    const state = withMessages([
+      fileToolCall("1", "Read", { file_path: "/work/proj/early.ts" }),
+      fileToolCall("2", "Read", { file_path: "/work/proj/middle.ts" }),
+      fileToolCall("3", "Edit", { file_path: "/work/proj/early.ts" }),
+    ]);
+    const order = deriveTouchedFiles(state, CWD).map((f) => f.relativePath);
+    // After edit, early.ts becomes most recent again
+    expect(order).toEqual(["early.ts", "middle.ts"]);
+  });
+
+  it("returns empty when workingDir is null", () => {
+    const state = withMessages([
+      fileToolCall("a", "Read", { file_path: "/work/proj/a.ts" }),
+    ]);
+    expect(deriveTouchedFiles(state, null)).toEqual([]);
   });
 });
