@@ -16,12 +16,9 @@ export interface SideEffectFile {
   kind: "created" | "modified";
 }
 
-interface Snapshot {
-  cwd: string;
-  // path → mtime in epoch ms. mtime is enough to detect changes; value space
-  // stays compact compared to hashing content.
-  mtimes: Map<string, number>;
-}
+// path → mtime in epoch ms. mtime is enough to detect changes; value space
+// stays compact compared to hashing content.
+type Snapshot = Map<string, number>;
 
 const SKIP_DIRS: ReadonlySet<string> = new Set([
   ".git",
@@ -86,7 +83,7 @@ export class BashSideEffectsTracker {
   private effects = new Map<string, SideEffectFile[]>();
 
   snapshot(toolUseId: string, cwd: string): void {
-    this.snapshots.set(toolUseId, { cwd, mtimes: scanCwd(cwd) });
+    this.snapshots.set(toolUseId, scanCwd(cwd));
   }
 
   finalize(toolUseId: string, cwd: string): void {
@@ -100,7 +97,7 @@ export class BashSideEffectsTracker {
       return;
     }
     for (const [path, mt] of current) {
-      const before = prev.mtimes.get(path);
+      const before = prev.get(path);
       if (before === undefined) {
         out.push({ path, kind: "created" });
       } else if (mt > before) {

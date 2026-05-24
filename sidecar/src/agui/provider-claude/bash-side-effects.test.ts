@@ -21,10 +21,15 @@ beforeEach(() => {
 });
 
 describe("BashSideEffectsTracker", () => {
-  it("returns null effects when finalize is called without a snapshot", () => {
+  it("returns empty effects when finalize is called without a snapshot (no baseline → skip diff)", () => {
     const t = new BashSideEffectsTracker();
     t.finalize("tool_x", tmpRoot);
     expect(t.takeEffects("tool_x")).toEqual([]);
+  });
+
+  it("takeEffects returns null when finalize was never called for that toolUseId", () => {
+    const t = new BashSideEffectsTracker();
+    expect(t.takeEffects("never_finalized")).toBeNull();
   });
 
   it("detects newly created files", () => {
