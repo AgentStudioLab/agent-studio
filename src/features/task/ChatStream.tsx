@@ -302,6 +302,7 @@ export function ChatStream({
                 message={m}
                 showActions={!isLive}
                 isLastMessage={isLastMessage}
+                streaming={isLive}
                 interruptsByToolId={interruptsByToolId}
                 renderApprovalCard={renderApprovalCard}
                 onContinueAfterRestart={onContinueAfterRestart}
@@ -382,6 +383,7 @@ function MessageRow({
   message,
   showActions,
   isLastMessage,
+  streaming,
   interruptsByToolId,
   renderApprovalCard,
   onContinueAfterRestart,
@@ -390,6 +392,10 @@ function MessageRow({
 }: {
   message: MessageView;
   showActions: boolean;
+  /** True while this is the live assistant turn still receiving SSE events.
+   *  Artifact cards stay hidden until streaming flips false — matches the
+   *  "produce → reveal" rhythm of Cowork (full text first, then the card). */
+  streaming: boolean;
   isLastMessage: boolean;
   interruptsByToolId: Map<string, PendingInterrupt>;
   renderApprovalCard: (it: PendingInterrupt) => ReactNode;
@@ -402,7 +408,13 @@ function MessageRow({
   }
 
   const grouped = groupBlocks(message.blocks);
-  const artifacts = mutationToolCallsToArtifacts(message.blocks, workingDir);
+  // Hold off on artifact cards until the turn has fully streamed. A Write
+  // tool may succeed early in the turn while the model is still composing
+  // the explanatory text — showing the card mid-stream feels premature
+  // ("here's the file, also still talking"). Reveal once the turn settles.
+  const artifacts = streaming
+    ? []
+    : mutationToolCallsToArtifacts(message.blocks, workingDir);
 
   return (
     <div className="space-y-3">
