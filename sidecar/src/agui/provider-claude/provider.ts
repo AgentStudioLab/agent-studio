@@ -11,11 +11,12 @@
 // because session_id is captured on the next successful turn's init.
 
 import { query as sdkQuery } from "@anthropic-ai/claude-agent-sdk";
-import type { CanUseTool } from "@anthropic-ai/claude-agent-sdk";
+import type { CanUseTool, HookCallback } from "@anthropic-ai/claude-agent-sdk";
 import { claudeSdkToAgui } from "./bridge";
 import { getResumeSessionId, tagThreadSession } from "./session-tag";
 import { checkWorkspaceSandbox } from "./sandbox";
 import { createAuditHooks } from "./audit-hook";
+import { BashSideEffectsTracker, createBashSideEffectsHooks } from "./bash-side-effects";
 import type {
   AgentProvider,
   RunContext,
@@ -154,6 +155,9 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
       return result;
     };
 
+    const bashSideEffects = new BashSideEffectsTracker();
+    const bashHooks = createBashSideEffectsHooks(bashSideEffects);
+
     const auditHooks = opts.audit
       ? createAuditHooks(opts.audit, { threadId: ctx.threadId, runId: ctx.runId })
       : null;
@@ -198,12 +202,18 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
         // Always installed: even when there's no HITL bus, the sandbox
         // layer inside canUseTool needs to gate file paths.
         canUseTool,
-        ...(auditHooks ? {
-          hooks: {
-            PreToolUse:  [{ hooks: [auditHooks.pre], timeout: 2 }],
-            PostToolUse: [{ hooks: [auditHooks.post], timeout: 2 }],
-          },
-        } : {}),
+        hooks: (() => {
+          const preHooks: HookCallback[] = [bashHooks.pre];
+          const postHooks: HookCallback[] = [bashHooks.post];
+          if (auditHooks) {
+            preHooks.push(auditHooks.pre);
+            postHooks.push(auditHooks.post);
+          }
+          return {
+            PreToolUse: [{ hooks: preHooks, timeout: 2 }],
+            PostToolUse: [{ hooks: postHooks, timeout: 2 }],
+          };
+        })(),
         sandbox: {
           enabled: true,
           failIfUnavailable: true,
@@ -250,6 +260,7 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
       onInitMetadata: opts.onInitMetadata
         ? (meta) => opts.onInitMetadata!(ctx.threadId, meta)
         : undefined,
+      sideEffectsTracker: bashSideEffects,
     });
   }
 

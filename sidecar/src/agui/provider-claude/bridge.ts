@@ -39,6 +39,11 @@ export interface BridgeOptions {
     mcpServers: Array<{ name: string; status: string }>;
     tools: string[];
   }) => void;
+  /**
+   * When provided, bridge queries this tracker after each TOOL_CALL_RESULT to
+   * emit a CUSTOM "file.side_effects" event for Bash-produced/modified files.
+   */
+  sideEffectsTracker?: import("./bash-side-effects").BashSideEffectsTracker;
 }
 
 /**
@@ -54,7 +59,7 @@ export async function* claudeSdkToAgui(
   sdkStream: AsyncIterable<SDKMessage>,
   opts: BridgeOptions,
 ): AsyncIterable<AGUIEvent> {
-  const { threadId, runId, callbacks, onSessionId, onInitMetadata } = opts;
+  const { threadId, runId, callbacks, onSessionId, onInitMetadata, sideEffectsTracker } = opts;
 
   // Defer onSessionId until the SDK CLI has actually written the session
   // JSONL to disk. The CLI emits `system.init` carrying session_id BEFORE
@@ -416,6 +421,19 @@ export async function* claudeSdkToAgui(
                   : undefined
                 : undefined,
             });
+            if (sideEffectsTracker) {
+              const effects = sideEffectsTracker.takeEffects(block.tool_use_id);
+              if (effects && effects.length > 0) {
+                yield {
+                  type: EventType.CUSTOM,
+                  name: "file.side_effects",
+                  value: {
+                    toolCallId: block.tool_use_id,
+                    files: effects,
+                  },
+                } as AGUIEvent;
+              }
+            }
           }
         }
         continue;
