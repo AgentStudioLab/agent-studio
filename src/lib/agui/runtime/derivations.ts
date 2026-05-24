@@ -83,6 +83,14 @@ const FILE_TOOLS: ReadonlySet<string> = new Set<FileTool>([
   "NotebookEdit",
 ]);
 
+/** Tools that produce or modify files — what Files Tab cares about. */
+const MUTATION_TOOLS: ReadonlySet<string> = new Set([
+  "Write",
+  "Edit",
+  "MultiEdit",
+  "NotebookEdit",
+]);
+
 export interface TouchedFile {
   absolutePath: string;
   relativePath: string;
@@ -153,8 +161,10 @@ export function deriveTouchedFiles(
   const liveCalls = fileCallsInOrder(state.liveMessages, lastHistoricalSeq);
   const calls = [...historicalCalls, ...liveCalls];
   const map = new Map<string, TouchedFile>();
+  const sawMutation = new Set<string>();
   for (const call of calls) {
     if (!call.path.startsWith(cwdPrefix)) continue;
+    if (MUTATION_TOOLS.has(call.tool)) sawMutation.add(call.path);
     const relative = call.path.slice(cwdPrefix.length);
     const existing = map.get(call.path);
     if (existing) {
@@ -173,6 +183,11 @@ export function deriveTouchedFiles(
         lastTouched: call.seq,
       });
     }
+  }
+  // Drop Read-only files (never saw a mutation): Files Tab shows only files
+  // the agent produced or modified.
+  for (const path of map.keys()) {
+    if (!sawMutation.has(path)) map.delete(path);
   }
   return [...map.values()].sort((a, b) => b.lastTouched - a.lastTouched);
 }

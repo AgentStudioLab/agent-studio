@@ -147,7 +147,7 @@ describe("deriveTouchedFiles", () => {
     expect(deriveTouchedFiles(createInitialState(), CWD)).toEqual([]);
   });
 
-  it("collects Read/Write/Edit/MultiEdit/NotebookEdit, ignores others", () => {
+  it("collects Write/Edit/MultiEdit/NotebookEdit; skips Read-only files; ignores non-file tools", () => {
     const state = withMessages([
       fileToolCall("a", "Read", { file_path: "/work/proj/a.ts" }),
       fileToolCall("b", "Write", { file_path: "/work/proj/b.ts" }),
@@ -158,14 +158,15 @@ describe("deriveTouchedFiles", () => {
       fileToolCall("g", "Glob", { pattern: "*" }),
     ]);
     const got = deriveTouchedFiles(state, CWD).map((f) => f.relativePath).sort();
-    expect(got).toEqual(["a.ts", "b.ts", "c.ts", "d.ts", "e.ipynb"]);
+    // a.ts (Read-only) and bash/glob are excluded
+    expect(got).toEqual(["b.ts", "c.ts", "d.ts", "e.ipynb"]);
   });
 
   it("filters out paths outside cwd", () => {
     const state = withMessages([
-      fileToolCall("a", "Read", { file_path: "/work/proj/a.ts" }),
-      fileToolCall("b", "Read", { file_path: "/home/user/.zshrc" }),
-      fileToolCall("c", "Read", { file_path: "/work/other-proj/x.ts" }),
+      fileToolCall("a", "Write", { file_path: "/work/proj/a.ts" }),
+      fileToolCall("b", "Write", { file_path: "/home/user/.zshrc" }),
+      fileToolCall("c", "Write", { file_path: "/work/other-proj/x.ts" }),
     ]);
     const paths = deriveTouchedFiles(state, CWD).map((f) => f.relativePath);
     expect(paths).toEqual(["a.ts"]);
@@ -182,27 +183,25 @@ describe("deriveTouchedFiles", () => {
     expect(files[0]!.lastTool).toBe("Edit");
   });
 
-  it("firstTool is Write for new files; firstTool is Read for files only read", () => {
+  it("firstTool is Write for new files; Read-only files are dropped entirely", () => {
     const state = withMessages([
       fileToolCall("a", "Write", { file_path: "/work/proj/new.ts" }),
-      fileToolCall("b", "Read", { file_path: "/work/proj/old.ts" }),
+      fileToolCall("b", "Read", { file_path: "/work/proj/read-only.ts" }),
     ]);
     const files = deriveTouchedFiles(state, CWD);
-    const newOne = files.find((f) => f.relativePath === "new.ts");
-    const oldOne = files.find((f) => f.relativePath === "old.ts");
-    expect(newOne?.firstTool).toBe("Write");
-    expect(oldOne?.firstTool).toBe("Read");
+    expect(files.map((f) => f.relativePath)).toEqual(["new.ts"]);
+    expect(files[0]!.firstTool).toBe("Write");
   });
 
-  it("sorts by lastTouched descending (most-recent-action first)", () => {
+  it("sorts by lastTouched descending; drops Read-only", () => {
     const state = withMessages([
       fileToolCall("1", "Read", { file_path: "/work/proj/early.ts" }),
       fileToolCall("2", "Read", { file_path: "/work/proj/middle.ts" }),
       fileToolCall("3", "Edit", { file_path: "/work/proj/early.ts" }),
     ]);
     const order = deriveTouchedFiles(state, CWD).map((f) => f.relativePath);
-    // After edit, early.ts becomes most recent again
-    expect(order).toEqual(["early.ts", "middle.ts"]);
+    // middle.ts is Read-only and is dropped; early.ts has Edit so it stays
+    expect(order).toEqual(["early.ts"]);
   });
 
   it("returns empty when workingDir is null", () => {
@@ -218,12 +217,12 @@ describe("deriveTouchedFiles", () => {
     const state: ChatState = {
       ...createInitialState(),
       historicalMessages: [
-        fileToolCall("h1", "Read", { file_path: "/work/proj/old.ts" }),
-        fileToolCall("h2", "Read", { file_path: "/work/proj/older.ts" }),
-        fileToolCall("h3", "Read", { file_path: "/work/proj/oldest.ts" }),
+        fileToolCall("h1", "Write", { file_path: "/work/proj/old.ts" }),
+        fileToolCall("h2", "Write", { file_path: "/work/proj/older.ts" }),
+        fileToolCall("h3", "Write", { file_path: "/work/proj/oldest.ts" }),
       ],
       liveMessages: [
-        fileToolCall("l1", "Read", { file_path: "/work/proj/fresh.ts" }),
+        fileToolCall("l1", "Write", { file_path: "/work/proj/fresh.ts" }),
       ],
     };
     const order = deriveTouchedFiles(state, CWD).map((f) => f.relativePath);
