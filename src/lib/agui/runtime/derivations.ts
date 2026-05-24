@@ -236,3 +236,135 @@ export function deriveTouchedFiles(
   }
   return [...map.values()].sort((a, b) => b.lastTouched - a.lastTouched);
 }
+
+export type ToolStepStatus = "pending" | "active" | "done" | "failed";
+
+export interface ToolStep {
+  id: string;
+  toolName: string;
+  /** Pre-computed short label for display (e.g., "Bash: ls -la"). */
+  label: string;
+  status: ToolStepStatus;
+}
+
+const TOOL_TIMELINE_CAP = 12;
+
+/** Truncate a string to N chars with a trailing ellipsis. */
+function truncate(s: string, n: number): string {
+  return s.length <= n ? s : s.slice(0, n - 1) + "…";
+}
+
+function basenameFromArgs(args: unknown, key: string): string | null {
+  if (typeof args !== "object" || args === null) return null;
+  const v = (args as Record<string, unknown>)[key];
+  if (typeof v !== "string" || v.length === 0) return null;
+  const idx = v.lastIndexOf("/");
+  return idx >= 0 ? v.slice(idx + 1) : v;
+}
+
+/** Build a short, human-readable label for a tool call. Used by the Process
+ *  Tab fallback timeline when the agent never calls TodoWrite. */
+function labelForToolCall(tc: ToolCallView): string {
+  const args = tc.args;
+  switch (tc.toolName) {
+    case "Bash": {
+      if (typeof args === "object" && args !== null) {
+        const cmd = (args as { command?: unknown }).command;
+        if (typeof cmd === "string") return truncate(cmd, 60);
+      }
+      return "Bash";
+    }
+    case "Read":
+    case "Write":
+    case "Edit":
+    case "MultiEdit": {
+      const base = basenameFromArgs(args, "file_path");
+      return base ? `${tc.toolName} ${base}` : tc.toolName;
+    }
+    case "NotebookEdit": {
+      const base = basenameFromArgs(args, "notebook_path");
+      return base ? `NotebookEdit ${base}` : "NotebookEdit";
+    }
+    case "Glob": {
+      if (typeof args === "object" && args !== null) {
+        const p = (args as { pattern?: unknown }).pattern;
+        if (typeof p === "string") return `Glob ${truncate(p, 50)}`;
+      }
+      return "Glob";
+    }
+    case "Grep": {
+      if (typeof args === "object" && args !== null) {
+        const p = (args as { pattern?: unknown }).pattern;
+        if (typeof p === "string") return `Grep ${truncate(p, 50)}`;
+      }
+      return "Grep";
+    }
+    case "WebFetch": {
+      if (typeof args === "object" && args !== null) {
+        const u = (args as { url?: unknown }).url;
+        if (typeof u === "string") return `WebFetch ${truncate(u, 50)}`;
+      }
+      return "WebFetch";
+    }
+    case "WebSearch": {
+      if (typeof args === "object" && args !== null) {
+        const q = (args as { query?: unknown }).query;
+        if (typeof q === "string") return `WebSearch ${truncate(q, 50)}`;
+      }
+      return "WebSearch";
+    }
+    case "TodoWrite":
+      return "Plan update";
+    default:
+      return tc.toolName;
+  }
+}
+
+function statusForToolCall(
+  tc: ToolCallView,
+  isLastPending: boolean,
+): ToolStepStatus {
+  if (tc.status === "success") return "done";
+  if (tc.status === "error") return "failed";
+  // status === "pending"
+  return isLastPending ? "active" : "pending";
+}
+
+/**
+ * Linear walk of every tool_call in this thread, returned as the last
+ * TOOL_TIMELINE_CAP steps. Used by Process Tab as a fallback when the
+ * agent never invokes TodoWrite — gives the user *something* to see
+ * while the agent is working.
+ *
+ * The most-recently-pending tool call is marked "active" so the user
+ * sees a pulse on the current step. All earlier pending calls (rare —
+ * happens only with parallel batches) stay "pending".
+ */
+export function deriveToolTimeline(state: ChatState): ToolStep[] {
+  const collected: ToolCallView[] = [];
+  for (const list of [state.historicalMessages, state.liveMessages]) {
+    for (const m of list) {
+      if (m.role !== "assistant") continue;
+      for (const block of m.blocks) {
+        if (block.kind === "tool_call") collected.push(block.toolCall);
+      }
+    }
+  }
+  // Find the last pending call's index in the FULL collected array, so we
+  // mark exactly one "active" — even after slicing to the cap.
+  let lastPendingIdx = -1;
+  for (let i = collected.length - 1; i >= 0; i--) {
+    if (collected[i]!.status === "pending") {
+      lastPendingIdx = i;
+      break;
+    }
+  }
+  const sliceStart = Math.max(0, collected.length - TOOL_TIMELINE_CAP);
+  const sliced = collected.slice(sliceStart);
+  return sliced.map((tc, i) => ({
+    id: tc.id,
+    toolName: tc.toolName,
+    label: labelForToolCall(tc),
+    status: statusForToolCall(tc, sliceStart + i === lastPendingIdx),
+  }));
+}

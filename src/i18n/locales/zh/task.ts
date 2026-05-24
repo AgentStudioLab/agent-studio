@@ -22,6 +22,7 @@ export const task = {
     },
     processTab: {
       plan: "计划",
+      activity: "活动",
       countOf: "{{done}} / {{total}}",
       elapsed: "已用 {{time}}",
       empty: {

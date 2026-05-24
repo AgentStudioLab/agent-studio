@@ -3,7 +3,8 @@ import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useThreadPlan } from "@/lib/agui/react/useThreadPlan";
 import { useThreadRunMeta } from "@/lib/agui/react/useThreadRunMeta";
-import type { TodoEntry, TodoStatus } from "@/lib/agui/runtime/derivations";
+import { useThreadToolTimeline } from "@/lib/agui/react/useThreadToolTimeline";
+import type { TodoEntry, TodoStatus, ToolStep } from "@/lib/agui/runtime/derivations";
 import type { ChatState } from "@/lib/agui/runtime/types";
 
 interface ProcessTabProps {
@@ -93,39 +94,126 @@ function ProcessStep({
   );
 }
 
+function ToolStepRow({
+  step,
+  isLast,
+}: {
+  step: ToolStep;
+  isLast: boolean;
+}) {
+  // Map ToolStepStatus to the existing StepIndicator's status union.
+  // TodoStatus uses "pending"|"in_progress"|"completed"; ToolStepStatus
+  // uses "pending"|"active"|"done"|"failed". We collapse via lookup.
+  let indicatorStatus: TodoStatus;
+  if (step.status === "done") indicatorStatus = "completed";
+  else if (step.status === "active") indicatorStatus = "in_progress";
+  else indicatorStatus = "pending"; // failed shows pending dashed too (no failed token in TodoStatus)
+
+  return (
+    <div className="relative flex gap-3">
+      <div className="flex flex-col items-center shrink-0">
+        <StepIndicator status={indicatorStatus} />
+        {!isLast && (
+          <div
+            className="flex-1 w-px mt-1 mb-1 min-h-[18px]"
+            style={{
+              background:
+                step.status === "done"
+                  ? "hsl(var(--success-100) / 0.5)"
+                  : step.status === "failed"
+                    ? "hsl(var(--danger-100) / 0.5)"
+                    : "hsl(var(--border-300) / 0.2)",
+            }}
+          />
+        )}
+      </div>
+      <div className="flex-1 min-w-0 pt-0.5 pb-4">
+        <div
+          className={cn(
+            "text-[13px] leading-snug truncate",
+            step.status === "active" && "text-text-100 font-medium",
+            step.status === "done" && "text-text-200",
+            step.status === "failed" && "text-danger-100",
+            step.status === "pending" && "text-text-400",
+          )}
+          title={step.label}
+        >
+          {step.label}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ElapsedBanner({
+  t,
+  elapsedSeconds,
+}: {
+  t: (k: string, opts?: Record<string, unknown>) => string;
+  elapsedSeconds: number;
+}) {
+  return (
+    <div
+      className="mt-3 mx-2 px-3 py-2 rounded-md text-[11.5px] text-text-400 leading-relaxed"
+      style={{
+        background: "hsl(var(--bg-200) / 0.4)",
+        border: "1px solid hsl(var(--border-300) / 0.08)",
+      }}
+    >
+      <span className="inline-block w-1.5 h-1.5 rounded-full bg-success-100 pulse-dot mr-2 align-middle" />
+      {t("task.processTab.status.running")} ·{" "}
+      {t("task.processTab.elapsed", { time: formatElapsed(elapsedSeconds) })}
+    </div>
+  );
+}
+
 export function ProcessTab({ state }: ProcessTabProps) {
   const { t } = useTranslation();
   const { todos } = useThreadPlan(state);
+  const { timeline } = useThreadToolTimeline(state);
   const { elapsedSeconds, isRunning } = useThreadRunMeta(state);
 
   const doneCount = todos.filter((s) => s.status === "completed").length;
   const totalCount = todos.length;
 
-  if (totalCount === 0) {
-    // No TodoWrite yet — show empty state. If a run is active, still
-    // render the elapsed banner so users see something is happening.
+  // Three-way fallback:
+  // 1. agent called TodoWrite → show todo timeline (richest)
+  // 2. agent ran tools without TodoWrite → show tool timeline (Cowork-style fallback)
+  // 3. nothing yet → empty state + (if running) elapsed banner
+  if (totalCount === 0 && timeline.length === 0) {
     return (
       <div>
         <div className="px-6 py-12 text-center text-sm" style={{ color: "hsl(var(--text-300))" }}>
           {t("task.processTab.empty.notStarted")}
         </div>
-        {isRunning && (
-          <div
-            className="mt-3 mx-2 px-3 py-2 rounded-md text-[11.5px] text-text-400 leading-relaxed"
-            style={{
-              background: "hsl(var(--bg-200) / 0.4)",
-              border: "1px solid hsl(var(--border-300) / 0.08)",
-            }}
-          >
-            <span className="inline-block w-1.5 h-1.5 rounded-full bg-success-100 pulse-dot mr-2 align-middle" />
-            {t("task.processTab.status.running")} ·{" "}
-            {t("task.processTab.elapsed", { time: formatElapsed(elapsedSeconds) })}
-          </div>
-        )}
+        {isRunning && <ElapsedBanner t={t} elapsedSeconds={elapsedSeconds} />}
       </div>
     );
   }
 
+  if (totalCount === 0) {
+    // Fallback: tool-call timeline.
+    return (
+      <div>
+        <div className="flex items-center justify-between px-2 pt-3 pb-3">
+          <span className="text-[11px] tracking-wider uppercase text-text-400">
+            {t("task.processTab.activity")}
+          </span>
+          <span className="text-[11.5px] text-text-300 font-mono">
+            {timeline.length}
+          </span>
+        </div>
+        <div className="px-2">
+          {timeline.map((step, i) => (
+            <ToolStepRow key={step.id} step={step} isLast={i === timeline.length - 1} />
+          ))}
+        </div>
+        {isRunning && <ElapsedBanner t={t} elapsedSeconds={elapsedSeconds} />}
+      </div>
+    );
+  }
+
+  // Normal: todo timeline.
   return (
     <div>
       <div className="flex items-center justify-between px-2 pt-3 pb-3">
@@ -145,19 +233,7 @@ export function ProcessTab({ state }: ProcessTabProps) {
           />
         ))}
       </div>
-      {isRunning && (
-        <div
-          className="mt-3 mx-2 px-3 py-2 rounded-md text-[11.5px] text-text-400 leading-relaxed"
-          style={{
-            background: "hsl(var(--bg-200) / 0.4)",
-            border: "1px solid hsl(var(--border-300) / 0.08)",
-          }}
-        >
-          <span className="inline-block w-1.5 h-1.5 rounded-full bg-success-100 pulse-dot mr-2 align-middle" />
-          {t("task.processTab.status.running")} ·{" "}
-          {t("task.processTab.elapsed", { time: formatElapsed(elapsedSeconds) })}
-        </div>
-      )}
+      {isRunning && <ElapsedBanner t={t} elapsedSeconds={elapsedSeconds} />}
     </div>
   );
 }

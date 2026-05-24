@@ -24,6 +24,7 @@ export const task: typeof Zh = {
     },
     processTab: {
       plan: "Plan",
+      activity: "Activity",
       countOf: "{{done}} of {{total}}",
       elapsed: "{{time}} elapsed",
       empty: {
