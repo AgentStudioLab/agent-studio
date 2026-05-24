@@ -6,7 +6,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-type ArtifactKind = "Spreadsheet" | "Presentation" | "Document";
+export type ArtifactKind = "Spreadsheet" | "Presentation" | "Document";
 
 const KIND_ICON: Record<ArtifactKind, LucideIcon> = {
   Spreadsheet: FileSpreadsheet,

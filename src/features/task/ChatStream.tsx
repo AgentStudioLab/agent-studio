@@ -3,7 +3,7 @@ import { Streamdown } from "streamdown";
 import type { BundledLanguage } from "shiki";
 import type { MessageBlock, MessageView, PendingInterrupt, ToolCallView } from "@/lib/agui/runtime";
 import type { ChatRuntime } from "@/lib/agui/runtime/runtime";
-import { ArtifactInlineCard } from "@/features/task/ArtifactInlineCard";
+import { ArtifactInlineCard, type ArtifactKind } from "@/features/task/ArtifactInlineCard";
 import { useRunStatus } from "@/lib/agui/react/useRunStatus";
 import { useNavigate } from "react-router-dom";
 import { ToolApprovalCard } from "@/features/task/ToolApprovalCard";
@@ -32,8 +32,6 @@ import {
 } from "@/components/ai-elements/conversation";
 
 /* ---------------- artifact helpers ---------------- */
-
-type ArtifactKind = "Spreadsheet" | "Presentation" | "Document";
 
 interface ArtifactInfo {
   absolutePath: string;
