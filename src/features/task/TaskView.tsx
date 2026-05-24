@@ -281,7 +281,7 @@ export function TaskView() {
       }
       aside={
         previewOpen ? (
-          <PreviewPane file={preview.file!} onClose={closePreview} />
+          <PreviewPane file={preview.file!} workingDir={cwd} onClose={closePreview} />
         ) : (
           <TaskRightPanel
             state={state}

@@ -58,6 +58,13 @@ export const task = {
       close: "关闭",
       resizeHandle: "调整预览面板大小",
       notImplemented: "[此 mock 中未实现 .{{type}} 的预览]",
+      loading: "加载中…",
+      errorNotFound: "文件不存在",
+      errorOutsideWorkspace: "文件不在工作目录内，无权读取",
+      errorTooLarge: "文件超过 2 MiB，无法预览",
+      errorReadFailed: "读取失败：{{detail}}",
+      binaryNotice: "二进制文件，无法在应用内预览",
+      openExternal: "用系统应用打开",
       fileLabel: {
         markdown: "Markdown",
         spreadsheet: "XLSX",

@@ -32,19 +32,19 @@ const findFile = (type: MockFile["type"]): MockFile => {
 };
 
 export const MarkdownContent: Story = {
-  args: { file: findFile("markdown"), onClose: () => {} },
+  args: { file: findFile("markdown"), workingDir: null, onClose: () => {} },
 };
 
 export const SpreadsheetContent: Story = {
-  args: { file: findFile("spreadsheet"), onClose: () => {} },
+  args: { file: findFile("spreadsheet"), workingDir: null, onClose: () => {} },
 };
 
 export const PresentationContent: Story = {
-  args: { file: findFile("presentation"), onClose: () => {} },
+  args: { file: findFile("presentation"), workingDir: null, onClose: () => {} },
 };
 
 export const CodeContent: Story = {
-  args: { file: findFile("code"), onClose: () => {} },
+  args: { file: findFile("code"), workingDir: null, onClose: () => {} },
 };
 
 export const SideBySide: Story = {
@@ -65,7 +65,7 @@ export const SideBySide: Story = {
           justifyContent: "flex-end",
         }}
       >
-        <PreviewPane file={findFile("markdown")} onClose={() => {}} />
+        <PreviewPane file={findFile("markdown")} workingDir={null} onClose={() => {}} />
       </div>
       <div
         data-mode="dark"
@@ -75,7 +75,7 @@ export const SideBySide: Story = {
           justifyContent: "flex-end",
         }}
       >
-        <PreviewPane file={findFile("markdown")} onClose={() => {}} />
+        <PreviewPane file={findFile("markdown")} workingDir={null} onClose={() => {}} />
       </div>
     </div>
   ),

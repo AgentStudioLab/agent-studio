@@ -9,6 +9,12 @@
     "store:default",
     "dialog:default",
     {
+      "identifier": "shell:allow-open",
+      "allow": [
+        { "path": "**" }
+      ]
+    },
+    {
       "identifier": "shell:allow-spawn",
       "allow": [
         {

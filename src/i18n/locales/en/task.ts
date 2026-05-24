@@ -60,6 +60,13 @@ export const task: typeof Zh = {
       close: "Close",
       resizeHandle: "Resize preview pane",
       notImplemented: "[Preview for .{{type}} not implemented in this mock]",
+      loading: "Loading…",
+      errorNotFound: "File not found",
+      errorOutsideWorkspace: "File is outside the working directory",
+      errorTooLarge: "File exceeds 2 MiB; cannot preview",
+      errorReadFailed: "Read failed: {{detail}}",
+      binaryNotice: "Binary file — cannot preview in app",
+      openExternal: "Open in system default",
       fileLabel: {
         markdown: "Markdown",
         spreadsheet: "XLSX",
