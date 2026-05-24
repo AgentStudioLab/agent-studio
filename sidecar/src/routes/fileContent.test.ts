@@ -101,4 +101,25 @@ describe("GET /files/content", () => {
     );
     expect(res.status).toBe(400);
   });
+
+  it("returns 404 when path is a directory", async () => {
+    const app = makeApp();
+    const res = await app.request(
+      `/files/content?path=${encodeURIComponent(join(tmpRoot, "sub"))}&cwd=${encodeURIComponent(tmpRoot)}`,
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it("returns 413 when file exceeds 2 MiB", async () => {
+    const bigFile = join(tmpRoot, "big.bin");
+    writeFileSync(bigFile, Buffer.alloc(2 * 1024 * 1024 + 1));
+    const app = makeApp();
+    const res = await app.request(
+      `/files/content?path=${encodeURIComponent(bigFile)}&cwd=${encodeURIComponent(tmpRoot)}`,
+    );
+    expect(res.status).toBe(413);
+    const body = await res.json();
+    expect(body.error).toBe("file too large");
+    expect(body.size).toBe(2 * 1024 * 1024 + 1);
+  });
 });
