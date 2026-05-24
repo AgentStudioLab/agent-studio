@@ -77,7 +77,7 @@ function languageFromPath(path: string): BundledLanguage {
   if (lower.endsWith(".html")) return "html";
   if (lower.endsWith(".css")) return "css";
   if (lower.endsWith(".sh")) return "bash";
-  return "typescript"; // fallback — CodeBlock internally degrades to "text" for unknown langs
+  return "typescript";
 }
 
 /** Build a data URI for an image file from base64-encoded content. */
@@ -96,7 +96,7 @@ export function PreviewPane({ file, workingDir, onClose }: PreviewPaneProps) {
   const [width, setWidth] = useState<number>(DEFAULT_W);
   const [dragging, setDragging] = useState<boolean>(false);
 
-  const { data, error, isLoading, refetch } = useFileContent(file.path, workingDir);
+  const { data, error, isLoading, isFetching, refetch } = useFileContent(file.path, workingDir);
 
   useEffect(() => {
     if (!dragging) return;
@@ -202,10 +202,11 @@ export function PreviewPane({ file, workingDir, onClose }: PreviewPaneProps) {
           type="button"
           aria-label={t("task.preview.refresh")}
           onClick={refetch}
-          className="rounded-md p-1.5 transition hover:bg-muted hover:text-foreground"
+          disabled={isFetching}
+          className="rounded-md p-1.5 transition hover:bg-muted hover:text-foreground disabled:opacity-50"
           style={{ color: "hsl(var(--text-300))" }}
         >
-          <RotateCw className="size-[13px]" />
+          <RotateCw className={cn("size-[13px]", isFetching && "animate-spin")} />
         </button>
         <button
           type="button"

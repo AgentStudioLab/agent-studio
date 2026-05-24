@@ -59,7 +59,6 @@ export const task: typeof Zh = {
       refresh: "Refresh",
       close: "Close",
       resizeHandle: "Resize preview pane",
-      notImplemented: "[Preview for .{{type}} not implemented in this mock]",
       loading: "Loading…",
       errorNotFound: "File not found",
       errorOutsideWorkspace: "File is outside the working directory",
@@ -74,20 +73,6 @@ export const task: typeof Zh = {
         code: "Code",
         image: "Image",
         generic: "File",
-      },
-      slides: {
-        overview: {
-          title: "Scan overview",
-          subtitle: "5 inactive projects",
-        },
-        top3: {
-          title: "Top 3",
-          subtitle: "old-project-1 / old-project-2 / archive-x",
-        },
-        suggestion: {
-          title: "Suggestion",
-          subtitle: "Archive 4 · Delete 1",
-        },
       },
     },
     timeline: {

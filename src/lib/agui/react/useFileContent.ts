@@ -30,6 +30,7 @@ export function useFileContent(
   data: FileContentBody | null;
   error: FileContentError | null;
   isLoading: boolean;
+  isFetching: boolean;
   refetch: () => void;
 } {
   const enabled = Boolean(absolutePath && workingDir);
@@ -63,6 +64,7 @@ export function useFileContent(
     data: query.data ?? null,
     error: (query.error as FileContentError | null) ?? null,
     isLoading: query.isLoading,
+    isFetching: query.isFetching,
     refetch: () => void query.refetch(),
   };
 }

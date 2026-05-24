@@ -57,7 +57,6 @@ export const task = {
       refresh: "刷新",
       close: "关闭",
       resizeHandle: "调整预览面板大小",
-      notImplemented: "[此 mock 中未实现 .{{type}} 的预览]",
       loading: "加载中…",
       errorNotFound: "文件不存在",
       errorOutsideWorkspace: "文件不在工作目录内，无权读取",
@@ -72,20 +71,6 @@ export const task = {
         code: "代码",
         image: "图片",
         generic: "文件",
-      },
-      slides: {
-        overview: {
-          title: "扫描概览",
-          subtitle: "5 个不活跃项目",
-        },
-        top3: {
-          title: "Top 3",
-          subtitle: "old-project-1 / old-project-2 / archive-x",
-        },
-        suggestion: {
-          title: "建议",
-          subtitle: "归档 4 个 · 删除 1 个",
-        },
       },
     },
     timeline: {
