@@ -26,6 +26,7 @@ import {
 } from "./agui/provider-claude";
 import { SessionMetadataStore } from "./services/sessionMetadata";
 import { buildThreadContextRoutes } from "./routes/threadContext";
+import { buildFileContentRoutes } from "./routes/fileContent";
 
 type Args = { port: number; token: string; db: string };
 
@@ -189,6 +190,7 @@ app.route("/", buildUsageRoutes(usage));
 app.route("/", buildSettingsToolsRoutes(settingsTools));
 app.route("/", buildModelsRoutes(providerSettings));
 app.route("/", buildThreadContextRoutes(sessionMetadata));
+app.route("/", buildFileContentRoutes());
 
 console.log(`[sidecar] listening on http://127.0.0.1:${args.port} (db=${dbAbs})`);
 {
