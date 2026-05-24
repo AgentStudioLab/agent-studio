@@ -91,6 +91,29 @@ const MUTATION_TOOLS: ReadonlySet<string> = new Set([
   "NotebookEdit",
 ]);
 
+/** File extensions surfaced as user-facing artifacts. Scripts/source code
+ * (.py / .sh / .ts / .js / .go / .rs / ...) intentionally excluded — they
+ * are usually internal tooling, not what the user asked the agent to make. */
+const ARTIFACT_EXTENSIONS: ReadonlySet<string> = new Set([
+  "md", "markdown", "txt", "rtf",
+  "pdf", "docx", "doc",
+  "pptx", "ppt", "key",
+  "xlsx", "xls", "csv", "tsv", "ods",
+  "json", "yaml", "yml", "toml", "xml",
+  "html", "htm",
+  "png", "jpg", "jpeg", "gif", "svg", "webp", "bmp", "ico",
+  "zip", "tar", "gz", "tgz",
+  "ipynb",
+]);
+
+function isArtifactPath(p: string): boolean {
+  const lastSlash = p.lastIndexOf("/");
+  const name = lastSlash >= 0 ? p.slice(lastSlash + 1) : p;
+  const dotIdx = name.lastIndexOf(".");
+  if (dotIdx <= 0) return false;
+  return ARTIFACT_EXTENSIONS.has(name.slice(dotIdx + 1).toLowerCase());
+}
+
 export interface TouchedFile {
   absolutePath: string;
   relativePath: string;
@@ -121,10 +144,25 @@ function fileCallsInOrder(
       seq++;
       if (block.kind !== "tool_call") continue;
       const toolName = block.toolCall.toolName;
-      if (!FILE_TOOLS.has(toolName)) continue;
-      const path = extractFilePath(toolName, block.toolCall.args);
-      if (!path) continue;
-      out.push({ tool: toolName as FileTool, path, seq });
+
+      // 1. Mutation tools — direct file targets from args.
+      if (FILE_TOOLS.has(toolName)) {
+        const path = extractFilePath(toolName, block.toolCall.args);
+        if (path) out.push({ tool: toolName as FileTool, path, seq });
+      }
+
+      // 2. Bash sideEffects — Bash indirectly produced/modified files.
+      const sideEffects = block.toolCall.sideEffects;
+      if (sideEffects && sideEffects.length > 0) {
+        for (const eff of sideEffects) {
+          // Map kind → FileTool: created → Write, modified → Edit. This lets
+          // downstream code (Files Tab "new" badge, etc) treat Bash-produced
+          // files uniformly with directly-written files.
+          seq++;
+          const mappedTool: FileTool = eff.kind === "created" ? "Write" : "Edit";
+          out.push({ tool: mappedTool, path: eff.path, seq });
+        }
+      }
     }
   }
   return out;
@@ -190,6 +228,11 @@ export function deriveTouchedFiles(
   // the agent produced or modified.
   for (const path of map.keys()) {
     if (!sawMutation.has(path)) map.delete(path);
+  }
+  // Drop non-artifact extensions (.py / .sh / .ts / etc — internal tooling
+  // that the user didn't ask for as a deliverable).
+  for (const path of [...map.keys()]) {
+    if (!isArtifactPath(path)) map.delete(path);
   }
   return [...map.values()].sort((a, b) => b.lastTouched - a.lastTouched);
 }

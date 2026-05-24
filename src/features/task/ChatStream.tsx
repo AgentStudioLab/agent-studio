@@ -45,6 +45,25 @@ const MUTATION_TOOL_NAMES: ReadonlySet<string> = new Set([
   "Write", "Edit", "MultiEdit", "NotebookEdit",
 ]);
 
+const ARTIFACT_EXTENSIONS: ReadonlySet<string> = new Set([
+  "md", "markdown", "txt", "rtf",
+  "pdf", "docx", "doc",
+  "pptx", "ppt", "key",
+  "xlsx", "xls", "csv", "tsv", "ods",
+  "json", "yaml", "yml", "toml", "xml",
+  "html", "htm",
+  "png", "jpg", "jpeg", "gif", "svg", "webp", "bmp", "ico",
+  "zip", "tar", "gz", "tgz",
+  "ipynb",
+]);
+
+function isArtifactPath(p: string): boolean {
+  const name = basename(p);
+  const dotIdx = name.lastIndexOf(".");
+  if (dotIdx <= 0) return false;
+  return ARTIFACT_EXTENSIONS.has(name.slice(dotIdx + 1).toLowerCase());
+}
+
 function basename(p: string): string {
   const trimmed = p.replace(/\/+$/, "");
   const idx = trimmed.lastIndexOf("/");
@@ -86,6 +105,9 @@ function extractMutationPath(tool: ToolCallView): string | null {
 /**
  * Walk the assistant turn's tool_call blocks, return one ArtifactInfo per
  * unique absolute path written/edited in cwd (deduped, in first-seen order).
+ * Includes files from Bash sideEffects (indirect file creation/modification).
+ * Files whose extension is not in the artifact whitelist are hidden — scripts
+ * and source code (.py / .sh / .ts / etc) are internal tooling, not deliverables.
  */
 function mutationToolCallsToArtifacts(
   blocks: MessageBlock[],
@@ -95,12 +117,11 @@ function mutationToolCallsToArtifacts(
   const cwdPrefix = workingDir.endsWith("/") ? workingDir : workingDir + "/";
   const seen = new Set<string>();
   const out: ArtifactInfo[] = [];
-  for (const b of blocks) {
-    if (b.kind !== "tool_call") continue;
-    const path = extractMutationPath(b.toolCall);
-    if (!path) continue;
-    if (path !== workingDir && !path.startsWith(cwdPrefix)) continue;
-    if (seen.has(path)) continue;
+
+  function pushIfArtifact(path: string) {
+    if (path !== workingDir && !path.startsWith(cwdPrefix)) return;
+    if (!isArtifactPath(path)) return;
+    if (seen.has(path)) return;
     seen.add(path);
     const ext = extensionOf(path);
     out.push({
@@ -110,6 +131,16 @@ function mutationToolCallsToArtifacts(
       ext: ext || "FILE",
       opener: openerForExt(ext),
     });
+  }
+
+  for (const b of blocks) {
+    if (b.kind !== "tool_call") continue;
+    const path = extractMutationPath(b.toolCall);
+    if (path) pushIfArtifact(path);
+    const sideEffects = b.toolCall.sideEffects;
+    if (sideEffects && b.toolCall.status === "success") {
+      for (const eff of sideEffects) pushIfArtifact(eff.path);
+    }
   }
   return out;
 }
