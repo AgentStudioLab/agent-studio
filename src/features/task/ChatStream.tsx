@@ -1,8 +1,9 @@
 import { isValidElement, useCallback, useMemo, type ReactNode } from "react";
 import { Streamdown } from "streamdown";
 import type { BundledLanguage } from "shiki";
-import type { MessageBlock, MessageView, PendingInterrupt } from "@/lib/agui/runtime";
+import type { MessageBlock, MessageView, PendingInterrupt, ToolCallView } from "@/lib/agui/runtime";
 import type { ChatRuntime } from "@/lib/agui/runtime/runtime";
+import { ArtifactInlineCard } from "@/features/task/ArtifactInlineCard";
 import { useRunStatus } from "@/lib/agui/react/useRunStatus";
 import { useNavigate } from "react-router-dom";
 import { ToolApprovalCard } from "@/features/task/ToolApprovalCard";
@@ -30,6 +31,93 @@ import {
   ConversationScrollButton,
 } from "@/components/ai-elements/conversation";
 
+/* ---------------- artifact helpers ---------------- */
+
+type ArtifactKind = "Spreadsheet" | "Presentation" | "Document";
+
+interface ArtifactInfo {
+  absolutePath: string;
+  name: string;
+  kind: ArtifactKind;
+  ext: string;
+  opener: string;
+}
+
+const MUTATION_TOOL_NAMES: ReadonlySet<string> = new Set([
+  "Write", "Edit", "MultiEdit", "NotebookEdit",
+]);
+
+function basename(p: string): string {
+  const trimmed = p.replace(/\/+$/, "");
+  const idx = trimmed.lastIndexOf("/");
+  return idx >= 0 ? trimmed.slice(idx + 1) : trimmed;
+}
+
+function extensionOf(p: string): string {
+  const name = basename(p);
+  const idx = name.lastIndexOf(".");
+  if (idx <= 0) return "";
+  return name.slice(idx + 1).toUpperCase();
+}
+
+function kindForExt(ext: string): ArtifactKind {
+  if (ext === "XLSX" || ext === "CSV") return "Spreadsheet";
+  if (ext === "PPTX" || ext === "KEY") return "Presentation";
+  return "Document";
+}
+
+function openerForExt(ext: string): string {
+  if (ext === "XLSX" || ext === "CSV" || ext === "PPTX" || ext === "KEY") {
+    return "wpsoffice";
+  }
+  return "VS Code";
+}
+
+function extractMutationPath(tool: ToolCallView): string | null {
+  if (!MUTATION_TOOL_NAMES.has(tool.toolName)) return null;
+  if (tool.status !== "success") return null;
+  const args = tool.args;
+  if (typeof args !== "object" || args === null) return null;
+  const o = args as Record<string, unknown>;
+  if (tool.toolName === "NotebookEdit") {
+    return typeof o.notebook_path === "string" ? o.notebook_path : null;
+  }
+  return typeof o.file_path === "string" ? o.file_path : null;
+}
+
+/**
+ * Walk the assistant turn's tool_call blocks, return one ArtifactInfo per
+ * unique absolute path written/edited in cwd (deduped, in first-seen order).
+ */
+function mutationToolCallsToArtifacts(
+  blocks: MessageBlock[],
+  workingDir: string | null,
+): ArtifactInfo[] {
+  if (!workingDir) return [];
+  const cwdPrefix = workingDir.endsWith("/") ? workingDir : workingDir + "/";
+  const seen = new Set<string>();
+  const out: ArtifactInfo[] = [];
+  for (const b of blocks) {
+    if (b.kind !== "tool_call") continue;
+    const path = extractMutationPath(b.toolCall);
+    if (!path) continue;
+    if (path !== workingDir && !path.startsWith(cwdPrefix)) continue;
+    if (seen.has(path)) continue;
+    seen.add(path);
+    const ext = extensionOf(path);
+    out.push({
+      absolutePath: path,
+      name: basename(path),
+      kind: kindForExt(ext),
+      ext: ext || "FILE",
+      opener: openerForExt(ext),
+    });
+  }
+  return out;
+}
+
+/* ---------------- ChatStreamProps ---------------- */
+
 interface ChatStreamProps {
   threadId: string;
   runtime: ChatRuntime;
@@ -54,6 +142,10 @@ interface ChatStreamProps {
    * it left off.
    */
   onContinueAfterRestart: () => void;
+  /** Conversation working directory — used to filter artifact cards to cwd. */
+  workingDir: string | null;
+  /** Click handler for inline artifact cards. */
+  onOpenFile?: (info: { absolutePath: string }) => void;
 }
 
 /**
@@ -127,6 +219,8 @@ export function ChatStream({
   allowedTools,
   onAllowAlways,
   onContinueAfterRestart,
+  workingDir,
+  onOpenFile,
 }: ChatStreamProps) {
   const navigate = useNavigate();
   // cast: ChatRuntime.subscribe takes (state) => void; RuntimeLike expects () => void.
@@ -213,6 +307,8 @@ export function ChatStream({
                 interruptsByToolId={interruptsByToolId}
                 renderApprovalCard={renderApprovalCard}
                 onContinueAfterRestart={onContinueAfterRestart}
+                workingDir={workingDir}
+                onOpenFile={onOpenFile}
               />
             );
           })}
@@ -291,6 +387,8 @@ function MessageRow({
   interruptsByToolId,
   renderApprovalCard,
   onContinueAfterRestart,
+  workingDir,
+  onOpenFile,
 }: {
   message: MessageView;
   showActions: boolean;
@@ -298,12 +396,15 @@ function MessageRow({
   interruptsByToolId: Map<string, PendingInterrupt>;
   renderApprovalCard: (it: PendingInterrupt) => ReactNode;
   onContinueAfterRestart: () => void;
+  workingDir: string | null;
+  onOpenFile?: (info: { absolutePath: string }) => void;
 }) {
   if (message.role === "user") {
     return <UserMessage>{message.content}</UserMessage>;
   }
 
   const grouped = groupBlocks(message.blocks);
+  const artifacts = mutationToolCallsToArtifacts(message.blocks, workingDir);
 
   return (
     <div className="space-y-3">
@@ -373,6 +474,20 @@ function MessageRow({
         }
         return null;
       })}
+      {artifacts.length > 0 && (
+        <div className="space-y-2">
+          {artifacts.map((a) => (
+            <ArtifactInlineCard
+              key={a.absolutePath}
+              title={a.name}
+              kind={a.kind}
+              ext={a.ext}
+              opener={a.opener}
+              onOpen={() => onOpenFile?.({ absolutePath: a.absolutePath })}
+            />
+          ))}
+        </div>
+      )}
       {showActions && <MessageActions />}
     </div>
   );

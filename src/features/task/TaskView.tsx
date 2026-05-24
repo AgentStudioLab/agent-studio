@@ -246,6 +246,21 @@ export function TaskView() {
               onResume={resumeRun}
               allowedTools={allowedTools}
               onAllowAlways={addWorkspaceTool}
+              workingDir={cwd}
+              onOpenFile={({ absolutePath }) => {
+                const touched: TouchedFile = {
+                  absolutePath,
+                  relativePath:
+                    cwd && absolutePath.startsWith(cwd + "/")
+                      ? absolutePath.slice(cwd.length + 1)
+                      : absolutePath,
+                  firstTool: "Write",
+                  lastTool: "Write",
+                  firstSeenAt: 0,
+                  lastTouched: 0,
+                };
+                openPreview(touchedFileToPreview(touched));
+              }}
               onContinueAfterRestart={() => {
                 // Resend the last user message verbatim — gives the model the
                 // identical context it had at interrupt time, so it most likely
