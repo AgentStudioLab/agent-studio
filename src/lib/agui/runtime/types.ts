@@ -4,6 +4,13 @@
 
 // ============ 视图层（UI 直接消费的形状） ============
 
+export interface SideEffectFile {
+  /** Absolute filesystem path. */
+  path: string;
+  /** Whether the Bash call created the file or modified an existing one. */
+  kind: "created" | "modified";
+}
+
 /**
  * 工具调用的视图模型。
  * 跟服务端 wire-format 的差异：args 在流式过程中可能是部分 JSON 字符串，
@@ -16,6 +23,13 @@ export interface ToolCallView {
   result: unknown | null;
   status: "pending" | "success" | "error";
   errorMsg?: string;
+  /**
+   * Files the agent indirectly produced/modified during this tool call.
+   * Only Bash tool calls receive this (from the PostToolUse cwd-diff hook
+   * on the sidecar). Mutation tools (Write/Edit/...) declare their target
+   * in `args` instead.
+   */
+  sideEffects?: SideEffectFile[];
 }
 
 /**

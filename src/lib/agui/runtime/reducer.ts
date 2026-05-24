@@ -18,6 +18,7 @@ import type {
   MessageView,
   NoticeReason,
   PendingInterrupt,
+  SideEffectFile,
 } from "./types";
 import { sweepPendingToolCalls } from "./sweep";
 
@@ -206,6 +207,25 @@ export function applyEvent(
             ts: Date.now(),
           },
         };
+      } else if (name === "file.side_effects") {
+        const value = (event as { value?: Record<string, unknown> }).value ?? {};
+        const toolCallId = value.toolCallId;
+        const files = value.files;
+        if (typeof toolCallId === "string" && Array.isArray(files)) {
+          // Validate each entry — bridge may emit malformed data on a future bug.
+          const valid: SideEffectFile[] = files.filter(
+            (f): f is SideEffectFile =>
+              typeof f === "object" &&
+              f !== null &&
+              typeof (f as Record<string, unknown>).path === "string" &&
+              ((f as Record<string, unknown>).kind === "created" ||
+                (f as Record<string, unknown>).kind === "modified"),
+          );
+          next = updateToolCall(next, toolCallId, (tc) => ({
+            ...tc,
+            sideEffects: valid,
+          }));
+        }
       }
       break;
     }
