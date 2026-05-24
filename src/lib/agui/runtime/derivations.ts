@@ -131,10 +131,12 @@ function fileCallsInOrder(
 }
 
 /**
- * Cross-Run aggregate of files this thread's agent has touched via
- * Read / Write / Edit / MultiEdit / NotebookEdit. Paths outside
- * `workingDir` are dropped (system files like ~/.zshrc shouldn't
- * pollute the project file list).
+ * Cross-Run aggregate of files this thread's agent produced or modified
+ * via Write / Edit / MultiEdit / NotebookEdit. Files the agent only Read
+ * are collected internally (to preserve firstTool / firstSeenAt for
+ * files that LATER get edited) but filtered from the return value.
+ * Paths outside `workingDir` are dropped (system files like ~/.zshrc
+ * shouldn't pollute the project file list).
  *
  * `seq` is a synthetic block-ordinal we assign during traversal.
  * Live calls' seqs strictly exceed historical calls' seqs (the live
