@@ -36,6 +36,30 @@ export const task: typeof Zh = {
         failed: "Task failed",
         paused: "Task paused",
       },
+      phases: {
+        progress: "Progress",
+        context: {
+          label: "Gather context",
+          empty: "No reads yet",
+          summary: "{{count}} reads",
+        },
+        plan: {
+          label: "Plan steps",
+          empty: "No plan emitted",
+          thinking: "Thinking…",
+          summary: "{{count}} updates",
+        },
+        execute: {
+          label: "Execute",
+          empty: "No actions yet",
+          summary: "{{count}} actions",
+        },
+        finish: {
+          label: "Wrap up",
+          waiting: "Awaiting completion",
+          done: "Done",
+        },
+      },
     },
     filesTab: {
       fileCount: "{{count}} files",

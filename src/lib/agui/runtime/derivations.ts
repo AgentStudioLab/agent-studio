@@ -1,5 +1,25 @@
 import type { ChatState, MessageView, ToolCallView } from "./types";
 
+// ============ Progress phases (4-phase fixed pipeline) ============
+//
+// Manus / Cowork / ChatGPT-canvas style: the UI shows a fixed set of high-
+// level phases instead of one row per tool call. Tool invocations are
+// bucketed by name into a phase; the most recent phase is "active". This
+// gives a stable progress feeling even for models that never call TodoWrite
+// (DeepSeek-Reasoner skips it; raw Claude does too on small tasks).
+
+export type PhaseId = "context" | "plan" | "execute" | "finish";
+export type PhaseStatus = "pending" | "active" | "completed";
+
+export interface PhaseEntry {
+  id: PhaseId;
+  status: PhaseStatus;
+  /** How many tool calls landed in this phase. 0 for finish. */
+  count: number;
+  /** Short label of the most recent tool call in this phase. null when count=0. */
+  lastToolLabel: string | null;
+}
+
 export type TodoStatus = "pending" | "in_progress" | "completed";
 
 export interface TodoEntry {
@@ -237,18 +257,6 @@ export function deriveTouchedFiles(
   return [...map.values()].sort((a, b) => b.lastTouched - a.lastTouched);
 }
 
-export type ToolStepStatus = "pending" | "active" | "done" | "failed";
-
-export interface ToolStep {
-  id: string;
-  toolName: string;
-  /** Pre-computed short label for display (e.g., "Bash: ls -la"). */
-  label: string;
-  status: ToolStepStatus;
-}
-
-const TOOL_TIMELINE_CAP = 12;
-
 /** Truncate a string to N chars with a trailing ellipsis. */
 function truncate(s: string, n: number): string {
   return s.length <= n ? s : s.slice(0, n - 1) + "…";
@@ -320,51 +328,122 @@ function labelForToolCall(tc: ToolCallView): string {
   }
 }
 
-function statusForToolCall(
-  tc: ToolCallView,
-  isLastPending: boolean,
-): ToolStepStatus {
-  if (tc.status === "success") return "done";
-  if (tc.status === "error") return "failed";
-  // status === "pending"
-  return isLastPending ? "active" : "pending";
+// Tool-name → phase classification. Names not in any set are ignored.
+// Bash is in "execute" because in practice DeepSeek/Claude use Bash for
+// running scripts (mutations, builds, generators) more than for read-only
+// inspection — we accept the slight mis-classification of `ls` / `find`.
+const CONTEXT_TOOLS: ReadonlySet<string> = new Set([
+  "Read",
+  "Glob",
+  "Grep",
+  "LS",
+  "WebFetch",
+  "WebSearch",
+]);
+
+const EXECUTE_TOOLS: ReadonlySet<string> = new Set([
+  "Write",
+  "Edit",
+  "MultiEdit",
+  "NotebookEdit",
+  "Bash",
+]);
+
+type CategorizablePhase = Exclude<PhaseId, "finish">;
+
+const PHASE_ORDER: readonly PhaseId[] = ["context", "plan", "execute", "finish"];
+
+function phaseForTool(name: string): CategorizablePhase | null {
+  if (name === "TodoWrite") return "plan";
+  if (CONTEXT_TOOLS.has(name)) return "context";
+  if (EXECUTE_TOOLS.has(name)) return "execute";
+  return null;
 }
 
 /**
- * Linear walk of every tool_call in this thread, returned as the last
- * TOOL_TIMELINE_CAP steps. Used by Process Tab as a fallback when the
- * agent never invokes TodoWrite — gives the user *something* to see
- * while the agent is working.
+ * Returns the 4 fixed phases (context → plan → execute → finish) with
+ * status and counts derived from the current ChatState. Heuristic rules:
  *
- * The most-recently-pending tool call is marked "active" so the user
- * sees a pulse on the current step. All earlier pending calls (rare —
- * happens only with parallel batches) stay "pending".
+ *   - Each tool call increments exactly one phase's count (or zero if
+ *     the tool name isn't categorizable, e.g. an MCP tool we haven't
+ *     classified yet).
+ *   - "active" phase is whichever phase the most recent tool call
+ *     landed in — unless the run has finished (then "finish" is active),
+ *     or the run is still running with zero tool calls so far (then
+ *     "plan" is active to signal the agent is composing).
+ *   - All phases before the active one render as "completed", even when
+ *     count==0 — they were skipped, which we treat visually as "passed
+ *     through". Phases after the active one are "pending".
+ *   - With no run history at all (idle initial state), every phase is
+ *     "pending" and there is no active phase.
  */
-export function deriveToolTimeline(state: ChatState): ToolStep[] {
-  const collected: ToolCallView[] = [];
+export function deriveProgressPhases(state: ChatState): PhaseEntry[] {
+  const counts: Record<CategorizablePhase, number> = {
+    context: 0,
+    plan: 0,
+    execute: 0,
+  };
+  const lastTool: Record<CategorizablePhase, ToolCallView | null> = {
+    context: null,
+    plan: null,
+    execute: null,
+  };
+
+  let lastPhase: CategorizablePhase | null = null;
+  let anyAssistantOutput = false;
+
   for (const list of [state.historicalMessages, state.liveMessages]) {
     for (const m of list) {
       if (m.role !== "assistant") continue;
       for (const block of m.blocks) {
-        if (block.kind === "tool_call") collected.push(block.toolCall);
+        if (block.kind === "text" || block.kind === "reasoning") {
+          anyAssistantOutput = true;
+          continue;
+        }
+        if (block.kind !== "tool_call") continue;
+        const p = phaseForTool(block.toolCall.toolName);
+        if (!p) continue;
+        counts[p]++;
+        lastTool[p] = block.toolCall;
+        lastPhase = p;
       }
     }
   }
-  // Find the last pending call's index in the FULL collected array, so we
-  // mark exactly one "active" — even after slicing to the cap.
-  let lastPendingIdx = -1;
-  for (let i = collected.length - 1; i >= 0; i--) {
-    if (collected[i]!.status === "pending") {
-      lastPendingIdx = i;
-      break;
-    }
+
+  const hadActivity = lastPhase !== null || anyAssistantOutput;
+
+  let activePhase: PhaseId | null;
+  if (!hadActivity && !state.isRunning) {
+    activePhase = null; // truly idle
+  } else if (!state.isRunning) {
+    activePhase = "finish"; // run ended
+  } else if (lastPhase === null) {
+    // Running but no tools yet — agent is thinking / composing the plan.
+    activePhase = "plan";
+  } else {
+    activePhase = lastPhase;
   }
-  const sliceStart = Math.max(0, collected.length - TOOL_TIMELINE_CAP);
-  const sliced = collected.slice(sliceStart);
-  return sliced.map((tc, i) => ({
-    id: tc.id,
-    toolName: tc.toolName,
-    label: labelForToolCall(tc),
-    status: statusForToolCall(tc, sliceStart + i === lastPendingIdx),
-  }));
+
+  const activeIdx = activePhase === null ? -1 : PHASE_ORDER.indexOf(activePhase);
+
+  return PHASE_ORDER.map((id, idx): PhaseEntry => {
+    let status: PhaseStatus;
+    if (activeIdx === -1) status = "pending";
+    else if (idx < activeIdx) status = "completed";
+    else if (idx === activeIdx) status = "active";
+    else status = "pending";
+
+    if (id === "finish") {
+      return { id, status, count: 0, lastToolLabel: null };
+    }
+    const cnt = counts[id];
+    const lt = lastTool[id];
+    return {
+      id,
+      status,
+      count: cnt,
+      lastToolLabel: lt ? labelForToolCall(lt) : null,
+    };
+  });
 }
+

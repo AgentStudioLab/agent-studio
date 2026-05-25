@@ -74,6 +74,21 @@ fn spawn_sidecar(app: &AppHandle) -> Result<SidecarInfo, Box<dyn std::error::Err
     if let Ok(model) = std::env::var("ANTHROPIC_MODEL") {
         cmd = cmd.env("ANTHROPIC_MODEL", model);
     }
+    // Point sidecar at the bundled `built-in/` plugin directory.
+    //
+    // In a packaged .app the resolved path is real (`$RESOURCES/built-in`).
+    // In `tauri dev` the resolver returns a theoretical path under
+    // `src-tauri/target/.../Resources/` that does NOT exist — bundle.resources
+    // is only copied at bundle time, not on `dev`. If we set the env to a
+    // missing path, sidecar treats it as a production misconfig and refuses
+    // to fall back, which would hide all built-in skills in dev. So gate on
+    // existence: only set the env when the dir actually exists. With env
+    // unset, sidecar walks up from its own source file to find `built-in/`.
+    if let Ok(builtin_dir) = app.path().resolve("built-in", tauri::path::BaseDirectory::Resource) {
+        if builtin_dir.is_dir() {
+            cmd = cmd.env("AGENT_STUDIO_BUILTIN_DIR", builtin_dir);
+        }
+    }
     let (mut rx, child) = cmd.spawn()?;
 
     app.state::<SidecarChild>()

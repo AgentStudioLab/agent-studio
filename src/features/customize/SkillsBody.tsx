@@ -1,73 +1,115 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Info } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Switch } from "@/components/ui/switch";
 import { SkillCard } from "@/features/customize/SkillCard";
-import { loadedSkills } from "@/lib/mock/skills";
-import type { MockSkill } from "@/lib/mock/types";
+import { useSkills, type SkillView } from "@/lib/agui/react/useSkills";
 
-// Mock files surfaced when the active skill is expanded.
-const SKILL_CREATOR_FILES = [
-  "SKILL.md",
-  "agents/",
-  "assets/",
-  "eval-viewer/",
-  "references/",
-  "scripts/",
-  "LICENSE.txt",
-];
+/** Hash a skill name → stable hue for InitialsAvatar coloring. Mirrors the
+ *  vibe of the old mock palette without making us list every skill upfront. */
+function hueFor(name: string): "orange" | "blue" | "green" | "purple" {
+  const palette = ["orange", "blue", "green", "purple"] as const;
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  return palette[h % palette.length]!;
+}
 
-const PERSONAL_SKILLS = loadedSkills.slice(0, 2);
-const BUILTIN_SKILLS = loadedSkills.slice(2);
+function initialsFor(name: string): string {
+  const parts = name.split(/[\s\-_:]+/).filter(Boolean);
+  if (parts.length >= 2) return (parts[0]![0]! + parts[1]![0]!).toUpperCase();
+  const first = parts[0] ?? name;
+  return first.slice(0, 2).toUpperCase();
+}
 
 export function SkillsBody() {
   const { t } = useTranslation();
-  const [activeSkillId, setActiveSkillId] = useState<string | undefined>(
-    loadedSkills[0]?.id,
-  );
-  const [enabled, setEnabled] = useState(true);
-  const activeSkill = loadedSkills.find((s) => s.id === activeSkillId);
+  const { skills, isLoading, error, setEnabled } = useSkills();
+
+  const personal = useMemo(() => skills.filter((s) => s.source === "personal"), [skills]);
+  const builtin = useMemo(() => skills.filter((s) => s.source === "builtin"), [skills]);
+
+  const [activeSkillId, setActiveSkillId] = useState<string | undefined>(undefined);
+  // Pick a default selection: first personal, else first builtin.
+  const effectiveActiveId =
+    activeSkillId ?? personal[0]?.id ?? builtin[0]?.id;
+  const activeSkill = skills.find((s) => s.id === effectiveActiveId);
+
+  if (isLoading) {
+    return (
+      <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+        {t("customize.skills.loading")}
+      </div>
+    );
+  }
+  if (error) {
+    return (
+      <div className="flex h-full items-center justify-center text-sm text-destructive-foreground">
+        {error.message}
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-full min-h-0 flex-1">
       <aside className="flex w-[340px] shrink-0 flex-col overflow-y-auto border-r border-border bg-background px-3 py-4">
-        <h3 className="mb-2 px-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          {t("customize.skills.personal")}
-        </h3>
-        <div className="flex flex-col gap-1">
-          {PERSONAL_SKILLS.map((skill) => (
-            <SkillCard
-              key={skill.id}
-              skill={skill}
-              active={skill.id === activeSkillId}
-              expanded={skill.id === activeSkillId}
-              onClick={() => setActiveSkillId(skill.id)}
-              childFiles={
-                skill.id === activeSkillId ? SKILL_CREATOR_FILES : undefined
+        {personal.length > 0 && (
+          <>
+            <h3 className="mb-2 px-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              {t("customize.skills.personal")}
+            </h3>
+            <div className="flex flex-col gap-1">
+              {personal.map((skill) => (
+                <SkillCard
+                  key={skill.id}
+                  initials={initialsFor(skill.name)}
+                  hue={hueFor(skill.name)}
+                  name={skill.name}
+                  description={skill.description}
+                  sourcePath={skill.sourcePath}
+                  active={skill.id === effectiveActiveId}
+                  onClick={() => setActiveSkillId(skill.id)}
+                />
+              ))}
+            </div>
+          </>
+        )}
+        {builtin.length > 0 && (
+          <>
+            <h3
+              className={
+                personal.length > 0
+                  ? "mb-2 mt-6 px-2 text-xs font-medium uppercase tracking-wide text-muted-foreground"
+                  : "mb-2 px-2 text-xs font-medium uppercase tracking-wide text-muted-foreground"
               }
-            />
-          ))}
-        </div>
-        <h3 className="mb-2 mt-6 px-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          {t("customize.skills.builtIn")}
-        </h3>
-        <div className="flex flex-col gap-1">
-          {BUILTIN_SKILLS.map((skill) => (
-            <SkillCard
-              key={skill.id}
-              skill={skill}
-              active={skill.id === activeSkillId}
-              onClick={() => setActiveSkillId(skill.id)}
-            />
-          ))}
-        </div>
+            >
+              {t("customize.skills.builtIn")}
+            </h3>
+            <div className="flex flex-col gap-1">
+              {builtin.map((skill) => (
+                <SkillCard
+                  key={skill.id}
+                  initials={initialsFor(skill.name)}
+                  hue={hueFor(skill.name)}
+                  name={skill.name}
+                  description={skill.description}
+                  active={skill.id === effectiveActiveId}
+                  onClick={() => setActiveSkillId(skill.id)}
+                />
+              ))}
+            </div>
+          </>
+        )}
+        {personal.length === 0 && builtin.length === 0 && (
+          <div className="px-2 py-8 text-sm text-muted-foreground">
+            {t("customize.skills.empty")}
+          </div>
+        )}
       </aside>
       <section className="flex flex-1 flex-col overflow-y-auto px-8 py-6">
         {activeSkill ? (
           <SkillDetail
             skill={activeSkill}
-            enabled={enabled}
-            onToggle={setEnabled}
+            onToggle={(v) => setEnabled(activeSkill.id, v)}
           />
         ) : (
           <div className="text-sm text-muted-foreground">
@@ -80,22 +122,19 @@ export function SkillsBody() {
 }
 
 interface SkillDetailProps {
-  skill: MockSkill;
-  enabled: boolean;
+  skill: SkillView;
   onToggle: (v: boolean) => void;
 }
 
-function SkillDetail({ skill, enabled, onToggle }: SkillDetailProps) {
+function SkillDetail({ skill, onToggle }: SkillDetailProps) {
   const { t } = useTranslation();
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-start justify-between gap-4">
-        <h1 className="text-[22px] font-semibold text-foreground">
-          {skill.name}
-        </h1>
+        <h1 className="text-[22px] font-semibold text-foreground">{skill.name}</h1>
         <div className="flex items-center gap-2">
           <Switch
-            checked={enabled}
+            checked={skill.enabled}
             onCheckedChange={onToggle}
             aria-label={t("customize.skills.enabled")}
           />
@@ -109,14 +148,22 @@ function SkillDetail({ skill, enabled, onToggle }: SkillDetailProps) {
         </div>
       </div>
       <dl className="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-1 text-sm">
-        <dt className="text-muted-foreground">
-          {t("customize.skills.addedBy")}
-        </dt>
-        <dd className="text-foreground">{t("customize.skills.addedByYou")}</dd>
-        <dt className="text-muted-foreground">{t("customize.skills.trigger")}</dt>
+        <dt className="text-muted-foreground">{t("customize.skills.addedBy")}</dt>
         <dd className="text-foreground">
-          {t("customize.skills.triggerValue")}
+          {skill.source === "builtin"
+            ? t("customize.skills.addedByBuiltin")
+            : t("customize.skills.addedByYou")}
         </dd>
+        <dt className="text-muted-foreground">{t("customize.skills.trigger")}</dt>
+        <dd className="text-foreground">{t("customize.skills.triggerValue")}</dd>
+        {skill.source === "personal" && (
+          <>
+            <dt className="text-muted-foreground">{t("customize.skills.location")}</dt>
+            <dd className="font-mono text-[12px] text-muted-foreground">
+              {skill.sourcePath}
+            </dd>
+          </>
+        )}
       </dl>
       <div className="flex items-start gap-2 rounded-md border border-border bg-muted px-3 py-2 text-xs text-muted-foreground">
         <Info className="mt-0.5 size-3.5 shrink-0" />

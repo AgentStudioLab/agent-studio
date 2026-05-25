@@ -75,6 +75,17 @@ export interface ClaudeProviderOptions {
       tools: string[];
     },
   ) => void;
+  /**
+   * Called per-turn to compute SDK `skills` + `plugins` options. Returns the
+   * list of currently-enabled skill ids (with `agent-studio:` prefix for
+   * built-in) and the absolute path of the built-in plugin directory (or
+   * null when unavailable, e.g. dev mode without built-in/ committed). When
+   * omitted, no skill/plugin config is passed and the SDK uses its defaults.
+   */
+  resolveSkillsConfig?: () => {
+    enabledSkills: string[];
+    pluginPath: string | null;
+  };
 }
 
 export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider {
@@ -171,6 +182,12 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
     // takes effect on the very next /runs without provider rebuild.
     const appendPrompt = opts.resolveAppendPrompt?.() ?? null;
 
+    // Skill/plugin config — resolved per turn so a toggle from Customize >
+    // Skills takes effect on the very next /runs without provider rebuild.
+    // Always passes an explicit array (never 'all') so we don't get surprised
+    // by future SDK default-discovery changes.
+    const skillsConfig = opts.resolveSkillsConfig?.() ?? null;
+
     const sdkStream = sdkQuery({
       prompt,
       options: {
@@ -179,6 +196,14 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
         env: buildEnv(),
         allowedTools,
         ...(effectiveModel ? { model: effectiveModel } : {}),
+        ...(skillsConfig
+          ? {
+              skills: skillsConfig.enabledSkills,
+              ...(skillsConfig.pluginPath
+                ? { plugins: [{ type: "local" as const, path: skillsConfig.pluginPath }] }
+                : {}),
+            }
+          : {}),
         // Per-user system prompt addition (callMe / work / instructions).
         // We always opt into the claude_code preset — bare-string systemPrompt
         // would replace SDK's tool-use guidance. `append` extends, doesn't
@@ -209,9 +234,15 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
             preHooks.push(auditHooks.pre);
             postHooks.push(auditHooks.post);
           }
+          // timeout (seconds): Bash side-effects scan walks the cwd mtime tree
+          // and can take a few seconds on medium repos. 2s was empirically too
+          // tight — PostToolUse would time out before finalize(), takeEffects()
+          // returned null, and the CUSTOM file.side_effects event was never
+          // emitted (visible symptom: pptx produced by `python3 …` doesn't
+          // appear in Files Tab or inline cards). 30s gives ample headroom.
           return {
-            PreToolUse: [{ hooks: preHooks, timeout: 2 }],
-            PostToolUse: [{ hooks: postHooks, timeout: 2 }],
+            PreToolUse: [{ hooks: preHooks, timeout: 30 }],
+            PostToolUse: [{ hooks: postHooks, timeout: 30 }],
           };
         })(),
         sandbox: {

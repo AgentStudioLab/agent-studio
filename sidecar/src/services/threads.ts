@@ -25,11 +25,16 @@ interface ThreadRow {
 }
 
 /**
- * Per-conversation working directory. Falls back to ~/.agent-studio so the
- * SDK has a real cwd even for threads the user never picked one for. The
- * dir is created on first use so the SDK doesn't ENOENT on its first tool.
+ * Per-conversation working directory. Falls back to ~/.agent-studio/workspace
+ * so the SDK has a real cwd even for threads the user never picked one for.
+ *
+ * Path layout under `~/.agent-studio/`:
+ *   workspace/   default cwd
+ *   skills/      personal skill source (scanned by skillRegistry)
+ *
+ * The dir is created on first use so the SDK doesn't ENOENT on its first tool.
  */
-const DEFAULT_WORKING_DIR = join(homedir(), ".agent-studio");
+const DEFAULT_WORKING_DIR = join(homedir(), ".agent-studio", "workspace");
 let defaultDirEnsured = false;
 function ensureDefaultDir(): string {
   if (!defaultDirEnsured) {

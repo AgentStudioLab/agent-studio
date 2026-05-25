@@ -7,7 +7,8 @@
     "dev": "bun --hot src/server.ts --port=4123 --token=dev-token"
   },
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "@types/js-yaml": "^4.0.9"
   },
   "peerDependencies": {
     "typescript": "^5"
@@ -17,6 +18,7 @@
     "@ag-ui/encoder": "^0.0.53",
     "@anthropic-ai/claude-agent-sdk": "^0.3.144",
     "hono": "^4.12.18",
+    "js-yaml": "^4.1.1",
     "nanoid": "^5.1.11"
   }
 }

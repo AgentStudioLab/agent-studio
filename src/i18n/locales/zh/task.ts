@@ -34,6 +34,30 @@ export const task = {
         failed: "任务失败",
         paused: "任务已暂停",
       },
+      phases: {
+        progress: "进度",
+        context: {
+          label: "理解上下文",
+          empty: "未读取项目文件",
+          summary: "{{count}} 次读取",
+        },
+        plan: {
+          label: "规划步骤",
+          empty: "未输出步骤计划",
+          thinking: "思考中…",
+          summary: "{{count}} 次规划",
+        },
+        execute: {
+          label: "执行任务",
+          empty: "未执行操作",
+          summary: "{{count}} 次操作",
+        },
+        finish: {
+          label: "完成 & 输出",
+          waiting: "等待完成",
+          done: "已完成",
+        },
+      },
     },
     filesTab: {
       fileCount: "{{count}} 个文件",

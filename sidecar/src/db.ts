@@ -103,6 +103,17 @@ CREATE TABLE IF NOT EXISTS settings (
   key   TEXT PRIMARY KEY,
   value TEXT NOT NULL
 );
+
+-- skill_state: per-skill enable/disable toggle persisted across restarts.
+-- Default is "enabled"; a row exists ONLY when the user has touched the
+-- toggle. Rows for skill_ids no longer present on disk are kept (user may
+-- have temporarily removed the skill); listSkills LEFT JOINs and ignores
+-- orphan rows naturally.
+CREATE TABLE IF NOT EXISTS skill_state (
+  skill_id   TEXT PRIMARY KEY,
+  enabled    INTEGER NOT NULL DEFAULT 1,
+  updated_at INTEGER NOT NULL
+);
 `;
 
 interface ColumnInfo {

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "bun:test";
-import { deriveTodos, deriveTouchedFiles, deriveToolTimeline } from "./derivations";
+import {
+  deriveProgressPhases,
+  deriveTodos,
+  deriveTouchedFiles,
+} from "./derivations";
 import type { ChatState, MessageView } from "./types";
 import { createInitialState } from "./types";
 
@@ -367,226 +371,164 @@ describe("deriveTouchedFiles", () => {
   });
 });
 
-describe("deriveToolTimeline", () => {
-  it("returns empty when no tool_calls", () => {
-    expect(deriveToolTimeline(createInitialState())).toEqual([]);
-  });
-
-  it("collects all tool_calls in order with labels and status", () => {
-    const state = withMessages([
+function toolCallMsg(
+  id: string,
+  toolName: string,
+  args: Record<string, unknown>,
+  status: "pending" | "success" | "error" = "success",
+): MessageView {
+  return {
+    id: `msg_${id}`,
+    role: "assistant",
+    blocks: [
       {
-        id: "m1",
-        role: "assistant",
-        blocks: [
-          {
-            kind: "tool_call",
-            toolCall: {
-              id: "t1",
-              toolName: "Bash",
-              args: { command: "ls -la" },
-              result: null,
-              status: "success",
-            },
-          },
-          {
-            kind: "tool_call",
-            toolCall: {
-              id: "t2",
-              toolName: "Write",
-              args: { file_path: "/work/proj/foo.md" },
-              result: null,
-              status: "success",
-            },
-          },
-          {
-            kind: "tool_call",
-            toolCall: {
-              id: "t3",
-              toolName: "Bash",
-              args: { command: "python script.py" },
-              result: null,
-              status: "pending",
-            },
-          },
-        ],
+        kind: "tool_call",
+        toolCall: { id, toolName, args, result: null, status },
       },
-    ]);
-    const steps = deriveToolTimeline(state);
-    expect(steps.map((s) => s.id)).toEqual(["t1", "t2", "t3"]);
-    expect(steps[0]!.label).toBe("ls -la");
-    expect(steps[0]!.status).toBe("done");
-    expect(steps[1]!.label).toBe("Write foo.md");
-    expect(steps[1]!.status).toBe("done");
-    expect(steps[2]!.label).toBe("python script.py");
-    expect(steps[2]!.status).toBe("active"); // only pending → active
+    ],
+  };
+}
+
+describe("deriveProgressPhases", () => {
+  it("idle initial state — all phases pending, none active", () => {
+    const phases = deriveProgressPhases(createInitialState());
+    expect(phases.map((p) => p.id)).toEqual(["context", "plan", "execute", "finish"]);
+    expect(phases.every((p) => p.status === "pending")).toBe(true);
+    expect(phases.every((p) => p.count === 0)).toBe(true);
   });
 
-  it("truncates long Bash commands to 60 chars with ellipsis", () => {
-    const longCmd = "python very_long_script_name.py --arg1 foo --arg2 bar --arg3 baz --arg4 quux";
-    const state = withMessages([
-      {
-        id: "m1",
-        role: "assistant",
-        blocks: [
-          {
-            kind: "tool_call",
-            toolCall: {
-              id: "t1",
-              toolName: "Bash",
-              args: { command: longCmd },
-              result: null,
-              status: "success",
-            },
-          },
-        ],
-      },
-    ]);
-    const [s] = deriveToolTimeline(state);
-    expect(s!.label.length).toBeLessThanOrEqual(60);
-    expect(s!.label.endsWith("…")).toBe(true);
+  it("running with no tool calls yet → plan active (agent is thinking)", () => {
+    const state: ChatState = { ...createInitialState(), isRunning: true };
+    const phases = deriveProgressPhases(state);
+    expect(phases.find((p) => p.id === "plan")!.status).toBe("active");
+    expect(phases.find((p) => p.id === "context")!.status).toBe("completed");
+    expect(phases.find((p) => p.id === "execute")!.status).toBe("pending");
+    expect(phases.find((p) => p.id === "finish")!.status).toBe("pending");
   });
 
-  it("maps error status to failed", () => {
-    const state = withMessages([
-      {
-        id: "m1",
-        role: "assistant",
-        blocks: [
-          {
-            kind: "tool_call",
-            toolCall: {
-              id: "t1",
-              toolName: "Bash",
-              args: { command: "false" },
-              result: null,
-              status: "error",
-            },
-          },
-        ],
-      },
-    ]);
-    expect(deriveToolTimeline(state)[0]!.status).toBe("failed");
+  it("Read-only tools land in context phase", () => {
+    const state: ChatState = {
+      ...createInitialState(),
+      isRunning: true,
+      liveMessages: [
+        toolCallMsg("a", "Read", { file_path: "/x/a.md" }),
+        toolCallMsg("b", "Glob", { pattern: "*.md" }),
+      ],
+    };
+    const phases = deriveProgressPhases(state);
+    const ctx = phases.find((p) => p.id === "context")!;
+    expect(ctx.status).toBe("active");
+    expect(ctx.count).toBe(2);
+    expect(ctx.lastToolLabel).toBe("Glob *.md");
   });
 
-  it("caps to TOOL_TIMELINE_CAP (12) most recent", () => {
-    const blocks = Array.from({ length: 20 }, (_, i) => ({
-      kind: "tool_call" as const,
-      toolCall: {
-        id: `t${i}`,
-        toolName: "Bash",
-        args: { command: `cmd${i}` },
-        result: null,
-        status: "success" as const,
-      },
-    }));
-    const state = withMessages([{ id: "m1", role: "assistant", blocks }]);
-    const steps = deriveToolTimeline(state);
-    expect(steps).toHaveLength(12);
-    expect(steps[0]!.id).toBe("t8"); // 20 - 12 = 8
-    expect(steps[11]!.id).toBe("t19");
+  it("TodoWrite lands in plan phase", () => {
+    const state: ChatState = {
+      ...createInitialState(),
+      isRunning: true,
+      liveMessages: [
+        toolCallMsg("a", "Read", { file_path: "/x/a.md" }),
+        toolCallMsg("b", "TodoWrite", { todos: [] }),
+      ],
+    };
+    const phases = deriveProgressPhases(state);
+    expect(phases.find((p) => p.id === "context")!.status).toBe("completed");
+    expect(phases.find((p) => p.id === "plan")!.status).toBe("active");
+    expect(phases.find((p) => p.id === "plan")!.count).toBe(1);
   });
 
-  it("preserves active marker even when older pending calls exist (last pending wins)", () => {
-    const state = withMessages([
-      {
-        id: "m1",
-        role: "assistant",
-        blocks: [
-          {
-            kind: "tool_call",
-            toolCall: {
-              id: "t1",
-              toolName: "Bash",
-              args: { command: "a" },
-              result: null,
-              status: "pending",
-            },
-          },
-          {
-            kind: "tool_call",
-            toolCall: {
-              id: "t2",
-              toolName: "Bash",
-              args: { command: "b" },
-              result: null,
-              status: "pending",
-            },
-          },
-        ],
-      },
-    ]);
-    const steps = deriveToolTimeline(state);
-    expect(steps[0]!.status).toBe("pending");
-    expect(steps[1]!.status).toBe("active");
+  it("Write / Edit / Bash all land in execute phase", () => {
+    const state: ChatState = {
+      ...createInitialState(),
+      isRunning: true,
+      liveMessages: [
+        toolCallMsg("a", "Read", { file_path: "/x/a.md" }),
+        toolCallMsg("b", "Write", { file_path: "/x/b.md" }),
+        toolCallMsg("c", "Bash", { command: "python b.py" }),
+        toolCallMsg("d", "Edit", { file_path: "/x/c.md" }),
+      ],
+    };
+    const phases = deriveProgressPhases(state);
+    const exec = phases.find((p) => p.id === "execute")!;
+    expect(exec.status).toBe("active");
+    expect(exec.count).toBe(3);
+    expect(exec.lastToolLabel).toBe("Edit c.md");
+  });
+
+  it("run finished → finish phase is active, prior phases completed", () => {
+    const state: ChatState = {
+      ...createInitialState(),
+      isRunning: false,
+      runStartedAt: null,
+      liveMessages: [
+        toolCallMsg("a", "Read", { file_path: "/x/a.md" }),
+        toolCallMsg("b", "Write", { file_path: "/x/b.md" }, "success"),
+      ],
+    };
+    const phases = deriveProgressPhases(state);
+    expect(phases.find((p) => p.id === "context")!.status).toBe("completed");
+    expect(phases.find((p) => p.id === "plan")!.status).toBe("completed"); // skipped → still completed
+    expect(phases.find((p) => p.id === "execute")!.status).toBe("completed");
+    expect(phases.find((p) => p.id === "finish")!.status).toBe("active");
+  });
+
+  it("skipped phase still renders completed when later phase is active (e.g. DeepSeek skips TodoWrite)", () => {
+    const state: ChatState = {
+      ...createInitialState(),
+      isRunning: true,
+      liveMessages: [
+        toolCallMsg("a", "Read", { file_path: "/x/a.md" }),
+        toolCallMsg("b", "Write", { file_path: "/x/b.md" }),
+      ],
+    };
+    const phases = deriveProgressPhases(state);
+    expect(phases.find((p) => p.id === "context")!.status).toBe("completed");
+    // No TodoWrite was called, but execute is active → plan still rendered as completed (skipped).
+    expect(phases.find((p) => p.id === "plan")!.status).toBe("completed");
+    expect(phases.find((p) => p.id === "plan")!.count).toBe(0);
+    expect(phases.find((p) => p.id === "plan")!.lastToolLabel).toBe(null);
+    expect(phases.find((p) => p.id === "execute")!.status).toBe("active");
+  });
+
+  it("uncategorized tool names (unknown MCP tools) are ignored", () => {
+    const state: ChatState = {
+      ...createInitialState(),
+      isRunning: true,
+      liveMessages: [
+        toolCallMsg("a", "SomeRandomMCPTool", { foo: "bar" }),
+      ],
+    };
+    const phases = deriveProgressPhases(state);
+    // No categorized phase has activity — but assistant *output* would; here
+    // there's no text/reasoning block either, so it falls through to "agent
+    // composing" → plan active.
+    expect(phases.find((p) => p.id === "plan")!.status).toBe("active");
+    expect(phases.find((p) => p.id === "context")!.count).toBe(0);
   });
 
   it("walks both historical and live messages", () => {
     const state: ChatState = {
       ...createInitialState(),
-      historicalMessages: [
-        {
-          id: "h1",
-          role: "assistant",
-          blocks: [
-            {
-              kind: "tool_call",
-              toolCall: {
-                id: "th1",
-                toolName: "Bash",
-                args: { command: "hist" },
-                result: null,
-                status: "success",
-              },
-            },
-          ],
-        },
-      ],
-      liveMessages: [
-        {
-          id: "l1",
-          role: "assistant",
-          blocks: [
-            {
-              kind: "tool_call",
-              toolCall: {
-                id: "tl1",
-                toolName: "Bash",
-                args: { command: "live" },
-                result: null,
-                status: "pending",
-              },
-            },
-          ],
-        },
-      ],
+      isRunning: true,
+      historicalMessages: [toolCallMsg("h", "Read", { file_path: "/a.md" })],
+      liveMessages: [toolCallMsg("l", "Write", { file_path: "/b.md" })],
     };
-    const steps = deriveToolTimeline(state);
-    expect(steps.map((s) => s.id)).toEqual(["th1", "tl1"]);
+    const phases = deriveProgressPhases(state);
+    expect(phases.find((p) => p.id === "context")!.count).toBe(1);
+    expect(phases.find((p) => p.id === "execute")!.count).toBe(1);
+    expect(phases.find((p) => p.id === "execute")!.status).toBe("active");
   });
 
-  it("handles Read/Edit/Glob/WebFetch/WebSearch/TodoWrite labels", () => {
-    const state = withMessages([
-      {
-        id: "m1",
-        role: "assistant",
-        blocks: [
-          { kind: "tool_call", toolCall: { id: "1", toolName: "Read", args: { file_path: "/a/b/x.md" }, result: null, status: "success" } },
-          { kind: "tool_call", toolCall: { id: "2", toolName: "Edit", args: { file_path: "/a/b/y.md" }, result: null, status: "success" } },
-          { kind: "tool_call", toolCall: { id: "3", toolName: "Glob", args: { pattern: "**/*.py" }, result: null, status: "success" } },
-          { kind: "tool_call", toolCall: { id: "4", toolName: "WebFetch", args: { url: "https://example.com" }, result: null, status: "success" } },
-          { kind: "tool_call", toolCall: { id: "5", toolName: "WebSearch", args: { query: "claude agent sdk" }, result: null, status: "success" } },
-          { kind: "tool_call", toolCall: { id: "6", toolName: "TodoWrite", args: { todos: [] }, result: null, status: "success" } },
-        ],
-      },
-    ]);
-    const labels = deriveToolTimeline(state).map((s) => s.label);
-    expect(labels).toEqual([
-      "Read x.md",
-      "Edit y.md",
-      "Glob **/*.py",
-      "WebFetch https://example.com",
-      "WebSearch claude agent sdk",
-      "Plan update",
-    ]);
+  it("lastToolLabel uses labelForToolCall (basename for files)", () => {
+    const state: ChatState = {
+      ...createInitialState(),
+      isRunning: true,
+      liveMessages: [
+        toolCallMsg("a", "Read", { file_path: "/Users/x/proj/sub/dir/file.md" }),
+      ],
+    };
+    expect(
+      deriveProgressPhases(state).find((p) => p.id === "context")!.lastToolLabel,
+    ).toBe("Read file.md");
   });
 });

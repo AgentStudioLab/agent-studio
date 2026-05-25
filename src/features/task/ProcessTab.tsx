@@ -1,10 +1,9 @@
 import { useTranslation } from "react-i18next";
 import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useThreadPlan } from "@/lib/agui/react/useThreadPlan";
+import { useThreadProgressPhases } from "@/lib/agui/react/useThreadProgressPhases";
 import { useThreadRunMeta } from "@/lib/agui/react/useThreadRunMeta";
-import { useThreadToolTimeline } from "@/lib/agui/react/useThreadToolTimeline";
-import type { TodoEntry, TodoStatus, ToolStep } from "@/lib/agui/runtime/derivations";
+import type { PhaseEntry, PhaseId, PhaseStatus } from "@/lib/agui/runtime/derivations";
 import type { ChatState } from "@/lib/agui/runtime/types";
 
 interface ProcessTabProps {
@@ -17,7 +16,7 @@ function formatElapsed(seconds: number): string {
   return `${mm}:${ss}`;
 }
 
-function StepIndicator({ status }: { status: TodoStatus }) {
+function PhaseIndicator({ status }: { status: PhaseStatus }) {
   if (status === "completed") {
     return (
       <span
@@ -28,7 +27,7 @@ function StepIndicator({ status }: { status: TodoStatus }) {
       </span>
     );
   }
-  if (status === "in_progress") {
+  if (status === "active") {
     return (
       <span
         className="relative w-6 h-6 rounded-full flex items-center justify-center shrink-0"
@@ -53,92 +52,92 @@ function StepIndicator({ status }: { status: TodoStatus }) {
   );
 }
 
-function ProcessStep({
-  todo,
+/** Compose the per-phase secondary line shown beneath the label. */
+function phaseDescription(
+  phase: PhaseEntry,
+  t: (k: string, opts?: Record<string, unknown>) => string,
+): string {
+  switch (phase.id) {
+    case "context": {
+      if (phase.count === 0) return t("task.processTab.phases.context.empty");
+      return phase.lastToolLabel
+        ? `${t("task.processTab.phases.context.summary", { count: phase.count })} · ${phase.lastToolLabel}`
+        : t("task.processTab.phases.context.summary", { count: phase.count });
+    }
+    case "plan": {
+      if (phase.count === 0) {
+        return phase.status === "active"
+          ? t("task.processTab.phases.plan.thinking")
+          : t("task.processTab.phases.plan.empty");
+      }
+      return phase.lastToolLabel
+        ? `${t("task.processTab.phases.plan.summary", { count: phase.count })} · ${phase.lastToolLabel}`
+        : t("task.processTab.phases.plan.summary", { count: phase.count });
+    }
+    case "execute": {
+      if (phase.count === 0) return t("task.processTab.phases.execute.empty");
+      return phase.lastToolLabel
+        ? `${t("task.processTab.phases.execute.summary", { count: phase.count })} · ${phase.lastToolLabel}`
+        : t("task.processTab.phases.execute.summary", { count: phase.count });
+    }
+    case "finish": {
+      return phase.status === "active"
+        ? t("task.processTab.phases.finish.done")
+        : t("task.processTab.phases.finish.waiting");
+    }
+  }
+}
+
+function PhaseRow({
+  phase,
   isLast,
+  t,
 }: {
-  todo: TodoEntry;
+  phase: PhaseEntry;
   isLast: boolean;
+  t: (k: string, opts?: Record<string, unknown>) => string;
 }) {
-  const label =
-    todo.status === "in_progress" && todo.activeForm ? todo.activeForm : todo.content;
+  const labelKey: Record<PhaseId, string> = {
+    context: "task.processTab.phases.context.label",
+    plan: "task.processTab.phases.plan.label",
+    execute: "task.processTab.phases.execute.label",
+    finish: "task.processTab.phases.finish.label",
+  };
   return (
     <div className="relative flex gap-3">
       <div className="flex flex-col items-center shrink-0">
-        <StepIndicator status={todo.status} />
+        <PhaseIndicator status={phase.status} />
         {!isLast && (
           <div
-            className="flex-1 w-px mt-1 mb-1 min-h-[18px]"
+            className="flex-1 w-px mt-1 mb-1 min-h-[28px]"
             style={{
               background:
-                todo.status === "completed"
+                phase.status === "completed"
                   ? "hsl(var(--success-100) / 0.5)"
                   : "hsl(var(--border-300) / 0.2)",
             }}
           />
         )}
       </div>
-      <div className="flex-1 min-w-0 pt-0.5 pb-4">
+      <div className="flex-1 min-w-0 pt-0.5 pb-5">
         <div
           className={cn(
             "text-[13px] leading-snug",
-            todo.status === "in_progress" && "text-text-100 font-medium",
-            todo.status === "completed" && "text-text-200",
-            todo.status === "pending" && "text-text-400",
+            phase.status === "active" && "text-text-100 font-medium",
+            phase.status === "completed" && "text-text-200",
+            phase.status === "pending" && "text-text-400",
           )}
         >
-          {label}
+          {t(labelKey[phase.id])}
         </div>
-      </div>
-    </div>
-  );
-}
-
-function ToolStepRow({
-  step,
-  isLast,
-}: {
-  step: ToolStep;
-  isLast: boolean;
-}) {
-  // Map ToolStepStatus to the existing StepIndicator's status union.
-  // TodoStatus uses "pending"|"in_progress"|"completed"; ToolStepStatus
-  // uses "pending"|"active"|"done"|"failed". We collapse via lookup.
-  let indicatorStatus: TodoStatus;
-  if (step.status === "done") indicatorStatus = "completed";
-  else if (step.status === "active") indicatorStatus = "in_progress";
-  else indicatorStatus = "pending"; // failed shows pending dashed too (no failed token in TodoStatus)
-
-  return (
-    <div className="relative flex gap-3">
-      <div className="flex flex-col items-center shrink-0">
-        <StepIndicator status={indicatorStatus} />
-        {!isLast && (
-          <div
-            className="flex-1 w-px mt-1 mb-1 min-h-[18px]"
-            style={{
-              background:
-                step.status === "done"
-                  ? "hsl(var(--success-100) / 0.5)"
-                  : step.status === "failed"
-                    ? "hsl(var(--danger-100) / 0.5)"
-                    : "hsl(var(--border-300) / 0.2)",
-            }}
-          />
-        )}
-      </div>
-      <div className="flex-1 min-w-0 pt-0.5 pb-4">
         <div
           className={cn(
-            "text-[13px] leading-snug truncate",
-            step.status === "active" && "text-text-100 font-medium",
-            step.status === "done" && "text-text-200",
-            step.status === "failed" && "text-danger-100",
-            step.status === "pending" && "text-text-400",
+            "text-[11.5px] leading-snug mt-1 truncate",
+            phase.status === "active" ? "text-text-300" : "text-text-400",
           )}
-          title={step.label}
+          title={phaseDescription(phase, t)}
         >
-          {step.label}
+          {phaseDescription(phase, t)}
         </div>
       </div>
     </div>
@@ -169,18 +168,16 @@ function ElapsedBanner({
 
 export function ProcessTab({ state }: ProcessTabProps) {
   const { t } = useTranslation();
-  const { todos } = useThreadPlan(state);
-  const { timeline } = useThreadToolTimeline(state);
+  const { phases } = useThreadProgressPhases(state);
   const { elapsedSeconds, isRunning } = useThreadRunMeta(state);
 
-  const doneCount = todos.filter((s) => s.status === "completed").length;
-  const totalCount = todos.length;
+  // Truly idle: every phase is pending AND none has activity yet.
+  const isIdle =
+    phases.length === 0 ||
+    (phases.every((p) => p.status === "pending") &&
+      phases.every((p) => p.count === 0));
 
-  // Three-way fallback:
-  // 1. agent called TodoWrite → show todo timeline (richest)
-  // 2. agent ran tools without TodoWrite → show tool timeline (Cowork-style fallback)
-  // 3. nothing yet → empty state + (if running) elapsed banner
-  if (totalCount === 0 && timeline.length === 0) {
+  if (isIdle) {
     return (
       <div>
         <div className="px-6 py-12 text-center text-sm" style={{ color: "hsl(var(--text-300))" }}>
@@ -191,45 +188,24 @@ export function ProcessTab({ state }: ProcessTabProps) {
     );
   }
 
-  if (totalCount === 0) {
-    // Fallback: tool-call timeline.
-    return (
-      <div>
-        <div className="flex items-center justify-between px-2 pt-3 pb-3">
-          <span className="text-[11px] tracking-wider uppercase text-text-400">
-            {t("task.processTab.activity")}
-          </span>
-          <span className="text-[11.5px] text-text-300 font-mono">
-            {timeline.length}
-          </span>
-        </div>
-        <div className="px-2">
-          {timeline.map((step, i) => (
-            <ToolStepRow key={step.id} step={step} isLast={i === timeline.length - 1} />
-          ))}
-        </div>
-        {isRunning && <ElapsedBanner t={t} elapsedSeconds={elapsedSeconds} />}
-      </div>
-    );
-  }
-
-  // Normal: todo timeline.
+  const completedCount = phases.filter((p) => p.status === "completed").length;
   return (
     <div>
       <div className="flex items-center justify-between px-2 pt-3 pb-3">
         <span className="text-[11px] tracking-wider uppercase text-text-400">
-          {t("task.processTab.plan")}
+          {t("task.processTab.phases.progress")}
         </span>
         <span className="text-[11.5px] text-text-300 font-mono">
-          {t("task.processTab.countOf", { done: doneCount, total: totalCount })}
+          {t("task.processTab.countOf", { done: completedCount, total: phases.length })}
         </span>
       </div>
       <div className="px-2">
-        {todos.map((todo, i) => (
-          <ProcessStep
-            key={`${todo.content.slice(0, 64)}-${i}`}
-            todo={todo}
-            isLast={i === todos.length - 1}
+        {phases.map((phase, i) => (
+          <PhaseRow
+            key={phase.id}
+            phase={phase}
+            isLast={i === phases.length - 1}
+            t={t}
           />
         ))}
       </div>

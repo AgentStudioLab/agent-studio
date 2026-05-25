@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import path from "node:path";
 import { openDb } from "./db";
+import { ensureAgentStudioHome } from "./lib/agentStudioHome";
 import { healthRoutes } from "./routes/health";
 import { buildConversationRoutes } from "./routes/conversations";
 import { buildMessageRoutes } from "./routes/messages";
@@ -27,6 +28,8 @@ import {
 import { SessionMetadataStore } from "./services/sessionMetadata";
 import { buildThreadContextRoutes } from "./routes/threadContext";
 import { buildFileContentRoutes } from "./routes/fileContent";
+import { SkillRegistry } from "./services/skillRegistry";
+import { buildSkillsRoutes } from "./routes/skills";
 
 type Args = { port: number; token: string; db: string };
 
@@ -59,6 +62,11 @@ if (!dbAbs.endsWith(".db")) {
   process.exit(2);
 }
 
+// Create ~/.agent-studio/{workspace,skills} once on boot so the user sees
+// where to drop personal skills and the default cwd is ready before any
+// thread starts. Idempotent — mkdir recursive swallows EEXIST.
+ensureAgentStudioHome();
+
 const db = openDb(dbAbs);
 // Provider state is DB-backed. Env vars only seed the very first boot
 // (when the settings row doesn't exist yet) — after the user saves once,
@@ -78,6 +86,11 @@ const audit = new AuditService(db);
 const usage = new UsageService(db);
 const settingsTools = new SettingsToolsService(db);
 const sessionMetadata = new SessionMetadataStore();
+const skillRegistry = new SkillRegistry(db);
+// Scan ~/.agent-studio/skills, ~/.claude/skills, and the built-in plugin's
+// skills/ once at boot. Re-scan requires a sidecar restart — Cowork is the
+// same. Frontend GET /skills reads from this in-memory registry.
+skillRegistry.init();
 
 // Mark orphan running rows (process crashed mid-stream) as error so the
 // sidebar pulse dot doesn't lie. Synchronous SQL UPDATE — must stay sync
@@ -147,6 +160,10 @@ function buildProvider() {
     resolveAppendPrompt: () =>
       composeAppendPrompt(userProfileSettings.current()),
     onInitMetadata: (threadId, meta) => sessionMetadata.upsert(threadId, meta),
+    resolveSkillsConfig: () => ({
+      enabledSkills: skillRegistry.listEnabledIds(),
+      pluginPath: skillRegistry.builtinPluginPath(),
+    }),
   });
 }
 
@@ -191,6 +208,7 @@ app.route("/", buildSettingsToolsRoutes(settingsTools));
 app.route("/", buildModelsRoutes(providerSettings));
 app.route("/", buildThreadContextRoutes(sessionMetadata));
 app.route("/", buildFileContentRoutes());
+app.route("/", buildSkillsRoutes(skillRegistry));
 
 console.log(`[sidecar] listening on http://127.0.0.1:${args.port} (db=${dbAbs})`);
 {
