@@ -1,5 +1,11 @@
-import { useState } from "react";
-import { ChevronDown, FastForward, Hand } from "lucide-react";
+import { useRef, useState } from "react";
+import {
+  ChevronDown,
+  CornerDownRight,
+  FastForward,
+  Hand,
+  SquareIcon,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import {
   PromptInput,
@@ -32,15 +38,23 @@ import { ModelPicker } from "@/features/task/ModelPicker";
 
 interface TaskMessageInputProps {
   threadId: string;
+  /** Default send (Enter when idle, not streaming). */
   onSend: (text: string) => void | Promise<void>;
+  /** Plain Enter / Queue button click while streaming — adds to queue. */
+  onQueue?: (text: string) => void;
+  /** Cmd/Ctrl+Enter while streaming — cancels active run, sends immediately. */
+  onOverride?: (text: string) => void;
+  /** Stop button click — only visible while streaming. */
   onStop?: () => void;
-  /** True while the run is in flight — flips submit button into "Stop" mode. */
+  /** True while the run is in flight. */
   streaming?: boolean;
 }
 
 export function TaskMessageInput({
   threadId,
   onSend,
+  onQueue,
+  onOverride,
   onStop,
   streaming = false,
 }: TaskMessageInputProps) {
@@ -51,10 +65,23 @@ export function TaskMessageInput({
   // mode flip. We do NOT change mode optimistically — only after the user
   // explicitly clicks "Yes, continue" in the dialog.
   const [confirmAct, setConfirmAct] = useState(false);
+  // Set by the keydown handler when the user pressed Cmd/Ctrl+Enter; read
+  // (and reset) inside handleSubmit so we can route through the same form
+  // submit pipeline without duplicating textarea-value reading.
+  const overrideIntentRef = useRef(false);
 
   const handleSubmit = async (msg: PromptInputMessage) => {
     const text = msg.text.trim();
-    if (!text || streaming) return;
+    if (!text) return;
+    if (streaming) {
+      if (overrideIntentRef.current) {
+        overrideIntentRef.current = false;
+        onOverride?.(text);
+      } else {
+        onQueue?.(text);
+      }
+      return;
+    }
     await onSend(text);
   };
 
@@ -66,6 +93,19 @@ export function TaskMessageInput({
         <PromptInputTextarea
           placeholder={t("task.input.placeholder")}
           rows={2}
+          onKeyDown={(e) => {
+            // Cmd/Ctrl+Enter during streaming = "override send". Don't
+            // preventDefault — let the internal handler trigger form submit,
+            // which lands in handleSubmit with overrideIntentRef set.
+            if (
+              streaming &&
+              e.key === "Enter" &&
+              (e.metaKey || e.ctrlKey) &&
+              !e.nativeEvent.isComposing
+            ) {
+              overrideIntentRef.current = true;
+            }
+          }}
         />
         <PromptInputFooter>
           <PromptInputTools>
@@ -119,10 +159,48 @@ export function TaskMessageInput({
           </PromptInputTools>
           <PromptInputTools>
             <ModelPicker value={model} onChange={setModel} />
-            <PromptInputSubmit
-              status={streaming ? "streaming" : undefined}
-              onStop={onStop}
-            />
+            {/*
+              During streaming OR HITL-pause we render TWO buttons:
+                - Stop (square icon, neutral border): cancels the active run
+                - Queue (orange pill with ↳ + label): submit-type, routes
+                  through form.onSubmit → handleSubmit → onQueue
+              The split keeps "stop" and "send a queued message" as separate
+              gestures. During idle we fall back to the default submit-arrow
+              <PromptInputSubmit>.
+            */}
+            {streaming ? (
+              <>
+                {onStop && (
+                  <button
+                    type="button"
+                    onClick={onStop}
+                    aria-label={t("task.input.stop", { defaultValue: "Stop" })}
+                    className="flex h-8 w-8 items-center justify-center rounded-md transition hover:bg-muted"
+                    style={{
+                      color: "hsl(var(--text-200))",
+                      border: "1px solid hsl(var(--border-300) / 0.25)",
+                    }}
+                  >
+                    <SquareIcon className="size-3.5" />
+                  </button>
+                )}
+                <button
+                  type="submit"
+                  aria-label={t("task.queue.label")}
+                  title={t("task.queue.queueTooltip")}
+                  className="flex h-8 items-center gap-1.5 rounded-md px-3 text-[12.5px] font-medium transition hover:opacity-90"
+                  style={{
+                    background: "hsl(var(--brand-100))",
+                    color: "hsl(var(--oncolor-100))",
+                  }}
+                >
+                  <CornerDownRight className="size-3.5" />
+                  {t("task.queue.label")}
+                </button>
+              </>
+            ) : (
+              <PromptInputSubmit status={undefined} />
+            )}
           </PromptInputTools>
         </PromptInputFooter>
       </PromptInput>

@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
+import { ScrollText } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { InitialsAvatar } from "@/shared/atoms/InitialsAvatar";
 import { useThreadContext } from "@/lib/agui/react/useThreadContext";
 
 interface ContextTabProps {
@@ -21,8 +21,17 @@ function SectionHeading({ label, count }: { label: string; count: string }) {
 
 export function ContextTab({ threadId }: ContextTabProps) {
   const { t } = useTranslation();
+  const location = useLocation();
   const { context, isLoading } = useThreadContext(threadId);
   const { skills, mcpServers } = context;
+
+  // Build a /customize deep-link that remembers where we came from. The
+  // `from` param is read back by CustomizeView's back button so the user
+  // returns to *this* thread instead of the New Task screen.
+  const buildSkillLink = (skillId: string) => {
+    const back = encodeURIComponent(location.pathname + location.search);
+    return `/customize?section=skills&skill=${encodeURIComponent(skillId)}&from=${back}`;
+  };
 
   // No active thread OR query in-flight → "waiting for agent" state. We can't
   // gate on isLoading alone — TanStack Query v5 reports isLoading=false when
@@ -63,26 +72,25 @@ export function ContextTab({ threadId }: ContextTabProps) {
           />
           <div className="flex flex-col gap-1">
             {skills.map((skill) => (
-              <div
+              <Link
                 key={skill.id}
-                className="flex items-center gap-2.5 px-2 py-2 rounded-md hover:bg-bg-200/60 transition"
+                to={buildSkillLink(skill.id)}
+                className="flex items-center gap-2.5 px-2 py-1.5 rounded-md hover:bg-bg-200/60 transition"
+                title={skill.description || skill.name}
               >
-                <InitialsAvatar
-                  initials={skill.name.slice(0, 1).toUpperCase()}
-                  size={20}
-                  className="shrink-0 text-[10px] font-bold"
-                />
-                <div className="flex-1 min-w-0">
-                  <div className="text-[13px] text-text-200 font-mono leading-tight">
-                    {skill.name}
-                  </div>
-                  {skill.description && (
-                    <div className="text-[11px] text-text-400 leading-tight mt-0.5">
-                      {skill.description}
-                    </div>
-                  )}
-                </div>
-              </div>
+                <span
+                  aria-hidden="true"
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-bg-200"
+                >
+                  <ScrollText
+                    className="size-3.5"
+                    style={{ color: "hsl(var(--text-400))" }}
+                  />
+                </span>
+                <span className="flex-1 min-w-0 truncate text-[13px] font-mono text-text-200 leading-tight">
+                  {skill.name}
+                </span>
+              </Link>
             ))}
           </div>
         </>

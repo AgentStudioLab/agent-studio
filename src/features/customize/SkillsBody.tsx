@@ -1,8 +1,10 @@
 import { useMemo, useState } from "react";
-import { Info } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { useSearchParams } from "react-router-dom";
 import { Switch } from "@/components/ui/switch";
 import { SkillCard } from "@/features/customize/SkillCard";
+import { SkillFileTree } from "@/features/customize/skill-files/SkillFileTree";
+import { SkillFilePreview } from "@/features/customize/skill-files/SkillFilePreview";
 import { useSkills, type SkillView } from "@/lib/agui/react/useSkills";
 
 /** Hash a skill name → stable hue for InitialsAvatar coloring. Mirrors the
@@ -24,15 +26,32 @@ function initialsFor(name: string): string {
 export function SkillsBody() {
   const { t } = useTranslation();
   const { skills, isLoading, error, setEnabled } = useSkills();
+  const [searchParams] = useSearchParams();
 
   const personal = useMemo(() => skills.filter((s) => s.source === "personal"), [skills]);
   const builtin = useMemo(() => skills.filter((s) => s.source === "builtin"), [skills]);
 
-  const [activeSkillId, setActiveSkillId] = useState<string | undefined>(undefined);
+  // `?skill=<id>` deep-links from elsewhere (Context Tab → here) seed the
+  // initial selection. Once mounted, local state takes over so in-pane card
+  // clicks don't churn the URL.
+  const [activeSkillId, setActiveSkillId] = useState<string | undefined>(
+    () => searchParams.get("skill") ?? undefined,
+  );
+  // Selected file within the active personal skill — null = show the skill
+  // description in the right pane (default). Reset whenever the user picks
+  // a different skill so a half-open file from skill A doesn't bleed into
+  // skill B's view.
+  const [activeFilePath, setActiveFilePath] = useState<string | null>(null);
+  const selectSkill = (id: string) => {
+    setActiveSkillId(id);
+    setActiveFilePath(null);
+  };
   // Pick a default selection: first personal, else first builtin.
   const effectiveActiveId =
     activeSkillId ?? personal[0]?.id ?? builtin[0]?.id;
   const activeSkill = skills.find((s) => s.id === effectiveActiveId);
+  const showFileTree =
+    activeSkill?.source === "personal" && activeSkill.id === effectiveActiveId;
 
   if (isLoading) {
     return (
@@ -58,18 +77,30 @@ export function SkillsBody() {
               {t("customize.skills.personal")}
             </h3>
             <div className="flex flex-col gap-1">
-              {personal.map((skill) => (
-                <SkillCard
-                  key={skill.id}
-                  initials={initialsFor(skill.name)}
-                  hue={hueFor(skill.name)}
-                  name={skill.name}
-                  description={skill.description}
-                  sourcePath={skill.sourcePath}
-                  active={skill.id === effectiveActiveId}
-                  onClick={() => setActiveSkillId(skill.id)}
-                />
-              ))}
+              {personal.map((skill) => {
+                const isActive = skill.id === effectiveActiveId;
+                return (
+                  <div key={skill.id} className="flex flex-col">
+                    <SkillCard
+                      initials={initialsFor(skill.name)}
+                      hue={hueFor(skill.name)}
+                      name={skill.name}
+                      description={skill.description}
+                      active={isActive}
+                      onClick={() => selectSkill(skill.id)}
+                    />
+                    {isActive && showFileTree && (
+                      <div className="ml-2 mt-1 border-l border-border pl-1">
+                        <SkillFileTree
+                          skillId={skill.id}
+                          selectedPath={activeFilePath ?? undefined}
+                          onSelect={setActiveFilePath}
+                        />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </>
         )}
@@ -93,7 +124,7 @@ export function SkillsBody() {
                   name={skill.name}
                   description={skill.description}
                   active={skill.id === effectiveActiveId}
-                  onClick={() => setActiveSkillId(skill.id)}
+                  onClick={() => selectSkill(skill.id)}
                 />
               ))}
             </div>
@@ -105,14 +136,18 @@ export function SkillsBody() {
           </div>
         )}
       </aside>
-      <section className="flex flex-1 flex-col overflow-y-auto px-8 py-6">
-        {activeSkill ? (
-          <SkillDetail
-            skill={activeSkill}
-            onToggle={(v) => setEnabled(activeSkill.id, v)}
-          />
+      <section className="flex min-h-0 flex-1 flex-col">
+        {activeSkill && activeFilePath ? (
+          <SkillFilePreview skillId={activeSkill.id} relPath={activeFilePath} />
+        ) : activeSkill ? (
+          <div className="flex-1 overflow-y-auto px-8 py-6">
+            <SkillDetail
+              skill={activeSkill}
+              onToggle={(v) => setEnabled(activeSkill.id, v)}
+            />
+          </div>
         ) : (
-          <div className="text-sm text-muted-foreground">
+          <div className="px-8 py-6 text-sm text-muted-foreground">
             {t("customize.skills.empty")}
           </div>
         )}
@@ -165,20 +200,9 @@ function SkillDetail({ skill, onToggle }: SkillDetailProps) {
           </>
         )}
       </dl>
-      <div className="flex items-start gap-2 rounded-md border border-border bg-muted px-3 py-2 text-xs text-muted-foreground">
-        <Info className="mt-0.5 size-3.5 shrink-0" />
-        <span>{skill.description}</span>
-      </div>
-      <article className="flex flex-col gap-3 text-sm">
-        <h2 className="font-serif text-[22px] font-normal text-foreground">
-          {t("customize.skills.howItWorks")}
-        </h2>
-        <ul className="ml-4 list-disc text-foreground">
-          <li>{skill.description}</li>
-          <li>{t("customize.skills.bullets.autoTrigger")}</li>
-          <li>{t("customize.skills.bullets.tagged")}</li>
-        </ul>
-      </article>
+      <p className="text-sm leading-[1.65] text-foreground">
+        {skill.description}
+      </p>
     </div>
   );
 }

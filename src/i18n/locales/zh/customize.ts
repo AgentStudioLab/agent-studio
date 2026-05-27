@@ -39,10 +39,10 @@ export const customize = {
       location: "存放位置",
       trigger: "触发方式",
       triggerValue: "手动 + 自动建议",
-      howItWorks: "工作原理",
-      bullets: {
-        autoTrigger: "在检测到相关上下文时自动触发。",
-        tagged: "输出会标注技能名称。",
+      files: {
+        loading: "加载文件中…",
+        empty: "暂无文件",
+        description: "描述",
       },
     },
     agents: {

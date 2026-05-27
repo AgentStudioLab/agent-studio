@@ -113,6 +113,15 @@ export const task = {
         generic: "文件",
       },
     },
+    queue: {
+      label: "排队",
+      queuedCount: "{{count}} 条排队中",
+      queueTooltip: "Enter 排队，⌘+Enter 立即发送（中断当前任务）",
+      sendNow: "立即发送（中断当前任务）",
+      remove: "移除",
+      expand: "展开",
+      collapse: "收起",
+    },
     askUser: {
       pageOf: "{{page}} of {{total}}",
       somethingElse: "Something else",
@@ -132,8 +141,6 @@ export const task = {
     },
     messageActions: {
       copy: "复制",
-      thumbsUp: "赞",
-      thumbsDown: "踩",
     },
     input: {
       placeholder: "输入消息……",

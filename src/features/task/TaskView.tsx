@@ -6,6 +6,8 @@ import { TaskHeader } from "@/features/task/TaskHeader";
 import { ChatStream } from "@/features/task/ChatStream";
 import { TaskMessageInput } from "@/features/task/TaskMessageInput";
 import { TaskRightPanel, type TaskRightTabId } from "@/features/task/TaskRightPanel";
+import { QueuedMessagesPanel } from "@/features/task/QueuedMessagesPanel";
+import { useMessageQueue } from "@/features/task/MessageQueueContext";
 import { PreviewPane } from "@/features/task/PreviewPane";
 import { useChat } from "@/lib/agui/react/useChat";
 import type { TouchedFile } from "@/lib/agui/runtime/derivations";
@@ -225,6 +227,65 @@ export function TaskView() {
   // previewed, which would otherwise reset state to "process" on close.
   const [rightTab, setRightTab] = useState<TaskRightTabId>("process");
 
+  // Per-thread message queue. Lives in MessageQueueContext (app-level) so
+  // switching threads doesn't drop queued items — only an app restart does.
+  const queue = useMessageQueue(activeTaskId);
+
+  // "Busy" = streaming OR HITL-paused. Both states block the normal Send
+  // affordance: during streaming the agent is producing; during HITL the
+  // agent is waiting on tool approval. Either way new user messages need
+  // to queue or override, not fire-and-forget. isRunning alone is false
+  // during HITL even though the run isn't done.
+  const isBusy = isRunning || pendingInterrupts.length > 0;
+
+  // Auto-flush: when the active run cleanly completes, pop the head of the
+  // queue and send it. "Cleanly" = isRunning transitions true → false AND
+  // no error AND no HITL pending AND the user didn't manually cancel.
+  // The wasRunningRef gates on the TRANSITION so mounting an already-idle
+  // TaskView with queue items doesn't fire a spurious flush — but mounting
+  // an idle TaskView for the FIRST time after a thread switch also won't
+  // see a prior transition, so a separate one-shot check handles that case
+  // by treating the initial mount as "just-finished" if items exist.
+  const wasRunningRef = useRef<boolean | null>(null);
+  useEffect(() => {
+    const wasRunning = wasRunningRef.current;
+    wasRunningRef.current = isRunning;
+    if (!activeTaskId) return;
+    // Conditions for flush, regardless of transition:
+    const canFlush =
+      !isRunning &&
+      !error &&
+      pendingInterrupts.length === 0 &&
+      queue.items.length > 0;
+    if (!canFlush) return;
+    // Two trigger gates:
+    //   1) run just finished (wasRunning was true, now false) — normal flush
+    //   2) first render on this TaskView with the queue already populated
+    //      and idle (wasRunning === null) — covers thread-switch return.
+    const isTransition = wasRunning === true || wasRunning === null;
+    if (!isTransition) return;
+    if (queue.userCancelled) {
+      queue.clearUserCancelled();
+      return;
+    }
+    const head = queue.popHead();
+    if (head) {
+      void send(head.text, { permissionMode, model: effectiveModel });
+    }
+  }, [
+    activeTaskId,
+    isRunning,
+    error,
+    pendingInterrupts,
+    queue.items,
+    queue.userCancelled,
+    queue.popHead,
+    queue.clearUserCancelled,
+    send,
+    permissionMode,
+    effectiveModel,
+  ]);
+
   if (!activeTaskId) return null;
   const previewOpen = preview.open && preview.file;
 
@@ -287,13 +348,56 @@ export function TaskView() {
           </div>
           <div className="shrink-0 px-8 pb-6 pt-2">
             <div className="mx-auto w-full max-w-[760px]">
+              <QueuedMessagesPanel
+                items={queue.items}
+                onRemove={(id) => queue.remove(id)}
+                onSendNow={(id) => {
+                  // Per-item ↑ = cancel current + send THIS item + remove
+                  // it from queue. Equivalent to onOverride but text comes
+                  // from a specific entry. clearUserCancelled so the cancel
+                  // doesn't get tagged as user-stop (we WANT a flush after).
+                  const target = queue.items.find((it) => it.id === id);
+                  if (!target) return;
+                  queue.remove(id);
+                  queue.clearUserCancelled();
+                  void (async () => {
+                    if (isBusy) await cancel();
+                    await send(target.text, {
+                      permissionMode,
+                      model: effectiveModel,
+                    });
+                  })();
+                }}
+              />
               <TaskMessageInput
                 threadId={activeTaskId}
-                onSend={(text) =>
-                  void send(text, { permissionMode, model: effectiveModel })
-                }
-                onStop={() => void cancel()}
-                streaming={isRunning}
+                onSend={(text) => {
+                  queue.clearUserCancelled();
+                  void send(text, { permissionMode, model: effectiveModel });
+                }}
+                onQueue={(text) => {
+                  queue.add(text);
+                }}
+                onOverride={(text) => {
+                  queue.clearUserCancelled();
+                  void (async () => {
+                    if (isBusy) await cancel();
+                    await send(text, {
+                      permissionMode,
+                      model: effectiveModel,
+                    });
+                  })();
+                }}
+                onStop={() => {
+                  queue.markUserCancelled();
+                  void cancel();
+                }}
+                // Treat HITL-paused as busy too: when the agent is waiting on
+                // tool approval, isRunning is false but pendingInterrupts is
+                // non-empty. Without this gate the input would show the
+                // normal Send arrow even though the agent can't act on a new
+                // user message until the approval card is resolved.
+                streaming={isBusy}
               />
             </div>
           </div>

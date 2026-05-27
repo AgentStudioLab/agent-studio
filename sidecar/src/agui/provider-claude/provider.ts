@@ -17,6 +17,10 @@ import { getResumeSessionId, tagThreadSession } from "./session-tag";
 import { checkWorkspaceSandbox } from "./sandbox";
 import { createAuditHooks } from "./audit-hook";
 import { BashSideEffectsTracker, createBashSideEffectsHooks } from "./bash-side-effects";
+import {
+  SkillInvocationStore,
+  createSkillInvocationsHook,
+} from "./skill-invocations";
 import type {
   AgentProvider,
   RunContext,
@@ -86,6 +90,15 @@ export interface ClaudeProviderOptions {
     enabledSkills: string[];
     pluginPath: string | null;
   };
+  /**
+   * App-level store of skills the agent invoked at runtime via the built-in
+   * `Skill` tool, keyed by threadId. When provided, runTurn installs a
+   * PreToolUse hook that writes to the store. The GET /threads/:id/context
+   * route reads back from this store to populate the Context Tab's "Skills"
+   * section — without this, the panel only knows the static enabledSkills
+   * list, not what the agent actually loaded.
+   */
+  skillInvocationsStore?: SkillInvocationStore;
 }
 
 export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider {
@@ -204,6 +217,10 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
       ? createAuditHooks(opts.audit, { threadId: ctx.threadId, runId: ctx.runId })
       : null;
 
+    const skillInvocationsHook = opts.skillInvocationsStore
+      ? createSkillInvocationsHook(opts.skillInvocationsStore, ctx.threadId)
+      : null;
+
     // Per-run model override > provider's default (ANTHROPIC_MODEL env). When
     // neither is set, the SDK picks its own default (currently latest Sonnet).
     const effectiveModel = ctx.model ?? opts.model;
@@ -265,6 +282,7 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
             preHooks.push(auditHooks.pre);
             postHooks.push(auditHooks.post);
           }
+          if (skillInvocationsHook) preHooks.push(skillInvocationsHook);
           // timeout (seconds): Bash side-effects scan walks the cwd mtime tree
           // and can take a few seconds on medium repos. 2s was empirically too
           // tight — PostToolUse would time out before finalize(), takeEffects()

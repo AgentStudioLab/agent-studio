@@ -43,8 +43,13 @@ export function useThreadContext(threadId: string | null | undefined): {
       if (!res.ok) throw new Error(`thread-context ${res.status}`);
       return (await res.json()) as ThreadContext;
     },
-    staleTime: Infinity,
-    refetchOnWindowFocus: false,
+    // Skills accumulate during a run via a PreToolUse hook on the sidecar;
+    // the route is an in-memory read, so cheap to re-hit. Refetch when the
+    // Context tab is re-mounted or the window regains focus so users see
+    // newly-invoked skills without a manual reload.
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
   });
 
   return {

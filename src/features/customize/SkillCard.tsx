@@ -8,9 +8,6 @@ interface SkillCardProps {
   hue: "orange" | "blue" | "green" | "purple";
   name: string;
   description: string;
-  /** Personal skills pass their parent directory absolute path; built-in
-   *  skills omit this so the card stays compact. */
-  sourcePath?: string;
   active?: boolean;
   onClick?: () => void;
 }
@@ -20,7 +17,6 @@ export function SkillCard({
   hue,
   name,
   description,
-  sourcePath,
   active,
   onClick,
 }: SkillCardProps) {
@@ -36,11 +32,6 @@ export function SkillCard({
       <InitialsAvatar initials={initials} hue={hue} size={28} />
       <div className="min-w-0 flex-1">
         <div className="text-sm font-medium text-foreground">{name}</div>
-        {sourcePath && (
-          <div className="truncate font-mono text-[10.5px] text-muted-foreground/70">
-            {sourcePath}
-          </div>
-        )}
         <div className="truncate text-xs text-muted-foreground">{description}</div>
       </div>
     </button>

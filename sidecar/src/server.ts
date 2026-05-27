@@ -30,6 +30,8 @@ import { buildThreadContextRoutes } from "./routes/threadContext";
 import { buildFileContentRoutes } from "./routes/fileContent";
 import { SkillRegistry } from "./services/skillRegistry";
 import { buildSkillsRoutes } from "./routes/skills";
+import { buildSkillFilesRoutes } from "./routes/skillFiles";
+import { SkillInvocationStore } from "./agui/provider-claude/skill-invocations";
 
 type Args = { port: number; token: string; db: string };
 
@@ -87,6 +89,11 @@ const usage = new UsageService(db);
 const settingsTools = new SettingsToolsService(db);
 const sessionMetadata = new SessionMetadataStore();
 const skillRegistry = new SkillRegistry(db);
+// Tracks which skills the agent invoked at runtime via the built-in `Skill`
+// tool, keyed by threadId. Populated by a PreToolUse hook installed inside
+// runTurn; read back by GET /threads/:id/context. In-memory — cleared on
+// sidecar restart, same lifetime as SessionMetadataStore above.
+const skillInvocations = new SkillInvocationStore();
 // Scan ~/.agent-studio/skills, ~/.claude/skills, and the built-in plugin's
 // skills/ once at boot. Re-scan requires a sidecar restart — Cowork is the
 // same. Frontend GET /skills reads from this in-memory registry.
@@ -164,6 +171,7 @@ function buildProvider() {
       enabledSkills: skillRegistry.listEnabledIds(),
       pluginPath: skillRegistry.builtinPluginPath(),
     }),
+    skillInvocationsStore: skillInvocations,
   });
 }
 
@@ -206,9 +214,10 @@ app.route("/", buildAuditRoutes(audit));
 app.route("/", buildUsageRoutes(usage));
 app.route("/", buildSettingsToolsRoutes(settingsTools));
 app.route("/", buildModelsRoutes(providerSettings));
-app.route("/", buildThreadContextRoutes(sessionMetadata));
+app.route("/", buildThreadContextRoutes(sessionMetadata, skillInvocations, skillRegistry));
 app.route("/", buildFileContentRoutes());
 app.route("/", buildSkillsRoutes(skillRegistry));
+app.route("/", buildSkillFilesRoutes(skillRegistry));
 
 console.log(`[sidecar] listening on http://127.0.0.1:${args.port} (db=${dbAbs})`);
 {

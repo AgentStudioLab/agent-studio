@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ChevronLeft } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   CustomizeNav,
   type CustomizeNavSection,
@@ -18,10 +18,34 @@ interface CustomizeViewProps {
   initialSection?: CustomizeNavSection;
 }
 
+const SECTION_VALUES = ["home", "skills", "agents", "plugins"] as const;
+
+function parseSection(raw: string | null): CustomizeNavSection | null {
+  return SECTION_VALUES.includes(raw as CustomizeNavSection)
+    ? (raw as CustomizeNavSection)
+    : null;
+}
+
+/**
+ * Validate a `?from` return path. Must be a relative same-origin URL so a
+ * malicious link can't redirect the user off the app. Anything not starting
+ * with a single "/" is rejected and the back button falls back to "/".
+ */
+function safeReturnPath(raw: string | null): string | null {
+  if (!raw) return null;
+  if (!raw.startsWith("/") || raw.startsWith("//")) return null;
+  return raw;
+}
+
 export function CustomizeView({ initialSection = "home" }: CustomizeViewProps) {
   const navigate = useNavigate();
   const { t } = useTranslation();
-  const [section, setSection] = useState<CustomizeNavSection>(initialSection);
+  const [searchParams] = useSearchParams();
+  const sectionFromUrl = parseSection(searchParams.get("section"));
+  const returnPath = safeReturnPath(searchParams.get("from"));
+  const [section, setSection] = useState<CustomizeNavSection>(
+    sectionFromUrl ?? initialSection,
+  );
 
   const handleHomeAction = (action: CustomizeHomeAction) => {
     if (action === "skills") setSection("skills");
@@ -34,7 +58,7 @@ export function CustomizeView({ initialSection = "home" }: CustomizeViewProps) {
       <header className="flex items-center gap-3 border-b border-border px-4 py-3">
         <button
           type="button"
-          onClick={() => navigate("/")}
+          onClick={() => navigate(returnPath ?? "/")}
           className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
           aria-label={t("customize.back")}
         >

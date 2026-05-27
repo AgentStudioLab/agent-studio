@@ -115,6 +115,15 @@ export const task: typeof Zh = {
         generic: "File",
       },
     },
+    queue: {
+      label: "Queue",
+      queuedCount: "{{count}} Queued",
+      queueTooltip: "Enter to queue, ⌘+Enter to send now (cancels current)",
+      sendNow: "Send now (cancels current run)",
+      remove: "Remove",
+      expand: "Expand",
+      collapse: "Collapse",
+    },
     askUser: {
       pageOf: "{{page}} of {{total}}",
       somethingElse: "Something else",
@@ -134,8 +143,6 @@ export const task: typeof Zh = {
     },
     messageActions: {
       copy: "Copy",
-      thumbsUp: "Thumbs up",
-      thumbsDown: "Thumbs down",
     },
     input: {
       placeholder: "Write a message...",

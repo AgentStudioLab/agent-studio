@@ -45,10 +45,10 @@ export const customize: typeof Zh = {
       location: "Location",
       trigger: "Trigger",
       triggerValue: "Manual + auto-suggest",
-      howItWorks: "How it works",
-      bullets: {
-        autoTrigger: "Triggers automatically when relevant context is detected.",
-        tagged: "Outputs are tagged with the skill name.",
+      files: {
+        loading: "Loading files…",
+        empty: "No files",
+        description: "Description",
       },
     },
     agents: {

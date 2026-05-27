@@ -226,6 +226,27 @@ export class SkillRegistry {
     }));
   }
 
+  /**
+   * Lookup a single skill by id. Returns null when the id isn't in the live
+   * registry (deleted from disk, or never existed). Routes that resolve a
+   * skill directory use this to verify the id is real before reading from
+   * the filesystem.
+   */
+  getById(skillId: string): SkillView | null {
+    this.ensureInitialized();
+    const entry = this.entries.find((e) => e.id === skillId);
+    if (!entry) return null;
+    const state = this.getStateMap();
+    return {
+      id: entry.id,
+      name: entry.name,
+      description: entry.description,
+      source: entry.source,
+      sourcePath: entry.sourcePath,
+      enabled: state.get(entry.id) ?? true,
+    };
+  }
+
   /** Returns ids of currently-enabled skills. Used by provider.ts to drive
    *  the SDK's `skills` option. Includes only skills present in the live
    *  registry — orphan SQLite rows can't leak in. */
