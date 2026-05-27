@@ -14,7 +14,11 @@ function App() {
       <AppShellProvider>
         <MessageQueueProvider>
           <TooltipProvider delayDuration={200}>
-            <div className="flex h-screen w-screen flex-col overflow-hidden bg-background">
+            {/* `rounded-xl` clips the app contents to a 12px radius so the
+             *  inner surfaces (sidebar bg, canvas bg) follow the macOS native
+             *  rounded window edge instead of showing a hard color step at
+             *  the corners. */}
+            <div className="flex h-screen w-screen flex-col overflow-hidden rounded-xl bg-background">
               <MacTitlebar />
               <div className="flex min-h-0 flex-1">
                 <RouterView />

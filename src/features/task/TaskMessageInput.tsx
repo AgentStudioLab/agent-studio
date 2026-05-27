@@ -12,10 +12,10 @@ import {
   PromptInputButton,
   PromptInputFooter,
   PromptInputSubmit,
-  PromptInputTextarea,
   PromptInputTools,
   type PromptInputMessage,
 } from "@/components/ai-elements/prompt-input";
+import { SlashEditor } from "@/features/composer/SlashEditor";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -90,18 +90,18 @@ export function TaskMessageInput({
   return (
     <div className="w-full">
       <PromptInput onSubmit={handleSubmit}>
-        <PromptInputTextarea
+        <SlashEditor
           placeholder={t("task.input.placeholder")}
           rows={2}
           onKeyDown={(e) => {
             // Cmd/Ctrl+Enter during streaming = "override send". Don't
-            // preventDefault — let the internal handler trigger form submit,
-            // which lands in handleSubmit with overrideIntentRef set.
+            // preventDefault — let SlashEditor's Enter handler trigger form
+            // submit, which lands in handleSubmit with overrideIntentRef set.
             if (
               streaming &&
               e.key === "Enter" &&
               (e.metaKey || e.ctrlKey) &&
-              !e.nativeEvent.isComposing
+              !e.isComposing
             ) {
               overrideIntentRef.current = true;
             }

@@ -6,6 +6,7 @@ import { projects } from "./projects";
 import { projectDetail } from "./projectDetail";
 import { scheduled } from "./scheduled";
 import { customize } from "./customize";
+import { composer } from "./composer";
 
 export const zh = {
   ...settings,
@@ -16,4 +17,5 @@ export const zh = {
   ...projectDetail,
   ...scheduled,
   ...customize,
+  ...composer,
 };

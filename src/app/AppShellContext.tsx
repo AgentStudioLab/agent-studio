@@ -24,6 +24,10 @@ interface AppShellContextValue {
   hideSidebar: boolean;
   sidebarCollapsed: boolean;
   setSidebarCollapsed: (collapsed: boolean) => void;
+  /** Sidebar global search dialog. Lifted from SidebarContent so the titlebar
+   *  (which lives outside the sidebar's DOM tree) can open it too. */
+  searchOpen: boolean;
+  setSearchOpen: (open: boolean) => void;
   asideOpen: boolean;
   toggleAside: () => void;
   preview: PreviewState;
@@ -58,6 +62,7 @@ const AppShellContext = createContext<AppShellContextValue | null>(null);
 export function AppShellProvider({ children }: { children: ReactNode }) {
   const location = useLocation();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const [asideOpen, setAsideOpen] = useState(true);
   const [preview, setPreview] = useState<PreviewState>({ file: null, open: false });
   const [pendingFirstPrompt, setPendingFirstPrompt] = useState<{
@@ -99,6 +104,8 @@ export function AppShellProvider({ children }: { children: ReactNode }) {
       hideSidebar,
       sidebarCollapsed,
       setSidebarCollapsed,
+      searchOpen,
+      setSearchOpen,
       asideOpen,
       toggleAside,
       preview,
@@ -110,6 +117,7 @@ export function AppShellProvider({ children }: { children: ReactNode }) {
     [
       hideSidebar,
       sidebarCollapsed,
+      searchOpen,
       asideOpen,
       toggleAside,
       preview,

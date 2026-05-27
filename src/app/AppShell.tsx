@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 import { Sidebar } from "@/features/sidebar/Sidebar";
-import { SidebarToggle } from "@/features/sidebar/SidebarToggle";
 import { useAppShell } from "@/app/AppShellContext";
 
 interface AppShellProps {
@@ -18,14 +17,12 @@ interface AppShellProps {
 export function AppShell({ main, aside, bareAside = false }: AppShellProps) {
   const { hideSidebar, sidebarCollapsed, asideOpen } = useAppShell();
   const showSidebar = !hideSidebar && !sidebarCollapsed;
-  const showSidebarToggle = !hideSidebar && sidebarCollapsed;
   const asideVisible = aside && asideOpen;
 
   return (
     <div className="flex min-h-0 flex-1 overflow-hidden bg-background text-foreground">
       {showSidebar && <Sidebar />}
       <main className="relative flex min-w-0 flex-1 flex-col overflow-y-auto bg-background">
-        {showSidebarToggle && <SidebarToggle />}
         {main}
       </main>
       {asideVisible &&

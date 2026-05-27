@@ -90,7 +90,12 @@
 :root[data-mode="dark"] {
     /* Mirror of light-mode depth: bg-100 (main canvas) is darker than
      * bg-200 (sidebar / cards). Keeps sidebar floating visually above
-     * the focal work area in dark mode too. */
+     * the focal work area in dark mode too.
+     *
+     * bg-100 = stone-900 (≈ #1f1f1d, L≈11.8%) — close to the targeted
+     * #1f1f1e canvas. stone-950 (L≈7.6%) was too dark and made popovers
+     * and the input box read as bright cutouts against a near-black
+     * field. */
     --bg-000: var(--color-stone-800);
     --bg-100: var(--color-stone-900);
     --bg-200: var(--color-stone-850);

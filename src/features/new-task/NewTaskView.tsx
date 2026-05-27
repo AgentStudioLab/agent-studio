@@ -11,10 +11,10 @@ import {
   PromptInputButton,
   PromptInputFooter,
   PromptInputSubmit,
-  PromptInputTextarea,
   PromptInputTools,
   type PromptInputMessage,
 } from "@/components/ai-elements/prompt-input";
+import { SlashEditor } from "@/features/composer/SlashEditor";
 import {
   Popover,
   PopoverContent,
@@ -137,7 +137,7 @@ export function NewTaskView() {
                   silhouette clean. */}
               <div className="rounded-2xl bg-background">
                 <PromptInput onSubmit={handleSubmit}>
-                  <PromptInputTextarea placeholder={t("newTask.input.placeholder")} />
+                  <SlashEditor placeholder={t("newTask.input.placeholder")} />
                 <PromptInputFooter>
                   <PromptInputTools>
                     <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>

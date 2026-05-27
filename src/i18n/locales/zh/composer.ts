@@ -1,0 +1,11 @@
+export const composer = {
+  composer: {
+    input: {
+      placeholder: "随便聊点什么…",
+    },
+    slash: {
+      empty: "没有匹配的技能",
+      kindLabel: "技能",
+    },
+  },
+};

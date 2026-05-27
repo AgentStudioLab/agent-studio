@@ -1,0 +1,76 @@
+/* ============================================================
+ * SlashEditor (Tiptap-based prompt input)
+ * ----------
+ * Styles the ProseMirror editor surface so it matches the visual
+ * weight of the InputGroupTextarea it replaces, plus the inline
+ * skill mention chip and tippy.js suggestion popup.
+ * ============================================================ */
+
+.slash-editor .ProseMirror {
+    min-height: 4rem;
+    max-height: 12rem;
+    overflow-y: auto;
+    padding: 0.5rem 0;
+    outline: none;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    color: hsl(var(--text-100));
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.slash-editor .ProseMirror p {
+    margin: 0;
+}
+
+.slash-editor .ProseMirror p + p {
+    margin-top: 0.25rem;
+}
+
+/* Placeholder — Tiptap's Placeholder extension toggles
+ * data-placeholder / is-editor-empty on the empty paragraph. */
+.slash-editor .ProseMirror p.is-editor-empty:first-child::before {
+    content: attr(data-placeholder);
+    color: hsl(var(--text-400));
+    float: left;
+    height: 0;
+    pointer-events: none;
+}
+
+/* React NodeView wrapper — transparent shell that ProseMirror attaches
+ * its node-view bookkeeping to. The visible chip is the inner span; the
+ * wrapper exists only to host structure (and the Tooltip portal anchor). */
+.slash-skill-mention-host {
+    display: inline;
+}
+
+/* Skill mention chip — atomic inline pill, brand-accent (blue)
+ * tint. Hover state lifts slightly so the chip reads as actionable
+ * even though it's inline content, not a button. */
+.slash-skill-mention {
+    display: inline-block;
+    padding: 1px 4px;
+    margin: 0 1px;
+    border-radius: 4px;
+    background: hsl(var(--accent-100) / 0.12);
+    color: hsl(var(--accent-100));
+    font-weight: 500;
+    line-height: 1.4;
+    white-space: nowrap;
+    cursor: default;
+}
+
+.slash-skill-mention:hover {
+    background: hsl(var(--accent-100) / 0.2);
+}
+
+/* Tippy popup chrome — match shadcn popover surface so it sits
+ * consistently with the rest of the UI. */
+.tippy-box[data-theme~="slash-menu"] {
+    background: transparent;
+    box-shadow: none;
+}
+
+.tippy-box[data-theme~="slash-menu"] .tippy-content {
+    padding: 0;
+}

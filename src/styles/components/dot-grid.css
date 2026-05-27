@@ -4,25 +4,42 @@
  * Subtle tiled-dot background used on NewTaskView. 14×14 grid of
  * 1px radial dots — matches the Cowork prototype.
  *
- * Animation is an opacity **breathe**: the whole layer fades
- * between low and full alpha on a slow cycle. We tried diagonal
- * drift via `background-position` first; in practice Chromium
- * repaints the gradient on every frame which stutters on
- * full-viewport elements. `opacity` animates on the compositor
- * thread and stays buttery.
+ * Animation is an opacity **breathe**: the dot layer fades between
+ * low and full alpha on a slow cycle. We tried diagonal drift via
+ * `background-position` first; in practice Chromium repaints the
+ * gradient on every frame which stutters on full-viewport elements.
+ * `opacity` animates on the compositor thread and stays buttery.
  *
- * The pattern is uniform across the viewport — we do NOT mask it.
- * Foreground elements that must stay clean (the prompt card,
- * dropdowns) need their own solid background to occlude.
+ * **The dots live on a `::before` pseudo, not the element itself.**
+ * If we animated opacity on the element, every descendant (incl. the
+ * input box content and any chips inside) would inherit the fade
+ * because parent opacity multiplies through the subtree. A pseudo at
+ * z-index:-1 keeps the breathe purely background.
+ *
+ * `isolation: isolate` confines the pseudo's z-index:-1 to this
+ * stacking context so it doesn't pop behind a higher ancestor.
  *
  * `prefers-reduced-motion: reduce` disables the breathing.
  * ============================================================ */
 
 .bg-dot-grid {
+    position: relative;
+    isolation: isolate;
+}
+
+.bg-dot-grid::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    /* Smaller dot: 0.75px solid → 1.1px feather. Bumped base alpha to
+     * 0.16 so the breathe-peak reads cleanly without enlarging the dot
+     * itself. The 14px tile stays — denser grid would feel busy. */
     background-image: radial-gradient(
         circle,
-        hsl(var(--text-400) / 0.08) 1px,
-        transparent 1.5px
+        hsl(var(--text-400) / 0.16) 0.75px,
+        transparent 1.1px
     );
     background-size: 14px 14px;
     /* opacity animates on the GPU compositor — no repaint cost. */
@@ -33,7 +50,7 @@
 @keyframes dot-grid-breathe {
     0%,
     100% {
-        opacity: 0.4;
+        opacity: 0.45;
     }
     50% {
         opacity: 1;
@@ -41,7 +58,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .bg-dot-grid {
+    .bg-dot-grid::before {
         animation: none;
     }
 }

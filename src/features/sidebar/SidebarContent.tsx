@@ -17,14 +17,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import type { Conversation } from "@/lib/data/types";
-import {
-  Briefcase,
-  Clock,
-  PanelLeftClose,
-  Plus,
-  Search,
-  Sparkles,
-} from "lucide-react";
+import { Briefcase, Clock, Plus, Sparkles } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -114,7 +107,6 @@ const APP_VERSION = "0.1.0";
  * mini-sidebar popover that appears when the sidebar is collapsed.
  */
 export function SidebarContent() {
-  const { sidebarCollapsed, setSidebarCollapsed } = useAppShell();
   const navigate = useNavigate();
   const location = useLocation();
   // URL is the source of truth for "which view is active". useMatch would
@@ -126,7 +118,9 @@ export function SidebarContent() {
   // (bg-000) — only counts when the task view is the one in focus.
   const selectedTaskId = routeThreadId ?? null;
   const { t } = useTranslation();
-  const [searchOpen, setSearchOpen] = useState(false);
+  // searchOpen is shared with MacTitlebar (which renders the search trigger),
+  // so it lives in AppShellContext rather than local state here.
+  const { searchOpen, setSearchOpen } = useAppShell();
 
   const { data: recentsData = [] } = useRecentConversations();
   const { data: pinnedData = [] } = usePinnedConversations();
@@ -180,34 +174,12 @@ export function SidebarContent() {
     setPendingDeleteId(null);
   };
 
-  const toggleLabel = sidebarCollapsed
-    ? t("sidebar.toggle.open")
-    : t("sidebar.toggle.collapse");
-
   return (
     <>
-      {/* Top icon bar */}
-      <div className="flex shrink-0 items-center gap-1 px-3 pt-3">
-        <button
-          type="button"
-          aria-label={toggleLabel}
-          onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-          className="rounded-md p-1.5 text-[hsl(var(--text-400))] transition-colors hover:bg-[hsl(var(--bg-100))] hover:text-[hsl(var(--text-200))]"
-        >
-          <PanelLeftClose className="size-[15px]" />
-        </button>
-        <button
-          type="button"
-          aria-label={t("sidebar.search.ariaLabel")}
-          onClick={() => setSearchOpen(true)}
-          className="rounded-md p-1.5 text-[hsl(var(--text-400))] transition-colors hover:bg-[hsl(var(--bg-100))] hover:text-[hsl(var(--text-200))]"
-        >
-          <Search className="size-[15px]" />
-        </button>
-      </div>
-
-      {/* Main nav */}
-      <nav className="flex shrink-0 flex-col gap-0.5 px-2 pt-4">
+      {/* Main nav — collapse / search controls now live in MacTitlebar (next
+       *  to the traffic lights) so the sidebar header section can start with
+       *  the navigation items directly. */}
+      <nav className="flex shrink-0 flex-col gap-0.5 px-2 pt-3">
         <NavItem
           icon={Plus}
           label={t("sidebar.nav.newTask")}
