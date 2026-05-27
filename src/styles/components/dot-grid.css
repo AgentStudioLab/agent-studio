@@ -29,7 +29,15 @@
 
 .bg-dot-grid::before {
     content: "";
-    position: absolute;
+    /* `fixed` anchors the dot pattern to the viewport instead of the
+     * element. Two consequences:
+     *   1. Multiple .bg-dot-grid elements (App root + NewTaskView wrapper)
+     *      render the same pattern offsets, so dots stay aligned across
+     *      element boundaries — no 8px tile jitter at the titlebar→main
+     *      seam.
+     *   2. The pattern stays still when the inner scroll containers move,
+     *      which feels closer to native macOS "background grain" depth. */
+    position: fixed;
     inset: 0;
     z-index: -1;
     pointer-events: none;

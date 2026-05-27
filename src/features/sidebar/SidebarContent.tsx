@@ -35,7 +35,6 @@ import { useThreadUnread } from "@/lib/agui/react/useThreadUnread";
 import { NavItem } from "@/features/sidebar/NavItem";
 import { PinnedItem } from "@/features/sidebar/PinnedItem";
 import { RecentItem } from "@/features/sidebar/RecentItem";
-import { UpdateCard } from "@/features/sidebar/UpdateCard";
 import { UserBar } from "@/features/sidebar/UserBar";
 
 import type { Status } from "@/lib/mock/types";
@@ -98,8 +97,6 @@ function toPinnedItem(
     status: aguiToMockStatus(entry?.status, isUnread(c.id, entry?.lastRunId)),
   };
 }
-
-const APP_VERSION = "0.1.0";
 
 /**
  * Inner content of the sidebar: top icon row + nav + pinned + recents + footer.
@@ -260,14 +257,10 @@ export function SidebarContent() {
         ))}
       </div>
 
-      {/* Footer */}
-      <div
-        className="flex shrink-0 flex-col gap-2 px-3 pb-3 pt-2"
-        style={{ borderTop: "1px solid hsl(var(--border-300) / 0.12)" }}
-      >
-        <div className="pt-2">
-          <UpdateCard version={`v${APP_VERSION}`} />
-        </div>
+      {/* Footer — divider line removed per design; UpdateCard temporarily
+       *  hidden until the auto-update flow is wired up. UserBar still
+       *  anchored at the bottom of the sidebar. */}
+      <div className="flex shrink-0 flex-col gap-2 px-3 pb-3 pt-2">
         <UserBar
           onSettings={() => navigate("/settings")}
           onLogout={() => console.log("logout")}

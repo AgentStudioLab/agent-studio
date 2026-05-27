@@ -37,6 +37,9 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { createConversation } from "@/lib/data/conversations";
+import { queryKeys } from "@/lib/data/queries";
+import { threadStatusKey } from "@/lib/agui/react/useChat";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAvailableModels } from "@/lib/models";
 import { ModelPicker } from "@/features/task/ModelPicker";
 
@@ -51,6 +54,7 @@ export function NewTaskView() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { setPendingFirstPrompt } = useAppShell();
+  const qc = useQueryClient();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // `null` = use the server default (~/.agent-studio).
@@ -94,6 +98,13 @@ export function NewTaskView() {
         title: text.slice(0, 60),
         workingDir,
       });
+      // We bypass useCreateConversationMutation (we need the returned
+      // conv.id synchronously to navigate), so its onSuccess invalidation
+      // doesn't run — invalidate the sidebar queries by hand so the new
+      // thread shows up in Recents + Thread Statuses immediately instead
+      // of waiting for the 5s staleTime to expire.
+      void qc.invalidateQueries({ queryKey: queryKeys.recents });
+      void qc.invalidateQueries({ queryKey: threadStatusKey });
       // TaskView reads this and immediately POST /ag-ui/run with the prompt.
       // The threadId is part of the URL — `useParams` in TaskView picks it up.
       setPendingFirstPrompt({

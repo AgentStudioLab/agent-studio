@@ -35,6 +35,23 @@ html, body {
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
     transition: background-color 0.25s ease, color 0.25s ease;
+    /* Kill the WebKit rubber-band / overscroll bounce. The Tauri WebView
+     * on macOS inherits Safari's elastic scroll past edges, which feels
+     * wrong for a desktop app (a chat thread bouncing when you scroll to
+     * the bottom looks like a touch UI glitch). Applied at the root so
+     * nested scroll containers inherit unless they explicitly opt in. */
+    overscroll-behavior: none;
+}
+
+/* Inner scroll containers (chat streams, sidebars, customize panes, etc.)
+ * also need the bounce killed — without this, scrolling past the bottom
+ * of an `overflow-y: auto` panel would still rubber-band the whole
+ * window. `contain` keeps focus-on-scroll behavior usable while disabling
+ * the elastic past-edge feedback. */
+*,
+*::before,
+*::after {
+    overscroll-behavior: contain;
 }
 
 /* ---- Scrollbar (Firefox + WebKit) ---- */

@@ -16,7 +16,10 @@ export function SettingsLayout() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-background">
-      <header className="flex items-center gap-3 border-b border-border px-4 py-3">
+      {/* `pl-20` reserves the 80px macOS traffic-light slot — this is a
+       *  hideSidebar route, so the MacTitlebar overlay has no sidebar
+       *  segment to claim that zone. */}
+      <header className="flex items-center gap-3 border-b border-border pl-20 pr-4 py-3">
         <button
           type="button"
           onClick={() => navigate("/")}
