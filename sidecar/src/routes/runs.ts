@@ -147,6 +147,15 @@ export function buildRunRoutes(deps: MountRunsDeps): Hono {
               decisions?: Array<
                 | { type?: "allow" }
                 | { type?: "deny"; message?: string }
+                | {
+                    type?: "ask_user_answers";
+                    answers?: Array<{
+                      question?: string;
+                      selected?: string[];
+                      custom?: string;
+                      skipped?: boolean;
+                    }>;
+                  }
               >;
             };
           }>;
@@ -160,6 +169,37 @@ export function buildRunRoutes(deps: MountRunsDeps): Hono {
 
     const decision = first.payload.decisions?.[0];
     if (!decision) return c.json({ error: "missing_decision" }, 400);
+
+    // Branch on decision type. ask_user_answers goes through a dedicated bus
+    // method because the deferred resolver type differs (AskUserAnswers vs
+    // PermissionResult). Routing through .resolve() would shape-mismatch and
+    // throw client-side.
+    if (decision.type === "ask_user_answers") {
+      const answers: Record<string, string> = {};
+      for (const entry of decision.answers ?? []) {
+        if (!entry || typeof entry.question !== "string") continue;
+        if (entry.skipped) {
+          // Empty string keeps the key in the map → agent sees "answered
+          // with nothing" rather than "no question asked". Matches SDK's
+          // `AskUserQuestionInput.answers` being a flat string map.
+          answers[entry.question] = "";
+        } else if (typeof entry.custom === "string") {
+          answers[entry.question] = entry.custom;
+        } else if (Array.isArray(entry.selected)) {
+          // Multi-select labels join with comma per SDK output schema:
+          // "answer string; multi-select answers are comma-separated".
+          answers[entry.question] = entry.selected.join(",");
+        } else {
+          answers[entry.question] = "";
+        }
+      }
+      const ok = deps.interruptBus.resolveAskUser(
+        runId,
+        first.interruptId,
+        { answers },
+      );
+      return c.json({ ok: true, alreadyResolved: !ok }, 202);
+    }
 
     const result =
       decision.type === "deny"

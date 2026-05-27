@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { type ReactNode } from "react";
 import { Activity, Folder, Layers } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
@@ -8,7 +8,7 @@ import { ContextTab } from "@/features/task/ContextTab";
 import type { TouchedFile } from "@/lib/agui/runtime/derivations";
 import type { ChatState } from "@/lib/agui/runtime/types";
 
-type TabId = "process" | "files" | "context";
+export type TaskRightTabId = "process" | "files" | "context";
 
 interface TaskRightPanelProps {
   /** ChatState from TaskView's useChat — drives Process/Files derivations. */
@@ -19,14 +19,21 @@ interface TaskRightPanelProps {
   workingDir: string | null;
   /** Called when a Files Tab entry is clicked — opens PreviewPane. */
   onOpenFile?: (file: TouchedFile) => void;
+  /**
+   * Controlled tab state. Lifted to TaskView so the selection survives
+   * unmount cycles (e.g. when PreviewPane temporarily takes over the aside
+   * slot).
+   */
+  tab: TaskRightTabId;
+  onTabChange: (next: TaskRightTabId) => void;
 }
 
 interface TabButtonProps {
-  id: TabId;
+  id: TaskRightTabId;
   label: string;
   icon: ReactNode;
   active: boolean;
-  onClick: (id: TabId) => void;
+  onClick: (id: TaskRightTabId) => void;
 }
 
 function TabButton({ id, label, icon, active, onClick }: TabButtonProps) {
@@ -53,8 +60,9 @@ export function TaskRightPanel({
   threadId,
   workingDir,
   onOpenFile,
+  tab,
+  onTabChange,
 }: TaskRightPanelProps) {
-  const [tab, setTab] = useState<TabId>("process");
   const { t } = useTranslation();
 
   return (
@@ -72,21 +80,21 @@ export function TaskRightPanel({
             label={t("task.tabs.process")}
             icon={<Activity size={14} />}
             active={tab === "process"}
-            onClick={setTab}
+            onClick={onTabChange}
           />
           <TabButton
             id="files"
             label={t("task.tabs.files")}
             icon={<Folder size={14} />}
             active={tab === "files"}
-            onClick={setTab}
+            onClick={onTabChange}
           />
           <TabButton
             id="context"
             label={t("task.tabs.context")}
             icon={<Layers size={14} />}
             active={tab === "context"}
-            onClick={setTab}
+            onClick={onTabChange}
           />
         </div>
       </div>

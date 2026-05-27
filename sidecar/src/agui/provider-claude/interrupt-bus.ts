@@ -16,6 +16,33 @@ export interface ApprovalRequest {
   description?: string;
 }
 
+/**
+ * Structured answers from an AskUserQuestion form. Keyed by question text per
+ * SDK's `AskUserQuestionOutput.answers`. Multi-select values are comma-joined
+ * labels ("Option A,Option C"); a custom "Something else" answer is the raw
+ * string; a skipped question is the empty string. Annotations are reserved
+ * for future free-text notes per question.
+ */
+export interface AskUserAnswers {
+  answers: Record<string, string>;
+  annotations?: Record<string, { notes?: string; preview?: string }>;
+}
+
+/** Subset of the SDK's question schema we re-emit verbatim to the client. */
+export interface AskUserQuestion {
+  question: string;
+  header: string;
+  multiSelect: boolean;
+  options: { label: string; description: string; preview?: string }[];
+}
+
+export interface AskUserRequest {
+  runId: string;
+  threadId: string;
+  toolUseID: string;
+  questions: AskUserQuestion[];
+}
+
 export interface InterruptBus {
   /**
    * Called from canUseTool: writes a synthetic RUN_FINISHED(outcome:"interrupt")
@@ -24,13 +51,27 @@ export interface InterruptBus {
    */
   requestApproval(req: ApprovalRequest): Promise<PermissionResult>;
   /**
+   * Same RUN_FINISHED(interrupt) mechanic, but the interrupt's reason is
+   * "ask_user" and the resolved value is the structured answers map. Used
+   * by canUseTool when toolName === "AskUserQuestion".
+   *
+   * The two flows can't share a deferred map — the resolver types differ.
+   * Keeping them separate also lets the resume route reject mismatched
+   * payloads cleanly (asking for ask_user answers on a tool_approval
+   * interrupt is a protocol error).
+   */
+  requestAskUser(req: AskUserRequest): Promise<AskUserAnswers>;
+  /**
    * Called from POST /runs/:runId/resume. Returns true if the deferred was
    * found and resolved; false if no matching pending interrupt.
    */
   resolve(runId: string, interruptId: string, result: PermissionResult): boolean;
+  /** Same as resolve, but for ask_user interrupts. */
+  resolveAskUser(runId: string, interruptId: string, result: AskUserAnswers): boolean;
   /**
    * Called from runWorker on terminal status: rejects every pending deferred
-   * for the run as `deny` so the SDK side unblocks and tears down cleanly.
+   * for the run as `deny` (approval) / empty-answers (ask_user) so the SDK
+   * side unblocks and tears down cleanly.
    */
   cancelAll(runId: string): void;
 }
@@ -41,20 +82,22 @@ export interface CreateInterruptBusOptions {
 
 export function createInterruptBus(opts: CreateInterruptBusOptions): InterruptBus {
   const { store } = opts;
-  // key: `${runId}:${interruptId}` — single map keeps lookup O(1)
-  // for both resolve() and cancelAll() (the latter scans keys prefixed
-  // with the runId).
-  const deferreds = new Map<string, (r: PermissionResult) => void>();
+  // Two maps keyed by `${runId}:${interruptId}` — separate because the
+  // resolver value type differs. resolve() / resolveAskUser() each look up
+  // in their own map, so a stale or mistargeted resume request fails cleanly
+  // (returns false) instead of forcing the wrong shape onto a deferred.
+  const permissionDeferreds = new Map<string, (r: PermissionResult) => void>();
+  const askUserDeferreds = new Map<string, (r: AskUserAnswers) => void>();
 
   return {
     async requestApproval(req) {
       const key = `${req.runId}:${req.toolUseID}`;
-      if (deferreds.has(key)) {
+      if (permissionDeferreds.has(key)) {
         throw new Error(`duplicate requestApproval for ${key}`);
       }
 
       const pending = new Promise<PermissionResult>((resolve) => {
-        deferreds.set(key, resolve);
+        permissionDeferreds.set(key, resolve);
       });
 
       const event = {
@@ -82,21 +125,71 @@ export function createInterruptBus(opts: CreateInterruptBusOptions): InterruptBu
       return pending;
     },
 
+    async requestAskUser(req) {
+      const key = `${req.runId}:${req.toolUseID}`;
+      if (askUserDeferreds.has(key)) {
+        throw new Error(`duplicate requestAskUser for ${key}`);
+      }
+
+      const pending = new Promise<AskUserAnswers>((resolve) => {
+        askUserDeferreds.set(key, resolve);
+      });
+
+      const event = {
+        type: EventType.RUN_FINISHED,
+        threadId: req.threadId,
+        runId: req.runId,
+        outcome: "interrupt",
+        interrupts: [
+          {
+            id: req.toolUseID,
+            reason: "ask_user",
+            payload: {
+              toolName: "AskUserQuestion",
+              questions: req.questions,
+            },
+          },
+        ],
+      } as unknown as AGUIEvent;
+
+      await store.appendEvent(req.runId, event);
+      await store.finishRun(req.runId, "awaiting_approval");
+
+      return pending;
+    },
+
     resolve(runId, interruptId, result) {
       const key = `${runId}:${interruptId}`;
-      const fn = deferreds.get(key);
+      const fn = permissionDeferreds.get(key);
       if (!fn) return false;
-      deferreds.delete(key);
+      permissionDeferreds.delete(key);
+      fn(result);
+      return true;
+    },
+
+    resolveAskUser(runId, interruptId, result) {
+      const key = `${runId}:${interruptId}`;
+      const fn = askUserDeferreds.get(key);
+      if (!fn) return false;
+      askUserDeferreds.delete(key);
       fn(result);
       return true;
     },
 
     cancelAll(runId) {
       const prefix = `${runId}:`;
-      for (const [key, fn] of deferreds) {
+      for (const [key, fn] of permissionDeferreds) {
         if (!key.startsWith(prefix)) continue;
-        deferreds.delete(key);
+        permissionDeferreds.delete(key);
         fn({ behavior: "deny", message: "run cancelled" });
+      }
+      for (const [key, fn] of askUserDeferreds) {
+        if (!key.startsWith(prefix)) continue;
+        askUserDeferreds.delete(key);
+        // Empty answers map → agent receives a no-op AskUserQuestion result;
+        // it can decide whether to retry or move on. Matches the "X close
+        // sends partial" spec when the partial is "nothing answered."
+        fn({ answers: {} });
       }
     },
   };

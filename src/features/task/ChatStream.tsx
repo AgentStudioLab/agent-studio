@@ -1,12 +1,16 @@
-import { isValidElement, useCallback, useMemo, type ReactNode } from "react";
+import { useCallback, useMemo, type ReactNode } from "react";
 import { Streamdown } from "streamdown";
-import type { BundledLanguage } from "shiki";
 import type { MessageBlock, MessageView, PendingInterrupt, ToolCallView } from "@/lib/agui/runtime";
 import type { ChatRuntime } from "@/lib/agui/runtime/runtime";
 import { ArtifactInlineCard, type ArtifactKind } from "@/features/task/ArtifactInlineCard";
 import { useRunStatus } from "@/lib/agui/react/useRunStatus";
 import { useNavigate } from "react-router-dom";
 import { ToolApprovalCard } from "@/features/task/ToolApprovalCard";
+import { AskUserCard } from "@/features/task/ask-user/AskUserCard";
+import type {
+  AskUserAnswersDecision,
+  AskUserPayload,
+} from "@/features/task/ask-user/types";
 import { UserMessage } from "@/features/task/UserMessage";
 import { MessageActions } from "@/features/task/MessageActions";
 import { ApiKeyMissingBanner } from "@/features/task/ApiKeyMissingBanner";
@@ -17,14 +21,7 @@ import {
   type ProcessStep,
 } from "@/features/task/ProcessGroup";
 import { ThinkingSpinner } from "@/shared/atoms/ThinkingSpinner";
-import {
-  CodeBlock,
-  CodeBlockActions,
-  CodeBlockCopyButton,
-  CodeBlockFilename,
-  CodeBlockHeader,
-  CodeBlockTitle,
-} from "@/components/ai-elements/code-block";
+import { STREAMDOWN_COMPONENTS } from "@/shared/markdown/MarkdownCodeBlock";
 import {
   Conversation,
   ConversationContent,
@@ -38,7 +35,6 @@ interface ArtifactInfo {
   name: string;
   kind: ArtifactKind;
   ext: string;
-  opener: string;
 }
 
 const MUTATION_TOOL_NAMES: ReadonlySet<string> = new Set([
@@ -83,13 +79,6 @@ function kindForExt(ext: string): ArtifactKind {
   return "Document";
 }
 
-function openerForExt(ext: string): string {
-  if (ext === "XLSX" || ext === "CSV" || ext === "PPTX" || ext === "KEY") {
-    return "wpsoffice";
-  }
-  return "VS Code";
-}
-
 function extractMutationPath(tool: ToolCallView): string | null {
   if (!MUTATION_TOOL_NAMES.has(tool.toolName)) return null;
   if (tool.status !== "success") return null;
@@ -129,7 +118,6 @@ function mutationToolCallsToArtifacts(
       name: basename(path),
       kind: kindForExt(ext),
       ext: ext || "FILE",
-      opener: openerForExt(ext),
     });
   }
 
@@ -160,6 +148,7 @@ interface ChatStreamProps {
     decisions: Array<
       | { type: "allow" }
       | { type: "deny"; message?: string }
+      | AskUserAnswersDecision
     >;
   }) => Promise<void>;
   allowedTools: ReadonlySet<string>;
@@ -177,51 +166,9 @@ interface ChatStreamProps {
   onOpenFile?: (info: { absolutePath: string }) => void;
 }
 
-/**
- * Streamdown component overrides: replace the built-in code block renderer
- * with the project's CodeBlock (shiki + GitHub themes + copy button) so the
- * code visuals match the rest of the chat surface.
- *
- * The `pre` element wraps a `<code className="language-foo">` node — we pull
- * out the language + raw text and forward to <CodeBlock>.
- */
-function MarkdownCodeBlock({
-  children,
-}: {
-  children?: ReactNode;
-}): ReactNode {
-  let className = "";
-  let code = "";
-  if (isValidElement<{ className?: string; children?: ReactNode }>(children)) {
-    className = children.props.className ?? "";
-    code = String(children.props.children ?? "").replace(/\n$/, "");
-  } else if (typeof children === "string") {
-    code = children;
-  }
-  const lang = (/language-([\w-]+)/.exec(className)?.[1] ?? "text") as
-    | BundledLanguage
-    | "text";
-  return (
-    <CodeBlock
-      code={code}
-      language={lang as BundledLanguage}
-      className="my-3"
-    >
-      <CodeBlockHeader>
-        <CodeBlockTitle>
-          <CodeBlockFilename>{lang}</CodeBlockFilename>
-        </CodeBlockTitle>
-        <CodeBlockActions>
-          <CodeBlockCopyButton />
-        </CodeBlockActions>
-      </CodeBlockHeader>
-    </CodeBlock>
-  );
-}
-
-const STREAMDOWN_COMPONENTS = {
-  pre: MarkdownCodeBlock,
-};
+// Streamdown code-fence override (`pre` → project CodeBlock with shiki +
+// copy button) is shared with PreviewPane's markdown renderer; see
+// `src/shared/markdown/MarkdownCodeBlock.tsx`.
 
 /**
  * Chat transcript per Showcase 1 prototype.
@@ -258,6 +205,13 @@ export function ChatStream({
   const interruptsByToolId = useMemo(() => {
     const m = new Map<string, PendingInterrupt>();
     for (const it of pendingInterrupts) {
+      // AskUserQuestion is a form, not an approval — the allowed-tools
+      // auto-skip filter doesn't apply (the user still needs to answer
+      // even if AskUserQuestion is on their always-allow list).
+      if (it.reason === "ask_user") {
+        m.set(it.id, it);
+        continue;
+      }
       const tn = (it.payload as { toolName?: string }).toolName;
       if (tn && allowedTools.has(tn)) continue;
       m.set(it.id, it);
@@ -266,15 +220,29 @@ export function ChatStream({
   }, [pendingInterrupts, allowedTools]);
 
   const renderApprovalCard = useCallback(
-    (it: PendingInterrupt) => (
-      <ToolApprovalCard
-        key={it.id}
-        interrupt={it}
-        onAllow={() => void onResume({ decisions: [{ type: "allow" }] })}
-        onDeny={(reason) => void onResume({ decisions: [{ type: "deny", message: reason }] })}
-        onAllowAlways={onAllowAlways}
-      />
-    ),
+    (it: PendingInterrupt) => {
+      if (it.reason === "ask_user") {
+        const payload = it.payload as unknown as AskUserPayload;
+        return (
+          <AskUserCard
+            key={it.id}
+            questions={payload.questions ?? []}
+            onSubmit={(decision: AskUserAnswersDecision) =>
+              void onResume({ decisions: [decision] })
+            }
+          />
+        );
+      }
+      return (
+        <ToolApprovalCard
+          key={it.id}
+          interrupt={it}
+          onAllow={() => void onResume({ decisions: [{ type: "allow" }] })}
+          onDeny={(reason) => void onResume({ decisions: [{ type: "deny", message: reason }] })}
+          onAllowAlways={onAllowAlways}
+        />
+      );
+    },
     [onResume, onAllowAlways],
   );
 
@@ -523,7 +491,7 @@ function MessageRow({
               title={a.name}
               kind={a.kind}
               ext={a.ext}
-              opener={a.opener}
+              absolutePath={a.absolutePath}
               onOpen={() => onOpenFile?.({ absolutePath: a.absolutePath })}
             />
           ))}

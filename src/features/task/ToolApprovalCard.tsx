@@ -14,6 +14,7 @@ import {
   CodeBlockCopyButton,
 } from "@/components/ai-elements/code-block";
 import type { BundledLanguage } from "shiki";
+import { languageFromPath } from "@/lib/code-lang";
 import type { PendingInterrupt } from "@/lib/agui/runtime";
 import { Terminal, FileText, Search, Globe, Folder, Wrench, AlertTriangle } from "lucide-react";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
@@ -26,11 +27,6 @@ import { assessToolRisk } from "./tool-risk";
 // every pending card at once. Mutable on purpose: useEffect cleanup clears
 // it back to null when the active card unmounts so the next card can claim.
 const activeCardId: { current: string | null } = { current: null };
-
-// Long Write/Edit payloads (e.g. writing a 250-line doc) would otherwise
-// either flood the card or get hard-truncated with "+N chars". Show the
-// first PREVIEW_LINES, then offer an inline expand.
-const PREVIEW_LINES = 20;
 
 interface ApprovalPayload {
   toolName?: string;
@@ -185,42 +181,19 @@ function renderTool(name: string, input: Record<string, unknown>, override?: str
   }
 }
 
+// Render the full code in a max-height scrollable container — no expand /
+// collapse toggle. The 60vh ceiling keeps the approval card from pushing
+// the action buttons off-screen on long payloads; anything beyond that
+// scrolls in-place.
 function ToolCodeBlock({ code, lang, filename }: { code: string; lang: BundledLanguage | "text"; filename: string }) {
-  const lines = code.split("\n");
-  const needsCollapse = lines.length > PREVIEW_LINES;
-  const [expanded, setExpanded] = useState(false);
-
-  const display = !needsCollapse || expanded
-    ? code
-    : lines.slice(0, PREVIEW_LINES).join("\n");
-  const hidden = needsCollapse ? lines.length - PREVIEW_LINES : 0;
-
-  const block = (
-    <CodeBlock code={display} language={lang as BundledLanguage} className="my-0">
-      <CodeBlockHeader>
-        <CodeBlockTitle><CodeBlockFilename>{filename}</CodeBlockFilename></CodeBlockTitle>
-        <CodeBlockActions><CodeBlockCopyButton /></CodeBlockActions>
-      </CodeBlockHeader>
-    </CodeBlock>
-  );
-
   return (
-    <div>
-      {expanded ? (
-        <div className="max-h-[60vh] overflow-y-auto rounded-md">{block}</div>
-      ) : (
-        block
-      )}
-      {needsCollapse && (
-        <button
-          type="button"
-          onClick={() => setExpanded((v) => !v)}
-          className="mt-1.5 text-[12px] hover:underline"
-          style={{ color: "hsl(var(--text-300))" }}
-        >
-          {expanded ? "收起" : `展开（剩余 ${hidden} 行）`}
-        </button>
-      )}
+    <div className="max-h-[60vh] overflow-y-auto rounded-md">
+      <CodeBlock code={code} language={lang as BundledLanguage} className="my-0">
+        <CodeBlockHeader>
+          <CodeBlockTitle><CodeBlockFilename>{filename}</CodeBlockFilename></CodeBlockTitle>
+          <CodeBlockActions><CodeBlockCopyButton /></CodeBlockActions>
+        </CodeBlockHeader>
+      </CodeBlock>
     </div>
   );
 }
@@ -285,10 +258,13 @@ function renderWrite(input: Record<string, unknown>, title?: string): ToolRender
   const filePath = String(input.file_path ?? "");
   const content = String(input.content ?? "");
   const lines = content.split("\n").length;
+  // Language inferred from extension — same helper PreviewPane uses. Without
+  // this, write previews land as monochrome monospace text even for JS/TS/
+  // Python where the surrounding chat surface offers full shiki coloring.
   return {
     icon: <FileText size={14} />,
     title: title ?? `写入 ${filePath}（${lines} 行）`,
-    body: <ToolCodeBlock code={content} lang="text" filename={filePath} />,
+    body: <ToolCodeBlock code={content} lang={languageFromPath(filePath)} filename={filePath} />,
   };
 }
 

@@ -1,10 +1,17 @@
-// Covers the `[reason]` content-prefix → notice.reason parser inside
-// groupIntoTurns. The frontend uses notice.reason === "process_restart" to
-// render the "继续上次任务" CTA after the user reopens an app whose HITL
-// approval was pending at exit.
+// Covers:
+//   1. The `[reason]` content-prefix → notice.reason parser inside
+//      groupIntoTurns. The frontend uses notice.reason === "process_restart" to
+//      render the "继续上次任务" CTA after the user reopens an app whose HITL
+//      approval was pending at exit.
+//   2. tool_calls.side_effects round-trip — completeToolCall writes the JSON
+//      column; listByThread reads it back into ToolCallDTO.sideEffects. Without
+//      this, Bash-produced artifacts (pptx / xlsx / etc) vanish from the Files
+//      Tab after a thread reload.
 
 import { describe, expect, it } from "bun:test";
-import { groupIntoTurns, type MessageDTO } from "./messages";
+import { Database } from "bun:sqlite";
+import { groupIntoTurns, MessageService, type MessageDTO } from "./messages";
+import { migrate } from "../db";
 
 function row(
   role: MessageDTO["role"],
@@ -47,5 +54,68 @@ describe("groupIntoTurns — notice reason parsing", () => {
     if (!notice || notice.kind !== "notice") throw new Error("expected notice block");
     expect(notice.reason).toBeUndefined();
     expect(notice.content).toBe("已被用户中止");
+  });
+});
+
+describe("MessageService — side_effects round-trip", () => {
+  function setupDb(): { db: Database; svc: MessageService } {
+    const db = new Database(":memory:");
+    migrate(db);
+    db.prepare(
+      `INSERT INTO conversations (id, title, created_at, updated_at)
+       VALUES ('t1', 'test', ?, ?)`,
+    ).run(Date.now(), Date.now());
+    return { db, svc: new MessageService(db) };
+  }
+
+  it("persists sideEffects to tool_calls.side_effects and parses on read", () => {
+    const { svc } = setupDb();
+    svc.appendUser("t1", "make a pptx");
+    const a = svc.appendAssistant("t1", { id: "m_a", content: "" });
+    svc.upsertToolCall(a.id, { id: "tc_1", toolName: "Bash", args: { command: "python make.py" } });
+    svc.completeToolCall("tc_1", {
+      result: "ok",
+      status: "success",
+      sideEffects: [
+        { path: "/tmp/work/deck.pptx", kind: "created" },
+        { path: "/tmp/work/notes.md", kind: "modified" },
+      ],
+    });
+
+    const rows = svc.listByThread("t1");
+    const assistant = rows.find((r) => r.role === "assistant");
+    if (!assistant) throw new Error("expected assistant message");
+    const tc = assistant.toolCalls?.[0];
+    if (!tc) throw new Error("expected tool call");
+    expect(tc.sideEffects).toEqual([
+      { path: "/tmp/work/deck.pptx", kind: "created" },
+      { path: "/tmp/work/notes.md", kind: "modified" },
+    ]);
+  });
+
+  it("leaves sideEffects undefined when none were detected", () => {
+    const { svc } = setupDb();
+    svc.appendUser("t1", "echo hi");
+    const a = svc.appendAssistant("t1", { id: "m_a", content: "" });
+    svc.upsertToolCall(a.id, { id: "tc_1", toolName: "Bash", args: { command: "echo hi" } });
+    svc.completeToolCall("tc_1", { result: "hi", status: "success" });
+
+    const rows = svc.listByThread("t1");
+    const tc = rows.find((r) => r.role === "assistant")?.toolCalls?.[0];
+    expect(tc?.sideEffects).toBeUndefined();
+  });
+
+  it("survives malformed JSON in the column (returns undefined, not crash)", () => {
+    const { db, svc } = setupDb();
+    svc.appendUser("t1", "x");
+    const a = svc.appendAssistant("t1", { id: "m_a", content: "" });
+    svc.upsertToolCall(a.id, { id: "tc_1", toolName: "Bash", args: {} });
+    svc.completeToolCall("tc_1", { result: null, status: "success" });
+    // Manually corrupt the column to simulate a legacy / partial write.
+    db.prepare(`UPDATE tool_calls SET side_effects = '{not json' WHERE id = ?`).run("tc_1");
+
+    const rows = svc.listByThread("t1");
+    const tc = rows.find((r) => r.role === "assistant")?.toolCalls?.[0];
+    expect(tc?.sideEffects).toBeUndefined();
   });
 });

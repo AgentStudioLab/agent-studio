@@ -14,6 +14,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { ToolCallView } from "@/lib/agui/runtime";
+import { cn } from "@/lib/utils";
 import {
   Collapsible,
   CollapsibleContent,
@@ -68,8 +69,11 @@ export function ProcessGroup({ steps, done }: ProcessGroupProps) {
   const summary = buildSummary(steps);
 
   return (
+    // Top padding stays fixed so the trigger button doesn't jump on toggle;
+    // bottom padding grows when expanded to leave breathing room under the
+    // last timeline step / DoneRow. Collapsed: 12/12. Expanded: 12/20.
     <div
-      className="rounded-xl p-5"
+      className={cn("rounded-xl px-5 pt-3", open ? "pb-5" : "pb-3")}
       style={{
         background: "hsl(var(--bg-200) / 0.35)",
         border: "1px solid hsl(var(--border-300) / 0.08)",

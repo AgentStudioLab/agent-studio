@@ -48,7 +48,9 @@ describe("provider sandbox config", () => {
   it("canUseTool fills updatedInput on allow (bus + no-bus paths)", async () => {
     const fakeBus = {
       requestApproval: async () => ({ behavior: "allow" as const }),
+      requestAskUser: async () => ({ answers: {} }),
       resolve: () => true,
+      resolveAskUser: () => true,
       cancelAll: () => {},
     };
     const provider = createClaudeProvider({ apiKey: "k", interruptBus: fakeBus });
@@ -90,7 +92,9 @@ describe("provider sandbox config", () => {
         approvalCalls++;
         return { behavior: "allow" as const };
       },
+      requestAskUser: async () => ({ answers: {} }),
       resolve: () => true,
+      resolveAskUser: () => true,
       cancelAll: () => {},
     };
     const provider = createClaudeProvider({ apiKey: "k", interruptBus: fakeBus });

@@ -81,6 +81,8 @@ export const task = {
     preview: {
       refresh: "刷新",
       close: "关闭",
+      copyContent: "复制内容",
+      copied: "已复制",
       resizeHandle: "调整预览面板大小",
       loading: "加载中…",
       errorNotFound: "文件不存在",
@@ -89,6 +91,19 @@ export const task = {
       errorReadFailed: "读取失败：{{detail}}",
       binaryNotice: "二进制文件，无法在应用内预览",
       openExternal: "用系统应用打开",
+      openWith: "用 {{name}} 打开",
+      openWithFallback: "用系统默认应用打开",
+      revealInFolder: "在 Finder 中显示",
+      confirmOpen: {
+        title: "用默认应用打开此文件？",
+        body: "将使用系统默认应用打开此文件。",
+        allow: "允许",
+        cancel: "取消",
+      },
+      markdownMode: {
+        preview: "预览",
+        source: "源码",
+      },
       fileLabel: {
         markdown: "Markdown",
         spreadsheet: "XLSX",
@@ -97,6 +112,19 @@ export const task = {
         image: "图片",
         generic: "文件",
       },
+    },
+    askUser: {
+      pageOf: "{{page}} of {{total}}",
+      somethingElse: "Something else",
+      somethingElsePlaceholder: "写下你的想法……",
+      selectedCount_one: "{{count}} selected",
+      selectedCount_other: "{{count}} selected",
+      skip: "Skip",
+      send: "Send",
+      next: "Next",
+      close: "关闭",
+      prevPage: "上一题",
+      nextPage: "下一题",
     },
     timeline: {
       done: "完成",

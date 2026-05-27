@@ -60,12 +60,15 @@ function Block({
       );
 
     case "artifact":
+      // Mock-fixture path: block.name doubles as the (fake) absolute path —
+      // useDefaultApp returns null in Storybook and the card falls back to
+      // a generic "Open with system default" label.
       return (
         <ArtifactInlineCard
           title={block.name}
           kind={block.kind}
           ext={block.ext}
-          opener={block.opener}
+          absolutePath={block.name}
           onOpen={() =>
             onOpenArtifact?.({
               id: block.name,

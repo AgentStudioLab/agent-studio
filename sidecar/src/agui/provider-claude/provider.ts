@@ -131,6 +131,37 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
       input: Record<string, unknown>,
       sdkOpts,
     ) => {
+      // AskUserQuestion is a form, not a tool approval. Sandbox doesn't apply
+      // (no fs access), and act-without-asking is irrelevant — the agent
+      // explicitly asked for user input, so we MUST surface the form even
+      // in autopilot mode. The SDK's tool contract has `answers?: Record`
+      // on `AskUserQuestionInput`; canUseTool returning `updatedInput` with
+      // answers populated is the documented way to feed user answers back
+      // through to the agent (the built-in tool impl just echoes the input
+      // as its output).
+      if (toolName === "AskUserQuestion" && bus) {
+        const questions = (input as { questions?: unknown }).questions;
+        if (!Array.isArray(questions)) {
+          // Malformed agent call — agent supplied no questions array. Let SDK
+          // handle the error path (allow + let tool crash with its own error).
+          return { behavior: "allow" as const, updatedInput: input };
+        }
+        const answers = await bus.requestAskUser({
+          runId: ctx.runId,
+          threadId: ctx.threadId,
+          toolUseID: sdkOpts.toolUseID,
+          questions: questions as Parameters<typeof bus.requestAskUser>[0]["questions"],
+        });
+        return {
+          behavior: "allow" as const,
+          updatedInput: {
+            ...input,
+            answers: answers.answers,
+            ...(answers.annotations ? { annotations: answers.annotations } : {}),
+          },
+        };
+      }
+
       const sandboxDeny = checkWorkspaceSandbox(toolName, input, ctx.cwd);
       if (sandboxDeny) {
         return { behavior: "deny" as const, message: sandboxDeny };

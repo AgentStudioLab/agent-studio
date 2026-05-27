@@ -411,6 +411,13 @@ export async function* claudeSdkToAgui(
               toolCallId: block.tool_use_id,
               content: resultText,
             } as AGUIEvent;
+            // Read effects ONCE here so we can hand them to both onToolCallResult
+            // (for DB persistence via runWorker → completeToolCall) and the
+            // CUSTOM event (for live-stream reducers). takeEffects() is one-shot.
+            const effects = sideEffectsTracker
+              ? sideEffectsTracker.takeEffects(block.tool_use_id)
+              : null;
+            const hasEffects = effects && effects.length > 0;
             await callbacks?.onToolCallResult?.({
               id: block.tool_use_id,
               result: block.content ?? null,
@@ -420,19 +427,17 @@ export async function* claudeSdkToAgui(
                   ? block.content
                   : undefined
                 : undefined,
+              sideEffects: hasEffects ? effects : undefined,
             });
-            if (sideEffectsTracker) {
-              const effects = sideEffectsTracker.takeEffects(block.tool_use_id);
-              if (effects && effects.length > 0) {
-                yield {
-                  type: EventType.CUSTOM,
-                  name: "file.side_effects",
-                  value: {
-                    toolCallId: block.tool_use_id,
-                    files: effects,
-                  },
-                } as AGUIEvent;
-              }
+            if (hasEffects) {
+              yield {
+                type: EventType.CUSTOM,
+                name: "file.side_effects",
+                value: {
+                  toolCallId: block.tool_use_id,
+                  files: effects,
+                },
+              } as AGUIEvent;
             }
           }
         }

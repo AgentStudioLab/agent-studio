@@ -2,6 +2,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -82,6 +83,16 @@ export function AppShellProvider({ children }: { children: ReactNode }) {
   const hideSidebar = FULLSCREEN_ROUTES.some((p) =>
     location.pathname.startsWith(p),
   );
+
+  // PreviewPane state is app-wide, not thread-scoped. Without this reset,
+  // switching threads (or going to /new) would keep the previous thread's
+  // file mounted — `useFileContent` then rejects it as outside the new
+  // thread's cwd ("文件不在工作目录内"). Clearing on pathname change is
+  // intentional: any preview the user wants on the new page must be
+  // re-opened explicitly.
+  useEffect(() => {
+    setPreview({ file: null, open: false });
+  }, [location.pathname]);
 
   const value = useMemo<AppShellContextValue>(
     () => ({

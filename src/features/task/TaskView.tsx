@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { AppShell } from "@/app/AppShell";
 import { useAppShell } from "@/app/AppShellContext";
 import { TaskHeader } from "@/features/task/TaskHeader";
 import { ChatStream } from "@/features/task/ChatStream";
 import { TaskMessageInput } from "@/features/task/TaskMessageInput";
-import { TaskRightPanel } from "@/features/task/TaskRightPanel";
+import { TaskRightPanel, type TaskRightTabId } from "@/features/task/TaskRightPanel";
 import { PreviewPane } from "@/features/task/PreviewPane";
 import { useChat } from "@/lib/agui/react/useChat";
 import type { TouchedFile } from "@/lib/agui/runtime/derivations";
@@ -220,6 +220,11 @@ export function TaskView() {
     }
   }, [activeTaskId, threadStatuses, markRead]);
 
+  // Lifted out of TaskRightPanel so the selected tab survives a preview
+  // open/close cycle — the panel itself is unmounted while a file is being
+  // previewed, which would otherwise reset state to "process" on close.
+  const [rightTab, setRightTab] = useState<TaskRightTabId>("process");
+
   if (!activeTaskId) return null;
   const previewOpen = preview.open && preview.file;
 
@@ -303,6 +308,8 @@ export function TaskView() {
             threadId={activeTaskId}
             workingDir={cwd}
             onOpenFile={(file) => openPreview(touchedFileToPreview(file))}
+            tab={rightTab}
+            onTabChange={setRightTab}
           />
         )
       }

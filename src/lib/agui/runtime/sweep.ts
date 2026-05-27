@@ -2,7 +2,7 @@
 // 都是纯函数，方便单测。
 
 import { nanoid } from "nanoid";
-import type { MessageBlock, MessageView, ToolCallView } from "./types";
+import type { MessageBlock, MessageView, SideEffectFile, ToolCallView } from "./types";
 
 /**
  * 把字符串安全地解析成 JSON。失败时原样返回，不抛错。
@@ -16,6 +16,19 @@ function safeJson(s: unknown): unknown {
   } catch {
     return s;
   }
+}
+
+function parseSideEffects(v: unknown): SideEffectFile[] | null {
+  if (!Array.isArray(v)) return null;
+  const out: SideEffectFile[] = [];
+  for (const item of v) {
+    if (typeof item !== "object" || item === null) continue;
+    const o = item as Record<string, unknown>;
+    if (typeof o.path !== "string") continue;
+    if (o.kind !== "created" && o.kind !== "modified") continue;
+    out.push({ path: o.path, kind: o.kind });
+  }
+  return out.length > 0 ? out : null;
 }
 
 /**
@@ -96,17 +109,17 @@ export function buildViewMessages(raw: unknown[]): MessageView[] {
         });
       } else if (b.kind === "tool_call" && b.toolCall) {
         const tc = b.toolCall as Record<string, unknown>;
-        blocks.push({
-          kind: "tool_call",
-          toolCall: {
-            id: String(tc.id ?? ""),
-            toolName: String(tc.toolName ?? ""),
-            args: safeJson(tc.args),
-            result: tc.result ?? null,
-            status: (tc.status as ToolCallView["status"]) ?? "pending",
-            errorMsg: tc.errorMsg as string | undefined,
-          },
-        });
+        const toolCall: ToolCallView = {
+          id: String(tc.id ?? ""),
+          toolName: String(tc.toolName ?? ""),
+          args: safeJson(tc.args),
+          result: tc.result ?? null,
+          status: (tc.status as ToolCallView["status"]) ?? "pending",
+          errorMsg: tc.errorMsg as string | undefined,
+        };
+        const effects = parseSideEffects(tc.sideEffects);
+        if (effects) toolCall.sideEffects = effects;
+        blocks.push({ kind: "tool_call", toolCall });
       } else if (b.kind === "notice") {
         blocks.push({
           kind: "notice",

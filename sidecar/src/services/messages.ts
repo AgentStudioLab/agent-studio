@@ -1,5 +1,6 @@
 import type { Database } from "bun:sqlite";
 import { nanoid } from "nanoid";
+import type { SideEffectFile } from "../agui/provider-claude/bash-side-effects";
 
 export type MessageRole = "user" | "assistant" | "system" | "tool";
 
@@ -20,6 +21,11 @@ export interface ToolCallDTO {
   result: unknown | null;
   status: "pending" | "success" | "error";
   errorMsg?: string;
+  /**
+   * Bash-only: files the tool indirectly produced/modified, detected by the
+   * sidecar's PostToolUse cwd-diff hook. Mutation tools declare targets in args.
+   */
+  sideEffects?: SideEffectFile[];
 }
 
 export type TurnDTO =
@@ -74,6 +80,7 @@ interface ToolCallRow {
   result: string | null;
   status: "pending" | "success" | "error";
   error_msg: string | null;
+  side_effects: string | null;
   created_at: number;
 }
 
@@ -84,6 +91,31 @@ function safeJson(s: string | null): unknown {
   } catch {
     return s;
   }
+}
+
+/**
+ * Decode tool_calls.side_effects (JSON column). Returns null for missing /
+ * malformed / empty arrays so the DTO field stays `undefined` rather than
+ * containing []. Each entry is validated — bad entries are dropped silently.
+ */
+function parseSideEffects(s: string | null): SideEffectFile[] | null {
+  if (s == null) return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(s);
+  } catch {
+    return null;
+  }
+  if (!Array.isArray(parsed)) return null;
+  const out: SideEffectFile[] = [];
+  for (const item of parsed) {
+    if (typeof item !== "object" || item === null) continue;
+    const o = item as Record<string, unknown>;
+    if (typeof o.path !== "string") continue;
+    if (o.kind !== "created" && o.kind !== "modified") continue;
+    out.push({ path: o.path, kind: o.kind });
+  }
+  return out.length > 0 ? out : null;
 }
 
 export class MessageService {
@@ -163,16 +195,26 @@ export class MessageService {
 
   completeToolCall(
     id: string,
-    payload: { result: unknown; status: "success" | "error"; errorMsg?: string },
+    payload: {
+      result: unknown;
+      status: "success" | "error";
+      errorMsg?: string;
+      sideEffects?: SideEffectFile[];
+    },
   ): void {
     this.db
       .prepare(
-        `UPDATE tool_calls SET result = ?, status = ?, error_msg = ? WHERE id = ?`,
+        `UPDATE tool_calls
+         SET result = ?, status = ?, error_msg = ?, side_effects = ?
+         WHERE id = ?`,
       )
       .run(
         JSON.stringify(payload.result ?? null),
         payload.status,
         payload.errorMsg ?? null,
+        payload.sideEffects && payload.sideEffects.length > 0
+          ? JSON.stringify(payload.sideEffects)
+          : null,
         id,
       );
   }
@@ -209,14 +251,19 @@ export class MessageService {
         reasoning: r.reasoning ?? undefined,
         createdAt: r.created_at,
         toolCalls: tcs.length
-          ? tcs.map((t) => ({
-              id: t.id,
-              toolName: t.tool_name,
-              args: safeJson(t.args),
-              result: safeJson(t.result),
-              status: t.status,
-              errorMsg: t.error_msg ?? undefined,
-            }))
+          ? tcs.map((t) => {
+              const dto: ToolCallDTO = {
+                id: t.id,
+                toolName: t.tool_name,
+                args: safeJson(t.args),
+                result: safeJson(t.result),
+                status: t.status,
+                errorMsg: t.error_msg ?? undefined,
+              };
+              const effects = parseSideEffects(t.side_effects);
+              if (effects) dto.sideEffects = effects;
+              return dto;
+            })
           : undefined,
       });
     }

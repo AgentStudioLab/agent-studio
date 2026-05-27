@@ -1,10 +1,11 @@
 import {
-  ChevronDown,
   FileSpreadsheet,
   FileText,
   Presentation,
   type LucideIcon,
 } from "lucide-react";
+import { OpenerMenu } from "@/features/task/preview/OpenerMenu";
+import type { MockFile } from "@/lib/mock/types";
 
 export type ArtifactKind = "Spreadsheet" | "Presentation" | "Document";
 
@@ -15,41 +16,51 @@ const KIND_ICON: Record<ArtifactKind, LucideIcon> = {
 };
 
 /**
- * Opener "brand chip" — small 14×14 letter square that mimics the host app
- * icon (W = Word/WPS Office, C = code editor). Matches prototype's
- * `openerLetter`/`openerColor` switch (HTML 2425-2427 for PreviewPane; line
- * 891-894 for ArtifactInlineCard which hardcodes W terracotta).
- *
- * Spreadsheet/Presentation → office suite ("W", brand orange).
- * Document (md/docx text)   → code editor ("C", accent blue).
+ * Map the chat-side artifact kind to the MockFile.type that OpenerMenu uses
+ * for badge coloring. Spreadsheet / Presentation stay in their office buckets
+ * (brand orange badge); Document → markdown (accent blue badge) since the
+ * Document bucket covers .md / .docx / .txt etc.
  */
-const KIND_OPENER: Record<ArtifactKind, { letter: string; bgVar: string }> = {
-  Spreadsheet: { letter: "W", bgVar: "--brand-100" },
-  Presentation: { letter: "W", bgVar: "--brand-100" },
-  Document: { letter: "C", bgVar: "--accent-100" },
-};
+function syntheticFile(
+  absolutePath: string,
+  title: string,
+  kind: ArtifactKind,
+): MockFile {
+  let type: MockFile["type"];
+  if (kind === "Spreadsheet") type = "spreadsheet";
+  else if (kind === "Presentation") type = "presentation";
+  else type = "markdown";
+  return { path: absolutePath, name: title, type };
+}
 
 interface ArtifactInlineCardProps {
   title: string;
   kind: ArtifactKind;
   ext: string;
-  opener: string;
+  /** Absolute filesystem path — used both for preview and OpenerMenu lookup. */
+  absolutePath: string;
+  /** Click on the icon+title area opens the in-app preview pane. */
   onOpen?: () => void;
 }
 
 /**
  * Inline artifact card (prototype Showcase 1 lines 882-896).
- * 48x48 file-type icon container + title/subtitle + opener button.
+ *
+ * Layout: 48x48 file-type icon container + title/subtitle button on the left
+ * (clicking opens the in-app preview), and an OpenerMenu on the right that
+ * provides the system-app dropdown (Open with [default app] / Show in
+ * Folder) — same component PreviewPane's header uses, so the open-with
+ * confirmation flow is consistent across surfaces.
  */
 export function ArtifactInlineCard({
   title,
   kind,
   ext,
-  opener,
+  absolutePath,
   onOpen,
 }: ArtifactInlineCardProps) {
   const Icon = KIND_ICON[kind];
-  const { letter, bgVar } = KIND_OPENER[kind];
+  const file = syntheticFile(absolutePath, title, kind);
 
   return (
     <div
@@ -59,50 +70,36 @@ export function ArtifactInlineCard({
         border: "1px solid hsl(var(--border-300) / 0.12)",
       }}
     >
-      <div
-        className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md"
-        style={{
-          background: "hsl(var(--bg-300))",
-          color: "hsl(var(--text-300))",
-        }}
-      >
-        <Icon size={22} strokeWidth={1.5} />
-      </div>
-      <div className="min-w-0 flex-1">
-        <div
-          className="truncate text-[14px] font-medium"
-          style={{ color: "hsl(var(--text-100))" }}
-        >
-          {title}
-        </div>
-        <div
-          className="mt-0.5 text-[12px]"
-          style={{ color: "hsl(var(--text-400))" }}
-        >
-          {kind} · {ext}
-        </div>
-      </div>
       <button
         type="button"
         onClick={onOpen}
-        className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[12.5px] transition-colors"
-        style={{
-          color: "hsl(var(--text-200))",
-          border: "1px solid hsl(var(--border-300) / 0.18)",
-        }}
+        className="flex min-w-0 flex-1 items-center gap-3 rounded-lg text-left transition hover:bg-muted/40"
       >
-        <span
-          className="flex h-3.5 w-3.5 items-center justify-center rounded-sm text-[9px] font-bold"
+        <div
+          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md"
           style={{
-            background: `hsl(var(${bgVar}))`,
-            color: "hsl(var(--oncolor-100))",
+            background: "hsl(var(--bg-300))",
+            color: "hsl(var(--text-300))",
           }}
         >
-          {letter}
-        </span>
-        {opener}
-        <ChevronDown size={11} />
+          <Icon size={22} strokeWidth={1.5} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div
+            className="truncate text-[14px] font-medium"
+            style={{ color: "hsl(var(--text-100))" }}
+          >
+            {title}
+          </div>
+          <div
+            className="mt-0.5 text-[12px]"
+            style={{ color: "hsl(var(--text-400))" }}
+          >
+            {kind} · {ext}
+          </div>
+        </div>
       </button>
+      <OpenerMenu file={file} />
     </div>
   );
 }

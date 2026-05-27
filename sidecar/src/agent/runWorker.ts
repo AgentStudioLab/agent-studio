@@ -52,7 +52,13 @@ export async function runWorker(input: RunWorkerInput): Promise<void> {
   // rebuild of the same turn, producing duplicates after cross-session resume.
   type PendingAssistant = { id: string; content: string; reasoning?: string };
   type PendingToolCall = { parentMessageId: string; id: string; toolName: string; args: unknown };
-  type PendingToolResult = { id: string; result: unknown; status: "success" | "error"; errorMsg?: string };
+  type PendingToolResult = {
+    id: string;
+    result: unknown;
+    status: "success" | "error";
+    errorMsg?: string;
+    sideEffects?: import("../agui/provider-claude/bash-side-effects").SideEffectFile[];
+  };
   const assistantBuffer: PendingAssistant[] = [];
   const toolCallBuffer: PendingToolCall[] = [];
   const toolResultBuffer: PendingToolResult[] = [];
@@ -73,6 +79,7 @@ export async function runWorker(input: RunWorkerInput): Promise<void> {
         result: r.result,
         status: r.status,
         errorMsg: r.errorMsg,
+        sideEffects: r.sideEffects,
       });
     }
     assistantBuffer.length = 0;
@@ -104,6 +111,7 @@ export async function runWorker(input: RunWorkerInput): Promise<void> {
         result: tc.result,
         status: tc.status,
         errorMsg: tc.errorMsg,
+        sideEffects: tc.sideEffects,
       });
     },
     onRunUsage(u) {

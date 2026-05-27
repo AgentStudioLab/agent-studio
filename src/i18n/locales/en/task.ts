@@ -83,6 +83,8 @@ export const task: typeof Zh = {
     preview: {
       refresh: "Refresh",
       close: "Close",
+      copyContent: "Copy content",
+      copied: "Copied",
       resizeHandle: "Resize preview pane",
       loading: "Loading…",
       errorNotFound: "File not found",
@@ -91,6 +93,19 @@ export const task: typeof Zh = {
       errorReadFailed: "Read failed: {{detail}}",
       binaryNotice: "Binary file — cannot preview in app",
       openExternal: "Open in system default",
+      openWith: "Open with {{name}}",
+      openWithFallback: "Open with system default",
+      revealInFolder: "Show in Folder",
+      confirmOpen: {
+        title: "Open this file with the system default app?",
+        body: "This will open the file with your system's default application.",
+        allow: "Allow",
+        cancel: "Cancel",
+      },
+      markdownMode: {
+        preview: "Preview",
+        source: "Source",
+      },
       fileLabel: {
         markdown: "Markdown",
         spreadsheet: "XLSX",
@@ -99,6 +114,19 @@ export const task: typeof Zh = {
         image: "Image",
         generic: "File",
       },
+    },
+    askUser: {
+      pageOf: "{{page}} of {{total}}",
+      somethingElse: "Something else",
+      somethingElsePlaceholder: "Write your own answer…",
+      selectedCount_one: "{{count}} selected",
+      selectedCount_other: "{{count}} selected",
+      skip: "Skip",
+      send: "Send",
+      next: "Next",
+      close: "Close",
+      prevPage: "Previous question",
+      nextPage: "Next question",
     },
     timeline: {
       done: "Done",

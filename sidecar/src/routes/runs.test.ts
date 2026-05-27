@@ -17,7 +17,9 @@ function makeApp(opts: {
 }) {
   const bus: InterruptBus = {
     requestApproval: async () => ({ behavior: "allow" }) as never,
+    requestAskUser: async () => ({ answers: {} }),
     resolve: () => opts.resolveReturns,
+    resolveAskUser: () => opts.resolveReturns,
     cancelAll: () => {},
   };
   // Minimal stubs for unused deps in the /resume path. Cast to never to

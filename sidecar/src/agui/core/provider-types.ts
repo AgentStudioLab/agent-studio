@@ -5,6 +5,7 @@
 import type { AGUIEvent } from "./types";
 import type { AGUIInterrupt } from "./interrupts";
 import type { SDKPermissionDenial } from "@anthropic-ai/claude-agent-sdk";
+import type { SideEffectFile } from "../provider-claude/bash-side-effects";
 
 export interface ProviderCallbacks {
   onMessageEnd?: (msg: {
@@ -24,6 +25,12 @@ export interface ProviderCallbacks {
     result: unknown;
     status: "success" | "error";
     errorMsg?: string;
+    /**
+     * Files indirectly produced/modified by this tool call (Bash only).
+     * Bridge populates this from BashSideEffectsTracker.takeEffects; runWorker
+     * persists it to tool_calls.side_effects so FilesTab survives a reload.
+     */
+    sideEffects?: SideEffectFile[];
   }) => void | Promise<void>;
   /**
    * Fired once per SDKResultMessage (success and error). runWorker uses this
