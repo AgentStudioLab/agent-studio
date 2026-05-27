@@ -1,21 +1,21 @@
-import { settings } from "./settings";
-import { sidebar } from "./sidebar";
-import { task } from "./task";
-import { newTask } from "./newTask";
-import { projects } from "./projects";
-import { projectDetail } from "./projectDetail";
-import { scheduled } from "./scheduled";
-import { customize } from "./customize";
-import { composer } from "./composer";
+import settings from "./settings.json";
+import sidebar from "./sidebar.json";
+import task from "./task.json";
+import newTask from "./newTask.json";
+import projects from "./projects.json";
+import projectDetail from "./projectDetail.json";
+import scheduled from "./scheduled.json";
+import customize from "./customize.json";
+import composer from "./composer.json";
 
 export const zh = {
-  ...settings,
-  ...sidebar,
-  ...task,
-  ...newTask,
-  ...projects,
-  ...projectDetail,
-  ...scheduled,
-  ...customize,
-  ...composer,
+  settings,
+  sidebar,
+  task,
+  newTask,
+  projects,
+  projectDetail,
+  scheduled,
+  customize,
+  composer,
 };

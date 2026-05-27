@@ -1,0 +1,184 @@
+{
+  "header": {
+    "menu": "任务菜单",
+    "schedule": "定时运行",
+    "turnIntoSkill": "转为技能",
+    "moveToProject": "移到项目",
+    "pin": "置顶",
+    "rename": "重命名",
+    "archive": "归档",
+    "delete": "删除",
+    "stop": "停止",
+    "toggleRightPanel": "切换右侧面板"
+  },
+  "tabs": {
+    "process": "过程",
+    "files": "文件",
+    "context": "上下文"
+  },
+  "rightPanel": {
+    "empty": "暂无产出"
+  },
+  "processTab": {
+    "plan": "计划",
+    "activity": "活动",
+    "countOf": "{{done}} / {{total}}",
+    "elapsed": "已用 {{time}}",
+    "empty": {
+      "notStarted": "等待 agent 制定计划…"
+    },
+    "status": {
+      "running": "任务运行中",
+      "done": "任务完成",
+      "failed": "任务失败",
+      "paused": "任务已暂停"
+    },
+    "phases": {
+      "progress": "进度",
+      "context": {
+        "label": "理解上下文",
+        "empty": "未读取项目文件",
+        "summary": "{{count}} 次读取"
+      },
+      "plan": {
+        "label": "规划步骤",
+        "empty": "未输出步骤计划",
+        "thinking": "思考中…",
+        "summary": "{{count}} 次规划"
+      },
+      "execute": {
+        "label": "执行任务",
+        "empty": "未执行操作",
+        "summary": "{{count}} 次操作"
+      },
+      "finish": {
+        "label": "完成 & 输出",
+        "waiting": "等待完成",
+        "done": "已完成"
+      }
+    }
+  },
+  "filesTab": {
+    "fileCount": "{{count}} 个文件",
+    "newBadge": "新",
+    "empty": "agent 还没读写文件"
+  },
+  "contextTab": {
+    "skills": "技能",
+    "skillsLoaded": "已加载 {{count}}",
+    "mcpServers": "MCP 服务器",
+    "mcpOnCount": "{{on}} / {{total}} 已开启",
+    "off": "未开启",
+    "connected": "已连接",
+    "disconnected": "未连接",
+    "empty": {
+      "notStarted": "等待 agent 启动…",
+      "noCapabilities": "未加载任何 skill 或 MCP server",
+      "goToCustomize": "前往自定义"
+    }
+  },
+  "preview": {
+    "refresh": "刷新",
+    "close": "关闭",
+    "copyContent": "复制内容",
+    "copied": "已复制",
+    "resizeHandle": "调整预览面板大小",
+    "loading": "加载中…",
+    "errorNotFound": "文件不存在",
+    "errorOutsideWorkspace": "文件不在工作目录内，无权读取",
+    "errorTooLarge": "文件超过 2 MiB，无法预览",
+    "errorReadFailed": "读取失败：{{detail}}",
+    "binaryNotice": "二进制文件，无法在应用内预览",
+    "openExternal": "用系统应用打开",
+    "openWith": "用 {{name}} 打开",
+    "openWithFallback": "用系统默认应用打开",
+    "revealInFolder": "在 Finder 中显示",
+    "confirmOpen": {
+      "title": "用默认应用打开此文件？",
+      "body": "将使用系统默认应用打开此文件。",
+      "allow": "允许",
+      "cancel": "取消"
+    },
+    "markdownMode": {
+      "preview": "预览",
+      "source": "源码"
+    },
+    "fileLabel": {
+      "markdown": "Markdown",
+      "spreadsheet": "XLSX",
+      "presentation": "PPTX",
+      "code": "代码",
+      "image": "图片",
+      "generic": "文件"
+    }
+  },
+  "queue": {
+    "label": "排队",
+    "queuedCount": "{{count}} 条排队中",
+    "queueTooltip": "Enter 排队，⌘+Enter 立即发送（中断当前任务）",
+    "sendNow": "立即发送（中断当前任务）",
+    "remove": "移除",
+    "expand": "展开",
+    "collapse": "收起"
+  },
+  "askUser": {
+    "pageOf": "{{page}} of {{total}}",
+    "somethingElse": "Something else",
+    "somethingElsePlaceholder": "写下你的想法……",
+    "selectedCount_one": "{{count}} selected",
+    "selectedCount_other": "{{count}} selected",
+    "skip": "Skip",
+    "send": "Send",
+    "next": "Next",
+    "close": "关闭",
+    "prevPage": "上一题",
+    "nextPage": "下一题"
+  },
+  "timeline": {
+    "done": "完成",
+    "stepsCount": "{{count}} 步"
+  },
+  "messageActions": {
+    "copy": "复制"
+  },
+  "input": {
+    "placeholder": "输入消息……",
+    "ask": "提问",
+    "legacyModel": "Legacy 模型",
+    "disclaimer": "Agent Studio 是 AI，可能会出错。请仔细核对回复。",
+    "models": {
+      "opus": { "displayName": "Opus 4.7", "description": "最强能力，应对硬核任务" },
+      "sonnet": { "displayName": "Sonnet 4.6", "description": "响应迅速的日常工作" },
+      "haiku": { "displayName": "Haiku 4.5", "description": "最快、最经济" }
+    },
+    "permissionMode": {
+      "askShort": "提问",
+      "actShort": "直接执行",
+      "askTitle": "执行前提问",
+      "askDesc": "agent 会暂停以等待你审批每一个动作。",
+      "actTitle": "无需审批直接执行",
+      "actDesc": "agent 不会暂停审批，直接执行所有动作。",
+      "confirmTitle": "无需审批直接执行？",
+      "confirmDesc": "agent 将无需审批直接执行所有动作。这可能将你的数据或系统置于风险之中。",
+      "cancel": "取消",
+      "confirm": "确认开启"
+    }
+  },
+  "error": {
+    "authFailed": "API key 失效或未配置",
+    "configureKey": "配置 API key",
+    "rateLimit": "已被限流，{{sec}} 秒后自动重试",
+    "generic": "agent 错误：{{msg}}",
+    "maxTurns": "达到最大轮次上限，请新开 thread",
+    "maxBudget": "达到费用上限"
+  },
+  "retry": {
+    "attempt": "正在重试 {{attempt}}/{{max}}"
+  },
+  "toolsPanel": {
+    "title": "工具集",
+    "followGlobal": "跟随全局默认",
+    "customize": "为此对话自定义",
+    "restore": "恢复全局默认"
+  }
+}

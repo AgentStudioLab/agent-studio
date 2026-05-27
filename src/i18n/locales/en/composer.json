@@ -1,0 +1,9 @@
+{
+  "input": {
+    "placeholder": "What would you like to know?"
+  },
+  "slash": {
+    "empty": "No matching skills",
+    "kindLabel": "Skill"
+  }
+}

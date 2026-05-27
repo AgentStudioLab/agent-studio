@@ -1,0 +1,37 @@
+{
+  "welcome": {
+    "heading": "来，把你清单上的事搞定一件",
+    "learnMore": "了解如何安全地使用 Agent Studio。"
+  },
+  "input": {
+    "placeholder": "今天想让我帮你做点什么？",
+    "workInProject": "在项目中工作",
+    "ask": "提问",
+    "legacyModel": "Legacy 模型",
+    "models": {
+      "opus": { "displayName": "Opus 4.7", "description": "最强能力，应对硬核任务" },
+      "sonnet": { "displayName": "Sonnet 4.6", "description": "响应迅速的日常工作" },
+      "haiku": { "displayName": "Haiku 4.5", "description": "最快、最经济" }
+    },
+    "permissionMode": {
+      "askShort": "提问",
+      "actShort": "直接执行",
+      "askTitle": "执行前提问",
+      "askDesc": "agent 会暂停以等待你审批每一个动作。",
+      "actTitle": "无需审批直接执行",
+      "actDesc": "agent 不会暂停审批，直接执行所有动作。",
+      "confirmTitle": "无需审批直接执行？",
+      "confirmDesc": "agent 将无需审批直接执行所有动作。这可能将你的数据或系统置于风险之中。",
+      "cancel": "取消",
+      "confirm": "确认开启"
+    }
+  },
+  "workInProject": {
+    "chooseFolder": "选择其他目录",
+    "pickerTitle": "选择该会话的工作目录"
+  },
+  "error": {
+    "apiKeyMissing": "未配置 API key。前往 设置 添加。",
+    "generic": "提交失败：{{msg}}"
+  }
+}
