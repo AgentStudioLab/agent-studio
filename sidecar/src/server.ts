@@ -16,6 +16,9 @@ import { createUserProfileSettings } from "./services/userProfileSettings";
 import { composeAppendPrompt } from "./lib/composeAppendPrompt";
 import { ThreadService } from "./services/threads";
 import { MessageService } from "./services/messages";
+import { ScheduledTaskService } from "./services/scheduledTasks";
+import { Scheduler } from "./services/scheduler";
+import { buildScheduledRoutes } from "./routes/scheduled";
 import { AuditService } from "./services/audit";
 import { UsageService } from "./services/usage";
 import { SettingsToolsService } from "./services/settings-tools";
@@ -82,6 +85,7 @@ const userProfileSettings = createUserProfileSettings(db);
 
 const threads = new ThreadService(db);
 const messages = new MessageService(db);
+const scheduledTasks = new ScheduledTaskService(db);
 const store = createBunSqliteRunStore(db);
 const interruptBus = createInterruptBus({ store });
 const audit = new AuditService(db);
@@ -195,8 +199,24 @@ const providerProxy = {
   notifyCancelled: ((tid) => getProvider().notifyCancelled?.(tid) ?? Promise.resolve()) as ReturnType<typeof createClaudeProvider>["notifyCancelled"],
 };
 
+// Scheduled-task engine. Polls scheduled_tasks.next_run_at every minute and
+// fires due tasks as fresh headless runs through the same runWorker path as
+// POST /runs. Only ticks while this process is alive (desktop app open).
+const scheduler = new Scheduler({
+  tasks: scheduledTasks,
+  threads,
+  messages,
+  store,
+  provider: providerProxy,
+  interruptBus,
+  usage,
+  canRun: () => !!providerSettings.current().apiKey,
+});
+scheduler.start();
+
 app.route("/", healthRoutes);
 app.route("/", buildConversationRoutes({ threads, store }));
+app.route("/", buildScheduledRoutes({ tasks: scheduledTasks, threads, store, scheduler }));
 app.route("/", buildMessageRoutes(messages));
 app.route("/", buildSettingsRoutes(providerSettings, userProfileSettings));
 app.route(

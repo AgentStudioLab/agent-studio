@@ -25,6 +25,8 @@ export interface RunWorkerInput {
   permissionMode?: "ask" | "act-without-asking";
   /** Per-run model id override (e.g. "claude-opus-4-7"). */
   model?: string;
+  /** Per-task allow-list for scheduled/background runs (see RunContext). */
+  autoApproveTools?: string[];
 }
 
 export async function runWorker(input: RunWorkerInput): Promise<void> {
@@ -41,6 +43,7 @@ export async function runWorker(input: RunWorkerInput): Promise<void> {
     usage,
     permissionMode = "ask",
     model,
+    autoApproveTools,
   } = input;
 
   // Buffer the structured messages/tool_calls writes until the run reaches a
@@ -148,6 +151,7 @@ export async function runWorker(input: RunWorkerInput): Promise<void> {
       cwd,
       permissionMode,
       model,
+      autoApproveTools,
     });
 
     await executeRunLoop({

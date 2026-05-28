@@ -19,6 +19,8 @@ export interface ThreadStatus {
   lastRunId: string | null;
   status: RunStatus | "idle";
   lastCursor: string | null;
+  /** Origin scheduled task when this conversation was spawned by the scheduler. */
+  scheduledTaskId: string | null;
   updatedAt: number;
 }
 

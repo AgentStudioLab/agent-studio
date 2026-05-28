@@ -15,6 +15,7 @@ export interface ThreadStatusItem {
     | "cancelled"
     | "awaiting_approval";
   lastCursor: string | null;
+  scheduledTaskId: string | null;
   updatedAt: number;
 }
 

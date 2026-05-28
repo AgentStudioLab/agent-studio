@@ -11,6 +11,7 @@ export interface Thread {
   pinned: boolean;
   archived: boolean;
   workingDir: string;
+  scheduledTaskId: string | null;
   createdAt: number;
   updatedAt: number;
 }
@@ -22,6 +23,7 @@ interface ThreadRow {
   pinned: number;
   archived: number;
   working_dir: string | null;
+  scheduled_task_id: string | null;
   created_at: number;
   updated_at: number;
 }
@@ -54,6 +56,7 @@ function rowToThread(r: ThreadRow): Thread {
     pinned: r.pinned === 1,
     archived: r.archived === 1,
     workingDir: r.working_dir ?? ensureDefaultDir(),
+    scheduledTaskId: r.scheduled_task_id ?? null,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -67,19 +70,21 @@ export class ThreadService {
     title?: string;
     projectId?: string | null;
     workingDir?: string | null;
+    scheduledTaskId?: string | null;
   }): Thread {
     const id = input?.id ?? `thr_${nanoid(12)}`;
     const now = Date.now();
     this.db
       .prepare(
-        `INSERT INTO conversations (id, title, project_id, pinned, working_dir, created_at, updated_at)
-         VALUES (?, ?, ?, 0, ?, ?, ?)`,
+        `INSERT INTO conversations (id, title, project_id, pinned, working_dir, scheduled_task_id, created_at, updated_at)
+         VALUES (?, ?, ?, 0, ?, ?, ?, ?)`,
       )
       .run(
         id,
         input?.title ?? "New chat",
         input?.projectId ?? null,
         input?.workingDir ?? null,
+        input?.scheduledTaskId ?? null,
         now,
         now,
       );
@@ -119,6 +124,16 @@ export class ThreadService {
         `SELECT * FROM conversations ${where} ORDER BY updated_at DESC LIMIT ?`,
       )
       .all(limit) as ThreadRow[];
+    return rows.map(rowToThread);
+  }
+
+  /** Run history for a scheduled task — every spawned conversation, newest first. */
+  listByScheduledTask(taskId: string, limit = 50): Thread[] {
+    const rows = this.db
+      .prepare(
+        "SELECT * FROM conversations WHERE scheduled_task_id = ? ORDER BY created_at DESC LIMIT ?",
+      )
+      .all(taskId, limit) as ThreadRow[];
     return rows.map(rowToThread);
   }
 

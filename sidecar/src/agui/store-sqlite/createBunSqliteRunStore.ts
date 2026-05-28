@@ -56,7 +56,7 @@ export function createBunSqliteRunStore(db: Database): RunEventStore {
   );
   const latestRunPerThread = db.prepare(`
     SELECT c.id AS threadId, c.title AS title, r.id AS lastRunId, r.status,
-           r.last_seq AS lastSeq,
+           r.last_seq AS lastSeq, c.scheduled_task_id AS scheduledTaskId,
            COALESCE(r.ended_at, r.started_at, c.updated_at) AS updatedAt
     FROM conversations c
     LEFT JOIN runs r ON r.id = (
@@ -182,6 +182,7 @@ export function createBunSqliteRunStore(db: Database): RunEventStore {
         lastRunId: string | null;
         status: RunStatus | null;
         lastSeq: number | null;
+        scheduledTaskId: string | null;
         updatedAt: number;
       }>;
       return rows.map((r) => ({
@@ -190,6 +191,7 @@ export function createBunSqliteRunStore(db: Database): RunEventStore {
         lastRunId: r.lastRunId,
         status: (r.status ?? "idle") as ThreadStatus["status"],
         lastCursor: r.lastSeq != null ? String(r.lastSeq) : null,
+        scheduledTaskId: r.scheduledTaskId,
         updatedAt: r.updatedAt,
       }));
     },

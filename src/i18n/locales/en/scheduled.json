@@ -2,6 +2,29 @@
   "title": "Scheduled tasks",
   "subtitle": "Run tasks on a schedule or whenever you need them. Type",
   "subtitleSuffix": "in any existing task to set one up.",
+  "empty": "No scheduled tasks yet.",
+  "badge": {
+    "awaiting": "Needs approval"
+  },
+  "card": {
+    "paused": "Paused"
+  },
+  "menu": {
+    "moreActions": "More actions",
+    "runNow": "Run now",
+    "enable": "Enable",
+    "disable": "Disable",
+    "edit": "Edit",
+    "delete": "Delete"
+  },
+  "runStatus": {
+    "idle": "Idle",
+    "running": "Running",
+    "completed": "Done",
+    "error": "Failed",
+    "cancelled": "Cancelled",
+    "awaiting_approval": "Awaiting approval"
+  },
   "toolbar": {
     "sort": "Sort",
     "search": "Search",
@@ -18,6 +41,7 @@
   },
   "modal": {
     "title": "Create scheduled task",
+    "editTitle": "Edit scheduled task",
     "name": "Name",
     "namePlaceholder": "Daily brief",
     "nameRequired": "Required",
@@ -27,8 +51,21 @@
     "promptPlaceholder": "Summarize my calendar and unread emails...",
     "promptChips": {
       "workInProject": "Work in a project",
+      "chooseFolder": "Choose a folder…",
       "ask": "Ask",
       "defaultModel": "Default model"
+    },
+    "permissionMode": {
+      "askShort": "Ask",
+      "actShort": "Act",
+      "askTitle": "Ask before acting",
+      "askDesc": "Pauses on actions outside the allow-list; destructive actions always need approval.",
+      "actTitle": "Act without asking",
+      "actDesc": "Full autopilot — runs every tool unattended, including destructive ones. Use with care.",
+      "confirmTitle": "Run unattended without asking?",
+      "confirmDesc": "This task will run every tool on its own — including file deletion and other destructive actions — with no approval pauses and no allow-list gating. Only enable this for tasks you fully trust.",
+      "cancel": "Cancel",
+      "confirm": "Enable autopilot"
     },
     "frequency": "Frequency",
     "frequencyOptions": {
@@ -60,10 +97,24 @@
     "active": "Active",
     "inactive": "Inactive",
     "nextRun": "Next run: {{value}}",
+    "nextRunManual": "On demand",
+    "lastRun": "Last run: {{value}}",
+    "loading": "Loading…",
+    "notFound": "Task not found.",
     "instructions": "Instructions",
     "repeats": "Repeats",
+    "runHistory": "Run history",
+    "runHistoryEmpty": "No runs yet.",
     "alwaysAllowed": "Always allowed",
-    "alwaysAllowedHint": "Approvals you grant during a run appear here.",
+    "alwaysAllowedHint": "Approvals you grant during a run appear here. Listed tools run without asking; destructive actions always require approval.",
+    "allowedRemove": "Remove",
+    "allowedAddPlaceholder": "Add a tool name (e.g. Read, Write), press Enter",
+    "deleteConfirm": {
+      "title": "Delete this scheduled task?",
+      "description": "This removes the task definition. Past runs are kept.",
+      "cancel": "Cancel",
+      "confirm": "Delete"
+    },
     "repeatsManual": "Manual — runs only when triggered.",
     "repeatsHourly": "Every hour.",
     "repeatsDaily": "Every day at {{time}}.",
@@ -71,6 +122,8 @@
     "repeatsWeekdays": "Weekdays at {{time}}.",
     "repeatsWeekdaysNoTime": "Weekdays.",
     "repeatsWeekly": "Every week at {{time}}.",
-    "repeatsWeeklyNoTime": "Every week."
+    "repeatsWeeklyNoTime": "Every week.",
+    "repeatsWeeklyOn": "Every {{day}} at {{time}}.",
+    "repeatsWeeklyOnNoTime": "Every {{day}}."
   }
 }

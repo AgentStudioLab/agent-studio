@@ -15,6 +15,7 @@ import type { CanUseTool, HookCallback } from "@anthropic-ai/claude-agent-sdk";
 import { claudeSdkToAgui } from "./bridge";
 import { getResumeSessionId, tagThreadSession } from "./session-tag";
 import { checkWorkspaceSandbox } from "./sandbox";
+import { isDestructiveToolCall } from "./destructive";
 import { createAuditHooks } from "./audit-hook";
 import { BashSideEffectsTracker, createBashSideEffectsHooks } from "./bash-side-effects";
 import {
@@ -193,6 +194,17 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
         return { behavior: "allow" as const, updatedInput: input };
       }
       if (!bus) {
+        return { behavior: "allow" as const, updatedInput: input };
+      }
+      // Per-task allow-list (scheduled/background runs): auto-approve a
+      // pre-authorized, non-destructive tool so unattended runs don't stall on
+      // every step. Runs AFTER the sandbox (an allow-listed Write still can't
+      // escape cwd) and AFTER the destructive guardrail (irreversible actions
+      // always fall through to the bus, even when allow-listed).
+      if (
+        ctx.autoApproveTools?.includes(toolName) &&
+        !isDestructiveToolCall(toolName, input)
+      ) {
         return { behavior: "allow" as const, updatedInput: input };
       }
       const result = await bus.requestApproval({

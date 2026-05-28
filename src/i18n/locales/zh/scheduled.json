@@ -2,6 +2,29 @@
   "title": "定时任务",
   "subtitle": "按计划运行任务，或随时手动触发。在任意已有任务中输入",
   "subtitleSuffix": "即可创建。",
+  "empty": "还没有定时任务。",
+  "badge": {
+    "awaiting": "待审批"
+  },
+  "card": {
+    "paused": "已暂停"
+  },
+  "menu": {
+    "moreActions": "更多操作",
+    "runNow": "立即运行",
+    "enable": "启用",
+    "disable": "暂停",
+    "edit": "编辑",
+    "delete": "删除"
+  },
+  "runStatus": {
+    "idle": "空闲",
+    "running": "运行中",
+    "completed": "已完成",
+    "error": "失败",
+    "cancelled": "已取消",
+    "awaiting_approval": "等待审批"
+  },
   "toolbar": {
     "sort": "排序",
     "search": "搜索",
@@ -18,6 +41,7 @@
   },
   "modal": {
     "title": "创建定时任务",
+    "editTitle": "编辑定时任务",
     "name": "名称",
     "namePlaceholder": "每日简报",
     "nameRequired": "必填",
@@ -27,8 +51,21 @@
     "promptPlaceholder": "汇总我的日程和未读邮件……",
     "promptChips": {
       "workInProject": "在项目中工作",
+      "chooseFolder": "选择文件夹……",
       "ask": "提问",
       "defaultModel": "默认模型"
+    },
+    "permissionMode": {
+      "askShort": "提问",
+      "actShort": "自动",
+      "askTitle": "操作前询问",
+      "askDesc": "白名单之外的操作会暂停等待批准；删除等破坏性操作始终需要批准。",
+      "actTitle": "无需询问直接执行",
+      "actDesc": "完全自动 — 无人值守跑所有工具，包括破坏性操作。请谨慎使用。",
+      "confirmTitle": "确定无人值守、不再询问？",
+      "confirmDesc": "该任务会自行运行所有工具——包括删除文件等破坏性操作——不再暂停等待批准，也不再走白名单过滤。请只对你完全信任的任务开启。",
+      "cancel": "取消",
+      "confirm": "开启完全自动"
     },
     "frequency": "频率",
     "frequencyOptions": {
@@ -60,10 +97,24 @@
     "active": "运行中",
     "inactive": "已暂停",
     "nextRun": "下次运行：{{value}}",
+    "nextRunManual": "手动触发",
+    "lastRun": "上次运行：{{value}}",
+    "loading": "加载中…",
+    "notFound": "未找到该任务。",
     "instructions": "指令",
     "repeats": "重复",
+    "runHistory": "运行历史",
+    "runHistoryEmpty": "还没有运行记录。",
     "alwaysAllowed": "始终允许",
-    "alwaysAllowedHint": "你在运行中授予的许可会显示在这里。",
+    "alwaysAllowedHint": "你在运行中授予的许可会显示在这里。清单内的工具会自动放行；删除等破坏性操作始终需要审批。",
+    "allowedRemove": "移除",
+    "allowedAddPlaceholder": "添加工具名（如 Read、Write），回车确认",
+    "deleteConfirm": {
+      "title": "删除这个定时任务？",
+      "description": "这会删除任务定义，已产生的运行记录会保留。",
+      "cancel": "取消",
+      "confirm": "删除"
+    },
     "repeatsManual": "手动 — 仅在触发时运行。",
     "repeatsHourly": "每小时。",
     "repeatsDaily": "每天 {{time}}。",
@@ -71,6 +122,8 @@
     "repeatsWeekdays": "工作日 {{time}}。",
     "repeatsWeekdaysNoTime": "工作日。",
     "repeatsWeekly": "每周 {{time}}。",
-    "repeatsWeeklyNoTime": "每周。"
+    "repeatsWeeklyNoTime": "每周。",
+    "repeatsWeeklyOn": "每{{day}} {{time}}。",
+    "repeatsWeeklyOnNoTime": "每{{day}}。"
   }
 }

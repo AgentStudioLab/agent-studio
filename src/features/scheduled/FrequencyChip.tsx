@@ -1,7 +1,7 @@
 import { Clock } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
-import type { Frequency } from "@/lib/mock/types";
+import type { Frequency } from "@/lib/data/types";
 
 interface FrequencyChipProps {
   frequency: Frequency;

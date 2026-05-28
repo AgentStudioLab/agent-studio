@@ -72,6 +72,14 @@ export interface RunContext {
    * as `options.model`.
    */
   model?: string;
+  /**
+   * Per-run allow-list for background (scheduled) runs. Tool names listed here
+   * are auto-approved inside `canUseTool` — AFTER the workspace sandbox and the
+   * destructive-action guardrail — so unattended runs don't stall on every
+   * step. Deliberately NOT the SDK-native `allowedTools` option (which bypasses
+   * canUseTool, and therefore the sandbox). Empty/undefined → no auto-approval.
+   */
+  autoApproveTools?: string[];
 }
 
 export interface ResumeContext {
@@ -83,6 +91,7 @@ export interface ResumeContext {
   cwd: string;
   permissionMode?: PermissionMode;
   model?: string;
+  autoApproveTools?: string[];
 }
 
 /**

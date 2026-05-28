@@ -114,6 +114,32 @@ CREATE TABLE IF NOT EXISTS skill_state (
   enabled    INTEGER NOT NULL DEFAULT 1,
   updated_at INTEGER NOT NULL
 );
+
+-- scheduled_tasks: user-defined recurring/on-demand task definitions. The
+-- scheduler polls next_run_at; each fire spawns a fresh conversation tagged
+-- with scheduled_task_id (see ensureColumn below). next_run_at is NULL for
+-- 'manual' frequency or disabled tasks — the poll loop skips those.
+CREATE TABLE IF NOT EXISTS scheduled_tasks (
+  id                 TEXT PRIMARY KEY,
+  name               TEXT NOT NULL,
+  description        TEXT NOT NULL DEFAULT '',
+  prompt             TEXT NOT NULL,
+  project_id         TEXT,
+  working_dir        TEXT,
+  model              TEXT,
+  permission_mode    TEXT NOT NULL DEFAULT 'ask',
+  frequency          TEXT NOT NULL
+                     CHECK (frequency IN ('manual','hourly','daily','weekdays','weekly')),
+  time_of_day        TEXT,
+  weekday            INTEGER,
+  enabled            INTEGER NOT NULL DEFAULT 1,
+  allowed_tools_json TEXT,
+  next_run_at        INTEGER,
+  last_run_at        INTEGER,
+  created_at         INTEGER NOT NULL,
+  updated_at         INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_sched_next ON scheduled_tasks (enabled, next_run_at);
 `;
 
 interface ColumnInfo {
@@ -142,6 +168,7 @@ export function migrate(db: Database): void {
   ensureColumn(db, "conversations", "working_dir", "TEXT");
   ensureColumn(db, "conversations", "allowed_tools_json", "TEXT");
   ensureColumn(db, "conversations", "archived", "INTEGER NOT NULL DEFAULT 0");
+  ensureColumn(db, "conversations", "scheduled_task_id", "TEXT");
   ensureColumn(db, "tool_calls", "side_effects", "TEXT");
   ensureColumn(db, "runs", "input_tokens", "INTEGER");
   ensureColumn(db, "runs", "output_tokens", "INTEGER");
@@ -150,6 +177,9 @@ export function migrate(db: Database): void {
   ensureColumn(db, "runs", "total_cost_usd", "REAL");
   ensureColumn(db, "runs", "permission_denials", "TEXT");
   ensureColumn(db, "runs", "model_used", "TEXT");
+  ensureColumn(db, "scheduled_tasks", "working_dir", "TEXT");
+  ensureColumn(db, "scheduled_tasks", "permission_mode", "TEXT NOT NULL DEFAULT 'ask'");
+  ensureColumn(db, "scheduled_tasks", "weekday", "INTEGER");
 }
 
 export function openDb(path: string): Database {
