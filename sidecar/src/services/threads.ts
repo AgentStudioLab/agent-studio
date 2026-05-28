@@ -9,6 +9,7 @@ export interface Thread {
   title: string;
   projectId: string | null;
   pinned: boolean;
+  archived: boolean;
   workingDir: string;
   createdAt: number;
   updatedAt: number;
@@ -19,6 +20,7 @@ interface ThreadRow {
   title: string;
   project_id: string | null;
   pinned: number;
+  archived: number;
   working_dir: string | null;
   created_at: number;
   updated_at: number;
@@ -50,6 +52,7 @@ function rowToThread(r: ThreadRow): Thread {
     title: r.title,
     projectId: r.project_id,
     pinned: r.pinned === 1,
+    archived: r.archived === 1,
     workingDir: r.working_dir ?? ensureDefaultDir(),
     createdAt: r.created_at,
     updatedAt: r.updated_at,
@@ -96,8 +99,20 @@ export class ThreadService {
     return row ? rowToThread(row) : null;
   }
 
-  list(opts: { limit?: number; pinnedOnly?: boolean } = {}): Thread[] {
-    const where = opts.pinnedOnly ? "WHERE pinned = 1" : "";
+  list(
+    opts: {
+      limit?: number;
+      pinnedOnly?: boolean;
+      /** Defaults to "active" — archived threads are hidden from the sidebar. */
+      archived?: "active" | "archived" | "all";
+    } = {},
+  ): Thread[] {
+    const clauses: string[] = [];
+    if (opts.pinnedOnly) clauses.push("pinned = 1");
+    const archivedFilter = opts.archived ?? "active";
+    if (archivedFilter === "active") clauses.push("archived = 0");
+    else if (archivedFilter === "archived") clauses.push("archived = 1");
+    const where = clauses.length > 0 ? `WHERE ${clauses.join(" AND ")}` : "";
     const limit = opts.limit ?? 100;
     const rows = this.db
       .prepare(
@@ -120,6 +135,13 @@ export class ThreadService {
     this.db
       .prepare("UPDATE conversations SET pinned = ?, updated_at = ? WHERE id = ?")
       .run(pinned ? 1 : 0, Date.now(), id);
+    return this.get(id)!;
+  }
+
+  updateArchived(id: string, archived: boolean): Thread {
+    this.db
+      .prepare("UPDATE conversations SET archived = ?, updated_at = ? WHERE id = ?")
+      .run(archived ? 1 : 0, Date.now(), id);
     return this.get(id)!;
   }
 

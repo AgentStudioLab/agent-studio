@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Archive,
+  ArchiveRestore,
   FolderInput,
   MoreHorizontal,
   Pencil,
@@ -21,6 +22,8 @@ import { cn } from "@/lib/utils";
 export interface SidebarItemContextMenuProps {
   /** "pin" for Recents row, "unpin" for Pinned row */
   pinMode: "pin" | "unpin";
+  /** When true the row is already archived → action becomes "Unarchive". */
+  archived?: boolean;
   onPinToggle?: () => void;
   onRename?: () => void;
   onArchive?: () => void;
@@ -41,6 +44,7 @@ export interface SidebarItemContextMenuProps {
  */
 export function SidebarItemContextMenu({
   pinMode,
+  archived = false,
   onPinToggle,
   onRename,
   onArchive,
@@ -87,8 +91,14 @@ export function SidebarItemContextMenu({
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={onArchive}>
-          <Archive className="size-4" />
-          {t("sidebar.contextMenu.archive")}
+          {archived ? (
+            <ArchiveRestore className="size-4" />
+          ) : (
+            <Archive className="size-4" />
+          )}
+          {archived
+            ? t("sidebar.contextMenu.unarchive")
+            : t("sidebar.contextMenu.archive")}
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={onDelete} variant="destructive">
           <Trash2 className="size-4" />

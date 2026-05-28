@@ -21,6 +21,10 @@
     --bg-300: var(--color-stone-100);
     --bg-400: var(--color-stone-200);
     --bg-500: var(--color-stone-200);
+    /* Floating overlay surface (popover / dropdown / dialog). Light mode keeps
+     * the bg-100 canvas tone; dark mode lifts it to a warmer gray so menus
+     * don't read as near-black cutouts. */
+    --bg-overlay: var(--color-stone-75);
 
     /* Chrome (window titlebar / system decorations) */
     --chrome-bg-top: var(--color-stone-100);
@@ -102,6 +106,9 @@
     --bg-300: var(--color-stone-950);
     --bg-400: var(--color-pure-black);
     --bg-500: var(--color-pure-black);
+    /* Grayer than bg-100 so dropdowns/menus/dialogs lift off the dark canvas
+     * (≈ #383835 / RGB 56,56,53). */
+    --bg-overlay: var(--color-stone-775);
 
     --chrome-bg-top: var(--color-stone-800);
     --chrome-bg-bottom: var(--color-stone-850);

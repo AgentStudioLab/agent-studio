@@ -56,6 +56,7 @@ export function TaskHeader({
   const { t } = useTranslation();
   return (
     <header
+      data-tauri-drag-region
       className={cn(
         "flex h-12 shrink-0 items-center gap-3 px-6",
         // Leave room for the absolute-positioned SidebarToggle (~40px footprint

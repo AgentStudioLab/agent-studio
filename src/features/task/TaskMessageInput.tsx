@@ -107,7 +107,7 @@ export function TaskMessageInput({
             }
           }}
         />
-        <PromptInputFooter>
+        <PromptInputFooter className="px-4 pb-3">
           <PromptInputTools>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

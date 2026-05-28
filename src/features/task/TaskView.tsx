@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { AppShell } from "@/app/AppShell";
+import { RenameDialog } from "@/shared/RenameDialog";
 import { useAppShell } from "@/app/AppShellContext";
 import { TaskHeader } from "@/features/task/TaskHeader";
 import { ChatStream } from "@/features/task/ChatStream";
@@ -22,7 +23,11 @@ import { useWorkspaceAllowedTools } from "@/lib/agui/react/useWorkspaceAllowedTo
 import { useThreadPermissionMode } from "@/lib/agui/react/useThreadPermissionMode";
 import { useThreadModel } from "@/lib/agui/react/useThreadModel";
 import { useAvailableModels } from "@/lib/models";
-import { useConversation, useMessages } from "@/lib/data/queries";
+import {
+  useArchiveConversationMutation,
+  useConversation,
+  useMessages,
+} from "@/lib/data/queries";
 
 function touchedFileToPreview(f: TouchedFile): MockFile {
   const lower = f.relativePath.toLowerCase();
@@ -42,6 +47,7 @@ function touchedFileToPreview(f: TouchedFile): MockFile {
 
 export function TaskView() {
   const { threadId: activeTaskId = null } = useParams<{ threadId: string }>();
+  const navigate = useNavigate();
   const {
     pendingFirstPrompt,
     setPendingFirstPrompt,
@@ -49,6 +55,8 @@ export function TaskView() {
     openPreview,
     closePreview,
   } = useAppShell();
+  const archiveMutation = useArchiveConversationMutation();
+  const [renameOpen, setRenameOpen] = useState(false);
 
   // History GET — turn-grouped; reducer reads as initialMessages via
   // setHistorical. Don't default `data` to `[]` here: that allocates a fresh
@@ -288,16 +296,23 @@ export function TaskView() {
 
   if (!activeTaskId) return null;
   const previewOpen = preview.open && preview.file;
+  const taskTitle = conversationQuery.data?.title ?? "…";
 
   return (
+    <>
     <AppShell
       bareAside={Boolean(previewOpen)}
       main={
         <>
           <TaskHeader
             conversationId={activeTaskId}
-            title={conversationQuery.data?.title ?? "…"}
+            title={taskTitle}
             onMoveToProject={() => {}}
+            onRename={() => setRenameOpen(true)}
+            onArchive={() => {
+              navigate("/");
+              archiveMutation.mutate({ id: activeTaskId, archived: true });
+            }}
           />
           <div className="flex min-h-0 flex-1 flex-col">
             <ChatStream
@@ -418,5 +433,12 @@ export function TaskView() {
         )
       }
     />
+    <RenameDialog
+      open={renameOpen}
+      onOpenChange={setRenameOpen}
+      conversationId={activeTaskId}
+      currentTitle={taskTitle}
+    />
+    </>
   );
 }

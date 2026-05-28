@@ -1,0 +1,20 @@
+{
+  "title": "Tasks",
+  "newTask": "New task",
+  "tabs": {
+    "active": "Active",
+    "archived": "Archived",
+    "all": "All"
+  },
+  "search": {
+    "open": "Search tasks",
+    "placeholder": "Filter tasks",
+    "clear": "Clear filter"
+  },
+  "empty": {
+    "active": "No active tasks yet",
+    "archived": "No archived tasks",
+    "all": "No tasks yet",
+    "noResults": "No tasks match your filter"
+  }
+}

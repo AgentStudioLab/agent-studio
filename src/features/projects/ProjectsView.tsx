@@ -37,7 +37,10 @@ export function ProjectsView() {
     <AppShell
       main={
         <div className="flex h-full flex-col overflow-y-auto">
-          <header className="flex items-center justify-between gap-4 px-12 pt-12 pb-8">
+          <header
+            data-tauri-drag-region
+            className="flex items-center justify-between gap-4 px-12 pt-12 pb-8"
+          >
             <h1 className="font-serif text-[34px] font-normal leading-none text-foreground">
               {t("projects.title")}
             </h1>

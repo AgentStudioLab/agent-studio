@@ -125,6 +125,7 @@ export function PreviewPane({ file, workingDir, onClose }: PreviewPaneProps) {
 
       {/* Header */}
       <header
+        data-tauri-drag-region
         className="flex h-12 shrink-0 items-center gap-3 px-4"
         style={{ borderBottom: "1px solid hsl(var(--border-300) / 0.1)" }}
       >

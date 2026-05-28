@@ -1,4 +1,9 @@
 {
+  "renameDialog": {
+    "title": "Rename session",
+    "cancel": "Cancel",
+    "save": "Save"
+  },
   "header": {
     "menu": "Task menu",
     "schedule": "Schedule",

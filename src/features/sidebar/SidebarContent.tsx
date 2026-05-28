@@ -4,6 +4,7 @@ import {
   useRecentConversations,
   usePinnedConversations,
   useTogglePinMutation,
+  useArchiveConversationMutation,
   useDeleteConversationMutation,
 } from "@/lib/data/queries";
 import {
@@ -17,7 +18,16 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import type { Conversation } from "@/lib/data/types";
-import { Briefcase, Clock, Plus, Sparkles } from "lucide-react";
+import {
+  Briefcase,
+  ChevronDown,
+  ChevronRight,
+  Clock,
+  Plus,
+  Sparkles,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { RenameDialog } from "@/shared/RenameDialog";
 import {
   Dialog,
   DialogContent,
@@ -123,8 +133,14 @@ export function SidebarContent() {
   const { data: pinnedData = [] } = usePinnedConversations();
   const { data: threadStatuses = [] } = useThreadStatuses();
   const togglePinMutation = useTogglePinMutation();
+  const archiveMutation = useArchiveConversationMutation();
   const deleteMutation = useDeleteConversationMutation();
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [pendingRename, setPendingRename] = useState<{
+    id: string;
+    title: string;
+  } | null>(null);
+  const [recentsCollapsed, setRecentsCollapsed] = useState(false);
 
   const { isUnread, markRead } = useThreadUnread();
 
@@ -153,6 +169,14 @@ export function SidebarContent() {
 
   const handleUnpin = (item: MockPinnedItem) => {
     togglePinMutation.mutate({ id: item.id, pinned: false });
+  };
+
+  // Archiving hides the thread from the sidebar. If the archived thread is the
+  // one currently open, leave the task view first so it doesn't sit on a thread
+  // that just vanished from every sidebar list.
+  const handleArchive = (id: string) => {
+    if (id === routeThreadId) navigate("/");
+    archiveMutation.mutate({ id, archived: true });
   };
 
   // ContextMenu's onDelete fires immediately on click — we route through an
@@ -227,6 +251,8 @@ export function SidebarContent() {
                   }
                 }}
                 onUnpin={() => void handleUnpin(item)}
+                onRename={() => setPendingRename({ id: item.id, title: item.name })}
+                onArchive={() => handleArchive(item.id)}
                 onDelete={() => requestDelete(item.id)}
               />
             ))}
@@ -234,27 +260,50 @@ export function SidebarContent() {
         </>
       )}
 
-      {/* Recents */}
-      <div className="px-3 pb-1 pt-4">
-        <div className="px-2 text-[12px] font-medium text-[hsl(var(--text-400))]">
-          {t("sidebar.sections.recents")}
+      {/* Recents — header reveals a collapse chevron + "View all" on hover. */}
+      <div className="group/recents px-3 pb-1 pt-4">
+        <div className="flex items-center justify-between px-2">
+          <button
+            type="button"
+            onClick={() => setRecentsCollapsed((v) => !v)}
+            className="flex items-center gap-1 text-[12px] font-medium text-[hsl(var(--text-400))] transition-colors hover:text-[hsl(var(--text-200))]"
+          >
+            {t("sidebar.sections.recents")}
+            <ChevronDown
+              className={cn(
+                "size-3 opacity-0 transition-all group-hover/recents:opacity-100",
+                recentsCollapsed && "-rotate-90",
+              )}
+            />
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate("/tasks")}
+            className="flex items-center gap-0.5 text-[12px] text-[hsl(var(--text-400))] opacity-0 transition-all hover:text-[hsl(var(--text-200))] group-hover/recents:opacity-100"
+          >
+            {t("sidebar.sections.viewAll")}
+            <ChevronRight className="size-3" />
+          </button>
         </div>
       </div>
       <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-2">
-        {recents.map((item) => (
-          <RecentItem
-            key={item.id}
-            item={item}
-            active={item.id === selectedTaskId}
-            onClick={() => {
-              const runId = entryByThread.get(item.id)?.lastRunId;
-              if (runId) markRead(item.id, runId);
-              navigate(`/task/${item.id}`);
-            }}
-            onPin={() => void handlePin(item)}
-            onDelete={() => requestDelete(item.id)}
-          />
-        ))}
+        {!recentsCollapsed &&
+          recents.map((item) => (
+            <RecentItem
+              key={item.id}
+              item={item}
+              active={item.id === selectedTaskId}
+              onClick={() => {
+                const runId = entryByThread.get(item.id)?.lastRunId;
+                if (runId) markRead(item.id, runId);
+                navigate(`/task/${item.id}`);
+              }}
+              onPin={() => void handlePin(item)}
+              onRename={() => setPendingRename({ id: item.id, title: item.title })}
+              onArchive={() => handleArchive(item.id)}
+              onDelete={() => requestDelete(item.id)}
+            />
+          ))}
       </div>
 
       {/* Footer — divider line removed per design; UpdateCard temporarily
@@ -283,6 +332,15 @@ export function SidebarContent() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <RenameDialog
+        open={pendingRename !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingRename(null);
+        }}
+        conversationId={pendingRename?.id ?? null}
+        currentTitle={pendingRename?.title ?? ""}
+      />
 
       <AlertDialog
         open={pendingDeleteId !== null}

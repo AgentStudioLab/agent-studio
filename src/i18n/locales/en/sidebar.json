@@ -8,7 +8,8 @@
   },
   "sections": {
     "pinned": "Pinned",
-    "recents": "Recents"
+    "recents": "Recents",
+    "viewAll": "View all"
   },
   "contextMenu": {
     "moreActions": "More actions",
@@ -17,6 +18,7 @@
     "unpin": "Unpin",
     "rename": "Rename",
     "archive": "Archive",
+    "unarchive": "Unarchive",
     "delete": "Delete"
   },
   "deleteDialog": {

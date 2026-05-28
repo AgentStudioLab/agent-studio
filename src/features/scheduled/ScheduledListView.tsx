@@ -44,7 +44,10 @@ export function ScheduledListView() {
     <AppShell
       main={
         <div className="flex h-full flex-col overflow-y-auto">
-          <header className="flex items-start justify-between gap-4 px-12 pt-12 pb-4">
+          <header
+            data-tauri-drag-region
+            className="flex items-start justify-between gap-4 px-12 pt-12 pb-4"
+          >
             <div>
               <h1 className="font-serif text-[32px] font-normal leading-none text-foreground">
                 {t("scheduled.title")}

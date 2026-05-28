@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { TaskView } from "@/features/task/TaskView";
+import { TasksView } from "@/features/tasks/TasksView";
 import { NewTaskView } from "@/features/new-task/NewTaskView";
 import { ProjectsView } from "@/features/projects/ProjectsView";
 import { ProjectDetailView } from "@/features/project-detail/ProjectDetailView";
@@ -23,6 +24,7 @@ export function RouterView() {
   return (
     <Routes>
       <Route path="/" element={<NewTaskView />} />
+      <Route path="/tasks" element={<TasksView />} />
       <Route path="/task/:threadId" element={<TaskView />} />
       <Route path="/projects" element={<ProjectsView />} />
       <Route path="/projects/:projectId" element={<ProjectDetailView />} />

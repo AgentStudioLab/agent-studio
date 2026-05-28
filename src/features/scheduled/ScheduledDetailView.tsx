@@ -21,7 +21,7 @@ export function ScheduledDetailView() {
     <AppShell
       main={
         <div className="flex h-full flex-col overflow-y-auto">
-          <div className="px-12 pt-10">
+          <div data-tauri-drag-region className="px-12 pt-10">
             <button
               type="button"
               onClick={() => navigate("/scheduled")}

@@ -125,7 +125,10 @@ export function NewTaskView() {
     <>
     <AppShell
       main={
-        <div className="bg-dot-grid flex h-full flex-col items-center overflow-y-auto px-12 pt-[18%]">
+        <div
+          data-tauri-drag-region
+          className="bg-dot-grid flex h-full flex-col items-center overflow-y-auto px-12 pt-[18%]"
+        >
           <div className="flex w-full max-w-[760px] flex-col items-start">
             <div className="mb-3 flex items-center gap-4">
               <BrandStar size={28} />
@@ -149,7 +152,7 @@ export function NewTaskView() {
               <div className="rounded-2xl bg-background">
                 <PromptInput onSubmit={handleSubmit}>
                   <SlashEditor placeholder={t("newTask.input.placeholder")} />
-                <PromptInputFooter>
+                <PromptInputFooter className="px-4 pb-3">
                   <PromptInputTools>
                     <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
                       <PopoverTrigger asChild>

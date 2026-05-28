@@ -1,6 +1,7 @@
 import settings from "./settings.json";
 import sidebar from "./sidebar.json";
 import task from "./task.json";
+import tasks from "./tasks.json";
 import newTask from "./newTask.json";
 import projects from "./projects.json";
 import projectDetail from "./projectDetail.json";
@@ -12,6 +13,7 @@ export const zh = {
   settings,
   sidebar,
   task,
+  tasks,
   newTask,
   projects,
   projectDetail,

@@ -1,4 +1,9 @@
 {
+  "renameDialog": {
+    "title": "重命名会话",
+    "cancel": "取消",
+    "save": "保存"
+  },
   "header": {
     "menu": "任务菜单",
     "schedule": "定时运行",

@@ -45,6 +45,19 @@ export async function listRecents(limit = 20): Promise<Conversation[]> {
   return expectJson<Conversation[]>(res);
 }
 
+export type ArchivedFilter = "active" | "archived" | "all";
+
+/** Full task list for the Tasks page. `archived` selects the tab. */
+export async function listConversations(
+  filter: ArchivedFilter = "active",
+  limit = 100,
+): Promise<Conversation[]> {
+  const res = await authedFetch(
+    `/conversations?limit=${limit}&archived=${filter}`,
+  );
+  return expectJson<Conversation[]>(res);
+}
+
 export async function listPinned(): Promise<Conversation[]> {
   const res = await authedFetch(`/conversations?limit=100&pinned=true`);
   return expectJson<Conversation[]>(res);
@@ -85,6 +98,18 @@ export async function renameConversation(
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ title }),
+  });
+  return expectJson<Conversation>(res);
+}
+
+export async function archiveConversation(
+  id: string,
+  archived: boolean,
+): Promise<Conversation> {
+  const res = await authedFetch(`/conversations/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ archived }),
   });
   return expectJson<Conversation>(res);
 }

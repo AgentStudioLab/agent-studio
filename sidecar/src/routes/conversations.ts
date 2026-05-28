@@ -32,7 +32,12 @@ export function buildConversationRoutes(deps: MountConversationsDeps): Hono {
   app.get("/conversations", (c) => {
     const limit = Math.min(Math.max(Number(c.req.query("limit") ?? "20"), 1), 100);
     const pinnedOnly = c.req.query("pinned") === "true";
-    return c.json(threads.list({ limit, pinnedOnly }));
+    const archivedParam = c.req.query("archived");
+    const archived =
+      archivedParam === "archived" || archivedParam === "all"
+        ? archivedParam
+        : "active";
+    return c.json(threads.list({ limit, pinnedOnly, archived }));
   });
 
   // Status aggregation — one row per conversation with lastRunId + run status.
@@ -53,7 +58,12 @@ export function buildConversationRoutes(deps: MountConversationsDeps): Hono {
     if (!threads.get(id)) return c.json({ error: "not_found" }, 404);
 
     const body = (await c.req.json().catch(() => null)) as
-      | { title?: string; pinned?: boolean; workingDir?: string | null }
+      | {
+          title?: string;
+          pinned?: boolean;
+          archived?: boolean;
+          workingDir?: string | null;
+        }
       | null;
     if (body?.title !== undefined) {
       if (typeof body.title !== "string" || body.title.length === 0) {
@@ -63,6 +73,12 @@ export function buildConversationRoutes(deps: MountConversationsDeps): Hono {
     }
     if (body?.pinned !== undefined) {
       threads.updatePin(id, body.pinned);
+    }
+    if (body?.archived !== undefined) {
+      if (typeof body.archived !== "boolean") {
+        return c.json({ error: "invalid_archived" }, 400);
+      }
+      threads.updateArchived(id, body.archived);
     }
     if (body?.workingDir !== undefined) {
       // Pass null through to clear (fall back to default); empty string is

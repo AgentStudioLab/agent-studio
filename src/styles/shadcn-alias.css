@@ -11,7 +11,7 @@
     --foreground:           hsl(var(--text-100));
     --card:                 hsl(var(--bg-200));
     --card-foreground:      hsl(var(--text-100));
-    --popover:              hsl(var(--bg-100));
+    --popover:              hsl(var(--bg-overlay));
     --popover-foreground:   hsl(var(--text-100));
     --primary:              hsl(var(--brand-100));
     --primary-foreground:   hsl(var(--oncolor-100));

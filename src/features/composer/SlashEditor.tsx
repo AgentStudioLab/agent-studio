@@ -179,7 +179,7 @@ export function SlashEditor({
 
   return (
     <div
-      className={cn("slash-editor w-full flex-1 self-stretch px-2.5", className)}
+      className={cn("slash-editor w-full flex-1 self-stretch px-4", className)}
       data-rows={rows}
       onClick={() => editor?.commands.focus()}
     >

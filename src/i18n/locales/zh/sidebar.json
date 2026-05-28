@@ -8,7 +8,8 @@
   },
   "sections": {
     "pinned": "已置顶",
-    "recents": "最近"
+    "recents": "最近",
+    "viewAll": "查看全部"
   },
   "contextMenu": {
     "moreActions": "更多操作",
@@ -17,6 +18,7 @@
     "unpin": "取消置顶",
     "rename": "重命名",
     "archive": "归档",
+    "unarchive": "取消归档",
     "delete": "删除"
   },
   "deleteDialog": {

@@ -1,10 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  archiveConversation,
+  type ArchivedFilter,
   createConversation,
   type CreateConversationArgs,
   deleteConversation,
   getConversation,
   getMessages,
+  listConversations,
   listPinned,
   listRecents,
   renameConversation,
@@ -14,6 +17,7 @@ import {
 export const queryKeys = {
   recents: ["conversations", "recents"] as const,
   pinned: ["conversations", "pinned"] as const,
+  list: (filter: ArchivedFilter) => ["conversations", "list", filter] as const,
   detail: (id: string) => ["conversations", "detail", id] as const,
   messages: (conversationId: string) =>
     ["conversations", conversationId, "messages"] as const,
@@ -44,6 +48,14 @@ export function usePinnedConversations() {
   });
 }
 
+export function useConversationsList(filter: ArchivedFilter) {
+  return useQuery({
+    queryKey: queryKeys.list(filter),
+    queryFn: () => listConversations(filter),
+    staleTime: 5_000,
+  });
+}
+
 export function useMessages(conversationId: string | null) {
   return useQuery({
     queryKey: queryKeys.messages(conversationId ?? "__none__"),
@@ -53,15 +65,28 @@ export function useMessages(conversationId: string | null) {
   });
 }
 
+/** Invalidate every conversation listing (recents, pinned, all Tasks-page tabs). */
+function invalidateConversationLists(qc: ReturnType<typeof useQueryClient>) {
+  qc.invalidateQueries({ queryKey: queryKeys.recents });
+  qc.invalidateQueries({ queryKey: queryKeys.pinned });
+  qc.invalidateQueries({ queryKey: ["conversations", "list"] });
+}
+
 export function useTogglePinMutation() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (vars: { id: string; pinned: boolean }) =>
       togglePin(vars.id, vars.pinned),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.recents });
-      qc.invalidateQueries({ queryKey: queryKeys.pinned });
-    },
+    onSuccess: () => invalidateConversationLists(qc),
+  });
+}
+
+export function useArchiveConversationMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { id: string; archived: boolean }) =>
+      archiveConversation(vars.id, vars.archived),
+    onSuccess: () => invalidateConversationLists(qc),
   });
 }
 
@@ -69,9 +94,7 @@ export function useCreateConversationMutation() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (args: CreateConversationArgs = {}) => createConversation(args),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.recents });
-    },
+    onSuccess: () => invalidateConversationLists(qc),
   });
 }
 
@@ -80,9 +103,9 @@ export function useRenameConversationMutation() {
   return useMutation({
     mutationFn: (vars: { id: string; title: string }) =>
       renameConversation(vars.id, vars.title),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.recents });
-      qc.invalidateQueries({ queryKey: queryKeys.pinned });
+    onSuccess: (updated) => {
+      invalidateConversationLists(qc);
+      qc.invalidateQueries({ queryKey: queryKeys.detail(updated.id) });
     },
   });
 }
@@ -91,9 +114,6 @@ export function useDeleteConversationMutation() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => deleteConversation(id),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.recents });
-      qc.invalidateQueries({ queryKey: queryKeys.pinned });
-    },
+    onSuccess: () => invalidateConversationLists(qc),
   });
 }
