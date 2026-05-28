@@ -34,8 +34,8 @@ export function PinnedItem({
         className={cn(
           "flex w-full items-center gap-3 rounded-md py-1.5 pl-3 pr-9 text-left text-[14px] transition-colors",
           active
-            ? "bg-[hsl(var(--bg-000))] text-[hsl(var(--text-100))]"
-            : "text-[hsl(var(--text-200))] hover:bg-[hsl(var(--bg-100))] hover:text-[hsl(var(--text-100))]",
+            ? "bg-state-selected text-[hsl(var(--text-100))]"
+            : "text-[hsl(var(--text-200))] hover:bg-state-hover hover:text-[hsl(var(--text-100))]",
         )}
       >
         {isProject ? (

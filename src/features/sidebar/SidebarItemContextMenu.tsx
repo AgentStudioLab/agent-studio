@@ -65,7 +65,7 @@ export function SidebarItemContextMenu({
             aria-label={t("sidebar.contextMenu.moreActions")}
             onClick={(e) => e.stopPropagation()}
             className={cn(
-              "flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-sidebar-accent",
+              "flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-state-hover",
               triggerClassName,
             )}
           >

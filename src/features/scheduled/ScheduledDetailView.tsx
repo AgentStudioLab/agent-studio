@@ -39,7 +39,7 @@ export function ScheduledDetailView() {
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                className="rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
+                className="rounded-md p-2 text-muted-foreground hover:bg-state-hover hover:text-foreground"
                 aria-label={t("scheduled.detail.edit")}
               >
                 <Pencil className="size-4" />

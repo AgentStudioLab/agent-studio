@@ -67,10 +67,10 @@ export function TasksView() {
     <>
       <AppShell
         main={
-          <div className="flex h-full flex-col overflow-y-auto">
+          <div className="flex h-full flex-col overflow-hidden">
             <header
               data-tauri-drag-region
-              className="flex items-center justify-between gap-4 px-12 pt-12 pb-6"
+              className="flex shrink-0 items-center justify-between gap-4 px-12 pt-12 pb-6"
             >
               <h1 className="font-serif text-[32px] font-normal leading-none text-foreground">
                 {t("tasks.title")}
@@ -93,7 +93,7 @@ export function TasksView() {
                       type="button"
                       onClick={closeSearch}
                       aria-label={t("tasks.search.clear")}
-                      className="flex size-5 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                      className="flex size-5 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-state-hover hover:text-foreground"
                     >
                       <X className="size-3.5" />
                     </button>
@@ -103,7 +103,7 @@ export function TasksView() {
                     type="button"
                     onClick={() => setSearchOpen(true)}
                     aria-label={t("tasks.search.open")}
-                    className="flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    className="flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-state-hover hover:text-foreground"
                   >
                     <Search className="size-[18px]" />
                   </button>
@@ -118,7 +118,7 @@ export function TasksView() {
               </div>
             </header>
 
-            <div className="flex items-center gap-1 px-12 pb-4">
+            <div className="flex shrink-0 items-center gap-1 px-12 pb-4">
               {TABS.map((id) => (
                 <button
                   key={id}
@@ -127,8 +127,8 @@ export function TasksView() {
                   className={cn(
                     "rounded-md px-2.5 py-1 text-sm font-medium transition-colors",
                     tab === id
-                      ? "bg-[hsl(var(--bg-000))] text-foreground"
-                      : "text-muted-foreground hover:text-foreground",
+                      ? "bg-state-selected text-foreground"
+                      : "text-muted-foreground hover:bg-state-hover hover:text-foreground",
                   )}
                 >
                   {t(`tasks.tabs.${id}`)}
@@ -136,7 +136,7 @@ export function TasksView() {
               ))}
             </div>
 
-            <div className="flex flex-1 flex-col gap-0.5 px-9 pb-12">
+            <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-9 pb-12">
               {filtered.length === 0 ? (
                 <p className="px-3 py-8 text-sm text-muted-foreground">
                   {emptyMessage}

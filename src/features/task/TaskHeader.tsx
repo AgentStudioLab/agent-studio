@@ -67,7 +67,7 @@ export function TaskHeader({
       <DropdownMenu>
         <DropdownMenuTrigger
           aria-label={t("task.header.menu")}
-          className="inline-flex min-w-0 items-center gap-1.5 rounded-md px-2 py-1 text-[14px] font-medium text-foreground outline-hidden hover:bg-muted focus-visible:ring-1 focus-visible:ring-ring"
+          className="inline-flex min-w-0 items-center gap-1.5 rounded-md px-2 py-1 text-[14px] font-medium text-foreground outline-hidden hover:bg-state-hover focus-visible:ring-1 focus-visible:ring-ring"
         >
           <span className="truncate">{title ?? conversationId}</span>
           <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
@@ -117,7 +117,7 @@ export function TaskHeader({
         type="button"
         onClick={toggleAside}
         aria-label={t("task.header.toggleRightPanel")}
-        className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+        className="rounded-md p-1.5 text-muted-foreground hover:bg-state-hover hover:text-foreground"
       >
         <PanelRight className="size-4" />
       </button>

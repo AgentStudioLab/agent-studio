@@ -61,14 +61,14 @@ export function ScheduledListView() {
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                className="rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
+                className="rounded-md p-2 text-muted-foreground hover:bg-state-hover hover:text-foreground"
                 aria-label={t("scheduled.toolbar.sort")}
               >
                 <ArrowUpDown className="size-4" />
               </button>
               <button
                 type="button"
-                className="rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
+                className="rounded-md p-2 text-muted-foreground hover:bg-state-hover hover:text-foreground"
                 aria-label={t("scheduled.toolbar.search")}
               >
                 <Search className="size-4" />

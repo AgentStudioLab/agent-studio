@@ -26,7 +26,7 @@ export function SettingsLayout() {
         <button
           type="button"
           onClick={() => navigate("/")}
-          className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+          className="rounded-md p-1.5 text-muted-foreground hover:bg-state-hover hover:text-foreground"
           aria-label={t("settings.back")}
         >
           <ChevronLeft className="size-4" />
@@ -46,8 +46,8 @@ export function SettingsLayout() {
                 cn(
                   "rounded-md px-3 py-1.5 text-left text-sm transition-colors",
                   isActive
-                    ? "bg-sidebar-accent text-foreground"
-                    : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground",
+                    ? "bg-state-selected text-foreground"
+                    : "text-muted-foreground hover:bg-state-hover hover:text-foreground",
                 )
               }
             >

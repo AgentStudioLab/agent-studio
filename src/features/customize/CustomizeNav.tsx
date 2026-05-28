@@ -31,7 +31,7 @@ export function CustomizeNav({ active, onChange }: CustomizeNavProps) {
         <span>{t("customize.nav.personalPlugins")}</span>
         <button
           type="button"
-          className="rounded-md p-0.5 hover:bg-muted hover:text-foreground"
+          className="rounded-md p-0.5 hover:bg-state-hover hover:text-foreground"
           aria-label={t("customize.nav.addPersonalPlugin")}
         >
           <Plus className="size-3.5" />
@@ -46,8 +46,8 @@ export function CustomizeNav({ active, onChange }: CustomizeNavProps) {
         className={cn(
           "mt-2 rounded-md px-3 py-1.5 text-left text-sm",
           active === "plugins"
-            ? "bg-sidebar-accent text-foreground"
-            : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground",
+            ? "bg-state-selected text-foreground"
+            : "text-muted-foreground hover:bg-state-hover hover:text-foreground",
         )}
       >
         {t("customize.nav.browsePlugins")}
@@ -71,8 +71,8 @@ function NavLink({ active, onClick, icon: Icon, label }: NavLinkProps) {
       className={cn(
         "flex items-center gap-2 rounded-md px-3 py-1.5 text-sm",
         active
-          ? "bg-sidebar-accent text-foreground"
-          : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground",
+          ? "bg-state-selected text-foreground"
+          : "text-muted-foreground hover:bg-state-hover hover:text-foreground",
       )}
     >
       <Icon className="size-4" />

@@ -12,7 +12,7 @@ export function UpdateCard({ version, onClick }: UpdateCardProps) {
     <button
       type="button"
       onClick={onClick}
-      className="group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-sidebar-accent"
+      className="group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-state-hover"
       style={{ border: "1px solid hsl(var(--border-300) / 0.15)" }}
     >
       <div

@@ -26,6 +26,12 @@
      * don't read as near-black cutouts. */
     --bg-overlay: var(--color-stone-75);
 
+    /* Interactive hover / selected — darkening overlays so they read on ANY
+     * surface (sidebar bg-200 or canvas bg-100). Light mode: warm gray on
+     * near-white (hover 浅灰, selected 深灰). */
+    --state-hover: hsl(var(--color-stone-950) / 0.07);
+    --state-selected: hsl(var(--color-stone-950) / 0.14);
+
     /* Chrome (window titlebar / system decorations) */
     --chrome-bg-top: var(--color-stone-100);
     --chrome-bg-bottom: var(--color-stone-200);
@@ -109,6 +115,10 @@
     /* Grayer than bg-100 so dropdowns/menus/dialogs lift off the dark canvas
      * (≈ #383835 / RGB 56,56,53). */
     --bg-overlay: var(--color-stone-775);
+
+    /* Dark mode keeps the prior recess: hover ≈ bg-300/50, selected = bg-300. */
+    --state-hover: hsl(var(--color-stone-950) / 0.5);
+    --state-selected: hsl(var(--color-stone-950));
 
     --chrome-bg-top: var(--color-stone-800);
     --chrome-bg-bottom: var(--color-stone-850);

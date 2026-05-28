@@ -65,7 +65,7 @@ export function CustomizeView({ initialSection = "home" }: CustomizeViewProps) {
         <button
           type="button"
           onClick={() => navigate(returnPath ?? "/")}
-          className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+          className="rounded-md p-1.5 text-muted-foreground hover:bg-state-hover hover:text-foreground"
           aria-label={t("customize.back")}
         >
           <ChevronLeft className="size-4" />

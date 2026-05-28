@@ -150,7 +150,7 @@ export function PreviewPane({ file, workingDir, onClose }: PreviewPaneProps) {
             aria-label={copied ? t("task.preview.copied") : t("task.preview.copyContent")}
             title={copied ? t("task.preview.copied") : t("task.preview.copyContent")}
             onClick={handleCopy}
-            className="rounded-md p-1.5 transition hover:bg-muted hover:text-foreground"
+            className="rounded-md p-1.5 transition hover:bg-state-hover hover:text-foreground"
             style={{ color: "hsl(var(--text-300))" }}
           >
             {copied ? (
@@ -166,7 +166,7 @@ export function PreviewPane({ file, workingDir, onClose }: PreviewPaneProps) {
           aria-label={t("task.preview.refresh")}
           onClick={refetch}
           disabled={isFetching}
-          className="rounded-md p-1.5 transition hover:bg-muted hover:text-foreground disabled:opacity-50"
+          className="rounded-md p-1.5 transition hover:bg-state-hover hover:text-foreground disabled:opacity-50"
           style={{ color: "hsl(var(--text-300))" }}
         >
           <RotateCw className={cn("size-[13px]", isFetching && "animate-spin")} />
@@ -175,7 +175,7 @@ export function PreviewPane({ file, workingDir, onClose }: PreviewPaneProps) {
           type="button"
           aria-label={t("task.preview.close")}
           onClick={onClose}
-          className="rounded-md p-1.5 transition hover:bg-muted hover:text-foreground"
+          className="rounded-md p-1.5 transition hover:bg-state-hover hover:text-foreground"
           style={{ color: "hsl(var(--text-300))" }}
         >
           <X className="size-[14px]" />
