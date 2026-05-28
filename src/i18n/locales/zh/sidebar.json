@@ -7,6 +7,8 @@
     "settings": "设置"
   },
   "sections": {
+    "scheduled": "定时任务",
+    "scheduledNew": "{{count}} 条新",
     "pinned": "已置顶",
     "recents": "最近",
     "viewAll": "查看全部"

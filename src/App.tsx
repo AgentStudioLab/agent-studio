@@ -4,6 +4,7 @@ import { MessageQueueProvider } from "@/features/task/MessageQueueContext";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { MacTitlebar } from "@/app/MacTitlebar";
 import { RouterView } from "@/app/RouterView";
+import { ScheduledRunWatcher } from "@/features/scheduled/ScheduledRunWatcher";
 
 function App() {
   return (
@@ -38,6 +39,7 @@ function App() {
                 <RouterView />
               </div>
               <MacTitlebar />
+              <ScheduledRunWatcher />
             </div>
           </TooltipProvider>
         </MessageQueueProvider>

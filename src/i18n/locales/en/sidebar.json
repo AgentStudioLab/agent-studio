@@ -7,6 +7,8 @@
     "settings": "Settings"
   },
   "sections": {
+    "scheduled": "Scheduled",
+    "scheduledNew": "{{count}} new",
     "pinned": "Pinned",
     "recents": "Recents",
     "viewAll": "View all"

@@ -99,6 +99,10 @@ export class Scheduler {
       projectId: task.projectId,
       workingDir: cwd,
       scheduledTaskId: task.id,
+      // Seed the conversation's defaults so opening it (and any follow-up
+      // message) inherits the task's model + permission mode.
+      model: task.model,
+      permissionMode: task.permissionMode,
     });
     const threadId = thread.id;
     const runId = crypto.randomUUID();

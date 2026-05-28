@@ -1,11 +1,14 @@
 import { useTranslation } from "react-i18next";
 import { Link, useLocation } from "react-router-dom";
-import { ScrollText } from "lucide-react";
+import { Clock, ExternalLink, ScrollText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useThreadContext } from "@/lib/agui/react/useThreadContext";
 
 interface ContextTabProps {
   threadId: string | null;
+  /** When set, the conversation is a scheduled run — show a link back to the task. */
+  scheduledTaskId?: string | null;
+  scheduledTaskName?: string | null;
 }
 
 function SectionHeading({ label, count }: { label: string; count: string }) {
@@ -19,11 +22,37 @@ function SectionHeading({ label, count }: { label: string; count: string }) {
   );
 }
 
-export function ContextTab({ threadId }: ContextTabProps) {
+export function ContextTab({
+  threadId,
+  scheduledTaskId,
+  scheduledTaskName,
+}: ContextTabProps) {
   const { t } = useTranslation();
   const location = useLocation();
   const { context, isLoading } = useThreadContext(threadId);
   const { skills, mcpServers } = context;
+
+  const scheduledSection = scheduledTaskId ? (
+    <>
+      <SectionHeading label={t("task.contextTab.scheduled")} count="" />
+      <Link
+        to={`/scheduled/${scheduledTaskId}`}
+        className="flex items-center gap-2.5 px-2 py-1.5 rounded-md hover:bg-bg-200/60 transition"
+        title={t("task.contextTab.scheduledOpen")}
+      >
+        <span
+          aria-hidden="true"
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-bg-200"
+        >
+          <Clock className="size-3.5" style={{ color: "hsl(var(--text-400))" }} />
+        </span>
+        <span className="flex-1 min-w-0 truncate text-[13px] text-text-200 leading-tight">
+          {scheduledTaskName ?? t("task.contextTab.scheduledTask")}
+        </span>
+        <ExternalLink className="size-3.5 shrink-0 text-text-400" />
+      </Link>
+    </>
+  ) : null;
 
   // Build a /customize deep-link that remembers where we came from. The
   // `from` param is read back by CustomizeView's back button so the user
@@ -45,7 +74,7 @@ export function ContextTab({ threadId }: ContextTabProps) {
     );
   }
 
-  if (skills.length === 0 && mcpServers.length === 0) {
+  if (skills.length === 0 && mcpServers.length === 0 && !scheduledTaskId) {
     return (
       <div className="px-6 py-12 text-center text-sm" style={{ color: "hsl(var(--text-300))" }}>
         <div>{t("task.contextTab.empty.noCapabilities")}</div>
@@ -64,6 +93,8 @@ export function ContextTab({ threadId }: ContextTabProps) {
 
   return (
     <div>
+      {scheduledSection}
+
       {skills.length > 0 && (
         <>
           <SectionHeading

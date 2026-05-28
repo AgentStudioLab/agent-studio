@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Briefcase,
@@ -104,20 +104,26 @@ export function NewScheduledModal({
     useState<SchedulePermissionMode>("ask");
   const [confirmAct, setConfirmAct] = useState(false);
 
-  // Sync form state from `initial` each time the dialog opens (edit mode), or
-  // reset to defaults (create mode). Keyed on `open` so reopening re-seeds.
+  // Seed form state from `initial` ONLY on the closed→open transition. `initial`
+  // is a fresh object literal on every parent render (and the parent re-renders
+  // on its 5s status poll), so depending on `initial` here would wipe the user's
+  // in-progress edits every poll. The ref keeps the latest values without making
+  // the effect re-run.
+  const initialRef = useRef(initial);
+  initialRef.current = initial;
   useEffect(() => {
     if (!open) return;
-    setName(initial?.name ?? "");
-    setDescription(initial?.description ?? "");
-    setPrompt(initial?.prompt ?? "");
-    setFrequency(initial?.frequency ?? "daily");
-    setTimeOfDay(initial?.timeOfDay ?? "09:00");
-    setWeekday(initial?.weekday ?? new Date().getDay());
-    setWorkingDir(initial?.workingDir ?? null);
-    setModel(initial?.model ?? null);
-    setPermissionMode(initial?.permissionMode ?? "ask");
-  }, [open, initial]);
+    const init = initialRef.current;
+    setName(init?.name ?? "");
+    setDescription(init?.description ?? "");
+    setPrompt(init?.prompt ?? "");
+    setFrequency(init?.frequency ?? "daily");
+    setTimeOfDay(init?.timeOfDay ?? "09:00");
+    setWeekday(init?.weekday ?? new Date().getDay());
+    setWorkingDir(init?.workingDir ?? null);
+    setModel(init?.model ?? null);
+    setPermissionMode(init?.permissionMode ?? "ask");
+  }, [open]);
 
   const canSave = name.trim().length > 0 && description.trim().length > 0;
   const showTimeInput = frequency !== "manual" && frequency !== "hourly";

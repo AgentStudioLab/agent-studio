@@ -169,6 +169,8 @@ export function migrate(db: Database): void {
   ensureColumn(db, "conversations", "allowed_tools_json", "TEXT");
   ensureColumn(db, "conversations", "archived", "INTEGER NOT NULL DEFAULT 0");
   ensureColumn(db, "conversations", "scheduled_task_id", "TEXT");
+  ensureColumn(db, "conversations", "model", "TEXT");
+  ensureColumn(db, "conversations", "permission_mode", "TEXT");
   ensureColumn(db, "tool_calls", "side_effects", "TEXT");
   ensureColumn(db, "runs", "input_tokens", "INTEGER");
   ensureColumn(db, "runs", "output_tokens", "INTEGER");

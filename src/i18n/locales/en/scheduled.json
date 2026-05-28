@@ -9,6 +9,11 @@
   "card": {
     "paused": "Paused"
   },
+  "toast": {
+    "started": "Scheduled task \"{{name}}\" started.",
+    "view": "View",
+    "dismiss": "Dismiss"
+  },
   "menu": {
     "moreActions": "More actions",
     "runNow": "Run now",

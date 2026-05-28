@@ -182,6 +182,27 @@ describe("ScheduledTaskService", () => {
     expect(new Date(t.nextRunAt!).getDay()).toBe(2);
   });
 
+  it("round-trips workingDir / model / permissionMode", () => {
+    const svc = new ScheduledTaskService(freshDb());
+    const t = svc.create({
+      name: "x",
+      prompt: "x",
+      frequency: "daily",
+      workingDir: "/Users/me/gitlab",
+      model: "deepseek-reasoner",
+      permissionMode: "act-without-asking",
+    });
+    expect(t.workingDir).toBe("/Users/me/gitlab");
+    expect(t.model).toBe("deepseek-reasoner");
+    expect(t.permissionMode).toBe("act-without-asking");
+    // survives a reload + a partial update
+    expect(svc.get(t.id)!.workingDir).toBe("/Users/me/gitlab");
+    const updated = svc.update(t.id, { model: "claude-opus-4-7", permissionMode: "ask" })!;
+    expect(updated.model).toBe("claude-opus-4-7");
+    expect(updated.permissionMode).toBe("ask");
+    expect(updated.workingDir).toBe("/Users/me/gitlab");
+  });
+
   it("round-trips the allow-list", () => {
     const svc = new ScheduledTaskService(freshDb());
     const t = svc.create({

@@ -48,6 +48,11 @@ interface TaskMessageInputProps {
   onStop?: () => void;
   /** True while the run is in flight. */
   streaming?: boolean;
+  /** Lock the model picker — the session has started, model is fixed. */
+  modelLocked?: boolean;
+  /** Conversation-level default model (seeded for scheduled runs) shown when
+   *  the user hasn't picked a per-thread model. */
+  fallbackModel?: string | null;
 }
 
 export function TaskMessageInput({
@@ -57,6 +62,8 @@ export function TaskMessageInput({
   onOverride,
   onStop,
   streaming = false,
+  modelLocked = false,
+  fallbackModel = null,
 }: TaskMessageInputProps) {
   const { t } = useTranslation();
   const { mode, setMode } = useThreadPermissionMode(threadId);
@@ -158,7 +165,12 @@ export function TaskMessageInput({
             </DropdownMenu>
           </PromptInputTools>
           <PromptInputTools>
-            <ModelPicker value={model} onChange={setModel} />
+            <ModelPicker
+              value={model ?? fallbackModel}
+              onChange={setModel}
+              disabled={modelLocked}
+              disabledReason={t("task.input.modelLocked")}
+            />
             {/*
               During streaming OR HITL-pause we render TWO buttons:
                 - Stop (square icon, neutral border): cancels the active run

@@ -12,6 +12,10 @@ export interface Thread {
   archived: boolean;
   workingDir: string;
   scheduledTaskId: string | null;
+  /** Default model for this conversation (seeded for scheduled runs). null = composer falls back to the global default. */
+  model: string | null;
+  /** Default permission mode (seeded for scheduled runs). null = composer default ("ask"). */
+  permissionMode: "ask" | "act-without-asking" | null;
   createdAt: number;
   updatedAt: number;
 }
@@ -24,6 +28,8 @@ interface ThreadRow {
   archived: number;
   working_dir: string | null;
   scheduled_task_id: string | null;
+  model: string | null;
+  permission_mode: string | null;
   created_at: number;
   updated_at: number;
 }
@@ -57,6 +63,13 @@ function rowToThread(r: ThreadRow): Thread {
     archived: r.archived === 1,
     workingDir: r.working_dir ?? ensureDefaultDir(),
     scheduledTaskId: r.scheduled_task_id ?? null,
+    model: r.model ?? null,
+    permissionMode:
+      r.permission_mode === "act-without-asking"
+        ? "act-without-asking"
+        : r.permission_mode === "ask"
+          ? "ask"
+          : null,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -71,13 +84,15 @@ export class ThreadService {
     projectId?: string | null;
     workingDir?: string | null;
     scheduledTaskId?: string | null;
+    model?: string | null;
+    permissionMode?: "ask" | "act-without-asking" | null;
   }): Thread {
     const id = input?.id ?? `thr_${nanoid(12)}`;
     const now = Date.now();
     this.db
       .prepare(
-        `INSERT INTO conversations (id, title, project_id, pinned, working_dir, scheduled_task_id, created_at, updated_at)
-         VALUES (?, ?, ?, 0, ?, ?, ?, ?)`,
+        `INSERT INTO conversations (id, title, project_id, pinned, working_dir, scheduled_task_id, model, permission_mode, created_at, updated_at)
+         VALUES (?, ?, ?, 0, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         id,
@@ -85,6 +100,8 @@ export class ThreadService {
         input?.projectId ?? null,
         input?.workingDir ?? null,
         input?.scheduledTaskId ?? null,
+        input?.model ?? null,
+        input?.permissionMode ?? null,
         now,
         now,
       );
@@ -112,7 +129,10 @@ export class ThreadService {
       archived?: "active" | "archived" | "all";
     } = {},
   ): Thread[] {
-    const clauses: string[] = [];
+    // Scheduler-spawned conversations are surfaced under the sidebar's
+    // "Scheduled" section + each task's Runs tab, NOT in the general
+    // Recents/Pinned/Tasks lists — otherwise N daily runs would flood Recents.
+    const clauses: string[] = ["scheduled_task_id IS NULL"];
     if (opts.pinnedOnly) clauses.push("pinned = 1");
     const archivedFilter = opts.archived ?? "active";
     if (archivedFilter === "active") clauses.push("archived = 0");

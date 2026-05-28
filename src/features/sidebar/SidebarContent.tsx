@@ -45,7 +45,9 @@ import { useThreadUnread } from "@/lib/agui/react/useThreadUnread";
 import { NavItem } from "@/features/sidebar/NavItem";
 import { PinnedItem } from "@/features/sidebar/PinnedItem";
 import { RecentItem } from "@/features/sidebar/RecentItem";
+import { ScheduledNavItem } from "@/features/sidebar/ScheduledNavItem";
 import { UserBar } from "@/features/sidebar/UserBar";
+import { useScheduledTasks } from "@/lib/data/scheduled-queries";
 
 import type { Status } from "@/lib/mock/types";
 import type { ThreadStatusItem } from "@/lib/agui/react/useThreadStatuses";
@@ -119,7 +121,10 @@ export function SidebarContent() {
   // URL is the source of truth for "which view is active". useMatch would
   // also work but a single useParams + a substring check on pathname is
   // enough for the few sidebar slots we light up.
-  const { threadId: routeThreadId } = useParams<{ threadId: string }>();
+  const { threadId: routeThreadId, scheduledId: routeScheduledId } = useParams<{
+    threadId: string;
+    scheduledId: string;
+  }>();
   const pathname = location.pathname;
   // Pulse-dot prototype shows the selected thread with a darker fill
   // (bg-000) — only counts when the task view is the one in focus.
@@ -132,6 +137,7 @@ export function SidebarContent() {
   const { data: recentsData = [] } = useRecentConversations();
   const { data: pinnedData = [] } = usePinnedConversations();
   const { data: threadStatuses = [] } = useThreadStatuses();
+  const { data: scheduledTasks = [] } = useScheduledTasks();
   const togglePinMutation = useTogglePinMutation();
   const archiveMutation = useArchiveConversationMutation();
   const deleteMutation = useDeleteConversationMutation();
@@ -162,6 +168,22 @@ export function SidebarContent() {
     () => pinnedData.map((c) => toPinnedItem(c, entryByThread.get(c.id), isUnread)),
     [pinnedData, entryByThread, isUnread],
   );
+  // Group scheduler-spawned run threads by their origin task so each sidebar
+  // Scheduled row can show its latest run's dot + an unviewed-run count.
+  const scheduledRunsByTask = useMemo(() => {
+    const m = new Map<string, ThreadStatusItem[]>();
+    for (const s of threadStatuses) {
+      if (!s.scheduledTaskId) continue;
+      const arr = m.get(s.scheduledTaskId) ?? [];
+      arr.push(s);
+      m.set(s.scheduledTaskId, arr);
+    }
+    return m;
+  }, [threadStatuses]);
+  // The Scheduled row highlights when the open conversation is one of its runs.
+  const activeScheduledTaskId = routeThreadId
+    ? entryByThread.get(routeThreadId)?.scheduledTaskId ?? null
+    : null;
 
   const handlePin = (recent: MockRecentItem) => {
     togglePinMutation.mutate({ id: recent.id, pinned: true });
@@ -226,6 +248,61 @@ export function SidebarContent() {
           onClick={() => navigate("/customize")}
         />
       </nav>
+
+      {/* Scheduled — the user's scheduled-task definitions, with a status dot
+       *  and either the cadence label or an unviewed-run count. */}
+      {scheduledTasks.length > 0 && (
+        <>
+          <div className="px-3 pb-1 pt-5">
+            <div className="px-2 text-[12px] font-medium text-[hsl(var(--text-400))]">
+              {t("sidebar.sections.scheduled")}
+            </div>
+          </div>
+          <div className="flex shrink-0 flex-col gap-0.5 px-2">
+            {scheduledTasks.map((task) => {
+              const runs = scheduledRunsByTask.get(task.id) ?? [];
+              const latest = runs.reduce<ThreadStatusItem | undefined>(
+                (acc, r) => (!acc || r.updatedAt > acc.updatedAt ? r : acc),
+                undefined,
+              );
+              const newCount = runs.filter((r) =>
+                isUnread(r.threadId, r.lastRunId),
+              ).length;
+              const status = latest
+                ? aguiToMockStatus(
+                    latest.status,
+                    isUnread(latest.threadId, latest.lastRunId),
+                  )
+                : "pending";
+              return (
+                <ScheduledNavItem
+                  key={task.id}
+                  name={task.name}
+                  status={status}
+                  frequencyLabel={t(`scheduled.frequencyChip.${task.frequency}`)}
+                  newCount={newCount}
+                  newLabel={t("sidebar.sections.scheduledNew", { count: newCount })}
+                  active={
+                    activeScheduledTaskId === task.id || routeScheduledId === task.id
+                  }
+                  onClick={() => {
+                    // The sidebar row opens the task's CONVERSATION (its latest
+                    // run), not the config page. Config is reached by clicking
+                    // the card on the /scheduled list. No runs yet → fall back
+                    // to the config page so there's somewhere to land.
+                    if (latest) {
+                      if (latest.lastRunId) markRead(latest.threadId, latest.lastRunId);
+                      navigate(`/task/${latest.threadId}`);
+                    } else {
+                      navigate(`/scheduled/${task.id}`);
+                    }
+                  }}
+                />
+              );
+            })}
+          </div>
+        </>
+      )}
 
       {/* Pinned */}
       {pinned.length > 0 && (

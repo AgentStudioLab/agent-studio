@@ -9,6 +9,11 @@
   "card": {
     "paused": "已暂停"
   },
+  "toast": {
+    "started": "定时任务 “{{name}}” 已开始运行。",
+    "view": "查看",
+    "dismiss": "关闭"
+  },
   "menu": {
     "moreActions": "更多操作",
     "runNow": "立即运行",

@@ -17,9 +17,14 @@
     "toggleRightPanel": "Toggle right panel"
   },
   "tabs": {
+    "runs": "Runs",
     "process": "Process",
     "files": "Files",
     "context": "Context"
+  },
+  "runsTab": {
+    "loading": "Loading runs…",
+    "empty": "No runs yet."
   },
   "rightPanel": {
     "empty": "No artifacts yet"
@@ -69,6 +74,9 @@
     "empty": "Agent hasn't touched any files yet"
   },
   "contextTab": {
+    "scheduled": "Scheduled task",
+    "scheduledTask": "Scheduled task",
+    "scheduledOpen": "Open scheduled task",
     "skills": "Skills",
     "skillsLoaded": "{{count}} loaded",
     "mcpServers": "MCP servers",
@@ -150,6 +158,7 @@
     "placeholder": "Write a message...",
     "ask": "Ask",
     "legacyModel": "Legacy Model",
+    "modelLocked": "The model can't be changed once a session has started. Start a new session to use a different model.",
     "disclaimer": "Agent Studio is AI and can make mistakes. Please double-check responses.",
     "models": {
       "opus": { "displayName": "Opus 4.7", "description": "Most capable for ambitious work" },

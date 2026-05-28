@@ -110,7 +110,27 @@ export function TaskView() {
   // the live default from /models (first id in the active profile's list).
   // If /models hasn't resolved yet, leave undefined so send() omits the field
   // and the sidecar falls back to its own default.
-  const effectiveModel = threadModel ?? defaultModelId ?? undefined;
+  // Resolution order: explicit per-thread pick → conversation default (seeded
+  // for scheduled runs) → global default. So a scheduled run's conversation
+  // shows the task's model even before the user touches the picker.
+  const effectiveModel =
+    threadModel ?? conversationQuery.data?.model ?? defaultModelId ?? undefined;
+
+  // Seed the per-thread permission mode from the conversation's stored mode
+  // (scheduled runs persist their mode on the conversation). The mode store
+  // can't distinguish "unset" from "explicitly ask", so seed once per mount
+  // via a ref and only when currently "ask" — a user flip within the session
+  // still wins.
+  const modeSeededRef = useRef<string | null>(null);
+  useEffect(() => {
+    const conv = conversationQuery.data;
+    if (!conv || !activeTaskId) return;
+    if (modeSeededRef.current === activeTaskId) return;
+    modeSeededRef.current = activeTaskId;
+    if (conv.permissionMode === "act-without-asking" && permissionMode === "ask") {
+      setPermissionMode("act-without-asking");
+    }
+  }, [conversationQuery.data, activeTaskId, permissionMode, setPermissionMode]);
 
   // Prime runtime once history actually arrives. Skipping `undefined` keeps
   // the effect quiet during the loading window; once data is resolved
@@ -234,6 +254,17 @@ export function TaskView() {
   // open/close cycle — the panel itself is unmounted while a file is being
   // previewed, which would otherwise reset state to "process" on close.
   const [rightTab, setRightTab] = useState<TaskRightTabId>("process");
+  // Scheduled-run conversations open on the Runs tab (per design). Seed once
+  // per thread so the user can still switch away without it snapping back.
+  const tabSeededRef = useRef<string | null>(null);
+  useEffect(() => {
+    const conv = conversationQuery.data;
+    if (!conv || !activeTaskId) return;
+    if (tabSeededRef.current === activeTaskId) return;
+    tabSeededRef.current = activeTaskId;
+    if (conv.scheduledTaskId) setRightTab("runs");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversationQuery.data, activeTaskId]);
 
   // Per-thread message queue. Lives in MessageQueueContext (app-level) so
   // switching threads doesn't drop queued items — only an app restart does.
@@ -386,6 +417,8 @@ export function TaskView() {
               />
               <TaskMessageInput
                 threadId={activeTaskId}
+                modelLocked={viewMessages.length > 0}
+                fallbackModel={conversationQuery.data?.model ?? null}
                 onSend={(text) => {
                   queue.clearUserCancelled();
                   void send(text, { permissionMode, model: effectiveModel });
@@ -425,6 +458,8 @@ export function TaskView() {
           <TaskRightPanel
             state={state}
             threadId={activeTaskId}
+            scheduledTaskId={conversationQuery.data?.scheduledTaskId ?? null}
+            scheduledTaskName={conversationQuery.data?.title ?? null}
             workingDir={cwd}
             onOpenFile={(file) => openPreview(touchedFileToPreview(file))}
             tab={rightTab}

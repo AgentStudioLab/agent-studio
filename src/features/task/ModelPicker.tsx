@@ -6,20 +6,52 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useAvailableModels } from "@/lib/models";
 
 interface ModelPickerProps {
   /** Selected model id. `null` → first model in the fetched list. */
   value: string | null;
   onChange: (id: string) => void;
+  /** Lock the picker (e.g. after a session has started — model is fixed). */
+  disabled?: boolean;
+  /** Tooltip explaining why it's locked. */
+  disabledReason?: string;
 }
 
-export function ModelPicker({ value, onChange }: ModelPickerProps) {
+export function ModelPicker({
+  value,
+  onChange,
+  disabled,
+  disabledReason,
+}: ModelPickerProps) {
   const { models, defaultModelId } = useAvailableModels();
   const effectiveId = value ?? defaultModelId;
   const selected = models.find((m) => m.id === effectiveId);
   // Loading / empty: show "Model" placeholder so the trigger doesn't collapse.
   const label = selected?.displayName ?? effectiveId ?? "Model";
+
+  if (disabled) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="inline-flex cursor-not-allowed items-center gap-1 rounded-md px-2 py-1.5 text-sm text-muted-foreground opacity-60">
+            {label}
+            <ChevronDown className="size-3" />
+          </span>
+        </TooltipTrigger>
+        {disabledReason && (
+          <TooltipContent side="top" className="max-w-[260px]">
+            {disabledReason}
+          </TooltipContent>
+        )}
+      </Tooltip>
+    );
+  }
 
   return (
     <DropdownMenu>

@@ -17,9 +17,14 @@
     "toggleRightPanel": "切换右侧面板"
   },
   "tabs": {
+    "runs": "运行",
     "process": "过程",
     "files": "文件",
     "context": "上下文"
+  },
+  "runsTab": {
+    "loading": "加载运行记录…",
+    "empty": "还没有运行记录。"
   },
   "rightPanel": {
     "empty": "暂无产出"
@@ -69,6 +74,9 @@
     "empty": "agent 还没读写文件"
   },
   "contextTab": {
+    "scheduled": "定时任务",
+    "scheduledTask": "定时任务",
+    "scheduledOpen": "打开定时任务",
     "skills": "技能",
     "skillsLoaded": "已加载 {{count}}",
     "mcpServers": "MCP 服务器",
@@ -150,6 +158,7 @@
     "placeholder": "输入消息……",
     "ask": "提问",
     "legacyModel": "Legacy 模型",
+    "modelLocked": "会话开始后不能更换模型。新建会话才能使用其他模型。",
     "disclaimer": "Agent Studio 是 AI，可能会出错。请仔细核对回复。",
     "models": {
       "opus": { "displayName": "Opus 4.7", "description": "最强能力，应对硬核任务" },

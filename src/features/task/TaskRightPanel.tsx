@@ -1,20 +1,26 @@
 import { type ReactNode } from "react";
-import { Activity, Folder, Layers } from "lucide-react";
+import { Activity, Folder, History, Layers } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { ProcessTab } from "@/features/task/ProcessTab";
 import { FilesTab } from "@/features/task/FilesTab";
 import { ContextTab } from "@/features/task/ContextTab";
+import { RunsTab } from "@/features/task/RunsTab";
 import type { TouchedFile } from "@/lib/agui/runtime/derivations";
 import type { ChatState } from "@/lib/agui/runtime/types";
 
-export type TaskRightTabId = "process" | "files" | "context";
+export type TaskRightTabId = "runs" | "process" | "files" | "context";
 
 interface TaskRightPanelProps {
   /** ChatState from TaskView's useChat — drives Process/Files derivations. */
   state: ChatState | null;
   /** threadId for ContextTab (TanStack Query-backed, doesn't need state). */
   threadId: string | null;
+  /** Origin scheduled task (when this conversation is a scheduled run). Enables
+   *  the Runs tab + the Context tab's scheduled-task entry. */
+  scheduledTaskId?: string | null;
+  /** Scheduled task name for the Context tab entry. */
+  scheduledTaskName?: string | null;
   /** Conversation working directory — drives Files Tab cwd filter + header. */
   workingDir: string | null;
   /** Called when a Files Tab entry is clicked — opens PreviewPane. */
@@ -58,6 +64,8 @@ function TabButton({ id, label, icon, active, onClick }: TabButtonProps) {
 export function TaskRightPanel({
   state,
   threadId,
+  scheduledTaskId,
+  scheduledTaskName,
   workingDir,
   onOpenFile,
   tab,
@@ -75,6 +83,15 @@ export function TaskRightPanel({
             border: "1px solid hsl(var(--border-300) / 0.12)",
           }}
         >
+          {scheduledTaskId && (
+            <TabButton
+              id="runs"
+              label={t("task.tabs.runs")}
+              icon={<History size={14} />}
+              active={tab === "runs"}
+              onClick={onTabChange}
+            />
+          )}
           <TabButton
             id="process"
             label={t("task.tabs.process")}
@@ -99,6 +116,12 @@ export function TaskRightPanel({
         </div>
       </div>
       <div className="flex-1 overflow-y-auto px-3 pb-3">
+        {tab === "runs" && scheduledTaskId && (
+          <RunsTab
+            scheduledTaskId={scheduledTaskId}
+            currentThreadId={threadId}
+          />
+        )}
         {tab === "process" && <ProcessTab state={state} />}
         {tab === "files" && (
           <FilesTab
@@ -107,7 +130,13 @@ export function TaskRightPanel({
             onOpenFile={onOpenFile}
           />
         )}
-        {tab === "context" && <ContextTab threadId={threadId} />}
+        {tab === "context" && (
+          <ContextTab
+            threadId={threadId}
+            scheduledTaskId={scheduledTaskId}
+            scheduledTaskName={scheduledTaskName}
+          />
+        )}
       </div>
     </div>
   );

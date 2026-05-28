@@ -13,6 +13,12 @@ export interface Conversation {
    *  `~/.agent-studio` when the user hasn't picked one, so this is always
    *  a real path. */
   workingDir: string;
+  /** Origin scheduled task when this conversation was spawned by the scheduler. */
+  scheduledTaskId?: string | null;
+  /** Conversation default model (seeded for scheduled runs); null → global default. */
+  model?: string | null;
+  /** Conversation default permission mode (seeded for scheduled runs); null → "ask". */
+  permissionMode?: "ask" | "act-without-asking" | null;
   createdAt: number;
   updatedAt: number;
 }
