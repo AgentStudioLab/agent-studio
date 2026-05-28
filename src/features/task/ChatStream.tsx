@@ -407,6 +407,12 @@ function MessageRow({
   }
 
   const grouped = groupBlocks(message.blocks);
+  // Copy only the assistant's prose — tool calls and reasoning (deep thinking)
+  // are process detail, not the answer.
+  const copyText = message.blocks
+    .filter((b) => b.kind === "text")
+    .map((b) => b.content)
+    .join("\n\n");
   // Hold off on artifact cards until the turn has fully streamed. A Write
   // tool may succeed early in the turn while the model is still composing
   // the explanatory text — showing the card mid-stream feels premature
@@ -497,7 +503,7 @@ function MessageRow({
           ))}
         </div>
       )}
-      {showActions && <MessageActions />}
+      {showActions && <MessageActions text={copyText} />}
     </div>
   );
 }

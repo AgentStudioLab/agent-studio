@@ -152,7 +152,8 @@
     "stepsCount": "{{count}} steps"
   },
   "messageActions": {
-    "copy": "Copy"
+    "copy": "Copy",
+    "regenerate": "Regenerate"
   },
   "input": {
     "placeholder": "Write a message...",

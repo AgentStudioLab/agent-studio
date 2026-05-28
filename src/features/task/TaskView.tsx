@@ -345,7 +345,24 @@ export function TaskView() {
               archiveMutation.mutate({ id: activeTaskId, archived: true });
             }}
           />
-          <div className="flex min-h-0 flex-1 flex-col">
+          <div className="relative flex min-h-0 flex-1 flex-col">
+            {/* Frosted fade under the header: content scrolling up blurs and
+                dissolves into the page bg instead of being hard-cut at the
+                header edge. mask fades the blur out downward. */}
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-x-0 top-0 z-10 h-12"
+              style={{
+                background:
+                  "linear-gradient(to bottom, hsl(var(--bg-100)), hsl(var(--bg-100) / 0))",
+                backdropFilter: "blur(5px)",
+                WebkitBackdropFilter: "blur(5px)",
+                maskImage:
+                  "linear-gradient(to bottom, hsl(var(--bg-100)), hsl(var(--bg-100) / 0))",
+                WebkitMaskImage:
+                  "linear-gradient(to bottom, hsl(var(--bg-100)), hsl(var(--bg-100) / 0))",
+              }}
+            />
             <ChatStream
               threadId={activeTaskId}
               runtime={runtime}
@@ -392,7 +409,7 @@ export function TaskView() {
               }}
             />
           </div>
-          <div className="shrink-0 px-8 pb-6 pt-2">
+          <div className="shrink-0 px-8 pb-3 pt-2">
             <div className="mx-auto w-full max-w-[760px]">
               <QueuedMessagesPanel
                 items={queue.items}

@@ -73,6 +73,16 @@ export function TaskRightPanel({
 }: TaskRightPanelProps) {
   const { t } = useTranslation();
 
+  // The selected tab is lifted state that survives thread switches, so it can
+  // hold a value the current conversation doesn't offer (e.g. "runs" carried
+  // over from a scheduled run into a normal task, which has no Runs tab). When
+  // the key doesn't match an available tab, fall back to the first one so the
+  // panel never renders empty.
+  const availableTabs: TaskRightTabId[] = scheduledTaskId
+    ? ["runs", "process", "files", "context"]
+    : ["process", "files", "context"];
+  const activeTab = availableTabs.includes(tab) ? tab : availableTabs[0];
+
   return (
     <div className="flex h-full flex-col">
       <div className="px-3 pt-3 pb-2">
@@ -88,7 +98,7 @@ export function TaskRightPanel({
               id="runs"
               label={t("task.tabs.runs")}
               icon={<History size={14} />}
-              active={tab === "runs"}
+              active={activeTab === "runs"}
               onClick={onTabChange}
             />
           )}
@@ -96,41 +106,41 @@ export function TaskRightPanel({
             id="process"
             label={t("task.tabs.process")}
             icon={<Activity size={14} />}
-            active={tab === "process"}
+            active={activeTab === "process"}
             onClick={onTabChange}
           />
           <TabButton
             id="files"
             label={t("task.tabs.files")}
             icon={<Folder size={14} />}
-            active={tab === "files"}
+            active={activeTab === "files"}
             onClick={onTabChange}
           />
           <TabButton
             id="context"
             label={t("task.tabs.context")}
             icon={<Layers size={14} />}
-            active={tab === "context"}
+            active={activeTab === "context"}
             onClick={onTabChange}
           />
         </div>
       </div>
       <div className="flex-1 overflow-y-auto px-3 pb-3">
-        {tab === "runs" && scheduledTaskId && (
+        {activeTab === "runs" && scheduledTaskId && (
           <RunsTab
             scheduledTaskId={scheduledTaskId}
             currentThreadId={threadId}
           />
         )}
-        {tab === "process" && <ProcessTab state={state} />}
-        {tab === "files" && (
+        {activeTab === "process" && <ProcessTab state={state} />}
+        {activeTab === "files" && (
           <FilesTab
             state={state}
             workingDir={workingDir}
             onOpenFile={onOpenFile}
           />
         )}
-        {tab === "context" && (
+        {activeTab === "context" && (
           <ContextTab
             threadId={threadId}
             scheduledTaskId={scheduledTaskId}

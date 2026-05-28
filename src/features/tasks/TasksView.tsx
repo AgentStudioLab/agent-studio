@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
-import { Search, X } from "lucide-react";
+import { Archive, Check, FolderInput, Minus, Search, Trash2, X } from "lucide-react";
 import { AppShell } from "@/app/AppShell";
 import { cn } from "@/lib/utils";
 import type { ArchivedFilter } from "@/lib/data/conversations";
@@ -9,10 +9,14 @@ import {
   useArchiveConversationMutation,
   useConversationsList,
   useDeleteConversationMutation,
-  useTogglePinMutation,
 } from "@/lib/data/queries";
 import { TaskListRow } from "@/features/tasks/TaskListRow";
-import { RenameDialog } from "@/shared/RenameDialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -32,15 +36,11 @@ export function TasksView() {
   const [tab, setTab] = useState<ArchivedFilter>("active");
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [pendingRename, setPendingRename] = useState<{
-    id: string;
-    title: string;
-  } | null>(null);
-  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
 
   const { data: items = [] } = useConversationsList(tab);
-  const togglePin = useTogglePinMutation();
   const archive = useArchiveConversationMutation();
   const del = useDeleteConversationMutation();
 
@@ -57,6 +57,37 @@ export function TasksView() {
   const closeSearch = () => {
     setSearchOpen(false);
     setQuery("");
+  };
+
+  const selectionMode = selectedIds.size > 0;
+  const selectedCount = selectedIds.size;
+  const allSelected =
+    filtered.length > 0 && filtered.every((c) => selectedIds.has(c.id));
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+  const clearSelection = () => setSelectedIds(new Set());
+  const toggleSelectAll = () => {
+    // Master checkbox is only visible in selection mode (≥1 selected), so it's
+    // either fully checked (→ clear) or indeterminate (→ select every visible).
+    if (allSelected) clearSelection();
+    else setSelectedIds(new Set(filtered.map((c) => c.id)));
+  };
+
+  const archiveSelected = () => {
+    for (const id of selectedIds) archive.mutate({ id, archived: true });
+    clearSelection();
+  };
+  const deleteSelected = () => {
+    for (const id of selectedIds) del.mutate(id);
+    clearSelection();
+    setConfirmDelete(false);
   };
 
   const emptyMessage = query.trim()
@@ -136,6 +167,79 @@ export function TasksView() {
               ))}
             </div>
 
+            {selectionMode && (
+              <TooltipProvider delayDuration={300}>
+                <div className="flex shrink-0 items-center gap-3 px-9 pb-2">
+                  <button
+                    type="button"
+                    onClick={toggleSelectAll}
+                    aria-label={t("tasks.selection.selectAll")}
+                    className="flex size-4 shrink-0 items-center justify-center rounded-[4px] border border-primary bg-primary text-primary-foreground"
+                  >
+                    {allSelected ? (
+                      <Check className="size-3.5" strokeWidth={3} />
+                    ) : (
+                      <Minus className="size-3.5" strokeWidth={3} />
+                    )}
+                  </button>
+                  <span className="text-sm text-muted-foreground">
+                    {t("tasks.selection.selected", { count: selectedCount })}
+                  </span>
+                  {/* Move-to-project is reserved for a future picker. */}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        className="flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-state-hover hover:text-foreground"
+                      >
+                        <FolderInput className="size-[18px]" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {t("tasks.selection.moveToProject", { count: selectedCount })}
+                    </TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        onClick={archiveSelected}
+                        className="flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-state-hover hover:text-foreground"
+                      >
+                        <Archive className="size-[18px]" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {t("tasks.selection.archive", { count: selectedCount })}
+                    </TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDelete(true)}
+                        className="flex size-8 items-center justify-center rounded-md text-[hsl(var(--danger-100))] transition-colors hover:bg-[hsl(var(--danger-100)/0.12)]"
+                      >
+                        <Trash2 className="size-[18px]" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {t("tasks.selection.delete", { count: selectedCount })}
+                    </TooltipContent>
+                  </Tooltip>
+                  <div className="flex-1" />
+                  <button
+                    type="button"
+                    onClick={clearSelection}
+                    aria-label={t("tasks.selection.exit")}
+                    className="flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-state-hover hover:text-foreground"
+                  >
+                    <X className="size-[18px]" />
+                  </button>
+                </div>
+              </TooltipProvider>
+            )}
+
             <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-9 pb-12">
               {filtered.length === 0 ? (
                 <p className="px-3 py-8 text-sm text-muted-foreground">
@@ -147,17 +251,10 @@ export function TasksView() {
                     key={c.id}
                     conversation={c}
                     locale={i18n.language}
+                    selected={selectedIds.has(c.id)}
+                    selectionMode={selectionMode}
                     onOpen={() => navigate(`/task/${c.id}`)}
-                    onPinToggle={() =>
-                      togglePin.mutate({ id: c.id, pinned: !c.pinned })
-                    }
-                    onRename={() =>
-                      setPendingRename({ id: c.id, title: c.title })
-                    }
-                    onArchiveToggle={() =>
-                      archive.mutate({ id: c.id, archived: !c.archived })
-                    }
-                    onDelete={() => setPendingDeleteId(c.id)}
+                    onToggleSelect={() => toggleSelect(c.id)}
                   />
                 ))
               )}
@@ -166,42 +263,30 @@ export function TasksView() {
         }
       />
 
-      <RenameDialog
-        open={pendingRename !== null}
-        onOpenChange={(o) => {
-          if (!o) setPendingRename(null);
-        }}
-        conversationId={pendingRename?.id ?? null}
-        currentTitle={pendingRename?.title ?? ""}
-      />
-
       <AlertDialog
-        open={pendingDeleteId !== null}
+        open={confirmDelete}
         onOpenChange={(o) => {
-          if (!o) setPendingDeleteId(null);
+          if (!o) setConfirmDelete(false);
         }}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {t("sidebar.deleteDialog.title")}
+              {t("tasks.deleteDialog.title", { count: selectedCount })}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {t("sidebar.deleteDialog.description")}
+              {t("tasks.deleteDialog.description")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>
-              {t("sidebar.deleteDialog.cancel")}
+              {t("tasks.deleteDialog.cancel")}
             </AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => {
-                if (pendingDeleteId) del.mutate(pendingDeleteId);
-                setPendingDeleteId(null);
-              }}
+              onClick={deleteSelected}
               className="bg-[hsl(var(--danger-100))] text-white hover:bg-[hsl(var(--danger-100)/0.9)]"
             >
-              {t("sidebar.deleteDialog.confirm")}
+              {t("tasks.deleteDialog.confirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

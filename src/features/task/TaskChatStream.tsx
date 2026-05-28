@@ -86,7 +86,7 @@ function Block({
       );
 
     case "message-actions":
-      return <MessageActions />;
+      return <MessageActions text="" />;
 
     case "brand-star":
       return (

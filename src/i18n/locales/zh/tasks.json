@@ -16,5 +16,19 @@
     "archived": "暂无已归档任务",
     "all": "暂无任务",
     "noResults": "没有匹配的任务"
+  },
+  "selection": {
+    "selected": "已选 {{count}} 项",
+    "selectAll": "全选",
+    "exit": "退出多选",
+    "moveToProject": "移动 {{count}} 个对话到项目",
+    "archive": "归档选中的 {{count}} 项",
+    "delete": "删除选中的 {{count}} 项"
+  },
+  "deleteDialog": {
+    "title": "删除 {{count}} 个任务？",
+    "description": "将永久删除选中的任务及其对话，此操作无法撤销。",
+    "cancel": "取消",
+    "confirm": "删除"
   }
 }

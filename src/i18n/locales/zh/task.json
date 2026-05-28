@@ -152,7 +152,8 @@
     "stepsCount": "{{count}} 步"
   },
   "messageActions": {
-    "copy": "复制"
+    "copy": "复制",
+    "regenerate": "重新生成"
   },
   "input": {
     "placeholder": "输入消息……",

@@ -147,6 +147,7 @@ export function SidebarContent() {
     title: string;
   } | null>(null);
   const [recentsCollapsed, setRecentsCollapsed] = useState(false);
+  const [scheduledCollapsed, setScheduledCollapsed] = useState(false);
 
   const { isUnread, markRead } = useThreadUnread();
 
@@ -253,11 +254,22 @@ export function SidebarContent() {
        *  and either the cadence label or an unviewed-run count. */}
       {scheduledTasks.length > 0 && (
         <>
-          <div className="px-3 pb-1 pt-5">
-            <div className="px-2 text-[12px] font-medium text-[hsl(var(--text-400))]">
+          <div className="group/scheduled px-3 pb-1 pt-5">
+            <button
+              type="button"
+              onClick={() => setScheduledCollapsed((v) => !v)}
+              className="flex items-center gap-1 px-2 text-[12px] font-medium text-[hsl(var(--text-400))] transition-colors hover:text-[hsl(var(--text-200))]"
+            >
               {t("sidebar.sections.scheduled")}
-            </div>
+              <ChevronDown
+                className={cn(
+                  "size-3 opacity-0 transition-all group-hover/scheduled:opacity-100",
+                  scheduledCollapsed && "-rotate-90",
+                )}
+              />
+            </button>
           </div>
+          {!scheduledCollapsed && (
           <div className="flex shrink-0 flex-col gap-0.5 px-2">
             {scheduledTasks.map((task) => {
               const runs = scheduledRunsByTask.get(task.id) ?? [];
@@ -301,6 +313,7 @@ export function SidebarContent() {
               );
             })}
           </div>
+          )}
         </>
       )}
 

@@ -16,5 +16,19 @@
     "archived": "No archived tasks",
     "all": "No tasks yet",
     "noResults": "No tasks match your filter"
+  },
+  "selection": {
+    "selected": "{{count}} selected",
+    "selectAll": "Select all",
+    "exit": "Exit selection",
+    "moveToProject": "Move {{count}} chats to a project",
+    "archive": "Archive {{count}} selected items",
+    "delete": "Delete {{count}} selected items"
+  },
+  "deleteDialog": {
+    "title": "Delete {{count}} tasks?",
+    "description": "This permanently deletes the selected tasks and their conversations. This can't be undone.",
+    "cancel": "Cancel",
+    "confirm": "Delete"
   }
 }

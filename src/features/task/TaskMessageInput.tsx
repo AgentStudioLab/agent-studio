@@ -216,7 +216,7 @@ export function TaskMessageInput({
           </PromptInputTools>
         </PromptInputFooter>
       </PromptInput>
-      <p className="mt-2 text-center text-[11.5px] text-muted-foreground">
+      <p className="mt-3 w-full text-center text-[11px] text-muted-foreground">
         {t("task.input.disclaimer")}
       </p>
 
