@@ -110,6 +110,19 @@ export function useChat(opts: UseChatOptions) {
     },
     [runtime, qc],
   );
+  const regenerate = useCallback(
+    async (
+      fromMessageId: string,
+      regenOpts?: {
+        permissionMode?: "ask" | "act-without-asking";
+        model?: string;
+      },
+    ) => {
+      await runtime.regenerate(fromMessageId, regenOpts);
+      void qc.invalidateQueries({ queryKey: THREAD_STATUS_KEY });
+    },
+    [runtime, qc],
+  );
   const cancel = useCallback(async () => {
     await runtime.cancel();
     void qc.invalidateQueries({ queryKey: THREAD_STATUS_KEY });
@@ -164,6 +177,7 @@ export function useChat(opts: UseChatOptions) {
     pendingInterrupts: state.pendingInterrupts,
     isAwaitingApproval,
     send,
+    regenerate,
     cancel,
     resumeRun,
     attachToRun,

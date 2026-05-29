@@ -32,6 +32,16 @@ export interface PostRunRequest {
   model?: string;
 }
 
+export interface PostRegenerateRequest {
+  threadId: string;
+  /** DB id of the user message to regenerate from (re-runs the same prompt,
+   *  discarding it + every later turn, and rolling back its file edits). */
+  fromMessageId: string;
+  runId: string;
+  permissionMode?: "ask" | "act-without-asking";
+  model?: string;
+}
+
 export interface ResumeRequest {
   resumes: Array<{ interruptId: string; payload: unknown }>;
   /**
@@ -65,6 +75,30 @@ export class AGUIHttpClient {
     });
     if (res.status !== 202) {
       throw new Error(`POST /runs failed: ${res.status}`);
+    }
+    return (await res.json()) as { runId: string };
+  }
+
+  /** 重新生成某一轮：丢弃该 user 消息及其后所有轮次、回滚文件、重跑同一句。
+   *  返回服务端确认的 runId。 */
+  async postRegenerate(
+    req: PostRegenerateRequest,
+  ): Promise<{ runId: string }> {
+    const res = await this.fetchImpl(
+      `${this.apiBase}/threads/${req.threadId}/regenerate`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          fromMessageId: req.fromMessageId,
+          runId: req.runId,
+          ...(req.permissionMode ? { permissionMode: req.permissionMode } : {}),
+          ...(req.model ? { model: req.model } : {}),
+        }),
+      },
+    );
+    if (res.status !== 202) {
+      throw new Error(`POST regenerate failed: ${res.status}`);
     }
     return (await res.json()) as { runId: string };
   }

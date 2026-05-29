@@ -13,7 +13,17 @@ export interface ProviderCallbacks {
     content: string;
     reasoning?: string;
     phase?: "reasoning" | "conclusion";
+    /** SDK transcript uuid of this assistant message (`am.uuid`). Persisted to
+     *  messages.sdk_uuid so it can anchor a later resumeSessionAt. */
+    sdkUuid?: string;
   }) => void | Promise<void>;
+  /**
+   * Fired once per turn when the SDK echoes the live user prompt with its
+   * transcript uuid (requires `extraArgs: { 'replay-user-messages': null }`).
+   * runWorker persists it onto the just-appended user message row so a future
+   * regenerate can use it as the rewindFiles checkpoint id.
+   */
+  onUserMessageId?: (uuid: string) => void;
   onToolCallEnd?: (tc: {
     id: string;
     toolName: string;
@@ -80,6 +90,18 @@ export interface RunContext {
    * canUseTool, and therefore the sandbox). Empty/undefined → no auto-approval.
    */
   autoApproveTools?: string[];
+  /**
+   * Regenerate: SDK message uuid to resume the session AT (transcript is
+   * restored up to and including this message, then `userMessage` re-runs).
+   * Maps to the SDK `resumeSessionAt` option. Omit for a normal turn.
+   */
+  resumeSessionAt?: string;
+  /**
+   * Regenerate of the FIRST turn: there's no preceding message to anchor on,
+   * so skip resume entirely and let the SDK allocate a fresh session (which is
+   * then re-tagged to this thread). Ignored when resumeSessionAt is set.
+   */
+  freshSession?: boolean;
 }
 
 export interface ResumeContext {
@@ -114,4 +136,17 @@ export interface AgentProvider {
     runId: string,
   ): Promise<AGUIInterrupt[]>;
   notifyCancelled?(threadId: string): Promise<void>;
+  /**
+   * Roll back files (Write/Edit/NotebookEdit only) to the state captured at the
+   * given SDK checkpoint uuid. Optional — providers without file checkpointing
+   * omit it. Resolves the thread's session internally; best-effort (returns
+   * `canRewind: false` when there's no session/checkpoint, never throws into
+   * the caller's flow).
+   */
+  rewindFiles?(input: {
+    threadId: string;
+    cwd: string;
+    checkpointUuid: string;
+    signal?: AbortSignal;
+  }): Promise<{ canRewind: boolean; error?: string; filesChanged?: number }>;
 }

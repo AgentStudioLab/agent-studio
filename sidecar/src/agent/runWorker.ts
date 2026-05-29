@@ -27,6 +27,13 @@ export interface RunWorkerInput {
   model?: string;
   /** Per-task allow-list for scheduled/background runs (see RunContext). */
   autoApproveTools?: string[];
+  /** DB id of the user message this run answers. When set, the captured SDK
+   *  prompt uuid is persisted onto it (for future regenerate). */
+  userMessageId?: string;
+  /** Regenerate: resume the SDK session at this message uuid (see RunContext). */
+  resumeSessionAt?: string;
+  /** Regenerate of the first turn: skip resume, fresh session (see RunContext). */
+  freshSession?: boolean;
 }
 
 export async function runWorker(input: RunWorkerInput): Promise<void> {
@@ -44,6 +51,9 @@ export async function runWorker(input: RunWorkerInput): Promise<void> {
     permissionMode = "ask",
     model,
     autoApproveTools,
+    userMessageId,
+    resumeSessionAt,
+    freshSession,
   } = input;
 
   // Buffer the structured messages/tool_calls writes until the run reaches a
@@ -53,7 +63,7 @@ export async function runWorker(input: RunWorkerInput): Promise<void> {
   // /conversations/:id/messages reads from messages/tool_calls — if we flush
   // mid-run, the client gets both a persisted half-turn AND the SSE-replay
   // rebuild of the same turn, producing duplicates after cross-session resume.
-  type PendingAssistant = { id: string; content: string; reasoning?: string };
+  type PendingAssistant = { id: string; content: string; reasoning?: string; sdkUuid?: string };
   type PendingToolCall = { parentMessageId: string; id: string; toolName: string; args: unknown };
   type PendingToolResult = {
     id: string;
@@ -68,7 +78,12 @@ export async function runWorker(input: RunWorkerInput): Promise<void> {
 
   function flushMessagesBuffers(): void {
     for (const m of assistantBuffer) {
-      messages.appendAssistant(threadId, m);
+      messages.appendAssistant(threadId, {
+        id: m.id,
+        content: m.content,
+        reasoning: m.reasoning,
+        sdkUuid: m.sdkUuid,
+      });
     }
     for (const tc of toolCallBuffer) {
       messages.upsertToolCall(tc.parentMessageId, {
@@ -96,7 +111,15 @@ export async function runWorker(input: RunWorkerInput): Promise<void> {
         id: msg.id,
         content: msg.content,
         reasoning: msg.reasoning,
+        sdkUuid: msg.sdkUuid,
       });
+    },
+    onUserMessageId(uuid) {
+      // The user row already exists (appended by the route before the run).
+      // Persist the SDK prompt uuid immediately — it's metadata, not part of
+      // the buffered single-source-of-truth turn, and a valid checkpoint even
+      // if the run is later cancelled.
+      if (userMessageId) messages.setSdkUuid(userMessageId, uuid);
     },
     onToolCallEnd(tc) {
       if (tc.parentMessageId) {
@@ -152,6 +175,8 @@ export async function runWorker(input: RunWorkerInput): Promise<void> {
       permissionMode,
       model,
       autoApproveTools,
+      resumeSessionAt,
+      freshSession,
     });
 
     await executeRunLoop({

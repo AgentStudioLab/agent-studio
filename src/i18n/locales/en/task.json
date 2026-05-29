@@ -155,6 +155,14 @@
     "copy": "Copy",
     "regenerate": "Regenerate"
   },
+  "regenerate": {
+    "title": "Regenerate this answer?",
+    "descLater_one": "This discards the {{count}} later round and rolls back the file edits made in this turn (files created by scripts or commands are not rolled back). This can't be undone.",
+    "descLater_other": "This discards the {{count}} later rounds and rolls back the file edits made in this turn (files created by scripts or commands are not rolled back). This can't be undone.",
+    "descFilesOnly": "This rolls back the file edits made in this turn (files created by scripts or commands are not rolled back). This can't be undone.",
+    "cancel": "Cancel",
+    "confirm": "Regenerate"
+  },
   "input": {
     "placeholder": "Write a message...",
     "ask": "Ask",

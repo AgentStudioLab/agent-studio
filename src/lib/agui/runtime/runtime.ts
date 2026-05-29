@@ -46,6 +46,18 @@ export interface ChatRuntime {
       model?: string;
     },
   ): Promise<void>;
+  /**
+   * 重新生成：丢弃 fromMessageId（某条 user 消息）及其后所有轮次，回滚该轮
+   * 通过 Write/Edit/NotebookEdit 产生的文件改动，用同一句 prompt 重跑。
+   * 乐观地把 historical 截断到该 user 消息（含），新回答流式接到其下。
+   */
+  regenerate(
+    fromMessageId: string,
+    opts?: {
+      permissionMode?: "ask" | "act-without-asking";
+      model?: string;
+    },
+  ): Promise<void>;
   cancel(): Promise<void>;
   resume(payload: unknown): Promise<void>;
   attachToRun(runId: string, opts?: { cursor?: string; preserveLive?: boolean }): void;
@@ -218,6 +230,53 @@ export function createChatRuntime(opts: ChatRuntimeOptions): ChatRuntime {
     attachToRun(runId);
   }
 
+  async function regenerate(
+    fromMessageId: string,
+    regenOpts?: {
+      permissionMode?: "ask" | "act-without-asking";
+      model?: string;
+    },
+  ): Promise<void> {
+    if (state.isRunning) return;
+    if (state.pendingInterrupts.some((it) => it.reason === "tool_approval")) return;
+
+    // 乐观截断：保留到目标 user 消息（含）为止，丢弃旧回答 + 其后所有轮次。
+    // 找不到（不在 historical，例如还在 live）就放弃，避免误删。
+    const idx = state.historicalMessages.findIndex((m) => m.id === fromMessageId);
+    if (idx < 0) return;
+
+    setState((s) => ({
+      ...s,
+      error: null,
+      isRunning: true,
+      historicalMessages: s.historicalMessages.slice(0, idx + 1),
+      liveMessages: [],
+    }));
+
+    const runId = `run_${nanoid(10)}`;
+    setState({ activeRunId: runId });
+
+    try {
+      await http.postRegenerate({
+        threadId: opts.threadId,
+        fromMessageId,
+        runId,
+        ...(regenOpts?.permissionMode
+          ? { permissionMode: regenOpts.permissionMode }
+          : {}),
+        ...(regenOpts?.model ? { model: regenOpts.model } : {}),
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setState({ error: msg, isRunning: false, activeRunId: null });
+      thinking.clear();
+      opts.onRunError?.(msg);
+      return;
+    }
+
+    attachToRun(runId);
+  }
+
   async function cancel(): Promise<void> {
     if (!state.activeRunId) return;
     await http.cancelRun(state.activeRunId);
@@ -317,6 +376,7 @@ export function createChatRuntime(opts: ChatRuntimeOptions): ChatRuntime {
       };
     },
     send,
+    regenerate,
     cancel,
     resume,
     attachToRun,

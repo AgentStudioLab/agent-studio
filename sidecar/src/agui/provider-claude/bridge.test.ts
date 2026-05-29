@@ -370,6 +370,98 @@ describe("bridge — assistant message persistence", () => {
   });
 });
 
+describe("bridge — user prompt uuid capture (regenerate checkpoint)", () => {
+  // With `extraArgs: { 'replay-user-messages': null }`, the SDK re-delivers
+  // user prompts as SDKUserMessageReplay (isReplay:true) carrying the uuid
+  // we need as the file-checkpoint id. The capture MUST include replays.
+  it("captures the replayed prompt uuid (isReplay:true)", async () => {
+    const captured: string[] = [];
+    const sdkStream = (async function* () {
+      yield { type: "system", subtype: "init", session_id: "s1" };
+      yield {
+        type: "user",
+        uuid: "umsg_current",
+        isReplay: true,
+        message: { role: "user", content: "summarize the repo" },
+      };
+      yield { type: "assistant", message: { content: [{ type: "text", text: "ok" }] } };
+      yield { type: "result", subtype: "success", is_error: false, result: "ok", session_id: "s1" };
+    })();
+    await drain(
+      claudeSdkToAgui(sdkStream as never, {
+        threadId: "t",
+        runId: "r",
+        onUserMessageId: (u) => captured.push(u),
+      }),
+    );
+    expect(captured).toContain("umsg_current");
+  });
+
+  it("keeps the latest prompt uuid; never a tool_result carrier", async () => {
+    const captured: string[] = [];
+    const sdkStream = (async function* () {
+      yield { type: "system", subtype: "init", session_id: "s1" };
+      yield { type: "user", uuid: "u_old", isReplay: true, message: { role: "user", content: "old q" } };
+      yield {
+        type: "user",
+        uuid: "u_toolresult",
+        isReplay: true,
+        message: { role: "user", content: [{ type: "tool_result", tool_use_id: "x", content: "r", is_error: false }] },
+      };
+      yield { type: "user", uuid: "u_current", isReplay: true, message: { role: "user", content: "new q" } };
+      yield { type: "assistant", message: { content: [{ type: "text", text: "ok" }] } };
+      yield { type: "result", subtype: "success", is_error: false, result: "ok", session_id: "s1" };
+    })();
+    await drain(
+      claudeSdkToAgui(sdkStream as never, {
+        threadId: "t",
+        runId: "r",
+        onUserMessageId: (u) => captured.push(u),
+      }),
+    );
+    expect(captured).not.toContain("u_toolresult");
+    expect(captured[captured.length - 1]).toBe("u_current");
+  });
+
+  it("does not re-emit TOOL_CALL_RESULT for replayed historical tool_results", async () => {
+    const { callbacks, toolCallResults } = makeCallbacks();
+    const sdkStream = (async function* () {
+      yield { type: "system", subtype: "init", session_id: "s1" };
+      yield {
+        type: "user",
+        uuid: "u_tr",
+        isReplay: true,
+        message: { role: "user", content: [{ type: "tool_result", tool_use_id: "old", content: "x", is_error: false }] },
+      };
+      yield { type: "assistant", message: { content: [{ type: "text", text: "ok" }] } };
+      yield { type: "result", subtype: "success", is_error: false, result: "ok", session_id: "s1" };
+    })();
+    const events = await drain(
+      claudeSdkToAgui(sdkStream as never, { threadId: "t", runId: "r", callbacks }),
+    );
+    expect(toolCallResults).toHaveLength(0);
+    expect(events.some((e) => e.type === "TOOL_CALL_RESULT")).toBe(false);
+  });
+
+  it("still emits TOOL_CALL_RESULT for LIVE (non-replay) tool_results", async () => {
+    const { callbacks, toolCallResults } = makeCallbacks();
+    const sdkStream = (async function* () {
+      yield {
+        type: "assistant",
+        message: { content: [{ type: "tool_use", id: "toolu_x", name: "Bash", input: {} }] },
+      };
+      yield {
+        type: "user",
+        message: { role: "user", content: [{ type: "tool_result", tool_use_id: "toolu_x", content: "ok", is_error: false }] },
+      };
+      yield { type: "result", subtype: "success", is_error: false, result: "ok", session_id: "s1" };
+    })();
+    await drain(claudeSdkToAgui(sdkStream as never, { threadId: "t", runId: "r", callbacks }));
+    expect(toolCallResults).toHaveLength(1);
+    expect(toolCallResults[0]!.id).toBe("toolu_x");
+  });
+});
+
 describe("bridge — usage callback", () => {
   it("invokes onRunUsage with totals from result.usage", async () => {
     const sdkStream = (async function* () {

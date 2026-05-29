@@ -70,6 +70,12 @@ interface MessageRow {
   content: string;
   reasoning: string | null;
   created_at: number;
+  /** SDK transcript message uuid. Captured per turn — assistant rows from
+   *  `am.uuid`, user rows from the replayed live prompt. Used as the anchor
+   *  for resumeSessionAt (preceding assistant) and the rewindFiles checkpoint
+   *  (user message) when regenerating a turn. NULL for older rows / turns that
+   *  ended without an assistant frame. */
+  sdk_uuid: string | null;
 }
 
 interface ToolCallRow {
@@ -143,18 +149,19 @@ export class MessageService {
    */
   appendAssistant(
     threadId: string,
-    input: { id: string; content: string; reasoning?: string },
+    input: { id: string; content: string; reasoning?: string; sdkUuid?: string },
   ): MessageDTO {
     const now = Date.now();
     this.db
       .prepare(
-        `INSERT INTO messages (id, thread_id, role, content, reasoning, created_at)
-         VALUES (?, ?, 'assistant', ?, ?, ?)
+        `INSERT INTO messages (id, thread_id, role, content, reasoning, sdk_uuid, created_at)
+         VALUES (?, ?, 'assistant', ?, ?, ?, ?)
          ON CONFLICT(id) DO UPDATE SET
            content = excluded.content,
-           reasoning = excluded.reasoning`,
+           reasoning = excluded.reasoning,
+           sdk_uuid = COALESCE(excluded.sdk_uuid, messages.sdk_uuid)`,
       )
-      .run(input.id, threadId, input.content, input.reasoning ?? null, now);
+      .run(input.id, threadId, input.content, input.reasoning ?? null, input.sdkUuid ?? null, now);
     this.db
       .prepare("UPDATE conversations SET updated_at = ? WHERE id = ?")
       .run(now, threadId);
@@ -238,6 +245,60 @@ export class MessageService {
       .prepare("SELECT COUNT(*) AS n FROM messages WHERE thread_id = ?")
       .get(threadId) as { n: number };
     return row.n;
+  }
+
+  /** Raw row by id (includes sdk_uuid + created_at) — used by the regenerate
+   *  route to locate the target user turn. */
+  getById(id: string): MessageRow | undefined {
+    return this.db
+      .prepare("SELECT * FROM messages WHERE id = ?")
+      .get(id) as MessageRow | undefined;
+  }
+
+  /** Persist the SDK transcript uuid onto an existing message row. Idempotent;
+   *  fired from the bridge when the SDK echoes the live user prompt's uuid. */
+  setSdkUuid(messageId: string, sdkUuid: string): void {
+    this.db
+      .prepare("UPDATE messages SET sdk_uuid = ? WHERE id = ?")
+      .run(sdkUuid, messageId);
+  }
+
+  /**
+   * sdk_uuid of the last assistant message before `beforeCreatedAt` in the
+   * thread — the resumeSessionAt anchor for regenerating the turn that starts
+   * at that point. Returns undefined when there is no preceding assistant turn
+   * (i.e. regenerating the first turn → fresh session, no resume).
+   */
+  getPrecedingAssistantSdkUuid(
+    threadId: string,
+    beforeCreatedAt: number,
+  ): string | undefined {
+    const row = this.db
+      .prepare(
+        `SELECT sdk_uuid FROM messages
+         WHERE thread_id = ? AND created_at < ?
+           AND role = 'assistant' AND sdk_uuid IS NOT NULL
+         ORDER BY created_at DESC LIMIT 1`,
+      )
+      .get(threadId, beforeCreatedAt) as { sdk_uuid: string } | undefined;
+    return row?.sdk_uuid ?? undefined;
+  }
+
+  /**
+   * Delete the given message and every message after it in the thread (by
+   * created_at, with the row's own id as an inclusive tie-break). tool_calls
+   * cascade via FK. Used by regenerate to discard the target turn + all
+   * subsequent turns before re-running.
+   */
+  deleteFromMessage(threadId: string, messageId: string): void {
+    const target = this.getById(messageId);
+    if (!target || target.thread_id !== threadId) return;
+    this.db
+      .prepare(
+        `DELETE FROM messages
+         WHERE thread_id = ? AND (created_at > ? OR id = ?)`,
+      )
+      .run(threadId, target.created_at, messageId);
   }
 
   listByThread(threadId: string): MessageDTO[] {

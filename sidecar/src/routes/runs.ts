@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
+import { EventType } from "@ag-ui/core";
 import { runWorker } from "../agent/runWorker";
 import type { RunEventStore, AgentProvider } from "../agui/core";
 import type { ThreadService } from "../services/threads";
@@ -78,7 +79,7 @@ export function buildRunRoutes(deps: MountRunsDeps): Hono {
     const isFirstTurn = deps.messages.countByThread(body.threadId) === 0;
 
     deps.threads.upsert(body.threadId);
-    deps.messages.appendUser(body.threadId, body.message.content);
+    const userMsg = deps.messages.appendUser(body.threadId, body.message.content);
     await deps.store.createRun(body.runId, body.threadId);
 
     if (isFirstTurn) {
@@ -107,9 +108,126 @@ export function buildRunRoutes(deps: MountRunsDeps): Hono {
       usage: deps.usage,
       permissionMode,
       model,
+      userMessageId: userMsg.id,
     }).finally(() => aborters.delete(body.runId!));
 
     return c.json({ runId: body.runId }, 202);
+  });
+
+  // Regenerate a turn: discard the target user message + everything after it,
+  // roll back its Write/Edit/NotebookEdit file changes, and re-run the same
+  // prompt. Resumes the SDK session at the preceding assistant message (or a
+  // fresh session when regenerating the very first turn). Shares the runWorker
+  // path with POST /runs.
+  app.post("/threads/:threadId/regenerate", async (c) => {
+    const threadId = c.req.param("threadId");
+    const body = (await c.req.json().catch(() => null)) as
+      | {
+          fromMessageId?: string;
+          runId?: string;
+          permissionMode?: "ask" | "act-without-asking";
+          model?: string;
+        }
+      | null;
+    if (!body?.fromMessageId || !body?.runId) {
+      return c.json({ error: "invalid_body" }, 400);
+    }
+    const target = deps.messages.getById(body.fromMessageId);
+    if (!target || target.thread_id !== threadId || target.role !== "user") {
+      return c.json({ error: "invalid_target" }, 400);
+    }
+    const thread = deps.threads.get(threadId);
+    if (!thread) return c.json({ error: "thread_not_found" }, 404);
+
+    const permissionMode: "ask" | "act-without-asking" =
+      body.permissionMode === "act-without-asking" ? "act-without-asking" : "ask";
+    const model =
+      typeof body.model === "string" && body.model.length > 0
+        ? body.model
+        : undefined;
+
+    const cwd = thread.workingDir;
+    const userContent = target.content;
+    const checkpointUuid = target.sdk_uuid;
+    // resumeSessionAt anchor = last assistant before this user turn. undefined
+    // when regenerating the first turn → fresh session.
+    const resumeSessionAt = deps.messages.getPrecedingAssistantSdkUuid(
+      threadId,
+      target.created_at,
+    );
+
+    const runId = body.runId;
+    // Create the run row up front so GET /runs/:id/events can attach while the
+    // rewind/truncate steps run.
+    await deps.store.createRun(runId, threadId);
+    const abort = new AbortController();
+    aborters.set(runId, abort);
+
+    void (async () => {
+      try {
+        // 1. Roll back files (Write/Edit/NotebookEdit only) to the turn's
+        //    checkpoint. Best-effort — never blocks the regenerate.
+        if (!checkpointUuid) {
+          console.warn(
+            `[regenerate] no checkpoint uuid on msg ${body.fromMessageId} — skipping file rewind (Bash-made files are never tracked)`,
+          );
+        } else if (deps.provider.rewindFiles) {
+          try {
+            const r = await deps.provider.rewindFiles({
+              threadId,
+              cwd,
+              checkpointUuid,
+              signal: abort.signal,
+            });
+            if (r.canRewind) {
+              console.log(
+                `[regenerate] files rewound to ${checkpointUuid} (changed=${r.filesChanged ?? "?"}) thread=${threadId}`,
+              );
+            } else {
+              console.warn(
+                `[regenerate] file rewind skipped (${r.error ?? "?"}) thread=${threadId}`,
+              );
+            }
+          } catch (err) {
+            console.warn("[regenerate] file rewind error:", err);
+          }
+        }
+        // 2. Discard the target turn + all subsequent turns (tool_calls cascade).
+        deps.messages.deleteFromMessage(threadId, body.fromMessageId!);
+        // 3. Re-append the same prompt + run it.
+        const newUser = deps.messages.appendUser(threadId, userContent);
+        await runWorker({
+          runId,
+          threadId,
+          userMessage: { role: "user", content: userContent },
+          store: deps.store,
+          messages: deps.messages,
+          threads: deps.threads,
+          provider: deps.provider,
+          interruptBus: deps.interruptBus,
+          abortSignal: abort.signal,
+          usage: deps.usage,
+          permissionMode,
+          model,
+          userMessageId: newUser.id,
+          resumeSessionAt,
+          freshSession: resumeSessionAt == null,
+        });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error("[regenerate] orchestration error:", msg);
+        await deps.store
+          .appendEvent(runId, {
+            type: EventType.RUN_ERROR,
+            message: msg,
+            code: "WORKER_ERROR",
+          } as never)
+          .catch(() => {});
+        await deps.store.finishRun(runId, "error", msg).catch(() => {});
+      }
+    })().finally(() => aborters.delete(runId));
+
+    return c.json({ runId }, 202);
   });
 
   app.get("/runs/:runId/events", (c) => {

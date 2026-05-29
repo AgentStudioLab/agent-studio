@@ -75,6 +75,7 @@ export function TaskView() {
     isThinking,
     error,
     send,
+    regenerate,
     cancel,
     attachToRun,
     setHistoricalMessages,
@@ -390,6 +391,12 @@ export function TaskView() {
                 };
                 openPreview(touchedFileToPreview(touched));
               }}
+              onRegenerate={(fromMessageId) =>
+                void regenerate(fromMessageId, {
+                  permissionMode,
+                  model: effectiveModel,
+                })
+              }
               onContinueAfterRestart={() => {
                 // Resend the last user message verbatim — gives the model the
                 // identical context it had at interrupt time, so it most likely

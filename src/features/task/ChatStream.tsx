@@ -133,6 +133,23 @@ function mutationToolCallsToArtifacts(
   return out;
 }
 
+/**
+ * Whether the assistant turn immediately following the user message at
+ * `userIdx` contains a Write/Edit/NotebookEdit tool call. Used to decide
+ * whether regenerating that turn needs a file-rollback confirmation when it's
+ * the last turn (no later rounds to otherwise warn about).
+ */
+function nextAssistantHasFileEdit(
+  messages: MessageView[],
+  userIdx: number,
+): boolean {
+  const next = messages[userIdx + 1];
+  if (!next || next.role !== "assistant") return false;
+  return next.blocks.some(
+    (b) => b.kind === "tool_call" && MUTATION_TOOL_NAMES.has(b.toolCall.toolName),
+  );
+}
+
 /* ---------------- ChatStreamProps ---------------- */
 
 interface ChatStreamProps {
@@ -164,6 +181,8 @@ interface ChatStreamProps {
   workingDir: string | null;
   /** Click handler for inline artifact cards. */
   onOpenFile?: (info: { absolutePath: string }) => void;
+  /** Re-run a user turn (discard it + later turns, roll back file edits). */
+  onRegenerate?: (fromMessageId: string) => void;
 }
 
 // Streamdown code-fence override (`pre` → project CodeBlock with shiki +
@@ -197,8 +216,12 @@ export function ChatStream({
   onContinueAfterRestart,
   workingDir,
   onOpenFile,
+  onRegenerate,
 }: ChatStreamProps) {
   const navigate = useNavigate();
+  // Regenerate is disabled while a run is active or an approval is pending —
+  // re-running mid-flight would race the live turn + truncate under it.
+  const regenerateBusy = isRunning || pendingInterrupts.length > 0;
   // cast: ChatRuntime.subscribe takes (state) => void; RuntimeLike expects () => void.
   // The wrapper in useRunStatus discards the state arg, so this is safe at runtime.
   const status = useRunStatus(runtime as never);
@@ -295,6 +318,17 @@ export function ChatStream({
               m.role === "assistant" &&
               idx === messages.length - 1;
             const isLastMessage = idx === messages.length - 1;
+            // Regenerate scope (user turns only): how many later user-initiated
+            // rounds would be discarded, and whether this turn's answer edited
+            // files (drives the confirm dialog vs one-click).
+            const laterRounds =
+              m.role === "user"
+                ? messages
+                    .slice(idx + 1)
+                    .filter((x) => x.role === "user").length
+                : 0;
+            const willRollbackFiles =
+              m.role === "user" && nextAssistantHasFileEdit(messages, idx);
             return (
               <MessageRow
                 key={m.id}
@@ -307,6 +341,10 @@ export function ChatStream({
                 onContinueAfterRestart={onContinueAfterRestart}
                 workingDir={workingDir}
                 onOpenFile={onOpenFile}
+                onRegenerate={onRegenerate}
+                regenerateDisabled={regenerateBusy}
+                laterRounds={laterRounds}
+                willRollbackFiles={willRollbackFiles}
               />
             );
           })}
@@ -388,6 +426,10 @@ function MessageRow({
   onContinueAfterRestart,
   workingDir,
   onOpenFile,
+  onRegenerate,
+  regenerateDisabled,
+  laterRounds,
+  willRollbackFiles,
 }: {
   message: MessageView;
   showActions: boolean;
@@ -401,9 +443,23 @@ function MessageRow({
   onContinueAfterRestart: () => void;
   workingDir: string | null;
   onOpenFile?: (info: { absolutePath: string }) => void;
+  onRegenerate?: (fromMessageId: string) => void;
+  regenerateDisabled: boolean;
+  laterRounds: number;
+  willRollbackFiles: boolean;
 }) {
   if (message.role === "user") {
-    return <UserMessage>{message.content}</UserMessage>;
+    return (
+      <UserMessage
+        messageId={message.id}
+        onRegenerate={onRegenerate}
+        regenerateDisabled={regenerateDisabled}
+        laterRounds={laterRounds}
+        willRollbackFiles={willRollbackFiles}
+      >
+        {message.content}
+      </UserMessage>
+    );
   }
 
   const grouped = groupBlocks(message.blocks);

@@ -31,6 +31,13 @@ export interface BridgeOptions {
   callbacks?: ProviderCallbacks;
   onSessionId?: (sessionId: string) => void;
   /**
+   * Fired once with the live user prompt's SDK transcript uuid. Requires the
+   * SDK to be run with `extraArgs: { 'replay-user-messages': null }` (otherwise
+   * user messages carry no uuid). Used to persist messages.sdk_uuid as the
+   * regenerate rewindFiles checkpoint.
+   */
+  onUserMessageId?: (uuid: string) => void;
+  /**
    * Fires once per turn when SDK's system.init carries mcp_servers + tools.
    * Used by sidecar to populate SessionMetadataStore so the GET /threads/:id/
    * context route can answer with what the SDK actually loaded for this run.
@@ -59,7 +66,7 @@ export async function* claudeSdkToAgui(
   sdkStream: AsyncIterable<SDKMessage>,
   opts: BridgeOptions,
 ): AsyncIterable<AGUIEvent> {
-  const { threadId, runId, callbacks, onSessionId, onInitMetadata, sideEffectsTracker } = opts;
+  const { threadId, runId, callbacks, onSessionId, onUserMessageId, onInitMetadata, sideEffectsTracker } = opts;
 
   // Defer onSessionId until the SDK CLI has actually written the session
   // JSONL to disk. The CLI emits `system.init` carrying session_id BEFORE
@@ -332,6 +339,7 @@ export async function* claudeSdkToAgui(
           content: accumulatedText,
           reasoning: accumulatedReasoning || undefined,
           phase,
+          sdkUuid: typeof am.uuid === "string" ? am.uuid : undefined,
         });
 
         // Reset per-message accumulators BEFORE handling tool_use blocks so
@@ -394,9 +402,31 @@ export async function* claudeSdkToAgui(
       // tool_result entries. Emit TOOL_CALL_RESULT so the UI flips the
       // spinner to a checkmark + the tool_calls row gets `result`/`status`.
       if (m.type === "user") {
-        const um = m as SDKUserMessage;
+        const um = m as SDKUserMessage & { isReplay?: boolean };
+        const isReplay = um.isReplay === true;
         const content = um.message?.content;
+        const isToolResultCarrier =
+          Array.isArray(content) &&
+          content.some((b) => (b as { type?: string }).type === "tool_result");
+        // Capture the prompt's checkpoint uuid. `replay-user-messages` re-delivers
+        // prompts as SDKUserMessageReplay (isReplay:true) — that's where the uuid
+        // lives, so we MUST include replays (an earlier `!isReplay` guard here was
+        // the bug that left every user row's sdk_uuid NULL). Exclude tool_result
+        // carriers + synthetic injections. Keep-latest: the SDK replays prompts in
+        // order, so the current turn's prompt is seen last and its uuid wins (the
+        // consumer overwrites the row on each call).
+        if (
+          onUserMessageId &&
+          typeof um.uuid === "string" &&
+          !um.isSynthetic &&
+          !isToolResultCarrier
+        ) {
+          onUserMessageId(um.uuid);
+        }
         if (!Array.isArray(content)) continue;
+        // Don't re-emit replayed (historical) tool_results — only live ones,
+        // else we double-complete already-finished tool calls.
+        if (isReplay) continue;
         for (const block of content) {
           if (block.type === "tool_result" && block.tool_use_id) {
             const status = block.is_error ? "error" : "success";

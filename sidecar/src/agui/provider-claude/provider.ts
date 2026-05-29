@@ -14,6 +14,7 @@ import { query as sdkQuery } from "@anthropic-ai/claude-agent-sdk";
 import type { CanUseTool, HookCallback } from "@anthropic-ai/claude-agent-sdk";
 import { claudeSdkToAgui } from "./bridge";
 import { getResumeSessionId, tagThreadSession } from "./session-tag";
+import { rewindSessionFiles } from "./file-rewind";
 import { checkWorkspaceSandbox } from "./sandbox";
 import { isDestructiveToolCall } from "./destructive";
 import { createAuditHooks } from "./audit-hook";
@@ -140,7 +141,13 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
       );
     }
 
-    const resumeSessionId = await getResumeSessionId(ctx.threadId, ctx.cwd);
+    // Regenerate extras live on RunContext only; read defensively for resume.
+    const ctxRun = ctx as RunContext;
+    // freshSession (regenerate of the first turn): skip resume so the SDK
+    // allocates a brand-new session, which onSessionId then re-tags.
+    const resumeSessionId = ctxRun.freshSession
+      ? undefined
+      : await getResumeSessionId(ctx.threadId, ctx.cwd);
 
     const allowedTools = [
       ...(opts.resolveAllowedTools
@@ -310,6 +317,14 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
               },
             }
           : {}),
+        // File checkpointing: snapshot Write/Edit/NotebookEdit changes so a
+        // later regenerate can rewindFiles() to a turn's user-message uuid.
+        // `replay-user-messages` is REQUIRED to surface user-message uuids in
+        // the stream (the checkpoint ids) — without it message.uuid is absent.
+        // Both are always on so every turn is rewindable + every user turn gets
+        // its sdk_uuid captured. Bash-produced files are NOT tracked (SDK limit).
+        enableFileCheckpointing: true,
+        extraArgs: { "replay-user-messages": null },
         // Emit fine-grained SDKPartialAssistantMessage (stream_event) frames so
         // the bridge can turn them into per-token TEXT_MESSAGE_CONTENT events
         // and the UI shows characters arriving in real time. Without this, the
@@ -369,6 +384,12 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
           },
         },
         ...(resumeSessionId ? { resume: resumeSessionId } : {}),
+        // Regenerate: rewind the transcript to the message before the turn
+        // being redone, then `prompt` (the same user message) re-runs. Requires
+        // an active resume session — only set when both are present.
+        ...(resumeSessionId && ctxRun.resumeSessionAt
+          ? { resumeSessionAt: ctxRun.resumeSessionAt }
+          : {}),
       },
     });
 
@@ -381,6 +402,9 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
         // resumed one. Either way, tag idempotently so resume lookup works.
         void tagThreadSession(sid, ctx.threadId, ctx.cwd);
       },
+      onUserMessageId: ctx.callbacks?.onUserMessageId
+        ? (uuid) => ctx.callbacks!.onUserMessageId!(uuid)
+        : undefined,
       onInitMetadata: opts.onInitMetadata
         ? (meta) => opts.onInitMetadata!(ctx.threadId, meta)
         : undefined,
@@ -417,6 +441,24 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
       // No-op for SDK provider. The next user message will land via resume
       // sessionId, and the cancelled assistant message stays in the SDK's
       // session transcript (it's recorded by the CLI before kill).
+    },
+
+    async rewindFiles(input: {
+      threadId: string;
+      cwd: string;
+      checkpointUuid: string;
+      signal?: AbortSignal;
+    }): Promise<{ canRewind: boolean; error?: string }> {
+      const sessionId = await getResumeSessionId(input.threadId, input.cwd);
+      if (!sessionId) return { canRewind: false, error: "no_session" };
+      return rewindSessionFiles({
+        sessionId,
+        cwd: input.cwd,
+        env: buildEnv(),
+        model: opts.model,
+        checkpointUuid: input.checkpointUuid,
+        signal: input.signal,
+      });
     },
   };
 }

@@ -215,6 +215,9 @@ const providerProxy = {
   resume: ((ctx) => getProvider().resume(ctx)) as ReturnType<typeof createClaudeProvider>["resume"],
   getPendingInterrupts: ((tid, rid) => getProvider().getPendingInterrupts(tid, rid)) as ReturnType<typeof createClaudeProvider>["getPendingInterrupts"],
   notifyCancelled: ((tid) => getProvider().notifyCancelled?.(tid) ?? Promise.resolve()) as ReturnType<typeof createClaudeProvider>["notifyCancelled"],
+  rewindFiles: ((input) =>
+    getProvider().rewindFiles?.(input) ??
+    Promise.resolve({ canRewind: false, error: "unsupported" })) as ReturnType<typeof createClaudeProvider>["rewindFiles"],
 };
 
 // Scheduled-task engine. Polls scheduled_tasks.next_run_at every minute and
