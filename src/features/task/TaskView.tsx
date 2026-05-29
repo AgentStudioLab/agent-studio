@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { AppShell } from "@/app/AppShell";
 import { RenameDialog } from "@/shared/RenameDialog";
@@ -11,6 +11,7 @@ import { QueuedMessagesPanel } from "@/features/task/QueuedMessagesPanel";
 import { useMessageQueue } from "@/features/task/MessageQueueContext";
 import { PreviewPane } from "@/features/task/PreviewPane";
 import { useChat } from "@/lib/agui/react/useChat";
+import { RunInProgressError } from "@/lib/agui/runtime/api";
 import type { TouchedFile } from "@/lib/agui/runtime/derivations";
 import type { MockFile } from "@/lib/mock/types";
 import {
@@ -33,6 +34,7 @@ function touchedFileToPreview(f: TouchedFile): MockFile {
   const lower = f.relativePath.toLowerCase();
   let type: MockFile["type"] = "generic";
   if (lower.endsWith(".md") || lower.endsWith(".markdown")) type = "markdown";
+  else if (lower.endsWith(".html") || lower.endsWith(".htm")) type = "html";
   else if (lower.endsWith(".xlsx") || lower.endsWith(".csv")) type = "spreadsheet";
   else if (lower.endsWith(".pptx") || lower.endsWith(".key")) type = "presentation";
   else if (/\.(png|jpe?g|gif|svg|webp)$/.test(lower)) type = "image";
@@ -271,12 +273,38 @@ export function TaskView() {
   // switching threads doesn't drop queued items — only an app restart does.
   const queue = useMessageQueue(activeTaskId);
 
-  // "Busy" = streaming OR HITL-paused. Both states block the normal Send
-  // affordance: during streaming the agent is producing; during HITL the
-  // agent is waiting on tool approval. Either way new user messages need
-  // to queue or override, not fire-and-forget. isRunning alone is false
-  // during HITL even though the run isn't done.
-  const isBusy = isRunning || pendingInterrupts.length > 0;
+  // Send a message, but if the sidecar reports the thread already has a live
+  // run (409 → RunInProgressError: a scheduled run, or a send from another
+  // window), re-queue the text so it auto-flushes when that run finishes,
+  // instead of erroring. Other send failures surface via the runtime's own
+  // error state. This is the client half of the backend's one-run-per-thread
+  // guard — the composer's busy-gating prevents it in the common case, so this
+  // only fires on races / multi-window.
+  const sendOrQueue = useCallback(
+    (text: string) => {
+      void send(text, { permissionMode, model: effectiveModel }).catch((e) => {
+        if (e instanceof RunInProgressError) queue.add(text);
+      });
+    },
+    [send, permissionMode, effectiveModel, queue.add],
+  );
+
+  // "Busy" = streaming OR HITL-paused OR a server-started run is in flight.
+  // Both local states block the normal Send affordance: during streaming the
+  // agent is producing; during HITL the agent is waiting on tool approval.
+  // Either way new user messages need to queue or override, not fire-and-forget.
+  // isRunning alone is false during HITL even though the run isn't done.
+  //
+  // activeRun is the THIRD source: runs started elsewhere (a scheduled task,
+  // another window) are discovered via /conversations/status, and local
+  // isRunning only flips true AFTER the SSE attach lands. Without folding
+  // activeRun in, opening a scheduled conversation whose run is still in
+  // flight shows the normal Send arrow during the pre-attach window — and
+  // send() (whose own guard only checks the local isRunning) would fire a
+  // SECOND concurrent run on a thread already resuming the same SDK session.
+  // Treating a server-known active run as busy makes the composer queue
+  // instead; the auto-flush below delivers it when that run finishes.
+  const isBusy = isRunning || pendingInterrupts.length > 0 || activeRun !== null;
 
   // Auto-flush: when the active run cleanly completes, pop the head of the
   // queue and send it. "Cleanly" = isRunning transitions true → false AND
@@ -310,7 +338,7 @@ export function TaskView() {
     }
     const head = queue.popHead();
     if (head) {
-      void send(head.text, { permissionMode, model: effectiveModel });
+      sendOrQueue(head.text);
     }
   }, [
     activeTaskId,
@@ -321,9 +349,7 @@ export function TaskView() {
     queue.userCancelled,
     queue.popHead,
     queue.clearUserCancelled,
-    send,
-    permissionMode,
-    effectiveModel,
+    sendOrQueue,
   ]);
 
   if (!activeTaskId) return null;
@@ -395,6 +421,11 @@ export function TaskView() {
                 void regenerate(fromMessageId, {
                   permissionMode,
                   model: effectiveModel,
+                }).catch(() => {
+                  // Only RunInProgressError propagates here (a run went live
+                  // mid-regenerate — rare race). The runtime already restored
+                  // the optimistic truncation + set no error; swallow so it
+                  // isn't an unhandled rejection. User can retry.
                 })
               }
               onContinueAfterRestart={() => {
@@ -406,10 +437,7 @@ export function TaskView() {
                 for (let i = viewMessages.length - 1; i >= 0; i--) {
                   const m = viewMessages[i]!;
                   if (m.role === "user") {
-                    void send(m.content, {
-                      permissionMode,
-                      model: effectiveModel,
-                    });
+                    sendOrQueue(m.content);
                     return;
                   }
                 }
@@ -432,10 +460,7 @@ export function TaskView() {
                   queue.clearUserCancelled();
                   void (async () => {
                     if (isBusy) await cancel();
-                    await send(target.text, {
-                      permissionMode,
-                      model: effectiveModel,
-                    });
+                    sendOrQueue(target.text);
                   })();
                 }}
               />
@@ -445,7 +470,7 @@ export function TaskView() {
                 fallbackModel={conversationQuery.data?.model ?? null}
                 onSend={(text) => {
                   queue.clearUserCancelled();
-                  void send(text, { permissionMode, model: effectiveModel });
+                  sendOrQueue(text);
                 }}
                 onQueue={(text) => {
                   queue.add(text);
@@ -454,10 +479,7 @@ export function TaskView() {
                   queue.clearUserCancelled();
                   void (async () => {
                     if (isBusy) await cancel();
-                    await send(text, {
-                      permissionMode,
-                      model: effectiveModel,
-                    });
+                    sendOrQueue(text);
                   })();
                 }}
                 onStop={() => {

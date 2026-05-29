@@ -18,7 +18,7 @@ import { applyEvent, appendInterruptedNotice, type ArgsBuffer } from "./reducer"
 import { sweepPendingToolCalls, buildViewMessages } from "./sweep";
 import { ThinkingTimer } from "./thinking";
 import { createResumableRun } from "./sse";
-import { AGUIHttpClient, type AGUIApiOptions } from "./api";
+import { AGUIHttpClient, RunInProgressError, type AGUIApiOptions } from "./api";
 import { buildResumeRequest } from "./protocol";
 
 // ============ 公开 API ============
@@ -187,13 +187,14 @@ export function createChatRuntime(opts: ChatRuntimeOptions): ChatRuntime {
     if (state.pendingInterrupts.some((it) => it.reason === "tool_approval")) return;
 
     // 先把 live 归档（如果有），再追加用户消息进 historical
+    const userMsgId = `msg_${nanoid(10)}`;
     setState((s) => {
       const merged: MessageView[] =
         s.liveMessages.length > 0
           ? [...s.historicalMessages, ...s.liveMessages]
           : s.historicalMessages;
       const userMsg: MessageView = {
-        id: `msg_${nanoid(10)}`,
+        id: userMsgId,
         role: "user",
         content: text,
       };
@@ -220,6 +221,21 @@ export function createChatRuntime(opts: ChatRuntimeOptions): ChatRuntime {
         ...(sendOpts?.model ? { model: sendOpts.model } : {}),
       });
     } catch (err) {
+      if (err instanceof RunInProgressError) {
+        // The thread already has a live run (scheduled / another window). Roll
+        // back the optimistic user message + running flags WITHOUT surfacing an
+        // error banner, then re-throw so the caller re-queues the text — it'll
+        // auto-flush when that run finishes. The attach effect (driven by
+        // /conversations/status) surfaces the live run in the meantime.
+        setState((s) => ({
+          ...s,
+          isRunning: false,
+          activeRunId: null,
+          historicalMessages: s.historicalMessages.filter((m) => m.id !== userMsgId),
+        }));
+        thinking.clear();
+        throw err;
+      }
       const msg = err instanceof Error ? err.message : String(err);
       setState({ error: msg, isRunning: false, activeRunId: null });
       thinking.clear();
@@ -245,6 +261,11 @@ export function createChatRuntime(opts: ChatRuntimeOptions): ChatRuntime {
     const idx = state.historicalMessages.findIndex((m) => m.id === fromMessageId);
     if (idx < 0) return;
 
+    // Snapshot the pre-truncation history so a rejected regenerate (409: a run
+    // is already live) can restore it. The server only truncates AFTER its own
+    // concurrency guard passes, so its history is still intact on 409 — we just
+    // undo the optimistic client-side truncation.
+    const prevHistorical = state.historicalMessages;
     setState((s) => ({
       ...s,
       error: null,
@@ -267,6 +288,16 @@ export function createChatRuntime(opts: ChatRuntimeOptions): ChatRuntime {
         ...(regenOpts?.model ? { model: regenOpts.model } : {}),
       });
     } catch (err) {
+      if (err instanceof RunInProgressError) {
+        setState((s) => ({
+          ...s,
+          isRunning: false,
+          activeRunId: null,
+          historicalMessages: prevHistorical,
+        }));
+        thinking.clear();
+        throw err;
+      }
       const msg = err instanceof Error ? err.message : String(err);
       setState({ error: msg, isRunning: false, activeRunId: null });
       thinking.clear();

@@ -74,6 +74,19 @@ export function buildRunRoutes(deps: MountRunsDeps): Hono {
         ? body.model
         : undefined;
 
+    // Refuse to start a second run on a thread that already has one in flight
+    // (a scheduled run, or a send from another window). Two runs resuming the
+    // same SDK session concurrently corrupt the transcript. The frontend gates
+    // this in the composer (busy → queue), so this 409 only fires on races /
+    // multi-window — the client re-queues the message rather than erroring.
+    const active = await deps.store.getThreadActiveRun(body.threadId);
+    if (active) {
+      return c.json(
+        { error: "run_in_progress", activeRunId: active.runId, status: active.status },
+        409,
+      );
+    }
+
     // Capture first-turn BEFORE appending — an empty thread means this is the
     // message that should drive the auto-title.
     const isFirstTurn = deps.messages.countByThread(body.threadId) === 0;
@@ -138,6 +151,19 @@ export function buildRunRoutes(deps: MountRunsDeps): Hono {
     }
     const thread = deps.threads.get(threadId);
     if (!thread) return c.json({ error: "thread_not_found" }, 404);
+
+    // Same concurrency guard as POST /runs — regenerate also starts a run and
+    // would collide with an in-flight one on the same SDK session. Checked
+    // BEFORE createRun + the truncate/rewind steps, so a rejected regenerate
+    // leaves the thread's history untouched (server-side truncate runs later,
+    // inside the async block below).
+    const active = await deps.store.getThreadActiveRun(threadId);
+    if (active) {
+      return c.json(
+        { error: "run_in_progress", activeRunId: active.runId, status: active.status },
+        409,
+      );
+    }
 
     const permissionMode: "ask" | "act-without-asking" =
       body.permissionMode === "act-without-asking" ? "act-without-asking" : "ask";

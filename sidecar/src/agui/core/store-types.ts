@@ -46,6 +46,17 @@ export interface RunEventStore {
     errorMsg?: string,
   ): Promise<void>;
   getRun(runId: string): Promise<RunSnapshot | null>;
+  /**
+   * The thread's most-recent run iff it is still non-terminal (running |
+   * awaiting_approval) — i.e. an in-flight run that a new run would collide
+   * with on the same SDK session. null when the latest run is terminal or the
+   * thread has no runs. Used to reject concurrent runs on one thread (POST
+   * /runs + regenerate), so a scheduled run + a user follow-up can't resume the
+   * same session simultaneously.
+   */
+  getThreadActiveRun(
+    threadId: string,
+  ): Promise<{ runId: string; status: RunStatus } | null>;
   streamFrom(
     runId: string,
     after: string | undefined,

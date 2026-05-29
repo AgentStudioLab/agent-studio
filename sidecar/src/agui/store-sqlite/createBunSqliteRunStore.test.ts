@@ -41,3 +41,54 @@ describe("createBunSqliteRunStore — reconcileOrphans", () => {
     expect(run.status).toBe("error");
   });
 });
+
+describe("createBunSqliteRunStore — getThreadActiveRun", () => {
+  function seed(): Database {
+    const db = new Database(":memory:");
+    migrate(db);
+    db.exec(`INSERT INTO conversations (id, title, created_at, updated_at) VALUES ('t1', 't', 1, 1)`);
+    return db;
+  }
+
+  it("returns the latest run when it is running", async () => {
+    const db = seed();
+    db.exec(`INSERT INTO runs (id, thread_id, status, started_at) VALUES ('r1', 't1', 'running', 1)`);
+    const store = createBunSqliteRunStore(db);
+    expect(await store.getThreadActiveRun("t1")).toEqual({ runId: "r1", status: "running" });
+  });
+
+  it("returns the latest run when it is awaiting_approval", async () => {
+    const db = seed();
+    db.exec(`INSERT INTO runs (id, thread_id, status, started_at) VALUES ('r1', 't1', 'awaiting_approval', 1)`);
+    const store = createBunSqliteRunStore(db);
+    expect(await store.getThreadActiveRun("t1")).toEqual({ runId: "r1", status: "awaiting_approval" });
+  });
+
+  it("returns null when the latest run is terminal", async () => {
+    const db = seed();
+    db.exec(`INSERT INTO runs (id, thread_id, status, started_at) VALUES ('r1', 't1', 'completed', 1)`);
+    const store = createBunSqliteRunStore(db);
+    expect(await store.getThreadActiveRun("t1")).toBeNull();
+  });
+
+  it("returns null when the thread has no runs", async () => {
+    const store = createBunSqliteRunStore(seed());
+    expect(await store.getThreadActiveRun("t1")).toBeNull();
+  });
+
+  it("considers only the latest run — a terminal latest shadows an older running orphan", async () => {
+    const db = seed();
+    db.exec(`INSERT INTO runs (id, thread_id, status, started_at) VALUES ('r1', 't1', 'running', 1)`);
+    db.exec(`INSERT INTO runs (id, thread_id, status, started_at) VALUES ('r2', 't1', 'completed', 2)`);
+    const store = createBunSqliteRunStore(db);
+    expect(await store.getThreadActiveRun("t1")).toBeNull();
+  });
+
+  it("returns the latest run when a newer run is live over an older terminal one", async () => {
+    const db = seed();
+    db.exec(`INSERT INTO runs (id, thread_id, status, started_at) VALUES ('r1', 't1', 'completed', 1)`);
+    db.exec(`INSERT INTO runs (id, thread_id, status, started_at) VALUES ('r2', 't1', 'running', 2)`);
+    const store = createBunSqliteRunStore(db);
+    expect(await store.getThreadActiveRun("t1")).toEqual({ runId: "r2", status: "running" });
+  });
+});

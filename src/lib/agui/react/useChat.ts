@@ -103,10 +103,17 @@ export function useChat(opts: UseChatOptions) {
         model?: string;
       },
     ) => {
-      await runtime.send(text, sendOpts);
-      // Light up sidebar pulse + active-run derivation immediately. Symmetric
-      // invalidation fires from onRunFinished/Error when the run terminates.
-      void qc.invalidateQueries({ queryKey: THREAD_STATUS_KEY });
+      // finally (not a trailing statement) so the status query also refreshes
+      // when runtime.send rejects with RunInProgressError — that lets the
+      // attach effect discover the live run faster. The rejection still
+      // propagates to the caller (TaskView re-queues on it).
+      try {
+        await runtime.send(text, sendOpts);
+      } finally {
+        // Light up sidebar pulse + active-run derivation immediately. Symmetric
+        // invalidation fires from onRunFinished/Error when the run terminates.
+        void qc.invalidateQueries({ queryKey: THREAD_STATUS_KEY });
+      }
     },
     [runtime, qc],
   );
@@ -118,8 +125,11 @@ export function useChat(opts: UseChatOptions) {
         model?: string;
       },
     ) => {
-      await runtime.regenerate(fromMessageId, regenOpts);
-      void qc.invalidateQueries({ queryKey: THREAD_STATUS_KEY });
+      try {
+        await runtime.regenerate(fromMessageId, regenOpts);
+      } finally {
+        void qc.invalidateQueries({ queryKey: THREAD_STATUS_KEY });
+      }
     },
     [runtime, qc],
   );

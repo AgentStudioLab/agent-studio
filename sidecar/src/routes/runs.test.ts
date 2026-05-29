@@ -86,3 +86,51 @@ describe("POST /runs/:runId/resume — idempotent semantics", () => {
     expect(res.status).toBe(202);
   });
 });
+
+describe("POST /runs — one-run-per-thread guard", () => {
+  // Only getThreadActiveRun is reached in the reject path (the guard sits
+  // before threads/messages), so the other deps can stay as never-stubs.
+  function makeApp(active: { runId: string; status: string } | null) {
+    const stub = () => undefined as never;
+    const store = { getThreadActiveRun: async () => active } as never;
+    const app = new Hono();
+    app.route(
+      "/",
+      buildRunRoutes({
+        threads: stub() as never,
+        messages: stub() as never,
+        provider: stub() as never,
+        store,
+        interruptBus: stub() as never,
+        usage: stub() as never,
+      }),
+    );
+    return app;
+  }
+
+  const runBody = JSON.stringify({
+    threadId: "t1",
+    runId: "r2",
+    message: { role: "user", content: "hi" },
+  });
+
+  it("returns 409 run_in_progress when the thread already has a live run", async () => {
+    const app = makeApp({ runId: "r1", status: "running" });
+    const res = await app.request("/runs", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: runBody,
+    });
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as {
+      error: string;
+      activeRunId: string;
+      status: string;
+    };
+    expect(body).toEqual({
+      error: "run_in_progress",
+      activeRunId: "r1",
+      status: "running",
+    });
+  });
+});

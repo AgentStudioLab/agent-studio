@@ -39,6 +39,9 @@ export function createBunSqliteRunStore(db: Database): RunEventStore {
   const selectRun = db.prepare(
     "SELECT id AS runId, thread_id AS threadId, status, last_seq AS lastSeq FROM runs WHERE id = ?",
   );
+  const selectLatestRunForThread = db.prepare(
+    "SELECT id AS runId, status FROM runs WHERE thread_id = ? ORDER BY started_at DESC LIMIT 1",
+  );
   const selectEventsAfter = db.prepare(
     "SELECT seq, type, payload FROM run_events WHERE run_id = ? AND seq > ? ORDER BY seq ASC",
   );
@@ -127,6 +130,19 @@ export function createBunSqliteRunStore(db: Database): RunEventStore {
         | { runId: string; threadId: string; status: RunStatus; lastSeq: number }
         | undefined;
       return row ? hydrateSnapshot(row) : null;
+    },
+
+    async getThreadActiveRun(threadId) {
+      const row = selectLatestRunForThread.get(threadId) as
+        | { runId: string; status: RunStatus }
+        | undefined;
+      if (!row) return null;
+      // Only the thread's LATEST run matters — an old orphaned "running" row
+      // would otherwise wedge the thread permanently (boot reconcile flips
+      // those to error/cancelled, but scope it here anyway).
+      return row.status === "running" || row.status === "awaiting_approval"
+        ? { runId: row.runId, status: row.status }
+        : null;
     },
 
     streamFrom(runId, after, signal) {

@@ -56,6 +56,22 @@ export interface ResumeRequest {
   alwaysAllowIndices?: number[];
 }
 
+/**
+ * Thrown when the sidecar rejects a run start (POST /runs or regenerate) with
+ * 409 because the thread already has a non-terminal run — e.g. a scheduled run
+ * is still executing, or another window started one. Callers treat this as
+ * "re-queue and retry when that run finishes", NOT as a fatal error, so it
+ * stays distinct from the generic Error thrown on other non-2xx responses.
+ */
+export class RunInProgressError extends Error {
+  readonly activeRunId: string | null;
+  constructor(activeRunId: string | null) {
+    super("run_in_progress");
+    this.name = "RunInProgressError";
+    this.activeRunId = activeRunId;
+  }
+}
+
 export class AGUIHttpClient {
   private readonly apiBase: string;
   private readonly fetchImpl: typeof fetch;
@@ -73,6 +89,10 @@ export class AGUIHttpClient {
       headers: { "content-type": "application/json" },
       body: JSON.stringify(req),
     });
+    if (res.status === 409) {
+      const b = (await res.json().catch(() => null)) as { activeRunId?: string } | null;
+      throw new RunInProgressError(b?.activeRunId ?? null);
+    }
     if (res.status !== 202) {
       throw new Error(`POST /runs failed: ${res.status}`);
     }
@@ -97,6 +117,10 @@ export class AGUIHttpClient {
         }),
       },
     );
+    if (res.status === 409) {
+      const b = (await res.json().catch(() => null)) as { activeRunId?: string } | null;
+      throw new RunInProgressError(b?.activeRunId ?? null);
+    }
     if (res.status !== 202) {
       throw new Error(`POST regenerate failed: ${res.status}`);
     }

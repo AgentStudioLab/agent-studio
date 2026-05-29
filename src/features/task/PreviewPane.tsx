@@ -52,9 +52,9 @@ export function PreviewPane({ file, workingDir, onClose }: PreviewPaneProps) {
   const { t } = useTranslation();
   const [width, setWidth] = useState<number>(DEFAULT_W);
   const [dragging, setDragging] = useState<boolean>(false);
-  // Renderer-specific display modes live in the shell so the header can host
-  // their controls. Future xlsx/pptx renderers will add their own state here.
-  const [markdownMode, setMarkdownMode] = useState<MarkdownViewMode>("preview");
+  // Preview-vs-source toggle lives in the shell so the header can host the
+  // control. Shared by markdown + html (identical semantics).
+  const [viewMode, setViewMode] = useState<MarkdownViewMode>("preview");
   const [copied, setCopied] = useState(false);
 
   const { data, error, isLoading, isFetching, refetch } = useFileContent(
@@ -88,6 +88,17 @@ export function PreviewPane({ file, workingDir, onClose }: PreviewPaneProps) {
     });
   };
 
+  // Body layout strategy:
+  //   - HTML preview: full-height container, the self-scaling iframe handles
+  //     its own size; the outer container scrolls the scaled-tall page.
+  //   - Code-block views (source toggle, or a code file): the code block fills
+  //     the pane height and scrolls INSIDE itself — code shouldn't zoom with
+  //     the pane (monospace) nor scroll at the outer container. `source` is
+  //     only reachable for markdown/html (the only types that show the toggle).
+  //   - Everything else: width-proportional zoom wrapper.
+  const isHtmlPreview = file.type === "html" && viewMode === "preview";
+  const isCodeView = viewMode === "source" || file.type === "code";
+
   const canCopy = data?.encoding === "utf8";
   const handleCopy = () => {
     if (!data || data.encoding !== "utf8") return;
@@ -101,6 +112,17 @@ export function PreviewPane({ file, workingDir, onClose }: PreviewPaneProps) {
         console.error("[PreviewPane] copy failed", err);
       });
   };
+
+  const body = (
+    <PreviewBody
+      file={file}
+      data={data}
+      error={error}
+      isLoading={isLoading}
+      onOpenExternal={handleOpenExternal}
+      viewMode={viewMode}
+    />
+  );
 
   return (
     <aside
@@ -129,8 +151,8 @@ export function PreviewPane({ file, workingDir, onClose }: PreviewPaneProps) {
         className="flex h-12 shrink-0 items-center gap-3 px-4"
         style={{ borderBottom: "1px solid hsl(var(--border-300) / 0.1)" }}
       >
-        {file.type === "markdown" && (
-          <MarkdownViewToggle value={markdownMode} onChange={setMarkdownMode} />
+        {(file.type === "markdown" || file.type === "html") && (
+          <MarkdownViewToggle value={viewMode} onChange={setViewMode} />
         )}
         {/* Filename: block-level + flex-1 + min-w-0 so `truncate` actually
             applies under narrow widths. An inline <span> ignores
@@ -182,34 +204,32 @@ export function PreviewPane({ file, workingDir, onClose }: PreviewPaneProps) {
         </button>
       </header>
 
-      {/* Body — zoom the content proportionally with the pane width so tables /
-          slides / docs scale rather than reflow. `zoom` chosen over
-          `transform: scale` because it affects layout (scrollbar bounds + flex
-          height adapt). The wrapper keeps a constant 480px design width; the
-          inner scales relative to that. */}
-      <div className="flex-1 overflow-y-auto p-3">
-        <div
-          className="space-y-3"
-          style={{
-            zoom: Math.min(
-              MAX_ZOOM,
-              Math.max(
-                MIN_ZOOM,
-                Math.max(0, width - PANE_BODY_PADDING) / DESIGN_CONTENT_WIDTH,
+      {/* Body — see isHtmlPreview / isCodeView above for the three strategies.
+          The zoom wrapper uses `zoom` (not `transform: scale`) so it affects
+          layout — scrollbar bounds + flex height adapt — around a constant
+          480px design width. */}
+      {isHtmlPreview ? (
+        <div className="min-h-0 flex-1 overflow-auto">{body}</div>
+      ) : isCodeView ? (
+        <div className="min-h-0 flex-1">{body}</div>
+      ) : (
+        <div className="flex-1 overflow-y-auto p-3">
+          <div
+            className="space-y-3"
+            style={{
+              zoom: Math.min(
+                MAX_ZOOM,
+                Math.max(
+                  MIN_ZOOM,
+                  Math.max(0, width - PANE_BODY_PADDING) / DESIGN_CONTENT_WIDTH,
+                ),
               ),
-            ),
-          }}
-        >
-          <PreviewBody
-            file={file}
-            data={data}
-            error={error}
-            isLoading={isLoading}
-            onOpenExternal={handleOpenExternal}
-            markdownMode={markdownMode}
-          />
+            }}
+          >
+            {body}
+          </div>
         </div>
-      </div>
+      )}
     </aside>
   );
 }

@@ -13,6 +13,7 @@ import { useTranslation } from "react-i18next";
 import type { FileContentBody, FileContentError } from "@/lib/agui/react/useFileContent";
 import type { MockFile } from "@/lib/mock/types";
 import { MarkdownRenderer } from "./renderers/MarkdownRenderer";
+import { HtmlRenderer } from "./renderers/HtmlRenderer";
 import { CodeRenderer } from "./renderers/CodeRenderer";
 import { SpreadsheetRenderer } from "./renderers/SpreadsheetRenderer";
 import { ImageRenderer } from "./renderers/ImageRenderer";
@@ -27,10 +28,10 @@ interface PreviewBodyProps {
   isLoading: boolean;
   onOpenExternal: () => void;
   /**
-   * Renderer-specific display mode bag. Each renderer reads only the field
-   * it cares about; pptx/xlsx renderers will extend this when they land.
+   * Preview-vs-source toggle, shared by the renderers that support it
+   * (markdown + html — identical semantics). Other renderers ignore it.
    */
-  markdownMode: MarkdownViewMode;
+  viewMode: MarkdownViewMode;
 }
 
 export function PreviewBody({
@@ -39,7 +40,7 @@ export function PreviewBody({
   error,
   isLoading,
   onOpenExternal,
-  markdownMode,
+  viewMode,
 }: PreviewBodyProps) {
   const { t } = useTranslation();
 
@@ -99,7 +100,9 @@ export function PreviewBody({
   // utf8 — text renderers keyed by file.type.
   switch (file.type) {
     case "markdown":
-      return <MarkdownRenderer {...props} mode={markdownMode} />;
+      return <MarkdownRenderer {...props} mode={viewMode} />;
+    case "html":
+      return <HtmlRenderer {...props} mode={viewMode} />;
     case "spreadsheet":
       return <SpreadsheetRenderer {...props} />;
     case "code":
