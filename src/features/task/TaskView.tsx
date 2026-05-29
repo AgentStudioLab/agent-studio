@@ -306,6 +306,17 @@ export function TaskView() {
   // instead; the auto-flush below delivers it when that run finishes.
   const isBusy = isRunning || pendingInterrupts.length > 0 || activeRun !== null;
 
+  // [Qdbg] TEMP — remove after diagnosing the "only one queued" issue.
+  useEffect(() => {
+    console.log("[Qdbg] state", {
+      isRunning,
+      isBusy,
+      interrupts: pendingInterrupts.length,
+      activeRun: activeRun?.runId ?? null,
+      queued: queue.items.map((i) => i.text),
+    });
+  }, [isRunning, isBusy, pendingInterrupts.length, activeRun, queue.items]);
+
   // Auto-flush: when the active run cleanly completes, pop the head of the
   // queue and send it. "Cleanly" = isRunning transitions true → false AND
   // no error AND no HITL pending AND the user didn't manually cancel.
@@ -331,6 +342,14 @@ export function TaskView() {
     //   2) first render on this TaskView with the queue already populated
     //      and idle (wasRunning === null) — covers thread-switch return.
     const isTransition = wasRunning === true || wasRunning === null;
+    // [Qdbg] TEMP — remove after diagnosing the "only one queued" issue.
+    console.log("[Qdbg] flush-check", {
+      isRunning,
+      wasRunning,
+      isTransition,
+      items: queue.items.length,
+      userCancelled: queue.userCancelled,
+    });
     if (!isTransition) return;
     if (queue.userCancelled) {
       queue.clearUserCancelled();
