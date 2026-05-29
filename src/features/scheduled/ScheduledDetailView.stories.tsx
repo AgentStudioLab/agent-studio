@@ -13,7 +13,7 @@ type Story = StoryObj<typeof ScheduledDetailView>;
 
 export const Default: Story = {
   render: () => (
-    <AppShellProvider initialView="scheduled-detail">
+    <AppShellProvider>
       <TooltipProvider delayDuration={200}>
         <ScheduledDetailView />
       </TooltipProvider>
@@ -25,14 +25,14 @@ export const SideBySide: Story = {
   render: () => (
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", height: "100vh" }}>
       <div>
-        <AppShellProvider initialView="scheduled-detail">
+        <AppShellProvider>
           <TooltipProvider delayDuration={200}>
             <ScheduledDetailView />
           </TooltipProvider>
         </AppShellProvider>
       </div>
       <div data-mode="dark">
-        <AppShellProvider initialView="scheduled-detail">
+        <AppShellProvider>
           <TooltipProvider delayDuration={200}>
             <ScheduledDetailView />
           </TooltipProvider>

@@ -18,29 +18,26 @@ export default meta;
 type Story = StoryObj<typeof SkillCard>;
 
 const skill = loadedSkills[0]!;
+const skillArgs = {
+  initials: skill.initials,
+  hue: "orange" as const,
+  name: skill.name,
+  description: skill.description,
+};
 
 export const Default: Story = {
-  args: { skill, active: false },
+  args: { ...skillArgs, active: false },
 };
 
 export const Active: Story = {
-  args: { skill, active: true },
+  args: { ...skillArgs, active: true },
 };
 
-export const Expanded: Story = {
+export const WithSourcePath: Story = {
   args: {
-    skill,
+    ...skillArgs,
     active: true,
-    expanded: true,
-    childFiles: [
-      "SKILL.md",
-      "agents/",
-      "assets/",
-      "eval-viewer/",
-      "references/",
-      "scripts/",
-      "LICENSE.txt",
-    ],
+    sourcePath: "/Users/demo/.agent-studio/skills/filesystem",
   },
 };
 
@@ -51,12 +48,7 @@ export const SideBySide: Story = {
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", minHeight: "100vh" }}>
       <div style={{ background: "hsl(var(--bg-100))", padding: "2rem" }}>
         <div style={{ width: 320 }}>
-          <SkillCard
-            skill={skill}
-            active
-            expanded
-            childFiles={["SKILL.md", "agents/", "assets/"]}
-          />
+          <SkillCard {...skillArgs} active />
         </div>
       </div>
       <div
@@ -65,10 +57,9 @@ export const SideBySide: Story = {
       >
         <div style={{ width: 320 }}>
           <SkillCard
-            skill={skill}
+            {...skillArgs}
             active
-            expanded
-            childFiles={["SKILL.md", "agents/", "assets/"]}
+            sourcePath="/Users/demo/.agent-studio/skills/filesystem"
           />
         </div>
       </div>

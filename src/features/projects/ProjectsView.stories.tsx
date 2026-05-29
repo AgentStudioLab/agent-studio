@@ -13,7 +13,7 @@ type Story = StoryObj<typeof ProjectsView>;
 
 export const Default: Story = {
   render: () => (
-    <AppShellProvider initialView="projects">
+    <AppShellProvider>
       <TooltipProvider delayDuration={200}>
         <ProjectsView />
       </TooltipProvider>
@@ -25,14 +25,14 @@ export const SideBySide: Story = {
   render: () => (
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", height: "100vh" }}>
       <div>
-        <AppShellProvider initialView="projects">
+        <AppShellProvider>
           <TooltipProvider delayDuration={200}>
             <ProjectsView />
           </TooltipProvider>
         </AppShellProvider>
       </div>
       <div data-mode="dark">
-        <AppShellProvider initialView="projects">
+        <AppShellProvider>
           <TooltipProvider delayDuration={200}>
             <ProjectsView />
           </TooltipProvider>

@@ -13,7 +13,7 @@ type Story = StoryObj<typeof CustomizeView>;
 
 export const Default: Story = {
   render: () => (
-    <AppShellProvider initialView="customize">
+    <AppShellProvider>
       <TooltipProvider delayDuration={200}>
         <CustomizeView />
       </TooltipProvider>
@@ -23,7 +23,7 @@ export const Default: Story = {
 
 export const SkillsActive: Story = {
   render: () => (
-    <AppShellProvider initialView="customize">
+    <AppShellProvider>
       <TooltipProvider delayDuration={200}>
         <CustomizeView initialSection="skills" />
       </TooltipProvider>
@@ -35,14 +35,14 @@ export const SideBySide: Story = {
   render: () => (
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", height: "100vh" }}>
       <div>
-        <AppShellProvider initialView="customize">
+        <AppShellProvider>
           <TooltipProvider delayDuration={200}>
             <CustomizeView initialSection="skills" />
           </TooltipProvider>
         </AppShellProvider>
       </div>
       <div data-mode="dark">
-        <AppShellProvider initialView="customize">
+        <AppShellProvider>
           <TooltipProvider delayDuration={200}>
             <CustomizeView initialSection="skills" />
           </TooltipProvider>
