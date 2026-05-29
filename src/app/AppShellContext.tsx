@@ -7,7 +7,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import type { MockFile } from "@/lib/mock/types";
 
 // Routes that render their own full-bleed layout — Sidebar should NOT show.
@@ -61,6 +61,7 @@ const AppShellContext = createContext<AppShellContextValue | null>(null);
 
 export function AppShellProvider({ children }: { children: ReactNode }) {
   const location = useLocation();
+  const navigate = useNavigate();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [asideOpen, setAsideOpen] = useState(true);
@@ -98,6 +99,19 @@ export function AppShellProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     setPreview({ file: null, open: false });
   }, [location.pathname]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey)) return;
+      if (event.key !== "," && event.code !== "Comma") return;
+
+      event.preventDefault();
+      navigate("/settings");
+    };
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [navigate]);
 
   const value = useMemo<AppShellContextValue>(
     () => ({
