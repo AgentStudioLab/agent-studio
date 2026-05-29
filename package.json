@@ -9,9 +9,9 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "build:sidecar": "bun run scripts/build-sidecar.ts",
-    "tauri": "bun run scripts/tauri.ts",
-    "tauri:dev": "bun run build:sidecar -- --host-only && bun run tauri -- dev",
-    "tauri:build": "bun run build:sidecar && bun run tauri -- build",
+    "tauri": "tauri",
+    "tauri:dev": "bun run build:sidecar -- --host-only && tauri dev",
+    "tauri:build": "bun run build:sidecar && tauri build",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build"
   },

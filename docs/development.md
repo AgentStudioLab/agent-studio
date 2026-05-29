@@ -16,7 +16,7 @@
 . "$HOME/.cargo/env"
 ```
 
-项目的 `bun run tauri:*` 脚本会通过 `scripts/tauri.ts` 自动把 `$HOME/.cargo/bin` 注入 Tauri 子进程 PATH；手动执行 `cargo ...` 时仍然需要当前 shell 能找到 Cargo。
+`bun run tauri:*` 会直接调用 Tauri CLI。运行这些命令前，当前 shell 需要能找到 `cargo` 和 `rustc`。
 
 ## 工具链要求
 
@@ -24,7 +24,7 @@
 | --- | --- |
 | Bun | 前端依赖安装、Vite 脚本、sidecar 开发/编译 |
 | Rust/Cargo | Tauri v2 桌面壳构建与检查 |
-| Tauri CLI | 通过根目录 devDependency 提供，使用 `bun run tauri ...` 调用；脚本会补齐 Cargo PATH |
+| Tauri CLI | 通过根目录 devDependency 提供，使用 `bun run tauri ...` 调用 |
 
 不要把这个仓库改成 workspace。根项目和 `sidecar/` 是独立 package，升级依赖时分别处理 lockfile。
 
