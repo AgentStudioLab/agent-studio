@@ -11,6 +11,9 @@ mock.module("@anthropic-ai/claude-agent-sdk", () => ({
   query: querySpy,
   listSessions: async () => [],
   tagSession: async () => {},
+  // scheduled-tool.ts (imported transitively via provider) pulls these in.
+  createSdkMcpServer: (config: unknown) => config,
+  tool: (name: string) => ({ name }),
 }));
 
 const { createClaudeProvider } = await import("./provider");

@@ -232,6 +232,14 @@ export class MessageService {
       .run(errorMsg, threadId);
   }
 
+  /** Cheap row count for a thread — used to detect the first user turn. */
+  countByThread(threadId: string): number {
+    const row = this.db
+      .prepare("SELECT COUNT(*) AS n FROM messages WHERE thread_id = ?")
+      .get(threadId) as { n: number };
+    return row.n;
+  }
+
   listByThread(threadId: string): MessageDTO[] {
     const rows = this.db
       .prepare(

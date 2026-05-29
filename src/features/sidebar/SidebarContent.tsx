@@ -121,10 +121,7 @@ export function SidebarContent() {
   // URL is the source of truth for "which view is active". useMatch would
   // also work but a single useParams + a substring check on pathname is
   // enough for the few sidebar slots we light up.
-  const { threadId: routeThreadId, scheduledId: routeScheduledId } = useParams<{
-    threadId: string;
-    scheduledId: string;
-  }>();
+  const { threadId: routeThreadId } = useParams<{ threadId: string }>();
   const pathname = location.pathname;
   // Pulse-dot prototype shows the selected thread with a darker fill
   // (bg-000) — only counts when the task view is the one in focus.
@@ -294,9 +291,7 @@ export function SidebarContent() {
                   frequencyLabel={t(`scheduled.frequencyChip.${task.frequency}`)}
                   newCount={newCount}
                   newLabel={t("sidebar.sections.scheduledNew", { count: newCount })}
-                  active={
-                    activeScheduledTaskId === task.id || routeScheduledId === task.id
-                  }
+                  active={activeScheduledTaskId === task.id}
                   onClick={() => {
                     // The sidebar row opens the task's CONVERSATION (its latest
                     // run), not the config page. Config is reached by clicking

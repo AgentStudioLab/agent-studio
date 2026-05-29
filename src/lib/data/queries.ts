@@ -29,6 +29,9 @@ export function useConversation(id: string | null) {
     queryFn: () => getConversation(id!),
     enabled: !!id,
     staleTime: 5_000,
+    // Poll so the server-side auto-title (first-turn summary) shows up in the
+    // open thread's header without a manual refetch.
+    refetchInterval: 5_000,
   });
 }
 
@@ -37,6 +40,9 @@ export function useRecentConversations(limit = 20) {
     queryKey: [...queryKeys.recents, limit],
     queryFn: () => listRecents(limit),
     staleTime: 5_000,
+    // Poll so the sidebar reflects server-side title changes (auto-title) and
+    // newly-created conversations promptly.
+    refetchInterval: 5_000,
   });
 }
 

@@ -16,6 +16,7 @@ import { createUserProfileSettings } from "./services/userProfileSettings";
 import { composeAppendPrompt } from "./lib/composeAppendPrompt";
 import { ThreadService } from "./services/threads";
 import { MessageService } from "./services/messages";
+import { generateTitle } from "./services/titleGenerator";
 import { ScheduledTaskService } from "./services/scheduledTasks";
 import { Scheduler } from "./services/scheduler";
 import { buildScheduledRoutes } from "./routes/scheduled";
@@ -176,6 +177,23 @@ function buildProvider() {
       pluginPath: skillRegistry.builtinPluginPath(),
     }),
     skillInvocationsStore: skillInvocations,
+    // `/schedule` skill → in-process MCP tool persists through the same service
+    // the scheduler reads. Working dir + model are injected by the provider
+    // from the live run; the agent only supplies name/prompt/cadence.
+    onCreateScheduledTask: (input) => {
+      const task = scheduledTasks.create({
+        name: input.name,
+        description: input.description ?? "",
+        prompt: input.prompt,
+        frequency: input.frequency,
+        timeOfDay: input.timeOfDay ?? null,
+        weekday: input.weekday ?? null,
+        workingDir: input.workingDir ?? null,
+        model: input.model ?? null,
+        permissionMode: "ask",
+      });
+      return { id: task.id, name: task.name };
+    },
   });
 }
 
@@ -228,6 +246,32 @@ app.route(
     store,
     interruptBus,
     usage,
+    // First user message → summarize into a title, replacing "New task".
+    // Fire-and-forget; uses the conversation's model and never throws into
+    // the run path.
+    onFirstUserMessage: ({ threadId, prompt, model }) => {
+      const settings = providerSettings.current();
+      const titleModel = model ?? process.env.ANTHROPIC_MODEL;
+      if (!settings.apiKey || !titleModel) {
+        console.warn(
+          `[autoTitle] skip ${threadId}: apiKey=${!!settings.apiKey} model=${titleModel ?? "—"}`,
+        );
+        return;
+      }
+      console.log(`[autoTitle] generating for ${threadId} (model=${titleModel})`);
+      void generateTitle(prompt, {
+        apiKey: settings.apiKey,
+        baseUrl: settings.baseUrl || undefined,
+        model: titleModel,
+      })
+        .then((title) => {
+          if (title) {
+            threads.rename(threadId, title);
+            console.log(`[autoTitle] ${threadId} → "${title}"`);
+          }
+        })
+        .catch((err) => console.warn("[autoTitle] error:", err));
+    },
   }),
 );
 app.route("/", buildAuditRoutes(audit));

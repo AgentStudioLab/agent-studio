@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { useNavigate, useParams } from "react-router-dom";
-import { ChevronLeft, Clock, Info, Pencil, Play, Plus, Trash2, X } from "lucide-react";
+import { CheckCircle2, ChevronLeft, Clock, Pencil, Play, Trash2 } from "lucide-react";
 import { AppShell } from "@/app/AppShell";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { NewScheduledModal } from "@/features/scheduled/NewScheduledModal";
 import { cn } from "@/lib/utils";
-import type { Frequency, ScheduledRun } from "@/lib/data/types";
+import type { Frequency, ScheduledRun, ScheduledTask } from "@/lib/data/types";
 import {
   useDeleteScheduledTaskMutation,
   useRunScheduledTaskMutation,
@@ -36,14 +36,60 @@ const STATUS_STYLE: Record<ScheduledRun["status"], string> = {
   idle: "bg-muted text-muted-foreground",
 };
 
-function formatWhen(ms: number | null | undefined, locale: string): string {
-  if (ms == null) return "—";
-  return new Date(ms).toLocaleString(locale, {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
+/** "09:00" → "9:00" (drop the leading zero on the hour). */
+function shortTime(hhmm: string): string {
+  const [h, m] = hhmm.split(":");
+  return `${Number(h)}:${m ?? "00"}`;
+}
+
+/** Calendar-day delta (to − from), ignoring wall-clock time. */
+function dayDelta(from: Date, to: Date): number {
+  const a = new Date(from.getFullYear(), from.getMonth(), from.getDate()).getTime();
+  const b = new Date(to.getFullYear(), to.getMonth(), to.getDate()).getTime();
+  return Math.round((b - a) / 86_400_000);
+}
+
+function formatRunWhen(ms: number, locale: string, t: TFunction): string {
+  const d = new Date(ms);
+  const delta = dayDelta(new Date(), d);
+  const time = d.toLocaleTimeString(locale, {
+    hour: "numeric",
     minute: "2-digit",
+    hour12: false,
   });
+  const day =
+    delta === 0
+      ? t("scheduled.detail.relToday")
+      : delta === -1
+        ? t("scheduled.detail.relYesterday")
+        : d.toLocaleDateString(locale, { month: "short", day: "numeric" });
+  return t("scheduled.detail.runWhen", { day, time });
+}
+
+function formatNextRun(
+  task: ScheduledTask,
+  locale: string,
+  t: TFunction,
+): string {
+  if (task.frequency === "manual" || task.nextRunAt == null) {
+    return t("scheduled.detail.nextRunManual");
+  }
+  const d = new Date(task.nextRunAt);
+  const delta = dayDelta(new Date(), d);
+  const day =
+    delta === 0
+      ? t("scheduled.detail.relToday")
+      : delta === 1
+        ? t("scheduled.detail.relTomorrow")
+        : d.toLocaleDateString(locale, { month: "short", day: "numeric" });
+  const time = task.timeOfDay
+    ? shortTime(task.timeOfDay)
+    : d.toLocaleTimeString(locale, {
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: false,
+      });
+  return t("scheduled.detail.nextRunAt", { day, time });
 }
 
 export function ScheduledDetailView() {
@@ -60,7 +106,6 @@ export function ScheduledDetailView() {
 
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [newTool, setNewTool] = useState("");
 
   if (!task) {
     return (
@@ -75,26 +120,9 @@ export function ScheduledDetailView() {
   }
 
   const enabled = task.enabled;
-
-  const addTool = () => {
-    const tool = newTool.trim();
-    if (!tool || task.allowedTools.includes(tool)) {
-      setNewTool("");
-      return;
-    }
-    updateMutation.mutate({
-      id: task.id,
-      patch: { allowedTools: [...task.allowedTools, tool] },
-    });
-    setNewTool("");
-  };
-
-  const removeTool = (tool: string) => {
-    updateMutation.mutate({
-      id: task.id,
-      patch: { allowedTools: task.allowedTools.filter((x) => x !== tool) },
-    });
-  };
+  // "Always allowed" collapses to a single binary now: act-without-asking =
+  // every tool auto-approved during a run; ask = pauses for approval.
+  const alwaysAllowed = task.permissionMode === "act-without-asking";
 
   return (
     <AppShell
@@ -111,11 +139,18 @@ export function ScheduledDetailView() {
             </button>
           </div>
 
-          <header className="flex items-start justify-between gap-4 px-12 pt-8 pb-3">
-            <h1 className="font-serif text-[36px] font-normal leading-none text-foreground">
-              {task.name}
-            </h1>
-            <div className="flex items-center gap-2">
+          <header className="flex items-start justify-between gap-4 px-12 pt-7">
+            <div className="min-w-0">
+              <h1 className="font-serif text-[36px] font-normal leading-none text-foreground">
+                {task.name}
+              </h1>
+              {task.description && (
+                <p className="mt-3 text-sm text-muted-foreground">
+                  {task.description}
+                </p>
+              )}
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
               <button
                 type="button"
                 onClick={() => setEditOpen(true)}
@@ -127,7 +162,7 @@ export function ScheduledDetailView() {
               <button
                 type="button"
                 onClick={() => setDeleteOpen(true)}
-                className="rounded-md p-2 text-destructive hover:bg-destructive/10"
+                className="rounded-md p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                 aria-label={t("scheduled.detail.delete")}
               >
                 <Trash2 className="size-4" />
@@ -138,16 +173,12 @@ export function ScheduledDetailView() {
                 disabled={runNowMutation.isPending}
                 className="inline-flex items-center gap-1.5 rounded-md bg-foreground px-3 py-1.5 text-sm font-medium text-background hover:bg-foreground/90 disabled:opacity-50"
               >
-                <Play className="size-4 fill-current" /> {t("scheduled.detail.runNow")}
+                <Play className="size-4" /> {t("scheduled.detail.runNow")}
               </button>
             </div>
           </header>
 
-          <p className="px-12 pb-5 text-sm text-muted-foreground">
-            {task.description}
-          </p>
-
-          <div className="flex flex-wrap items-center gap-3 px-12 pb-6">
+          <div className="flex flex-wrap items-center gap-3 px-12 pt-5 pb-7">
             <Switch
               checked={enabled}
               onCheckedChange={(v) =>
@@ -168,67 +199,39 @@ export function ScheduledDetailView() {
             </span>
             <span className="text-sm text-muted-foreground">
               {t("scheduled.detail.nextRun", {
-                value:
-                  task.frequency === "manual"
-                    ? t("scheduled.detail.nextRunManual")
-                    : formatWhen(task.nextRunAt, i18n.language),
+                value: formatNextRun(task, i18n.language, t),
               })}
             </span>
-            {task.lastRunAt != null && (
-              <span className="text-sm text-muted-foreground">
-                {t("scheduled.detail.lastRun", {
-                  value: formatWhen(task.lastRunAt, i18n.language),
-                })}
-              </span>
-            )}
           </div>
 
           <div
-            className="px-12 pt-6"
-            style={{ borderTop: "1px solid hsl(var(--border-300) / 0.1)" }}
-          >
-            <div className="flex max-w-2xl flex-col gap-10 py-6">
-              <section>
-                <h2 className="mb-2 text-sm font-medium text-foreground">
-                  {t("scheduled.detail.instructions")}
-                </h2>
-                <p className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
-                  {task.prompt}
-                </p>
-              </section>
+            className="mx-12 border-t"
+            style={{ borderColor: "hsl(var(--border-300) / 0.1)" }}
+          />
 
-              <section>
-                <h2 className="mb-2 text-sm font-medium text-foreground">
-                  {t("scheduled.detail.repeats")}
-                </h2>
-                <p className="text-sm font-medium text-foreground">
-                  {describeFrequency(task, t, i18n.language)}
+          <div className="grid grid-cols-1 gap-x-16 gap-y-10 px-12 py-8 lg:grid-cols-2">
+            <section>
+              <h2 className="mb-2 text-sm text-muted-foreground">
+                {t("scheduled.detail.history")}
+              </h2>
+              {runs.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  {t("scheduled.detail.runHistoryEmpty")}
                 </p>
-              </section>
-
-              <section>
-                <h2 className="mb-2 text-sm font-medium text-foreground">
-                  {t("scheduled.detail.runHistory")}
-                </h2>
-                {runs.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">
-                    {t("scheduled.detail.runHistoryEmpty")}
-                  </p>
-                ) : (
-                  <ul className="flex flex-col gap-2">
-                    {runs.map((run) => (
-                      <li key={run.threadId}>
-                        <button
-                          type="button"
-                          onClick={() => navigate(`/task/${run.threadId}`)}
-                          className="flex w-full items-center justify-between gap-3 rounded-md border border-border bg-card px-3 py-2 text-left transition-colors hover:bg-state-hover"
-                        >
-                          <span className="min-w-0 flex-1 truncate text-sm text-foreground">
-                            {run.title}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            {formatWhen(run.createdAt, i18n.language)}
-                          </span>
+              ) : (
+                <ul className="flex flex-col">
+                  {runs.map((run) => (
+                    <li key={run.threadId}>
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/task/${run.threadId}`)}
+                        className="flex w-full items-center justify-between gap-3 border-b py-3 text-left transition-colors hover:bg-state-hover"
+                        style={{ borderColor: "hsl(var(--border-300) / 0.08)" }}
+                      >
+                        <span className="min-w-0 flex-1 truncate text-[15px] text-foreground">
+                          {formatRunWhen(run.createdAt, i18n.language, t)}
+                        </span>
+                        {run.status !== "completed" && (
                           <span
                             className={cn(
                               "shrink-0 rounded-sm px-2 py-0.5 text-xs",
@@ -237,64 +240,48 @@ export function ScheduledDetailView() {
                           >
                             {t(`scheduled.runStatus.${run.status}`)}
                           </span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
+                        )}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+
+            <div className="flex flex-col gap-10">
+              <section>
+                <h2 className="mb-2 text-sm text-muted-foreground">
+                  {t("scheduled.detail.instructions")}
+                </h2>
+                <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-foreground">
+                  {task.prompt}
+                </p>
               </section>
 
               <section>
-                <h2 className="mb-2 flex items-center gap-1.5 text-sm font-medium text-foreground">
-                  {t("scheduled.detail.alwaysAllowed")}
-                  <Info className="size-3 text-muted-foreground" />
+                <h2 className="mb-2 text-sm text-muted-foreground">
+                  {t("scheduled.detail.repeats")}
                 </h2>
-                <p className="mb-3 text-sm leading-relaxed text-muted-foreground">
+                <p className="text-[15px] text-foreground">
+                  {describeFrequency(task, t, i18n.language)}
+                </p>
+              </section>
+
+              <section>
+                <h2 className="mb-2 flex items-center gap-1.5 text-sm text-muted-foreground">
+                  {t("scheduled.detail.alwaysAllowed")}
+                  <CheckCircle2
+                    className={cn(
+                      "size-4",
+                      alwaysAllowed
+                        ? "text-[hsl(var(--brand-100))]"
+                        : "text-muted-foreground/40",
+                    )}
+                  />
+                </h2>
+                <p className="text-sm leading-relaxed text-muted-foreground">
                   {t("scheduled.detail.alwaysAllowedHint")}
                 </p>
-                {task.allowedTools.length > 0 && (
-                  <ul className="mb-3 flex flex-col gap-2">
-                    {task.allowedTools.map((tool) => (
-                      <li
-                        key={tool}
-                        className="flex items-center justify-between gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground"
-                      >
-                        <span className="min-w-0 flex-1 truncate font-mono text-xs">
-                          {tool}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => removeTool(tool)}
-                          className="shrink-0 rounded p-0.5 text-muted-foreground hover:bg-state-hover hover:text-foreground"
-                          aria-label={t("scheduled.detail.allowedRemove")}
-                        >
-                          <X className="size-3.5" />
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                <div className="flex items-center gap-2">
-                  <input
-                    value={newTool}
-                    onChange={(e) => setNewTool(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        addTool();
-                      }
-                    }}
-                    placeholder={t("scheduled.detail.allowedAddPlaceholder")}
-                    className="flex-1 rounded-md border border-border bg-card px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                  />
-                  <button
-                    type="button"
-                    onClick={addTool}
-                    className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 text-sm text-muted-foreground hover:bg-state-hover hover:text-foreground"
-                  >
-                    <Plus className="size-4" />
-                  </button>
-                </div>
               </section>
             </div>
           </div>
@@ -368,7 +355,7 @@ function describeFrequency(
   t: TFunction,
   locale: string,
 ): string {
-  const time = task.timeOfDay ?? undefined;
+  const time = task.timeOfDay ? shortTime(task.timeOfDay) : undefined;
   switch (task.frequency) {
     case "manual":
       return t("scheduled.detail.repeatsManual");

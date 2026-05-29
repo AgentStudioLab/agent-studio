@@ -92,10 +92,10 @@ export function NewTaskView() {
     setSubmitting(true);
     setError(null);
     try {
-      // Title = first ~60 chars of prompt so the sidebar entry is recognisable
-      // before the title summariser (future) replaces it.
+      // Start as "New task"; the sidecar summarizes the first message into a
+      // real title on the first run and renames the conversation.
       const conv = await createConversation({
-        title: text.slice(0, 60),
+        title: t("newTask.defaultTitle"),
         workingDir,
       });
       // We bypass useCreateConversationMutation (we need the returned

@@ -14,6 +14,16 @@ export interface MountRunsDeps {
   store: RunEventStore;
   interruptBus: InterruptBus;
   usage: UsageService;
+  /**
+   * Called once, on a thread's first user message, so the host can replace the
+   * "New task" placeholder with a summarized title. Fire-and-forget — the host
+   * must not block the run on it. Scheduled runs bypass this route entirely.
+   */
+  onFirstUserMessage?: (input: {
+    threadId: string;
+    prompt: string;
+    model?: string;
+  }) => void;
 }
 
 /**
@@ -63,9 +73,21 @@ export function buildRunRoutes(deps: MountRunsDeps): Hono {
         ? body.model
         : undefined;
 
+    // Capture first-turn BEFORE appending — an empty thread means this is the
+    // message that should drive the auto-title.
+    const isFirstTurn = deps.messages.countByThread(body.threadId) === 0;
+
     deps.threads.upsert(body.threadId);
     deps.messages.appendUser(body.threadId, body.message.content);
     await deps.store.createRun(body.runId, body.threadId);
+
+    if (isFirstTurn) {
+      deps.onFirstUserMessage?.({
+        threadId: body.threadId,
+        prompt: body.message.content,
+        model,
+      });
+    }
 
     const abort = new AbortController();
     aborters.set(body.runId, abort);

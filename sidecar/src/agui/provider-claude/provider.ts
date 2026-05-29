@@ -22,6 +22,12 @@ import {
   SkillInvocationStore,
   createSkillInvocationsHook,
 } from "./skill-invocations";
+import {
+  buildScheduledMcpServer,
+  SCHEDULED_MCP_SERVER,
+  SCHEDULED_TOOL_FQN,
+  type CreateScheduledTaskFn,
+} from "./scheduled-tool";
 import type {
   AgentProvider,
   RunContext,
@@ -100,6 +106,13 @@ export interface ClaudeProviderOptions {
    * list, not what the agent actually loaded.
    */
   skillInvocationsStore?: SkillInvocationStore;
+  /**
+   * When provided, an in-process MCP tool `create_scheduled_task` is exposed to
+   * the agent (driven by the `/schedule` skill). The callback persists the task
+   * via the host's ScheduledTaskService. Working dir + model are injected from
+   * the current run, not chosen by the agent.
+   */
+  onCreateScheduledTask?: CreateScheduledTaskFn;
 }
 
 export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider {
@@ -129,9 +142,14 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
 
     const resumeSessionId = await getResumeSessionId(ctx.threadId, ctx.cwd);
 
-    const allowedTools = opts.resolveAllowedTools
-      ? opts.resolveAllowedTools(ctx.threadId)
-      : opts.allowedTools ?? [];
+    const allowedTools = [
+      ...(opts.resolveAllowedTools
+        ? opts.resolveAllowedTools(ctx.threadId)
+        : opts.allowedTools ?? []),
+      // The schedule MCP tool isn't in the user's built-in allow-list, so the
+      // SDK would never offer it unless we add it here explicitly.
+      ...(opts.onCreateScheduledTask ? [SCHEDULED_TOOL_FQN] : []),
+    ];
 
     const bus = opts.interruptBus;
     // canUseTool runs for every tool call. Two gates layered:
@@ -248,6 +266,17 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
     // by future SDK default-discovery changes.
     const skillsConfig = opts.resolveSkillsConfig?.() ?? null;
 
+    // In-process MCP tool for the `/schedule` skill. Built per-run so the
+    // handler inherits this conversation's cwd + model.
+    const scheduledMcp = opts.onCreateScheduledTask
+      ? buildScheduledMcpServer({
+          threadId: ctx.threadId,
+          cwd: ctx.cwd,
+          model: effectiveModel,
+          onCreate: opts.onCreateScheduledTask,
+        })
+      : null;
+
     const sdkStream = sdkQuery({
       prompt,
       options: {
@@ -255,6 +284,9 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
         cwd: ctx.cwd,
         env: buildEnv(),
         allowedTools,
+        ...(scheduledMcp
+          ? { mcpServers: { [SCHEDULED_MCP_SERVER]: scheduledMcp } }
+          : {}),
         ...(effectiveModel ? { model: effectiveModel } : {}),
         ...(skillsConfig
           ? {
