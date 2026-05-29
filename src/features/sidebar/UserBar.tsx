@@ -14,7 +14,7 @@ interface UserBarProps {
 export function UserBar({
   name = "Jay Yang",
   initials = "JY",
-  email = "jay.yang@ugreen.com",
+  email = "jay.yang@agent-studio.com",
   plan = "Max",
   onSettings,
   onLogout,
@@ -43,7 +43,9 @@ export function UserBar({
           <span className="min-w-0 truncate text-[13px] text-[hsl(var(--text-100))]">
             {name}
           </span>
-          <span className="shrink-0 text-[12px] text-[hsl(var(--text-400))]">·</span>
+          <span className="shrink-0 text-[12px] text-[hsl(var(--text-400))]">
+            ·
+          </span>
           <span className="shrink-0 text-[12px] text-[hsl(var(--text-300))]">
             {plan}
           </span>
