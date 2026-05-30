@@ -78,4 +78,13 @@ describe("db migrate — Phase 1 SDK leverage schema", () => {
     expect(hasColumn(db, "conversations", "agent_workspace_id")).toBe(true);
     expect(hasColumn(db, "scheduled_tasks", "agent_workspace_id")).toBe(true);
   });
+
+  it("creates agent_folders table with required columns", () => {
+    const db = new Database(":memory:");
+    migrate(db);
+    expect(hasTable(db, "agent_folders")).toBe(true);
+    for (const c of ["id","agent_workspace_id","path","folder_name","writable","created_at"]) {
+      expect(hasColumn(db, "agent_folders", c)).toBe(true);
+    }
+  });
 });

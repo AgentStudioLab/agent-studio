@@ -154,6 +154,22 @@ CREATE TABLE IF NOT EXISTS agent_workspaces (
   created_at  INTEGER NOT NULL,
   updated_at  INTEGER NOT NULL
 );
+
+-- agent_folders (P2): external folders mounted into an agent as extra context.
+-- Default read-only (writable=0); each can be granted write. Unlike
+-- conversations/scheduled_tasks (which reference an agent via a plain nullable
+-- column so they survive its deletion via archive/unbind), folders are OWNED by
+-- the agent — a real FK with ON DELETE CASCADE drops them when the agent is
+-- deleted. The external paths on disk are never touched.
+CREATE TABLE IF NOT EXISTS agent_folders (
+  id                 TEXT PRIMARY KEY,
+  agent_workspace_id TEXT NOT NULL REFERENCES agent_workspaces(id) ON DELETE CASCADE,
+  path               TEXT NOT NULL,
+  folder_name        TEXT NOT NULL,
+  writable           INTEGER NOT NULL DEFAULT 0,
+  created_at         INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_agent_folders_agent ON agent_folders (agent_workspace_id);
 `;
 
 interface ColumnInfo {
