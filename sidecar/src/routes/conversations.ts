@@ -25,6 +25,9 @@ export function buildConversationRoutes(deps: MountConversationsDeps): Hono {
     // Binding an agent seeds cwd = its home dir, unless the caller passed an
     // explicit workingDir (which wins).
     const agentWorkspaceId = body?.agentWorkspaceId ?? null;
+    if (agentWorkspaceId && !agentWorkspaces.get(agentWorkspaceId)) {
+      return c.json({ error: "agent_not_found" }, 404);
+    }
     const home = agentWorkspaceId ? agentWorkspaces.homeDir(agentWorkspaceId) : null;
     const t = threads.create({
       id: body?.id,
@@ -101,6 +104,9 @@ export function buildConversationRoutes(deps: MountConversationsDeps): Hono {
     if (body?.agentWorkspaceId !== undefined) {
       if (body.agentWorkspaceId !== null && typeof body.agentWorkspaceId !== "string") {
         return c.json({ error: "invalid_agent_workspace_id" }, 400);
+      }
+      if (body.agentWorkspaceId && !agentWorkspaces.get(body.agentWorkspaceId)) {
+        return c.json({ error: "agent_not_found" }, 404);
       }
       // Move into a space → working_dir follows the agent home; move out
       // (null) → clear working_dir so it falls back to the default workspace.

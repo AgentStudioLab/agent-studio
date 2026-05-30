@@ -289,11 +289,6 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
       options: {
         abortController: ac,
         cwd: ctx.cwd,
-        // Load CLAUDE.md (+ .claude/settings.json) from cwd. Combined with the
-        // claude_code systemPrompt preset below, this picks up an agent's
-        // home-dir CLAUDE.md (P3). NOTE: also reads <cwd>/.claude/settings.json
-        // — the agent home dir contains no such file, so this is a no-op there.
-        settingSources: ["project"],
         env: buildEnv(),
         allowedTools,
         ...(scheduledMcp

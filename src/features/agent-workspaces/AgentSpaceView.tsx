@@ -31,7 +31,7 @@ export function AgentSpaceView() {
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async ({ text }: PromptInputMessage) => {
-    if (!agentId || text.trim().length === 0 || submitting) return;
+    if (!agentId || !agent || text.trim().length === 0 || submitting) return;
     setSubmitting(true);
     try {
       // Bound conversation → backend sets working_dir = agent home dir.

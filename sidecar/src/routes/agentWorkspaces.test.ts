@@ -101,4 +101,22 @@ describe("conversation ↔ agent binding", () => {
     expect(after.agentWorkspaceId).toBeNull();
     rmSync(baseDir, { recursive: true, force: true });
   });
+
+  it("POST /conversations with a non-existent agentWorkspaceId returns 404", async () => {
+    const db = new Database(":memory:");
+    migrate(db);
+    const baseDir = mkdtempSync(join(tmpdir(), "agw-bind-404-"));
+    const agentWorkspaces = new AgentWorkspaceService(db, { baseDir });
+    const threads = new ThreadService(db);
+    const store = createBunSqliteRunStore(db);
+    const app = buildConversationRoutes({ threads, store, agentWorkspaces });
+
+    const res = await app.request("/conversations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ agentWorkspaceId: "agw_nonexistent" }),
+    });
+    expect(res.status).toBe(404);
+    rmSync(baseDir, { recursive: true, force: true });
+  });
 });
