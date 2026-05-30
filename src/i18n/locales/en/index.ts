@@ -8,6 +8,7 @@ import projectDetail from "./projectDetail.json";
 import scheduled from "./scheduled.json";
 import customize from "./customize.json";
 import composer from "./composer.json";
+import skills from "./skills.json";
 
 export const en = {
   settings,
@@ -20,4 +21,5 @@ export const en = {
   scheduled,
   customize,
   composer,
+  skills,
 };

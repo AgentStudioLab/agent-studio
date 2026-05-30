@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { Link, useLocation } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { Clock, ExternalLink, ScrollText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useThreadContext } from "@/lib/agui/react/useThreadContext";
@@ -28,7 +28,6 @@ export function ContextTab({
   scheduledTaskName,
 }: ContextTabProps) {
   const { t } = useTranslation();
-  const location = useLocation();
   const { context, isLoading } = useThreadContext(threadId);
   const { skills, mcpServers } = context;
 
@@ -54,13 +53,11 @@ export function ContextTab({
     </>
   ) : null;
 
-  // Build a /customize deep-link that remembers where we came from. The
-  // `from` param is read back by CustomizeView's back button so the user
-  // returns to *this* thread instead of the New Task screen.
-  const buildSkillLink = (skillId: string) => {
-    const back = encodeURIComponent(location.pathname + location.search);
-    return `/customize?section=skills&skill=${encodeURIComponent(skillId)}&from=${back}`;
-  };
+  // Deep-link to the Skills page with this skill pre-selected. SkillsBody
+  // reads `?skill=<id>` to seed its initial selection. The Skills page keeps
+  // the sidebar visible, so there's no back-button `from` param to thread.
+  const buildSkillLink = (skillId: string) =>
+    `/skills?skill=${encodeURIComponent(skillId)}`;
 
   // No active thread OR query in-flight → "waiting for agent" state. We can't
   // gate on isLoading alone — TanStack Query v5 reports isLoading=false when
@@ -79,11 +76,11 @@ export function ContextTab({
       <div className="px-6 py-12 text-center text-sm" style={{ color: "hsl(var(--text-300))" }}>
         <div>{t("task.contextTab.empty.noCapabilities")}</div>
         <Link
-          to="/customize"
+          to="/skills"
           className="mt-3 inline-block text-[12px] underline underline-offset-4"
           style={{ color: "hsl(var(--brand-100))" }}
         >
-          {t("task.contextTab.empty.goToCustomize")}
+          {t("task.contextTab.empty.goToSkills")}
         </Link>
       </div>
     );

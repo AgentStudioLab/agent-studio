@@ -10,7 +10,7 @@
       "skill": "技能"
     },
     "schedule": {
-      "label": "计划任务",
+      "label": "定时任务",
       "description": "按周期自动重复执行任务",
       "template": " 每天 09:00,自动帮我:<在此描述任务>",
       "templatePlaceholder": "<在此描述任务>"

@@ -7,6 +7,7 @@ import { ProjectDetailView } from "@/features/project-detail/ProjectDetailView";
 import { ScheduledListView } from "@/features/scheduled/ScheduledListView";
 import { ScheduledDetailView } from "@/features/scheduled/ScheduledDetailView";
 import { CustomizeView } from "@/features/customize/CustomizeView";
+import { SkillsView } from "@/features/skills/SkillsView";
 import { SettingsLayout } from "@/features/settings/SettingsLayout";
 import { AccountSection } from "@/features/settings/sections/AccountSection";
 import { ModelSection } from "@/features/settings/sections/ModelSection";
@@ -31,6 +32,7 @@ export function RouterView() {
       <Route path="/scheduled" element={<ScheduledListView />} />
       <Route path="/scheduled/:scheduledId" element={<ScheduledDetailView />} />
       <Route path="/customize" element={<CustomizeView />} />
+      <Route path="/skills" element={<SkillsView />} />
       <Route path="/settings" element={<SettingsLayout />}>
         {/* `index` lands on Account when the user clicks "Settings" from the
             sidebar — avoids a blank pane in the middle. */}

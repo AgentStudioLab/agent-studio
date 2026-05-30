@@ -24,7 +24,7 @@ import {
   ChevronRight,
   Clock,
   Plus,
-  Sparkles,
+  ScrollText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { RenameDialog } from "@/shared/RenameDialog";
@@ -246,10 +246,10 @@ export function SidebarContent() {
           onClick={() => navigate("/scheduled")}
         />
         <NavItem
-          icon={Sparkles}
-          label={t("sidebar.nav.customize")}
-          active={pathname === "/customize"}
-          onClick={() => navigate("/customize")}
+          icon={ScrollText}
+          label={t("sidebar.nav.skills")}
+          active={pathname.startsWith("/skills")}
+          onClick={() => navigate("/skills")}
         />
       </nav>
 

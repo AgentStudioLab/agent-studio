@@ -2,7 +2,8 @@
   "nav": {
     "newTask": "新建任务",
     "projects": "项目",
-    "scheduled": "计划任务",
+    "scheduled": "定时任务",
+    "skills": "技能",
     "customize": "自定义",
     "settings": "设置"
   },
