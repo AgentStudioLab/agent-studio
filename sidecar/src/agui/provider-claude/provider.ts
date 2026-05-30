@@ -158,6 +158,14 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
       ...(opts.onCreateScheduledTask ? [SCHEDULED_TOOL_FQN] : []),
     ];
 
+    // Agent-workspace sandbox roots (P2). cwd (agent home / default workspace)
+    // is always readable+writable; external folders extend the read set, and
+    // their writable subset extends the write set.
+    const additionalReadDirs = ctxRun.additionalReadDirs ?? [];
+    const additionalWriteDirs = ctxRun.additionalWriteDirs ?? [];
+    const readRoots = [ctx.cwd, ...additionalReadDirs];
+    const writeRoots = [ctx.cwd, ...additionalWriteDirs];
+
     const bus = opts.interruptBus;
     // canUseTool runs for every tool call. Two gates layered:
     //   1. Workspace sandbox (sync, policy) — paths outside ctx.cwd are
@@ -201,7 +209,10 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
         };
       }
 
-      const sandboxDeny = checkWorkspaceSandbox(toolName, input, ctx.cwd);
+      const sandboxDeny = checkWorkspaceSandbox(toolName, input, {
+        read: readRoots,
+        write: writeRoots,
+      });
       if (sandboxDeny) {
         return { behavior: "deny" as const, message: sandboxDeny };
       }
@@ -291,6 +302,12 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
         cwd: ctx.cwd,
         env: buildEnv(),
         allowedTools,
+        // External folders mounted into the bound agent (read set). Tells the
+        // model these dirs are reachable beyond cwd. Omitted when there are
+        // none (non-agent thread).
+        ...(additionalReadDirs.length > 0
+          ? { additionalDirectories: additionalReadDirs }
+          : {}),
         ...(scheduledMcp
           ? { mcpServers: { [SCHEDULED_MCP_SERVER]: scheduledMcp } }
           : {}),
@@ -361,7 +378,11 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
           allowUnsandboxedCommands: false,
           excludedCommands: [],
           filesystem: {
-            allowWrite: [ctx.cwd],
+            // OS-enforced write boundary: agent home / default cwd + any
+            // writable external folders. Read-only mounts are deliberately
+            // absent — a write there is blocked at the kernel level even if the
+            // UX-layer sandbox above were bypassed.
+            allowWrite: writeRoots,
           },
           // network 不限——本 phase 决策"仅写限"
         },

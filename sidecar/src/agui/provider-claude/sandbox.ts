@@ -32,29 +32,53 @@ export function isPathUnder(target: string, root: string): boolean {
   return !isAbsolute(rel) && !rel.startsWith(".." + sep);
 }
 
+/** True when `target` resolves inside ANY of `roots`. */
+export function isPathUnderAny(target: string, roots: string[]): boolean {
+  return roots.some((r) => isPathUnder(target, r));
+}
+
+/**
+ * Read/write roots for a run. For a non-agent thread both are `[cwd]`. For an
+ * agent-bound thread, `read` = [home, …all external folders] and `write` =
+ * [home, …writable external folders] — so read-only mounts are readable but
+ * not writable (spec §5.3).
+ */
+export interface SandboxRoots {
+  read: string[];
+  write: string[];
+}
+
 /**
  * Inspect a tool invocation and return a deny reason (string) if any of its
- * filesystem-touching arguments fall outside `root`. Returns null to allow.
- * The returned string is what the SDK feeds back to the model as the deny
- * message, so it should be specific enough for the model to adjust.
+ * filesystem-touching arguments fall outside the allowed roots. Returns null to
+ * allow. Reads are checked against `roots.read`; mutations (Write/Edit/…)
+ * against `roots.write`, so a write to a read-only mount is denied early at this
+ * UX layer with a clear message (the OS sandbox would block it regardless). The
+ * returned string is fed back to the model, so it's specific enough to adjust.
  */
 export function checkWorkspaceSandbox(
   toolName: string,
   input: Record<string, unknown>,
-  root: string,
+  roots: SandboxRoots,
 ): string | null {
-  // Tools that take a single `file_path` (string) argument.
-  if (
-    toolName === "Read" ||
+  const isMutation =
     toolName === "Write" ||
     toolName === "Edit" ||
     toolName === "MultiEdit" ||
-    toolName === "NotebookEdit"
-  ) {
+    toolName === "NotebookEdit";
+
+  // Tools that take a single `file_path` (string) argument.
+  if (toolName === "Read" || isMutation) {
     const fp = input.file_path;
     if (typeof fp !== "string") return null;
-    if (!isPathUnder(fp, root)) {
-      return `Path ${fp} is outside the working directory (${root}). This conversation is sandboxed to that directory.`;
+    if (isMutation) {
+      if (!isPathUnderAny(fp, roots.write)) {
+        return `Path ${fp} is not in a writable directory (${roots.write.join(", ")}). External folders mounted into this agent are read-only unless write access is granted.`;
+      }
+      return null;
+    }
+    if (!isPathUnderAny(fp, roots.read)) {
+      return `Path ${fp} is outside this conversation's accessible directories (${roots.read.join(", ")}).`;
     }
     return null;
   }
@@ -63,8 +87,8 @@ export function checkWorkspaceSandbox(
   if (toolName === "Glob" || toolName === "Grep") {
     const p = input.path;
     if (typeof p !== "string") return null; // optional → defaults to cwd
-    if (!isPathUnder(p, root)) {
-      return `Search root ${p} is outside the working directory (${root}).`;
+    if (!isPathUnderAny(p, roots.read)) {
+      return `Search root ${p} is outside this conversation's accessible directories (${roots.read.join(", ")}).`;
     }
     return null;
   }

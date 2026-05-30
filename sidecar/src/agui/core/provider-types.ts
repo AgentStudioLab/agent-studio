@@ -102,6 +102,18 @@ export interface RunContext {
    * then re-tagged to this thread). Ignored when resumeSessionAt is set.
    */
   freshSession?: boolean;
+  /**
+   * Agent-workspace sandbox extras (P2). When the thread is bound to an agent,
+   * runWorker resolves its external folders into:
+   *   additionalReadDirs  = all mounted folders (readable)
+   *   additionalWriteDirs = the writable subset
+   * The provider adds `cwd` (the agent home / default workspace) to both,
+   * fills `options.additionalDirectories` + `sandbox.filesystem.allowWrite`,
+   * and passes the roots to `checkWorkspaceSandbox`. Empty/undefined for a
+   * non-agent thread → the sandbox stays scoped to `[cwd]`.
+   */
+  additionalReadDirs?: string[];
+  additionalWriteDirs?: string[];
 }
 
 export interface ResumeContext {
