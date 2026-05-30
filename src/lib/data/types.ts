@@ -91,6 +91,16 @@ export interface AgentFolder {
   createdAt: number;
 }
 
+/** A linear memory entry for an agent (P3). `source` distinguishes entries the
+ *  agent saved itself (via the remember tool) from user-authored ones. */
+export interface AgentMemory {
+  id: string;
+  agentWorkspaceId: string;
+  content: string;
+  source: "agent" | "user";
+  createdAt: number;
+}
+
 /** One spawned run in a scheduled task's history. */
 export interface ScheduledRun {
   threadId: string;

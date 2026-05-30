@@ -10,5 +10,22 @@
     "allowWrite": "允许写入",
     "remove": "移除",
     "addError": "添加失败"
+  },
+  "instructions": {
+    "title": "说明",
+    "description": "作为这个智能体的 CLAUDE.md，每次运行自动加载。",
+    "placeholder": "写下这个智能体应遵循的指令…",
+    "save": "保存",
+    "saved": "已保存"
+  },
+  "memory": {
+    "title": "记忆",
+    "description": "跨会话记住的要点。智能体会自动记，你也可以手动增删。",
+    "placeholder": "添加一条记忆…",
+    "add": "添加",
+    "empty": "还没有记忆。",
+    "remove": "删除",
+    "sourceAgent": "智能体",
+    "sourceUser": "你"
   }
 }

@@ -10,5 +10,22 @@
     "allowWrite": "Allow write",
     "remove": "Remove",
     "addError": "Failed to add folder"
+  },
+  "instructions": {
+    "title": "Instructions",
+    "description": "Acts as this agent's CLAUDE.md — auto-loaded on every run.",
+    "placeholder": "Write instructions this agent should follow…",
+    "save": "Save",
+    "saved": "Saved"
+  },
+  "memory": {
+    "title": "Memory",
+    "description": "Points remembered across conversations. The agent saves these automatically; you can add or remove them.",
+    "placeholder": "Add a memory…",
+    "add": "Add",
+    "empty": "No memories yet.",
+    "remove": "Remove",
+    "sourceAgent": "Agent",
+    "sourceUser": "You"
   }
 }

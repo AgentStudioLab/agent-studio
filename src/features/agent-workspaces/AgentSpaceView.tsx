@@ -19,6 +19,8 @@ import {
 import { SlashEditor } from "@/features/composer/SlashEditor";
 import { ModelPicker } from "@/features/task/ModelPicker";
 import { AgentFoldersCard } from "@/features/agent-workspaces/AgentFoldersCard";
+import { InstructionsCard } from "@/features/agent-workspaces/InstructionsCard";
+import { MemoryCard } from "@/features/agent-workspaces/MemoryCard";
 
 export function AgentSpaceView() {
   const { agentId } = useParams<{ agentId: string }>();
@@ -76,7 +78,13 @@ export function AgentSpaceView() {
                 </PromptInputFooter>
               </PromptInput>
             </div>
-            {agentId && <AgentFoldersCard agentId={agentId} />}
+            {agentId && (
+              <>
+                <InstructionsCard agentId={agentId} />
+                <AgentFoldersCard agentId={agentId} />
+                <MemoryCard agentId={agentId} />
+              </>
+            )}
           </section>
         </div>
       }
