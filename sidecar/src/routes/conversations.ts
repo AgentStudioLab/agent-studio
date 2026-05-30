@@ -1,14 +1,16 @@
 import { Hono } from "hono";
 import type { ThreadService } from "../services/threads";
 import type { RunEventStore } from "../agui/core";
+import type { AgentWorkspaceService } from "../services/agentWorkspaces";
 
 export interface MountConversationsDeps {
   threads: ThreadService;
   store: RunEventStore;
+  agentWorkspaces: AgentWorkspaceService;
 }
 
 export function buildConversationRoutes(deps: MountConversationsDeps): Hono {
-  const { threads, store } = deps;
+  const { threads, store, agentWorkspaces } = deps;
   const app = new Hono();
 
   app.post("/conversations", async (c) => {
@@ -20,11 +22,15 @@ export function buildConversationRoutes(deps: MountConversationsDeps): Hono {
           workingDir?: string | null;
         }
       | null;
+    // Binding an agent seeds cwd = its home dir, unless the caller passed an
+    // explicit workingDir (which wins).
+    const agentWorkspaceId = body?.agentWorkspaceId ?? null;
+    const home = agentWorkspaceId ? agentWorkspaces.homeDir(agentWorkspaceId) : null;
     const t = threads.create({
       id: body?.id,
       title: body?.title,
-      agentWorkspaceId: body?.agentWorkspaceId ?? null,
-      workingDir: body?.workingDir ?? null,
+      agentWorkspaceId,
+      workingDir: body?.workingDir ?? home ?? null,
     });
     return c.json(t, 201);
   });
@@ -63,6 +69,7 @@ export function buildConversationRoutes(deps: MountConversationsDeps): Hono {
           pinned?: boolean;
           archived?: boolean;
           workingDir?: string | null;
+          agentWorkspaceId?: string | null;
         }
       | null;
     if (body?.title !== undefined) {
@@ -90,6 +97,17 @@ export function buildConversationRoutes(deps: MountConversationsDeps): Hono {
         return c.json({ error: "invalid_working_dir" }, 400);
       }
       threads.updateWorkingDir(id, body.workingDir);
+    }
+    if (body?.agentWorkspaceId !== undefined) {
+      if (body.agentWorkspaceId !== null && typeof body.agentWorkspaceId !== "string") {
+        return c.json({ error: "invalid_agent_workspace_id" }, 400);
+      }
+      // Move into a space → working_dir follows the agent home; move out
+      // (null) → clear working_dir so it falls back to the default workspace.
+      const home = body.agentWorkspaceId
+        ? agentWorkspaces.homeDir(body.agentWorkspaceId)
+        : null;
+      threads.updateAgentWorkspace(id, body.agentWorkspaceId, home);
     }
     return c.json(threads.get(id));
   });

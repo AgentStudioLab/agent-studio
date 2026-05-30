@@ -8,6 +8,8 @@ import { AgentWorkspaceService } from "../services/agentWorkspaces";
 import { ThreadService } from "../services/threads";
 import { ScheduledTaskService } from "../services/scheduledTasks";
 import { buildAgentWorkspaceRoutes } from "./agentWorkspaces";
+import { buildConversationRoutes } from "./conversations";
+import { createBunSqliteRunStore } from "../agui/store-sqlite";
 
 function harness() {
   const db = new Database(":memory:");
@@ -66,5 +68,37 @@ describe("agent workspace routes", () => {
     const reloaded = scheduledTasks.get(task.id);
     expect(reloaded).not.toBeNull();
     expect(reloaded?.agentWorkspaceId).toBeNull();
+  });
+});
+
+describe("conversation ↔ agent binding", () => {
+  it("POST /conversations with agentWorkspaceId sets working_dir = home", async () => {
+    const db = new Database(":memory:");
+    migrate(db);
+    const baseDir = mkdtempSync(join(tmpdir(), "agw-bind-"));
+    const agentWorkspaces = new AgentWorkspaceService(db, { baseDir });
+    const threads = new ThreadService(db);
+    const store = createBunSqliteRunStore(db);
+    const app = buildConversationRoutes({ threads, store, agentWorkspaces });
+    const agent = agentWorkspaces.create({ name: "Bound" });
+
+    const res = await app.request("/conversations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ agentWorkspaceId: agent.id }),
+    });
+    const conv = (await res.json()) as { id: string; workingDir: string; agentWorkspaceId: string };
+    expect(conv.agentWorkspaceId).toBe(agent.id);
+    expect(conv.workingDir).toBe(agent.homeDir);
+
+    // PATCH move-out: clearing the binding clears the agent binding.
+    const moved = await app.request(`/conversations/${conv.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ agentWorkspaceId: null }),
+    });
+    const after = (await moved.json()) as { agentWorkspaceId: string | null };
+    expect(after.agentWorkspaceId).toBeNull();
+    rmSync(baseDir, { recursive: true, force: true });
   });
 });

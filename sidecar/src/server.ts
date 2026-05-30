@@ -240,7 +240,7 @@ const scheduler = new Scheduler({
 scheduler.start();
 
 app.route("/", healthRoutes);
-app.route("/", buildConversationRoutes({ threads, store }));
+app.route("/", buildConversationRoutes({ threads, store, agentWorkspaces }));
 app.route("/", buildScheduledRoutes({ tasks: scheduledTasks, threads, store, scheduler }));
 app.route("/", buildAgentWorkspaceRoutes({ agentWorkspaces, threads, scheduledTasks }));
 app.route("/", buildMessageRoutes(messages));
