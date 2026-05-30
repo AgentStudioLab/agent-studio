@@ -313,6 +313,15 @@ export class ScheduledTaskService {
     this.db.prepare("DELETE FROM scheduled_tasks WHERE id = ?").run(id);
   }
 
+  /** Cascade for agent deletion: unbind tasks (keep the tasks themselves). */
+  unbindAgentWorkspace(agentWorkspaceId: string): void {
+    this.db
+      .prepare(
+        "UPDATE scheduled_tasks SET agent_workspace_id = NULL, updated_at = ? WHERE agent_workspace_id = ?",
+      )
+      .run(Date.now(), agentWorkspaceId);
+  }
+
   /** Tasks whose timer has elapsed — the scheduler fires these on each tick. */
   dueTasks(now: number): ScheduledTask[] {
     const rows = this.db

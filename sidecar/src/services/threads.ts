@@ -187,6 +187,38 @@ export class ThreadService {
     return this.get(id)!;
   }
 
+  /** Move a conversation into / out of an agent workspace. Pass null to
+   *  unbind (clears the binding; cwd handling is the route's concern). */
+  updateAgentWorkspace(
+    id: string,
+    agentWorkspaceId: string | null,
+    workingDir?: string | null,
+  ): Thread {
+    if (workingDir !== undefined) {
+      this.db
+        .prepare(
+          "UPDATE conversations SET agent_workspace_id = ?, working_dir = ?, updated_at = ? WHERE id = ?",
+        )
+        .run(agentWorkspaceId, workingDir, Date.now(), id);
+    } else {
+      this.db
+        .prepare(
+          "UPDATE conversations SET agent_workspace_id = ?, updated_at = ? WHERE id = ?",
+        )
+        .run(agentWorkspaceId, Date.now(), id);
+    }
+    return this.get(id)!;
+  }
+
+  /** Cascade for agent deletion: archive every conversation bound to it. */
+  archiveByAgentWorkspace(agentWorkspaceId: string): void {
+    this.db
+      .prepare(
+        "UPDATE conversations SET archived = 1, updated_at = ? WHERE agent_workspace_id = ?",
+      )
+      .run(Date.now(), agentWorkspaceId);
+  }
+
   touch(id: string): void {
     this.db
       .prepare("UPDATE conversations SET updated_at = ? WHERE id = ?")

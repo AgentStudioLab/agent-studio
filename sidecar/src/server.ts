@@ -20,6 +20,8 @@ import { generateTitle } from "./services/titleGenerator";
 import { ScheduledTaskService } from "./services/scheduledTasks";
 import { Scheduler } from "./services/scheduler";
 import { buildScheduledRoutes } from "./routes/scheduled";
+import { AgentWorkspaceService } from "./services/agentWorkspaces";
+import { buildAgentWorkspaceRoutes } from "./routes/agentWorkspaces";
 import { AuditService } from "./services/audit";
 import { UsageService } from "./services/usage";
 import { SettingsToolsService } from "./services/settings-tools";
@@ -87,6 +89,7 @@ const userProfileSettings = createUserProfileSettings(db);
 const threads = new ThreadService(db);
 const messages = new MessageService(db);
 const scheduledTasks = new ScheduledTaskService(db);
+const agentWorkspaces = new AgentWorkspaceService(db);
 const store = createBunSqliteRunStore(db);
 const interruptBus = createInterruptBus({ store });
 const audit = new AuditService(db);
@@ -231,6 +234,7 @@ const scheduler = new Scheduler({
   provider: providerProxy,
   interruptBus,
   usage,
+  resolveAgentHome: (agentWorkspaceId) => agentWorkspaces.homeDir(agentWorkspaceId),
   canRun: () => !!providerSettings.current().apiKey,
 });
 scheduler.start();
@@ -238,6 +242,7 @@ scheduler.start();
 app.route("/", healthRoutes);
 app.route("/", buildConversationRoutes({ threads, store }));
 app.route("/", buildScheduledRoutes({ tasks: scheduledTasks, threads, store, scheduler }));
+app.route("/", buildAgentWorkspaceRoutes({ agentWorkspaces, threads, scheduledTasks }));
 app.route("/", buildMessageRoutes(messages));
 app.route("/", buildSettingsRoutes(providerSettings, userProfileSettings));
 app.route(
