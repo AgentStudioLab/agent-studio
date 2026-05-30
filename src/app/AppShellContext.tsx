@@ -65,7 +65,7 @@ interface AppShellContextValue {
     } | null,
   ) => void;
   // Streaming state lives in the per-thread AG-UI ChatRuntime (see useChat),
-  // not here. Entity ids (threadId, projectId, scheduledId) live in the URL
+  // not here. Entity ids (threadId, agentWorkspaceId, scheduledId) live in the URL
   // — consume them via `useParams` in the corresponding view.
 }
 

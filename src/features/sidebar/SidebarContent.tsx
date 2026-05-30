@@ -235,9 +235,9 @@ export function SidebarContent() {
         />
         <NavItem
           icon={Briefcase}
-          label={t("sidebar.nav.projects")}
-          active={pathname.startsWith("/projects")}
-          onClick={() => navigate("/projects")}
+          label={t("sidebar.nav.agents")}
+          active={pathname.startsWith("/agents")}
+          onClick={() => navigate("/agents")}
         />
         <NavItem
           icon={Clock}
@@ -354,7 +354,7 @@ export function SidebarContent() {
                       if (runId) markRead(item.id, runId);
                       navigate(`/task/${item.id}`);
                     } else {
-                      navigate(`/projects/${item.id}`);
+                      navigate(`/agents/${item.id}`);
                     }
                   }}
                   onUnpin={() => void handleUnpin(item)}

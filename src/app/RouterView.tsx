@@ -2,8 +2,8 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { TaskView } from "@/features/task/TaskView";
 import { TasksView } from "@/features/tasks/TasksView";
 import { NewTaskView } from "@/features/new-task/NewTaskView";
-import { ProjectsView } from "@/features/projects/ProjectsView";
-import { ProjectDetailView } from "@/features/project-detail/ProjectDetailView";
+import { AgentsView } from "@/features/agent-workspaces/AgentsView";
+import { AgentSpaceView } from "@/features/agent-workspaces/AgentSpaceView";
 import { ScheduledListView } from "@/features/scheduled/ScheduledListView";
 import { ScheduledDetailView } from "@/features/scheduled/ScheduledDetailView";
 import { CustomizeView } from "@/features/customize/CustomizeView";
@@ -15,7 +15,7 @@ import { PermissionsSection } from "@/features/settings/sections/PermissionsSect
 import { AppearanceSection } from "@/features/settings/sections/AppearanceSection";
 
 /**
- * Route ↔ view mapping. Entity ids (threadId, projectId, scheduledId) come
+ * Route ↔ view mapping. Entity ids (threadId, agentId, scheduledId) come
  * via path params instead of context state — the view subscribes to URL via
  * `useParams`, so a Tauri webview reload or a deep-link restores the same
  * destination. Back navigation uses `useNavigate(-1)` which walks the real
@@ -27,8 +27,8 @@ export function RouterView() {
       <Route path="/" element={<NewTaskView />} />
       <Route path="/tasks" element={<TasksView />} />
       <Route path="/task/:threadId" element={<TaskView />} />
-      <Route path="/projects" element={<ProjectsView />} />
-      <Route path="/projects/:projectId" element={<ProjectDetailView />} />
+      <Route path="/agents" element={<AgentsView />} />
+      <Route path="/agents/:agentId" element={<AgentSpaceView />} />
       <Route path="/scheduled" element={<ScheduledListView />} />
       <Route path="/scheduled/:scheduledId" element={<ScheduledDetailView />} />
       <Route path="/customize" element={<CustomizeView />} />
