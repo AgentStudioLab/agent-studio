@@ -1,7 +1,7 @@
 {
   "nav": {
     "newTask": "新建任务",
-    "projects": "项目",
+    "agents": "智能体",
     "scheduled": "定时任务",
     "skills": "技能",
     "customize": "自定义",

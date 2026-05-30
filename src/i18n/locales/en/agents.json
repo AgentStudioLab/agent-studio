@@ -1,0 +1,15 @@
+{
+  "title": "Agent Space",
+  "subtitle": "Each agent has its own workspace and memory — manage them here, or create a new one.",
+  "newAgent": "New agent",
+  "sort": "Sort",
+  "search": "Search",
+  "empty": "No agents yet — create one from the top right.",
+  "modal": {
+    "title": "New agent",
+    "name": "Name",
+    "namePlaceholder": "e.g. Weekly blog, Q3 market research",
+    "cancel": "Cancel",
+    "save": "Create"
+  }
+}

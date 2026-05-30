@@ -3,8 +3,8 @@ import sidebar from "./sidebar.json";
 import task from "./task.json";
 import tasks from "./tasks.json";
 import newTask from "./newTask.json";
-import projects from "./projects.json";
-import projectDetail from "./projectDetail.json";
+import agents from "./agents.json";
+import agentSpace from "./agentSpace.json";
 import scheduled from "./scheduled.json";
 import customize from "./customize.json";
 import composer from "./composer.json";
@@ -16,8 +16,8 @@ export const zh = {
   task,
   tasks,
   newTask,
-  projects,
-  projectDetail,
+  agents,
+  agentSpace,
   scheduled,
   customize,
   composer,
