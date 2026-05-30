@@ -80,6 +80,17 @@ export interface AgentWorkspace {
   updatedAt: number;
 }
 
+/** An external folder mounted into an agent as extra context (P2). Read-only by
+ *  default; `writable` grants the agent write access (OS-sandbox enforced). */
+export interface AgentFolder {
+  id: string;
+  agentWorkspaceId: string;
+  path: string;
+  folderName: string;
+  writable: boolean;
+  createdAt: number;
+}
+
 /** One spawned run in a scheduled task's history. */
 export interface ScheduledRun {
   threadId: string;
