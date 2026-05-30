@@ -20,6 +20,11 @@ const SkillMention = Mention.extend({
   },
 });
 
+// The one built-in command surfaced in the slash menu as 内置指令 / 计划任务.
+// Built-in skills are id-namespaced `agent-studio:<name>` by the sidecar
+// skillRegistry, so the schedule skill's id is stable.
+const SCHEDULE_SKILL_ID = "agent-studio:schedule";
+
 // In Tiptap v3 the Mention extension assigns a fresh PluginKey per
 // suggestion internally unless one is provided. We supply this stable key
 // so the editor-level Enter handler can query the suggestion plugin state
@@ -71,12 +76,28 @@ export function SlashEditor({
   // current draft text). Tiptap doesn't reconcile extension config changes.
   const skillsRef = useRef<SlashSkillItem[]>([]);
   useMemo(() => {
-    skillsRef.current = skills.map((s) => ({
-      id: s.id,
-      label: s.name,
-      description: s.description,
-    }));
-  }, [skills]);
+    const mapped: SlashSkillItem[] = skills.map((s) => {
+      if (s.id === SCHEDULE_SKILL_ID) {
+        // Re-present the schedule skill as the 计划任务 built-in: localized
+        // label/description + a fill-in template inserted after the chip.
+        return {
+          id: s.id,
+          label: t("composer.slash.schedule.label"),
+          description: t("composer.slash.schedule.description"),
+          kind: "builtin",
+          keywords: `${s.name} schedule 计划任务`,
+          template: t("composer.slash.schedule.template"),
+          templatePlaceholder: t("composer.slash.schedule.templatePlaceholder"),
+        };
+      }
+      return { id: s.id, label: s.name, description: s.description, kind: "skill" };
+    });
+    // Built-ins first so the menu groups 内置指令 above 技能 (sort is stable).
+    mapped.sort((a, b) =>
+      a.kind === b.kind ? 0 : a.kind === "builtin" ? -1 : 1,
+    );
+    skillsRef.current = mapped;
+  }, [skills, t]);
 
   const editor = useEditor({
     extensions: [

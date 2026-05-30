@@ -38,21 +38,29 @@ export function createSkillSuggestion(
       if (!query) return all.slice(0, MAX_ITEMS);
       const q = query.toLowerCase();
       return all
-        .filter((item) => item.label.toLowerCase().includes(q))
+        .filter(
+          (item) =>
+            item.label.toLowerCase().includes(q) ||
+            (item.keywords?.toLowerCase().includes(q) ?? false),
+        )
         .slice(0, MAX_ITEMS);
     },
 
     command: ({ editor, range, props }) => {
-      // Insert mention node + trailing space so the cursor lands ready for
-      // the next token. `insertContentAt(range, ...)` replaces the `/<query>`
+      // Insert mention node + trailing text so the cursor lands ready for the
+      // next token. `insertContentAt(range, ...)` replaces the `/<query>`
       // range we matched, which is what makes the chip feel atomic.
+      //
+      // Built-in commands (e.g. 计划任务) carry a fill-in-the-blanks template
+      // that follows the chip; plain skills just get a trailing space.
       //
       // `mentionSuggestionChar: "/"` is the chip's stored trigger char.
       // It defaults to "@" on the node attr, so we set it explicitly so
       // any consumer that uses the attribute (e.g., Mention's Backspace
       // keymap when `deleteTriggerWithBackspace` is false) sees "/" rather
       // than the unrelated default.
-      editor
+      const trailing = props.kind === "builtin" && props.template ? props.template : " ";
+      const chain = editor
         .chain()
         .focus()
         .insertContentAt(range, [
@@ -64,9 +72,22 @@ export function createSkillSuggestion(
               mentionSuggestionChar: "/",
             },
           },
-          { type: "text", text: " " },
-        ])
-        .run();
+          { type: "text", text: trailing },
+        ]);
+
+      // Select the template's placeholder so the next keystroke overwrites it.
+      // Positions are relative to range.from: the mention atom occupies 1
+      // position, then `trailing` text begins. The template is BMP-only text,
+      // so JS string indices map 1:1 to ProseMirror offsets.
+      if (props.kind === "builtin" && props.template && props.templatePlaceholder) {
+        const phIdx = props.template.lastIndexOf(props.templatePlaceholder);
+        if (phIdx >= 0) {
+          const from = range.from + 1 + phIdx;
+          const to = from + props.templatePlaceholder.length;
+          chain.setTextSelection({ from, to });
+        }
+      }
+      chain.run();
     },
 
     render: () => {

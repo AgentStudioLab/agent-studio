@@ -6,7 +6,7 @@
 // alreadyResolved: true) keeps the UX clean while preserving the
 // observability for callers who care.
 
-import { describe, expect, it } from "bun:test";
+import { describe, expect, it, mock } from "bun:test";
 import { Hono } from "hono";
 import { buildRunRoutes } from "./runs";
 import type { InterruptBus } from "../agui/provider-claude/interrupt-bus";
@@ -25,6 +25,9 @@ function makeApp(opts: {
   // Minimal stubs for unused deps in the /resume path. Cast to never to
   // avoid sprouting unrelated infrastructure in this targeted test.
   const stub = () => undefined as never;
+  // The allow / ask-user resume path flips the run back to running on a
+  // successful resolve, so the store needs a markRunning spy.
+  const markRunning = mock(async () => {});
   const app = new Hono();
   app.route(
     "/",
@@ -32,12 +35,12 @@ function makeApp(opts: {
       threads: stub() as never,
       messages: stub() as never,
       provider: stub() as never,
-      store: stub() as never,
+      store: { markRunning } as never,
       interruptBus: bus,
       usage: stub() as never,
     }),
   );
-  return app;
+  return { app, markRunning };
 }
 
 const allowBody = JSON.stringify({
@@ -50,7 +53,7 @@ const denyBody = JSON.stringify({
 
 describe("POST /runs/:runId/resume — idempotent semantics", () => {
   it("returns 202 alreadyResolved=false on first successful resolve", async () => {
-    const app = makeApp({ resolveReturns: true });
+    const { app } = makeApp({ resolveReturns: true });
     const res = await app.request("/runs/r1/resume", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -62,7 +65,7 @@ describe("POST /runs/:runId/resume — idempotent semantics", () => {
   });
 
   it("returns 202 alreadyResolved=true when deferred is gone (no 409)", async () => {
-    const app = makeApp({ resolveReturns: false });
+    const { app } = makeApp({ resolveReturns: false });
     const res = await app.request("/runs/r1/resume", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -77,13 +80,45 @@ describe("POST /runs/:runId/resume — idempotent semantics", () => {
     // Without an aborter in the route's in-memory map (no POST /runs in this
     // test), abort would be a no-op anyway. The contract we're asserting:
     // even deny gets the idempotent 202 treatment so the UI doesn't choke.
-    const app = makeApp({ resolveReturns: false });
+    const { app } = makeApp({ resolveReturns: false });
     const res = await app.request("/runs/r1/resume", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: denyBody,
     });
     expect(res.status).toBe(202);
+  });
+
+  it("flips the run back to running on a successful allow resume", async () => {
+    // Regression: after resolving an interrupt the agent keeps working, so the
+    // run must leave awaiting_approval — otherwise the sidebar shows "awaiting
+    // approval" (ShieldAlert) for work in progress.
+    const { app, markRunning } = makeApp({ resolveReturns: true });
+    await app.request("/runs/r1/resume", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: allowBody,
+    });
+    expect(markRunning).toHaveBeenCalledTimes(1);
+    expect(markRunning).toHaveBeenCalledWith("r1");
+  });
+
+  it("does NOT flip to running on a stale resume (deferred gone) or a deny", async () => {
+    const stale = makeApp({ resolveReturns: false });
+    await stale.app.request("/runs/r1/resume", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: allowBody,
+    });
+    expect(stale.markRunning).not.toHaveBeenCalled();
+
+    const deny = makeApp({ resolveReturns: true });
+    await deny.app.request("/runs/r1/resume", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: denyBody,
+    });
+    expect(deny.markRunning).not.toHaveBeenCalled();
   });
 });
 

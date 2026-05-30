@@ -3,7 +3,17 @@
     "placeholder": "What would you like to know?"
   },
   "slash": {
-    "empty": "No matching skills",
-    "kindLabel": "Skill"
+    "empty": "No matching command or skill",
+    "kindLabel": "Skill",
+    "group": {
+      "builtin": "Built-in",
+      "skill": "Skills"
+    },
+    "schedule": {
+      "label": "Schedule",
+      "description": "Run a task automatically on a schedule",
+      "template": " every day at 09:00, automatically: <describe the task>",
+      "templatePlaceholder": "<describe the task>"
+    }
   }
 }

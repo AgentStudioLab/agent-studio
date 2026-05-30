@@ -45,6 +45,16 @@ export interface RunEventStore {
     status: Exclude<RunStatus, "running">,
     errorMsg?: string,
   ): Promise<void>;
+  /**
+   * Flip a run from `awaiting_approval` back to `running` after its HITL
+   * interrupt is resolved (tool allowed / ask-user answered) and the agent
+   * resumes work. Unlike {@link finishRun} this is NON-terminal: it does not
+   * emit the run-end signal, so in-flight SSE streamers keep listening. Without
+   * this the run keeps a stale `awaiting_approval` status while it's actually
+   * executing, and the sidebar shows "awaiting approval" for work in progress.
+   * Idempotent.
+   */
+  markRunning(runId: string): Promise<void>;
   getRun(runId: string): Promise<RunSnapshot | null>;
   /**
    * The thread's most-recent run iff it is still non-terminal (running |

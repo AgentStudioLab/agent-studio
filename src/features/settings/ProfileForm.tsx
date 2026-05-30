@@ -112,7 +112,7 @@ export function ProfileForm() {
             </Select>
           </FormField>
         </div>
-        <InitialsAvatar initials={initialsFrom(callMe)} hue="orange" size={56} />
+        <InitialsAvatar initials={initialsFrom(callMe)} size={56} shape="round" tone="subtle" />
       </section>
 
       <FormField

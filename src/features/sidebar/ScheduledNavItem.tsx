@@ -28,7 +28,7 @@ export function ScheduledNavItem({
       type="button"
       onClick={onClick}
       className={cn(
-        "flex w-full items-center gap-3 rounded-md py-1.5 pl-3 pr-3 text-left text-[14px] transition-colors",
+        "flex w-full items-center gap-2.5 rounded-md py-1 pl-2.5 pr-3 text-left text-[13px] transition-colors",
         active
           ? "bg-state-selected text-[hsl(var(--text-100))]"
           : "text-[hsl(var(--text-200))] hover:bg-state-hover hover:text-[hsl(var(--text-100))]",

@@ -364,6 +364,11 @@ export function buildRunRoutes(deps: MountRunsDeps): Hono {
         first.interruptId,
         { answers },
       );
+      // The agent resumes work now — flip the run back to running so the
+      // sidebar stops showing "awaiting approval" while it's executing again.
+      // Only on a real resolve (ok); a stale/no-op resume must not revive a
+      // run that already terminated.
+      if (ok) await deps.store.markRunning(runId);
       return c.json({ ok: true, alreadyResolved: !ok }, 202);
     }
 
@@ -388,6 +393,10 @@ export function buildRunRoutes(deps: MountRunsDeps): Hono {
     // (otherwise we'd abort a run that has already moved past this point).
     if (decision.type === "deny" && ok) {
       aborters.get(runId)?.abort();
+    } else if (ok) {
+      // Allow: the agent resumes work — flip the run back to running (see the
+      // ask_user branch). Deny is excluded: it aborts to a terminal status.
+      await deps.store.markRunning(runId);
     }
 
     return c.json({ ok: true, alreadyResolved: !ok }, 202);

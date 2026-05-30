@@ -20,6 +20,9 @@ interface PreviewState {
   open: boolean;
 }
 
+/** Collapsible sidebar section groups (all default-expanded). */
+export type SidebarSection = "scheduled" | "pinned" | "recents";
+
 interface AppShellContextValue {
   hideSidebar: boolean;
   sidebarCollapsed: boolean;
@@ -28,6 +31,15 @@ interface AppShellContextValue {
    *  (which lives outside the sidebar's DOM tree) can open it too. */
   searchOpen: boolean;
   setSearchOpen: (open: boolean) => void;
+  /**
+   * Collapsed/expanded state of the sidebar's section groups. Lives here (not
+   * in SidebarContent) because SidebarContent is rendered twice — the docked
+   * Sidebar and the collapsed-sidebar floating popover — and remounts on
+   * navigation; local state would reset. App-level state is in-memory only, so
+   * it survives view switches but resets when the app is closed.
+   */
+  sidebarCollapsedSections: Record<SidebarSection, boolean>;
+  toggleSidebarSection: (section: SidebarSection) => void;
   asideOpen: boolean;
   toggleAside: () => void;
   preview: PreviewState;
@@ -64,6 +76,9 @@ export function AppShellProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [sidebarCollapsedSections, setSidebarCollapsedSections] = useState<
+    Record<SidebarSection, boolean>
+  >({ scheduled: false, pinned: false, recents: false });
   const [asideOpen, setAsideOpen] = useState(true);
   const [preview, setPreview] = useState<PreviewState>({ file: null, open: false });
   const [pendingFirstPrompt, setPendingFirstPrompt] = useState<{
@@ -74,6 +89,9 @@ export function AppShellProvider({ children }: { children: ReactNode }) {
   } | null>(null);
 
   const toggleAside = useCallback(() => setAsideOpen((v) => !v), []);
+  const toggleSidebarSection = useCallback((section: SidebarSection) => {
+    setSidebarCollapsedSections((s) => ({ ...s, [section]: !s[section] }));
+  }, []);
   const openPreview = useCallback(
     (file: MockFile) => setPreview({ file, open: true }),
     [],
@@ -120,6 +138,8 @@ export function AppShellProvider({ children }: { children: ReactNode }) {
       setSidebarCollapsed,
       searchOpen,
       setSearchOpen,
+      sidebarCollapsedSections,
+      toggleSidebarSection,
       asideOpen,
       toggleAside,
       preview,
@@ -132,6 +152,8 @@ export function AppShellProvider({ children }: { children: ReactNode }) {
       hideSidebar,
       sidebarCollapsed,
       searchOpen,
+      sidebarCollapsedSections,
+      toggleSidebarSection,
       asideOpen,
       toggleAside,
       preview,

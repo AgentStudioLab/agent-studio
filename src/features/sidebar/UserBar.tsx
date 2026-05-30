@@ -36,11 +36,11 @@ export function UserBar({
     >
       <button
         type="button"
-        className="flex w-full items-center gap-2.5 rounded-md px-2 py-2 text-left transition-colors hover:bg-[hsl(var(--bg-100)/0.6)]"
+        className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-[hsl(var(--bg-100)/0.6)]"
       >
-        <InitialsAvatar initials={initials} size={28} hue="orange" />
+        <InitialsAvatar initials={initials} size={20} shape="round" tone="subtle" />
         <span className="flex min-w-0 flex-1 items-center gap-1">
-          <span className="min-w-0 truncate text-[13px] text-[hsl(var(--text-100))]">
+          <span className="min-w-0 truncate text-[12px] text-[hsl(var(--text-100))]">
             {name}
           </span>
           <span className="shrink-0 text-[12px] text-[hsl(var(--text-400))]">

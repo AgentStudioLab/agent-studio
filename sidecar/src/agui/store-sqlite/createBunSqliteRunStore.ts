@@ -36,6 +36,12 @@ export function createBunSqliteRunStore(db: Database): RunEventStore {
   const updateRunFinish = db.prepare(
     "UPDATE runs SET status = ?, error_msg = ?, ended_at = ? WHERE id = ?",
   );
+  // Non-terminal: awaiting_approval → running (HITL resolved, agent resumes).
+  // Clears ended_at since the run is no longer finished. No bus signal — the
+  // run isn't ending, so SSE streamers must keep listening.
+  const markRunningStmt = db.prepare(
+    "UPDATE runs SET status = 'running', ended_at = NULL WHERE id = ?",
+  );
   const selectRun = db.prepare(
     "SELECT id AS runId, thread_id AS threadId, status, last_seq AS lastSeq FROM runs WHERE id = ?",
   );
@@ -123,6 +129,10 @@ export function createBunSqliteRunStore(db: Database): RunEventStore {
     async finishRun(runId, status, errorMsg) {
       updateRunFinish.run(status, errorMsg ?? null, Date.now(), runId);
       bus.emit(`run:${runId}:end`);
+    },
+
+    async markRunning(runId) {
+      markRunningStmt.run(runId);
     },
 
     async getRun(runId): Promise<RunSnapshot | null> {

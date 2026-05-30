@@ -318,6 +318,14 @@ export function ChatStream({
               m.role === "assistant" &&
               idx === messages.length - 1;
             const isLastMessage = idx === messages.length - 1;
+            // Parked at awaiting_approval (tool approval / ask-user): isRunning
+            // is already false but the live turn isn't finished — it's paused
+            // mid-flight. Treat it like streaming for artifact reveal so the
+            // turn's file cards stay hidden until the run actually completes.
+            const parkedForApproval =
+              isLastMessage &&
+              m.role === "assistant" &&
+              pendingInterrupts.length > 0;
             // Regenerate scope (user turns only): how many later user-initiated
             // rounds would be discarded, and whether this turn's answer edited
             // files (drives the confirm dialog vs one-click).
@@ -336,6 +344,7 @@ export function ChatStream({
                 showActions={!isLive}
                 isLastMessage={isLastMessage}
                 streaming={isLive}
+                parkedForApproval={parkedForApproval}
                 interruptsByToolId={interruptsByToolId}
                 renderApprovalCard={renderApprovalCard}
                 onContinueAfterRestart={onContinueAfterRestart}
@@ -430,6 +439,7 @@ function MessageRow({
   regenerateDisabled,
   laterRounds,
   willRollbackFiles,
+  parkedForApproval,
 }: {
   message: MessageView;
   showActions: boolean;
@@ -437,6 +447,11 @@ function MessageRow({
    *  Artifact cards stay hidden until streaming flips false — matches the
    *  "produce → reveal" rhythm of Cowork (full text first, then the card). */
   streaming: boolean;
+  /** True when this turn is paused at awaiting_approval (tool approval /
+   *  ask-user). The turn isn't finished, so artifact cards stay hidden — same
+   *  as `streaming`, just for the parked-mid-flight case where isRunning has
+   *  already gone false. */
+  parkedForApproval: boolean;
   isLastMessage: boolean;
   interruptsByToolId: Map<string, PendingInterrupt>;
   renderApprovalCard: (it: PendingInterrupt) => ReactNode;
@@ -473,9 +488,13 @@ function MessageRow({
   // tool may succeed early in the turn while the model is still composing
   // the explanatory text — showing the card mid-stream feels premature
   // ("here's the file, also still talking"). Reveal once the turn settles.
-  const artifacts = streaming
-    ? []
-    : mutationToolCallsToArtifacts(message.blocks, workingDir);
+  // Also hold while parked at awaiting_approval: the turn paused for a tool
+  // approval / ask-user is not finished, so its earlier-succeeded writes must
+  // not surface yet — reveal only when the run actually completes.
+  const artifacts =
+    streaming || parkedForApproval
+      ? []
+      : mutationToolCallsToArtifacts(message.blocks, workingDir);
 
   return (
     <div className="space-y-3">

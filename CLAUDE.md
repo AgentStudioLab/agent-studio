@@ -170,7 +170,7 @@ Mirrors the sidecar's event protocol on the client. Two layers:
 
 7. **Styling MUST go through the 3-tier design token system.** Whenever you write component CSS, apply a Tailwind class for color/spacing/radius, or pick any style value — first consult the `design-tokens` skill. The chain is `src/styles/primitives/` → `src/styles/semantic/` → `src/styles/components/` → `src/styles/shadcn-alias.css` → Tailwind utility via `@theme inline` in `src/index.css`. Theme is single-axis (`data-mode="light|dark"`, no `data-theme`). Hardcoding hex / raw HSL anywhere in `src/components/` or `src/features/` is forbidden — components reference **semantic** tokens (`var(--brand-100)`, `var(--bg-100)`, etc) which flow through to primitives. Direct primitive references (e.g., `var(--color-orange-500)`) are allowed ONLY in narrow "categorical palette picker" cases per the design-tokens skill exception clause.
 
-8. **反 AI slop（必守）：** ❌ 紫色渐变 / ❌ emoji 装饰 icon / ❌ 圆角左 border 色条 / ❌ SVG 画的头像。改用：单一 brand-100 橙色 / lucide-react inline SVG / InitialsAvatar 字母方块。code review 期间任一条违反 = block，不是 nit。Anthropic 视觉身份是克制。
+8. **反 AI slop（必守）：** ❌ 紫色渐变 / ❌ emoji 装饰 icon / ❌ 圆角左 border 色条。改用：单一 brand-100 橙色 / lucide-react inline SVG。code review 期间任一条违反 = block，不是 nit。Anthropic 视觉身份是克制。
 
 9. **Tests run on Bun's runner, not vitest** — every `*.test.ts(x)` (frontend AND sidecar) imports `bun:test`. Run with `bun test`. There is no vitest config; invoking these under vitest fails with `Cannot find package 'bun:test'`.
 

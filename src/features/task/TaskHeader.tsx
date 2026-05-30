@@ -59,9 +59,10 @@ export function TaskHeader({
       data-tauri-drag-region
       className={cn(
         "flex h-12 shrink-0 items-center gap-3 px-6",
-        // Leave room for the absolute-positioned SidebarToggle (~40px footprint
-        // at left-3) so the title button doesn't crowd it.
-        sidebarCollapsed && "pl-14",
+        // When collapsed the MacTitlebar overlays the SidebarToggle behind the
+        // 80px traffic-light slot (toggle spans ~80-104px). Clear it: 80 +
+        // 24px button + gap, so the title button doesn't sit under the toggle.
+        sidebarCollapsed && "pl-28",
       )}
     >
       <DropdownMenu>

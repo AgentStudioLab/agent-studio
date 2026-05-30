@@ -59,7 +59,7 @@ import type { ThreadStatusItem } from "@/lib/agui/react/useThreadStatuses";
  *   - read → "pending" → gray hollow circle (the same visual as idle threads,
  *     which is intentional: "nothing here demanding your attention").
  * Other terminal states keep their distinctive icon regardless of read state
- * (failed = red ✗, cancelled = gray −) so the user always notices errors and
+ * (failed = red ✗, cancelled = gray ⊘) so the user always notices errors and
  * remembers their own stops.
  */
 function aguiToMockStatus(
@@ -128,8 +128,15 @@ export function SidebarContent() {
   const selectedTaskId = routeThreadId ?? null;
   const { t } = useTranslation();
   // searchOpen is shared with MacTitlebar (which renders the search trigger),
-  // so it lives in AppShellContext rather than local state here.
-  const { searchOpen, setSearchOpen } = useAppShell();
+  // so it lives in AppShellContext rather than local state here. Section
+  // collapse state lives there too — see AppShellContext: SidebarContent
+  // renders in two places + remounts on nav, so local state can't persist.
+  const {
+    searchOpen,
+    setSearchOpen,
+    sidebarCollapsedSections,
+    toggleSidebarSection,
+  } = useAppShell();
 
   const { data: recentsData = [] } = useRecentConversations();
   const { data: pinnedData = [] } = usePinnedConversations();
@@ -143,8 +150,6 @@ export function SidebarContent() {
     id: string;
     title: string;
   } | null>(null);
-  const [recentsCollapsed, setRecentsCollapsed] = useState(false);
-  const [scheduledCollapsed, setScheduledCollapsed] = useState(false);
 
   const { isUnread, markRead } = useThreadUnread();
 
@@ -163,7 +168,8 @@ export function SidebarContent() {
       .map((c) => toRecentItem(c, entryByThread.get(c.id), isUnread));
   }, [recentsData, pinnedData, entryByThread, isUnread]);
   const pinned = useMemo(
-    () => pinnedData.map((c) => toPinnedItem(c, entryByThread.get(c.id), isUnread)),
+    () =>
+      pinnedData.map((c) => toPinnedItem(c, entryByThread.get(c.id), isUnread)),
     [pinnedData, entryByThread, isUnread],
   );
   // Group scheduler-spawned run threads by their origin task so each sidebar
@@ -180,7 +186,7 @@ export function SidebarContent() {
   }, [threadStatuses]);
   // The Scheduled row highlights when the open conversation is one of its runs.
   const activeScheduledTaskId = routeThreadId
-    ? entryByThread.get(routeThreadId)?.scheduledTaskId ?? null
+    ? (entryByThread.get(routeThreadId)?.scheduledTaskId ?? null)
     : null;
 
   const handlePin = (recent: MockRecentItem) => {
@@ -251,120 +257,139 @@ export function SidebarContent() {
        *  and either the cadence label or an unviewed-run count. */}
       {scheduledTasks.length > 0 && (
         <>
-          <div className="group/scheduled px-3 pb-1 pt-5">
+          <div className="group/scheduled px-3 pb-0.5 pt-3.5">
             <button
               type="button"
-              onClick={() => setScheduledCollapsed((v) => !v)}
-              className="flex items-center gap-1 px-2 text-[12px] font-medium text-[hsl(var(--text-400))] transition-colors hover:text-[hsl(var(--text-200))]"
+              onClick={() => toggleSidebarSection("scheduled")}
+              className="flex items-center gap-1 px-2 text-[11px] font-medium text-[hsl(var(--text-400))] transition-colors hover:text-[hsl(var(--text-200))]"
             >
               {t("sidebar.sections.scheduled")}
               <ChevronDown
                 className={cn(
                   "size-3 opacity-0 transition-all group-hover/scheduled:opacity-100",
-                  scheduledCollapsed && "-rotate-90",
+                  sidebarCollapsedSections.scheduled && "-rotate-90",
                 )}
               />
             </button>
           </div>
-          {!scheduledCollapsed && (
-          <div className="flex shrink-0 flex-col gap-0.5 px-2">
-            {scheduledTasks.map((task) => {
-              const runs = scheduledRunsByTask.get(task.id) ?? [];
-              const latest = runs.reduce<ThreadStatusItem | undefined>(
-                (acc, r) => (!acc || r.updatedAt > acc.updatedAt ? r : acc),
-                undefined,
-              );
-              const newCount = runs.filter((r) =>
-                isUnread(r.threadId, r.lastRunId),
-              ).length;
-              const status = latest
-                ? aguiToMockStatus(
-                    latest.status,
-                    isUnread(latest.threadId, latest.lastRunId),
-                  )
-                : "pending";
-              return (
-                <ScheduledNavItem
-                  key={task.id}
-                  name={task.name}
-                  status={status}
-                  frequencyLabel={t(`scheduled.frequencyChip.${task.frequency}`)}
-                  newCount={newCount}
-                  newLabel={t("sidebar.sections.scheduledNew", { count: newCount })}
-                  active={activeScheduledTaskId === task.id}
-                  onClick={() => {
-                    // The sidebar row opens the task's CONVERSATION (its latest
-                    // run), not the config page. Config is reached by clicking
-                    // the card on the /scheduled list. No runs yet → fall back
-                    // to the config page so there's somewhere to land.
-                    if (latest) {
-                      if (latest.lastRunId) markRead(latest.threadId, latest.lastRunId);
-                      navigate(`/task/${latest.threadId}`);
-                    } else {
-                      navigate(`/scheduled/${task.id}`);
-                    }
-                  }}
-                />
-              );
-            })}
-          </div>
+          {!sidebarCollapsedSections.scheduled && (
+            <div className="flex shrink-0 flex-col gap-0.5 px-2">
+              {scheduledTasks.map((task) => {
+                const runs = scheduledRunsByTask.get(task.id) ?? [];
+                const latest = runs.reduce<ThreadStatusItem | undefined>(
+                  (acc, r) => (!acc || r.updatedAt > acc.updatedAt ? r : acc),
+                  undefined,
+                );
+                const newCount = runs.filter((r) =>
+                  isUnread(r.threadId, r.lastRunId),
+                ).length;
+                const status = latest
+                  ? aguiToMockStatus(
+                      latest.status,
+                      isUnread(latest.threadId, latest.lastRunId),
+                    )
+                  : "pending";
+                return (
+                  <ScheduledNavItem
+                    key={task.id}
+                    name={task.name}
+                    status={status}
+                    frequencyLabel={t(
+                      `scheduled.frequencyChip.${task.frequency}`,
+                    )}
+                    newCount={newCount}
+                    newLabel={t("sidebar.sections.scheduledNew", {
+                      count: newCount,
+                    })}
+                    active={activeScheduledTaskId === task.id}
+                    onClick={() => {
+                      // The sidebar row opens the task's CONVERSATION (its latest
+                      // run), not the config page. Config is reached by clicking
+                      // the card on the /scheduled list. No runs yet → fall back
+                      // to the config page so there's somewhere to land.
+                      if (latest) {
+                        if (latest.lastRunId)
+                          markRead(latest.threadId, latest.lastRunId);
+                        navigate(`/task/${latest.threadId}`);
+                      } else {
+                        navigate(`/scheduled/${task.id}`);
+                      }
+                    }}
+                  />
+                );
+              })}
+            </div>
           )}
         </>
       )}
 
-      {/* Pinned */}
+      {/* Pinned — collapsible, matching Scheduled / Recents. */}
       {pinned.length > 0 && (
         <>
-          <div className="px-3 pb-1 pt-5">
-            <div className="px-2 text-[12px] font-medium text-[hsl(var(--text-400))]">
+          <div className="group/pinned px-3 pb-0.5 pt-3.5">
+            <button
+              type="button"
+              onClick={() => toggleSidebarSection("pinned")}
+              className="flex items-center gap-1 px-2 text-[11px] font-medium text-[hsl(var(--text-400))] transition-colors hover:text-[hsl(var(--text-200))]"
+            >
               {t("sidebar.sections.pinned")}
-            </div>
-          </div>
-          <div className="flex shrink-0 flex-col gap-0.5 px-2">
-            {pinned.map((item) => (
-              <PinnedItem
-                key={item.id}
-                item={item}
-                active={item.kind !== "project" && item.id === selectedTaskId}
-                onClick={() => {
-                  if (item.kind !== "project") {
-                    const runId = entryByThread.get(item.id)?.lastRunId;
-                    if (runId) markRead(item.id, runId);
-                    navigate(`/task/${item.id}`);
-                  } else {
-                    navigate(`/projects/${item.id}`);
-                  }
-                }}
-                onUnpin={() => void handleUnpin(item)}
-                onRename={() => setPendingRename({ id: item.id, title: item.name })}
-                onArchive={() => handleArchive(item.id)}
-                onDelete={() => requestDelete(item.id)}
+              <ChevronDown
+                className={cn(
+                  "size-3 opacity-0 transition-all group-hover/pinned:opacity-100",
+                  sidebarCollapsedSections.pinned && "-rotate-90",
+                )}
               />
-            ))}
+            </button>
           </div>
+          {!sidebarCollapsedSections.pinned && (
+            <div className="flex shrink-0 flex-col gap-0.5 px-2">
+              {pinned.map((item) => (
+                <PinnedItem
+                  key={item.id}
+                  item={item}
+                  active={item.kind !== "project" && item.id === selectedTaskId}
+                  onClick={() => {
+                    if (item.kind !== "project") {
+                      const runId = entryByThread.get(item.id)?.lastRunId;
+                      if (runId) markRead(item.id, runId);
+                      navigate(`/task/${item.id}`);
+                    } else {
+                      navigate(`/projects/${item.id}`);
+                    }
+                  }}
+                  onUnpin={() => void handleUnpin(item)}
+                  onRename={() =>
+                    setPendingRename({ id: item.id, title: item.name })
+                  }
+                  onArchive={() => handleArchive(item.id)}
+                  onDelete={() => requestDelete(item.id)}
+                />
+              ))}
+            </div>
+          )}
         </>
       )}
 
       {/* Recents — header reveals a collapse chevron + "View all" on hover. */}
-      <div className="group/recents px-3 pb-1 pt-4">
+      <div className="group/recents px-3 pb-0.5 pt-3.5">
         <div className="flex items-center justify-between px-2">
           <button
             type="button"
-            onClick={() => setRecentsCollapsed((v) => !v)}
-            className="flex items-center gap-1 text-[12px] font-medium text-[hsl(var(--text-400))] transition-colors hover:text-[hsl(var(--text-200))]"
+            onClick={() => toggleSidebarSection("recents")}
+            className="flex items-center gap-1 text-[11px] font-medium text-[hsl(var(--text-400))] transition-colors hover:text-[hsl(var(--text-200))]"
           >
             {t("sidebar.sections.recents")}
             <ChevronDown
               className={cn(
                 "size-3 opacity-0 transition-all group-hover/recents:opacity-100",
-                recentsCollapsed && "-rotate-90",
+                sidebarCollapsedSections.recents && "-rotate-90",
               )}
             />
           </button>
           <button
             type="button"
             onClick={() => navigate("/tasks")}
-            className="flex items-center gap-0.5 text-[12px] text-[hsl(var(--text-400))] opacity-0 transition-all hover:text-[hsl(var(--text-200))] group-hover/recents:opacity-100"
+            className="flex items-center gap-0.5 text-[11px] text-[hsl(var(--text-400))] opacity-0 transition-all hover:text-[hsl(var(--text-200))] group-hover/recents:opacity-100"
           >
             {t("sidebar.sections.viewAll")}
             <ChevronRight className="size-3" />
@@ -372,7 +397,7 @@ export function SidebarContent() {
         </div>
       </div>
       <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-2">
-        {!recentsCollapsed &&
+        {!sidebarCollapsedSections.recents &&
           recents.map((item) => (
             <RecentItem
               key={item.id}
@@ -384,7 +409,9 @@ export function SidebarContent() {
                 navigate(`/task/${item.id}`);
               }}
               onPin={() => void handlePin(item)}
-              onRename={() => setPendingRename({ id: item.id, title: item.title })}
+              onRename={() =>
+                setPendingRename({ id: item.id, title: item.title })
+              }
               onArchive={() => handleArchive(item.id)}
               onDelete={() => requestDelete(item.id)}
             />
@@ -393,8 +420,9 @@ export function SidebarContent() {
 
       {/* Footer — divider line removed per design; UpdateCard temporarily
        *  hidden until the auto-update flow is wired up. UserBar still
-       *  anchored at the bottom of the sidebar. */}
-      <div className="flex shrink-0 flex-col gap-2 px-3 pb-3 pt-2">
+       *  anchored at the bottom of the sidebar, with extra top separation so
+       *  the (now smaller, blended) user row stays out of the task list's way. */}
+      <div className="flex shrink-0 flex-col gap-2 px-3 pb-1 pt-4">
         <UserBar
           onSettings={() => navigate("/settings")}
           onLogout={() => console.log("logout")}
@@ -435,13 +463,17 @@ export function SidebarContent() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{t("sidebar.deleteDialog.title")}</AlertDialogTitle>
+            <AlertDialogTitle>
+              {t("sidebar.deleteDialog.title")}
+            </AlertDialogTitle>
             <AlertDialogDescription>
               {t("sidebar.deleteDialog.description")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>{t("sidebar.deleteDialog.cancel")}</AlertDialogCancel>
+            <AlertDialogCancel>
+              {t("sidebar.deleteDialog.cancel")}
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={confirmDelete}
               className="bg-[hsl(var(--danger-100))] text-white hover:bg-[hsl(var(--danger-100)/0.9)]"
