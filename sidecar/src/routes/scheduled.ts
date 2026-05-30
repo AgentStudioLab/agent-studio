@@ -69,7 +69,7 @@ export function buildScheduledRoutes(deps: MountScheduledDeps): Hono {
       name: body.name,
       description: typeof body.description === "string" ? body.description : "",
       prompt: body.prompt,
-      projectId: typeof body.projectId === "string" ? body.projectId : null,
+      agentWorkspaceId: typeof body.agentWorkspaceId === "string" ? body.agentWorkspaceId : null,
       workingDir: typeof body.workingDir === "string" ? body.workingDir : null,
       model: typeof body.model === "string" ? body.model : null,
       permissionMode:
@@ -108,9 +108,9 @@ export function buildScheduledRoutes(deps: MountScheduledDeps): Hono {
       description:
         typeof body.description === "string" ? body.description : undefined,
       prompt: typeof body.prompt === "string" ? body.prompt : undefined,
-      projectId:
-        body.projectId === null || typeof body.projectId === "string"
-          ? (body.projectId as string | null)
+      agentWorkspaceId:
+        body.agentWorkspaceId === null || typeof body.agentWorkspaceId === "string"
+          ? (body.agentWorkspaceId as string | null)
           : undefined,
       workingDir:
         body.workingDir === null || typeof body.workingDir === "string"

@@ -10,7 +10,7 @@ export interface ScheduledTask {
   name: string;
   description: string;
   prompt: string;
-  projectId: string | null;
+  agentWorkspaceId: string | null;
   workingDir: string | null;
   model: string | null;
   permissionMode: PermissionMode;
@@ -31,7 +31,7 @@ interface ScheduledTaskRow {
   name: string;
   description: string;
   prompt: string;
-  project_id: string | null;
+  agent_workspace_id: string | null;
   working_dir: string | null;
   model: string | null;
   permission_mode: PermissionMode;
@@ -160,7 +160,7 @@ function rowToTask(r: ScheduledTaskRow): ScheduledTask {
     name: r.name,
     description: r.description,
     prompt: r.prompt,
-    projectId: r.project_id,
+    agentWorkspaceId: r.agent_workspace_id,
     workingDir: r.working_dir,
     model: r.model,
     permissionMode: r.permission_mode === "act-without-asking" ? "act-without-asking" : "ask",
@@ -181,7 +181,7 @@ export interface CreateScheduledTaskInput {
   name: string;
   description?: string;
   prompt: string;
-  projectId?: string | null;
+  agentWorkspaceId?: string | null;
   workingDir?: string | null;
   model?: string | null;
   permissionMode?: PermissionMode;
@@ -218,7 +218,7 @@ export class ScheduledTaskService {
     this.db
       .prepare(
         `INSERT INTO scheduled_tasks
-           (id, name, description, prompt, project_id, working_dir, model,
+           (id, name, description, prompt, agent_workspace_id, working_dir, model,
             permission_mode, frequency, time_of_day, weekday, enabled,
             allowed_tools_json, next_run_at, last_run_at, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?)`,
@@ -228,7 +228,7 @@ export class ScheduledTaskService {
         input.name,
         input.description ?? "",
         input.prompt,
-        input.projectId ?? null,
+        input.agentWorkspaceId ?? null,
         input.workingDir ?? null,
         input.model ?? null,
         input.permissionMode === "act-without-asking" ? "act-without-asking" : "ask",
@@ -274,7 +274,7 @@ export class ScheduledTaskService {
     if (patch.name !== undefined) push("name", patch.name);
     if (patch.description !== undefined) push("description", patch.description);
     if (patch.prompt !== undefined) push("prompt", patch.prompt);
-    if (patch.projectId !== undefined) push("project_id", patch.projectId);
+    if (patch.agentWorkspaceId !== undefined) push("agent_workspace_id", patch.agentWorkspaceId);
     if (patch.workingDir !== undefined) push("working_dir", patch.workingDir);
     if (patch.model !== undefined) push("model", patch.model);
     if (patch.permissionMode !== undefined) {

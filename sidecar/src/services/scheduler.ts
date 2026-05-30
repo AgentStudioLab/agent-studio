@@ -14,9 +14,9 @@ export interface SchedulerDeps {
   provider: AgentProvider;
   interruptBus: InterruptBus;
   usage: UsageService;
-  /** Resolve a project's working dir for project-bound tasks. Returns null →
-   *  the spawned conversation falls back to the default workspace cwd. */
-  resolveProjectCwd?: (projectId: string) => string | null | undefined;
+  /** Resolve an agent workspace's home dir for agent-bound tasks. Returns
+   *  null → the spawned conversation falls back to the default workspace cwd. */
+  resolveAgentHome?: (agentWorkspaceId: string) => string | null | undefined;
   /** When this returns false (e.g. no API key yet), the tick is skipped WITHOUT
    *  advancing — so a task due during the gap still catch-up fires once ready. */
   canRun?: () => boolean;
@@ -91,12 +91,12 @@ export class Scheduler {
     // wired) or the default workspace (workingDir null → ThreadService default).
     const cwd =
       task.workingDir ??
-      (task.projectId
-        ? this.deps.resolveProjectCwd?.(task.projectId) ?? null
+      (task.agentWorkspaceId
+        ? this.deps.resolveAgentHome?.(task.agentWorkspaceId) ?? null
         : null);
     const thread = this.deps.threads.create({
       title: task.name,
-      projectId: task.projectId,
+      agentWorkspaceId: task.agentWorkspaceId,
       workingDir: cwd,
       scheduledTaskId: task.id,
       // Seed the conversation's defaults so opening it (and any follow-up

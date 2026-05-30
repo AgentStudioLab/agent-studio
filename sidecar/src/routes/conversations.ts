@@ -16,14 +16,14 @@ export function buildConversationRoutes(deps: MountConversationsDeps): Hono {
       | {
           id?: string;
           title?: string;
-          projectId?: string | null;
+          agentWorkspaceId?: string | null;
           workingDir?: string | null;
         }
       | null;
     const t = threads.create({
       id: body?.id,
       title: body?.title,
-      projectId: body?.projectId ?? null,
+      agentWorkspaceId: body?.agentWorkspaceId ?? null,
       workingDir: body?.workingDir ?? null,
     });
     return c.json(t, 201);

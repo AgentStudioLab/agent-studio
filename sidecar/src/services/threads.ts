@@ -7,7 +7,7 @@ import { nanoid } from "nanoid";
 export interface Thread {
   id: string;
   title: string;
-  projectId: string | null;
+  agentWorkspaceId: string | null;
   pinned: boolean;
   archived: boolean;
   workingDir: string;
@@ -23,7 +23,7 @@ export interface Thread {
 interface ThreadRow {
   id: string;
   title: string;
-  project_id: string | null;
+  agent_workspace_id: string | null;
   pinned: number;
   archived: number;
   working_dir: string | null;
@@ -58,7 +58,7 @@ function rowToThread(r: ThreadRow): Thread {
   return {
     id: r.id,
     title: r.title,
-    projectId: r.project_id,
+    agentWorkspaceId: r.agent_workspace_id,
     pinned: r.pinned === 1,
     archived: r.archived === 1,
     workingDir: r.working_dir ?? ensureDefaultDir(),
@@ -81,7 +81,7 @@ export class ThreadService {
   create(input?: {
     id?: string;
     title?: string;
-    projectId?: string | null;
+    agentWorkspaceId?: string | null;
     workingDir?: string | null;
     scheduledTaskId?: string | null;
     model?: string | null;
@@ -91,13 +91,13 @@ export class ThreadService {
     const now = Date.now();
     this.db
       .prepare(
-        `INSERT INTO conversations (id, title, project_id, pinned, working_dir, scheduled_task_id, model, permission_mode, created_at, updated_at)
+        `INSERT INTO conversations (id, title, agent_workspace_id, pinned, working_dir, scheduled_task_id, model, permission_mode, created_at, updated_at)
          VALUES (?, ?, ?, 0, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         id,
         input?.title ?? "New chat",
-        input?.projectId ?? null,
+        input?.agentWorkspaceId ?? null,
         input?.workingDir ?? null,
         input?.scheduledTaskId ?? null,
         input?.model ?? null,

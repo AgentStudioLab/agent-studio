@@ -8,7 +8,7 @@ export type MessageRole = "user" | "assistant";
 export interface Conversation {
   id: string;
   title: string;
-  projectId: string | null;
+  agentWorkspaceId: string | null;
   mode: ConversationMode;
   status: ConversationStatus;
   pinned: boolean;
@@ -28,6 +28,6 @@ export interface Message {
 
 export interface CreateConversationInput {
   prompt: string;
-  projectId?: string | null;
+  agentWorkspaceId?: string | null;
   mode: ConversationMode;
 }
