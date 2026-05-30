@@ -67,6 +67,13 @@ function getDeviceId(): string {
 function parseCallbackUrl(callbackUrl: string): { code: string; state: string } | null {
   try {
     const url = new URL(callbackUrl);
+    if (
+      url.protocol !== "agent-studio:" ||
+      url.hostname !== "auth" ||
+      url.pathname !== "/callback"
+    ) {
+      return null;
+    }
     const code = url.searchParams.get("code");
     const state = url.searchParams.get("state");
     if (!code || !state) return null;
@@ -74,6 +81,25 @@ function parseCallbackUrl(callbackUrl: string): { code: string; state: string } 
   } catch {
     return null;
   }
+}
+
+function createAuthStaleError(): Error {
+  return new Error("auth_stale");
+}
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function shouldClearSessionForAuthError(error: unknown): boolean {
+  const message = getErrorMessage(error);
+  return (
+    message === "auth_required" ||
+    message === "desktop_api_401" ||
+    message === "desktop_api_invalid_token_response" ||
+    message.includes("invalid_grant") ||
+    message.includes("invalid_refresh")
+  );
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -84,23 +110,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const userRef = useRef<DesktopUser | null>(null);
   const pendingLoginRef = useRef<PendingLogin | null>(null);
   const authVersionRef = useRef(0);
+  const mountedRef = useRef(true);
+
+  const canApplyAuthResult = useCallback(
+    (operationVersion: number, refreshToken?: string) =>
+      mountedRef.current &&
+      authVersionRef.current === operationVersion &&
+      (!refreshToken || tokensRef.current?.refreshToken === refreshToken),
+    [],
+  );
 
   const applySignedOut = useCallback(() => {
     authVersionRef.current += 1;
     tokensRef.current = null;
     userRef.current = null;
-    setTokens(null);
-    setUser(null);
-    setStatus("signed-out");
+    if (mountedRef.current) {
+      setTokens(null);
+      setUser(null);
+      setStatus("signed-out");
+    }
   }, []);
 
   const applySession = useCallback((nextTokens: DesktopAuthTokens, nextUser: DesktopUser) => {
     authVersionRef.current += 1;
     tokensRef.current = nextTokens;
     userRef.current = nextUser;
-    setTokens(nextTokens);
-    setUser(nextUser);
-    setStatus("signed-in");
+    if (mountedRef.current) {
+      setTokens(nextTokens);
+      setUser(nextUser);
+      setStatus("signed-in");
+    }
   }, []);
 
   const clearSession = useCallback(async () => {
@@ -116,17 +155,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [applySignedOut, clearSession]);
 
-  const refreshTokens = useCallback(async (currentTokens: DesktopAuthTokens) => {
+  const refreshTokens = useCallback(async (
+    currentTokens: DesktopAuthTokens,
+    operationVersion: number,
+  ) => {
     const refreshed = await refreshAccessToken(currentTokens.refreshToken);
+    if (!canApplyAuthResult(operationVersion, currentTokens.refreshToken)) {
+      throw createAuthStaleError();
+    }
+
     const nextTokens = { ...currentTokens, ...refreshed };
     await saveStoredAuthTokens(nextTokens);
+    if (!canApplyAuthResult(operationVersion, currentTokens.refreshToken)) {
+      throw createAuthStaleError();
+    }
+
     tokensRef.current = nextTokens;
-    setTokens(nextTokens);
+    if (mountedRef.current) {
+      setTokens(nextTokens);
+    }
     return nextTokens;
-  }, []);
+  }, [canApplyAuthResult]);
 
   const getValidAccessToken = useCallback(async () => {
     const currentTokens = tokensRef.current;
+    const operationVersion = authVersionRef.current;
     if (!currentTokens || isRefreshTokenExpired(currentTokens)) {
       await clearSession();
       throw new Error("auth_required");
@@ -137,26 +190,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      const nextTokens = await refreshTokens(currentTokens);
+      const nextTokens = await refreshTokens(currentTokens, operationVersion);
       return nextTokens.accessToken;
     } catch (error) {
-      await clearSession();
+      if (shouldClearSessionForAuthError(error)) {
+        await clearSession();
+      }
       throw error;
     }
   }, [clearSession, refreshTokens]);
 
   const refreshUser = useCallback(async () => {
+    const operationVersion = authVersionRef.current;
     try {
       const accessToken = await getValidAccessToken();
       const nextUser = await fetchDesktopMe(accessToken);
+      if (!canApplyAuthResult(operationVersion)) {
+        throw createAuthStaleError();
+      }
       userRef.current = nextUser;
-      setUser(nextUser);
+      if (mountedRef.current) {
+        setUser(nextUser);
+      }
       return nextUser;
     } catch (error) {
-      await clearSession();
+      if (shouldClearSessionForAuthError(error)) {
+        await clearSession();
+      }
       throw error;
     }
-  }, [clearSession, getValidAccessToken]);
+  }, [canApplyAuthResult, clearSession, getValidAccessToken]);
 
   const login = useCallback(async () => {
     const deviceId = getDeviceId();
@@ -204,20 +267,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       pendingLoginRef.current = null;
+      const operationVersion = authVersionRef.current;
       try {
         const session = await exchangeAuthCode({
           code: callback.code,
           codeVerifier: pendingLogin.verifier,
           deviceId: pendingLogin.deviceId,
         });
+        if (!canApplyAuthResult(operationVersion)) {
+          throw createAuthStaleError();
+        }
         await saveStoredAuthTokens(session.tokens);
+        if (!canApplyAuthResult(operationVersion)) {
+          throw createAuthStaleError();
+        }
         applySession(session.tokens, session.user);
-      } catch {
-        await clearSessionBestEffort();
+      } catch (error) {
+        if (shouldClearSessionForAuthError(error)) {
+          await clearSessionBestEffort();
+        }
       }
     },
-    [applySession, clearSessionBestEffort],
+    [applySession, canApplyAuthResult, clearSessionBestEffort],
   );
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      authVersionRef.current += 1;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -250,7 +330,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!isStale()) applySession(usableTokens, nextUser);
       } catch {
         if (!isStale()) {
-          await clearSessionBestEffort();
+          applySignedOut();
         }
       }
     }
@@ -260,7 +340,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [applySession, applySignedOut, clearSessionBestEffort, refreshTokens]);
+  }, [applySession, applySignedOut]);
 
   useEffect(() => {
     let cancelled = false;

@@ -91,6 +91,15 @@ function expectSignedInTokens(tokens: DesktopAuthTokens | null) {
   expect(tokens?.refreshTokenExpiresAt).toBeGreaterThan(Date.now());
 }
 
+function createExpiredAccessTokens(): DesktopAuthTokens {
+  return {
+    accessToken: "expired-access-token",
+    accessTokenExpiresAt: Date.now() - 1_000,
+    refreshToken: "stored-refresh-token",
+    refreshTokenExpiresAt: Date.now() + 7_200_000,
+  };
+}
+
 describe("AuthProvider", () => {
   beforeEach(() => {
     window.localStorage.clear();
@@ -221,5 +230,83 @@ describe("AuthProvider", () => {
     expect(result.current.status).toBe("signed-in");
     expect(result.current.user).toEqual(signedInUser);
     expectSignedInTokens(result.current.tokens);
+  });
+
+  it("does not let a stale refresh write tokens after logout", async () => {
+    const refresh = createDeferred<Response>();
+    let tokenExchangeResolved = false;
+    globalThis.fetch = mock(async (input) => {
+      if (String(input).endsWith("/api/desktop/oauth/token")) {
+        tokenExchangeResolved = true;
+        return jsonResponse({
+          code: 0,
+          data: {
+            accessToken: "server-access-token",
+            expiresIn: 0,
+            refreshToken: signedInTokens.refreshToken,
+            refreshExpiresIn: 7200,
+            user: signedInUser,
+          },
+        });
+      }
+      if (String(input).endsWith("/api/desktop/oauth/refresh")) {
+        return refresh.promise;
+      }
+      throw new Error(`unexpected fetch ${String(input)}`);
+    }) as typeof fetch;
+
+    const { result } = renderHook(() => useAuthForTest(), { wrapper: wrap });
+    await waitFor(() => expect(result.current.status).toBe("signed-out"));
+    await act(async () => {
+      await result.current.login();
+    });
+    await act(async () => {
+      await eventHandler?.({
+        payload: "agent-studio://auth/callback?code=code-1&state=state-1",
+      });
+    });
+    await waitFor(() => expect(result.current.status).toBe("signed-in"));
+    expect(tokenExchangeResolved).toBe(true);
+
+    const validTokenPromise = result.current.getValidAccessToken().catch((error) => error);
+    await waitFor(() => {
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        "https://example.test/api/desktop/oauth/refresh",
+        expect.any(Object),
+      );
+    });
+    const initialSaveCount = saveStoredAuthTokens.mock.calls.length;
+
+    await act(async () => {
+      await result.current.logout();
+    });
+    refresh.resolve(
+      jsonResponse({
+        code: 0,
+        data: { accessToken: "late-access-token", expiresIn: 3600 },
+      }),
+    );
+    const staleError = await validTokenPromise;
+
+    expect(staleError).toBeInstanceOf(Error);
+    expect(staleError.message).toBe("auth_stale");
+    expect(result.current.status).toBe("signed-out");
+    expect(result.current.tokens).toBeNull();
+    expect(saveStoredAuthTokens).toHaveBeenCalledTimes(initialSaveCount);
+  });
+
+  it("keeps an existing session when refreshUser hits a transient API failure", async () => {
+    loadStoredAuthTokens.mockImplementationOnce(async () => signedInTokens);
+    globalThis.fetch = mock(async () => jsonResponse({ code: 0, data: signedInUser })) as typeof fetch;
+    const { result } = renderHook(() => useAuthForTest(), { wrapper: wrap });
+    await waitFor(() => expect(result.current.status).toBe("signed-in"));
+
+    globalThis.fetch = mock(async () => new Response("upstream", { status: 503 })) as typeof fetch;
+    await expect(result.current.refreshUser()).rejects.toThrow("desktop_api_503");
+
+    expect(result.current.status).toBe("signed-in");
+    expect(result.current.user).toEqual(signedInUser);
+    expectSignedInTokens(result.current.tokens);
+    expect(clearStoredAuthTokens).not.toHaveBeenCalled();
   });
 });
