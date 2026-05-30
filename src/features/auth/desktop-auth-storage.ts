@@ -28,6 +28,17 @@ function fromRust(tokens: StoredDesktopAuthTokens): DesktopAuthTokens {
   };
 }
 
+function isStoredDesktopAuthTokens(value: unknown): value is DesktopAuthTokens {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as DesktopAuthTokens).accessToken === "string" &&
+    Number.isFinite((value as DesktopAuthTokens).accessTokenExpiresAt) &&
+    typeof (value as DesktopAuthTokens).refreshToken === "string" &&
+    Number.isFinite((value as DesktopAuthTokens).refreshTokenExpiresAt)
+  );
+}
+
 function isTauri(): boolean {
   return (
     typeof window !== "undefined" &&
@@ -42,7 +53,19 @@ export async function loadStoredAuthTokens(): Promise<DesktopAuthTokens | null> 
   }
 
   const raw = window.localStorage.getItem(STORAGE_KEY);
-  return raw ? (JSON.parse(raw) as DesktopAuthTokens) : null;
+  if (!raw) return null;
+
+  try {
+    const tokens: unknown = JSON.parse(raw);
+    if (isStoredDesktopAuthTokens(tokens)) {
+      return tokens;
+    }
+  } catch {
+    // Fall through to clear bad browser fallback state.
+  }
+
+  window.localStorage.removeItem(STORAGE_KEY);
+  return null;
 }
 
 export async function saveStoredAuthTokens(tokens: DesktopAuthTokens): Promise<void> {

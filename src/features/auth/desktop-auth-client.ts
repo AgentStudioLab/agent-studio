@@ -22,8 +22,58 @@ export function getWebsiteOrigin(): string {
   return import.meta.env.VITE_AGENT_STUDIO_WEBSITE_ORIGIN || DEFAULT_WEBSITE_ORIGIN;
 }
 
+function buildWebsiteUrl(path: string): string {
+  return new URL(path, getWebsiteOrigin()).toString();
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0;
+}
+
+function isDesktopUser(value: unknown): value is DesktopUser {
+  return isRecord(value) && isNonEmptyString(value.id);
+}
+
+function assertTokenResponse(data: TokenResponse): void {
+  if (
+    !isRecord(data) ||
+    !isNonEmptyString(data.accessToken) ||
+    !isFiniteNumber(data.expiresIn) ||
+    !isNonEmptyString(data.refreshToken) ||
+    !isFiniteNumber(data.refreshExpiresIn) ||
+    !isDesktopUser(data.user)
+  ) {
+    throw new Error("desktop_api_invalid_token_response");
+  }
+}
+
+function assertRefreshResponse(
+  data: { accessToken: string; expiresIn: number },
+): void {
+  if (!isRecord(data) || !isNonEmptyString(data.accessToken) || !isFiniteNumber(data.expiresIn)) {
+    throw new Error("desktop_api_invalid_token_response");
+  }
+}
+
 async function readApiResponse<T>(res: Response): Promise<T> {
-  const json = (await res.json()) as ApiEnvelope<T>;
+  let json: ApiEnvelope<T> | null = null;
+  try {
+    json = (await res.json()) as ApiEnvelope<T>;
+  } catch {
+    if (!res.ok) {
+      throw new Error(`desktop_api_${res.status}`);
+    }
+    throw new Error("desktop_api_invalid_response");
+  }
+
   if (!res.ok || json.code !== 0) {
     throw new Error(json.message || `desktop_api_${res.status}`);
   }
@@ -51,7 +101,7 @@ export async function exchangeAuthCode(input: {
   codeVerifier: string;
   deviceId: string;
 }): Promise<{ tokens: DesktopAuthTokens; user: DesktopUser }> {
-  const data = await fetch(`${getWebsiteOrigin()}/api/desktop/oauth/token`, {
+  const data = await fetch(buildWebsiteUrl("/api/desktop/oauth/token"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -63,6 +113,8 @@ export async function exchangeAuthCode(input: {
       device_id: input.deviceId,
     }),
   }).then(readApiResponse<TokenResponse>);
+
+  assertTokenResponse(data);
 
   const now = Date.now();
   return {
@@ -79,7 +131,7 @@ export async function exchangeAuthCode(input: {
 export async function refreshAccessToken(
   refreshToken: string,
 ): Promise<Pick<DesktopAuthTokens, "accessToken" | "accessTokenExpiresAt">> {
-  const data = await fetch(`${getWebsiteOrigin()}/api/desktop/oauth/refresh`, {
+  const data = await fetch(buildWebsiteUrl("/api/desktop/oauth/refresh"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -88,6 +140,8 @@ export async function refreshAccessToken(
     }),
   }).then(readApiResponse<{ accessToken: string; expiresIn: number }>);
 
+  assertRefreshResponse(data);
+
   return {
     accessToken: data.accessToken,
     accessTokenExpiresAt: Date.now() + data.expiresIn * 1000,
@@ -95,15 +149,15 @@ export async function refreshAccessToken(
 }
 
 export async function revokeRefreshToken(refreshToken: string): Promise<void> {
-  await fetch(`${getWebsiteOrigin()}/api/desktop/oauth/revoke`, {
+  await fetch(buildWebsiteUrl("/api/desktop/oauth/revoke"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ refresh_token: refreshToken }),
-  }).then(readApiResponse);
+  }).then(readApiResponse<void>);
 }
 
 export async function fetchDesktopMe(accessToken: string): Promise<DesktopUser> {
-  return fetch(`${getWebsiteOrigin()}/api/desktop/me`, {
+  return fetch(buildWebsiteUrl("/api/desktop/me"), {
     headers: { Authorization: `Bearer ${accessToken}` },
   }).then(readApiResponse<DesktopUser>);
 }
@@ -116,7 +170,11 @@ export async function consumeDesktopCredits(input: {
   idempotencyKey: string;
   metadata?: Record<string, unknown>;
 }): Promise<{ remainingCredits: number }> {
-  return fetch(`${getWebsiteOrigin()}/api/desktop/credits/consume`, {
+  if (!Number.isFinite(input.amount) || input.amount <= 0) {
+    throw new Error("desktop_api_invalid_credit_amount");
+  }
+
+  return fetch(buildWebsiteUrl("/api/desktop/credits/consume"), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
