@@ -108,22 +108,6 @@ export interface MockMcpServer {
   connected: boolean;
 }
 
-export interface MockProject {
-  id: string;
-  name: string;
-  lastActivity: string; // ISO or "2 hours ago"
-  instructions?: string;
-  scheduledTasks?: string[]; // scheduled task IDs
-  computerContext?: { path: string; folderName: string }[];
-  memory?: string[];
-  recentConversations?: Array<{
-    id: string;
-    title: string;
-    preview: string;
-    time: string;
-  }>;
-}
-
 export type Frequency = "manual" | "hourly" | "daily" | "weekdays" | "weekly";
 
 export interface MockScheduledTask {

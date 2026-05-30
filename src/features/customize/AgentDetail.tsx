@@ -6,7 +6,6 @@ import { InitialsAvatar } from "@/shared/atoms/InitialsAvatar";
 import { cn } from "@/lib/utils";
 import { loadedSkills } from "@/lib/mock/skills";
 import { mcpServers } from "@/lib/mock/mcp-servers";
-import { projects } from "@/lib/mock/projects";
 import type { MockAgent, MockSkill } from "@/lib/mock/types";
 
 interface AgentDetailProps {
@@ -156,18 +155,15 @@ export function AgentDetail({ agent }: AgentDetailProps) {
             {t("customize.agents.allProjects")}
           </span>
         ) : (
-          projectChips.map((projectId) => {
-            const project = projects.find((p) => p.id === projectId);
-            return (
-              <span
-                key={projectId}
-                className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1 text-xs text-foreground"
-              >
-                <FolderOpen className="size-3 text-muted-foreground" />
-                {project?.name ?? projectId}
-              </span>
-            );
-          })
+          projectChips.map((projectId) => (
+            <span
+              key={projectId}
+              className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1 text-xs text-foreground"
+            >
+              <FolderOpen className="size-3 text-muted-foreground" />
+              {projectId}
+            </span>
+          ))
         )}
       </ChipSection>
     </div>

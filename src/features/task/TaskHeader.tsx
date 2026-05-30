@@ -22,7 +22,6 @@ import {
 import { useTranslation } from "react-i18next";
 import { useAppShell } from "@/app/AppShellContext";
 import { cn } from "@/lib/utils";
-import { projects as mockProjects } from "@/lib/mock/projects";
 
 interface TaskHeaderProps {
   conversationId: string;
@@ -40,7 +39,7 @@ interface TaskHeaderProps {
 export function TaskHeader({
   conversationId,
   title,
-  projects = mockProjects,
+  projects = [],
   onSchedule,
   onTurnIntoSkill,
   onMoveToProject,
