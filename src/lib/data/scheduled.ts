@@ -23,7 +23,7 @@ export interface CreateScheduledTaskArgs {
   frequency: Frequency;
   timeOfDay?: string | null;
   weekday?: number | null;
-  projectId?: string | null;
+  agentWorkspaceId?: string | null;
   workingDir?: string | null;
   model?: string | null;
   permissionMode?: SchedulePermissionMode;

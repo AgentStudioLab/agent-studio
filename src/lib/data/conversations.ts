@@ -13,7 +13,7 @@ async function expectJson<T>(res: Response): Promise<T> {
 
 export interface CreateConversationArgs {
   title?: string;
-  projectId?: string | null;
+  agentWorkspaceId?: string | null;
   workingDir?: string | null;
 }
 

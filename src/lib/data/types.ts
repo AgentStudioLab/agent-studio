@@ -1,12 +1,12 @@
 /**
  * Thread = conversation. The new AG-UI-style backend treats it as opaque
- * metadata (title/pin/projectId/timestamps); message content + tool calls
+ * metadata (title/pin/agentWorkspaceId/timestamps); message content + tool calls
  * are surfaced through the agui runtime, not these REST types.
  */
 export interface Conversation {
   id: string;
   title: string;
-  projectId: string | null;
+  agentWorkspaceId: string | null;
   pinned: boolean;
   archived: boolean;
   /** Resolved working directory used as cwd by the SDK. Server falls back to
@@ -50,7 +50,7 @@ export interface ScheduledTask {
   name: string;
   description: string;
   prompt: string;
-  projectId: string | null;
+  agentWorkspaceId: string | null;
   /** Working directory for spawned runs; null → default workspace. */
   workingDir: string | null;
   model: string | null;
@@ -65,6 +65,17 @@ export interface ScheduledTask {
   /** epoch ms; null for manual or disabled tasks. */
   nextRunAt: number | null;
   lastRunAt: number | null;
+  createdAt: number;
+  updatedAt: number;
+}
+
+/** A persistent Agent (智能体) — its own home dir + (P2/P3) folders, CLAUDE.md, memory. */
+export interface AgentWorkspace {
+  id: string;
+  name: string;
+  avatar: string | null;
+  homeDir: string;
+  archived: boolean;
   createdAt: number;
   updatedAt: number;
 }
