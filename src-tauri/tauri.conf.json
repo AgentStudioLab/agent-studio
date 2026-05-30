@@ -28,6 +28,11 @@
     }
   },
   "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": ["agent-studio"]
+      }
+    },
     "shell": {
       "open": ".+"
     }

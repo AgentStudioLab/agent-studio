@@ -1,13 +1,16 @@
 use std::sync::Mutex;
 
 use rand::distr::{Alphanumeric, SampleString};
-use serde::Serialize;
-use tauri::{AppHandle, Manager, RunEvent, State};
+use serde::{Deserialize, Serialize};
+use tauri::{AppHandle, Emitter, Manager, RunEvent, State};
+use tauri_plugin_deep_link::DeepLinkExt;
 use tauri_plugin_shell::{
     process::{CommandChild, CommandEvent},
     ShellExt,
 };
 use tauri_plugin_store::StoreExt;
+
+const DESKTOP_AUTH_CALLBACK_PREFIX: &str = "agent-studio://auth/callback";
 
 #[derive(Clone, Serialize)]
 pub struct SidecarInfo {
@@ -18,9 +21,58 @@ pub struct SidecarInfo {
 #[derive(Default)]
 struct SidecarChild(Mutex<Option<CommandChild>>);
 
+#[derive(Default)]
+struct PendingAuthCallback(Mutex<Option<String>>);
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct DesktopAuthTokens {
+    access_token: String,
+    access_token_expires_at: i64,
+    refresh_token: String,
+    refresh_token_expires_at: i64,
+}
+
 #[tauri::command]
 fn get_sidecar_info(state: State<'_, SidecarInfo>) -> SidecarInfo {
     state.inner().clone()
+}
+
+#[tauri::command]
+async fn get_pending_auth_callback(
+    state: State<'_, PendingAuthCallback>,
+) -> Result<Option<String>, String> {
+    Ok(state.0.lock().map_err(|e| e.to_string())?.take())
+}
+
+#[tauri::command]
+async fn store_desktop_auth(
+    app: tauri::AppHandle,
+    tokens: DesktopAuthTokens,
+) -> Result<(), String> {
+    let store = app.store("settings.json").map_err(|e| e.to_string())?;
+    store.set(
+        "desktop_auth",
+        serde_json::to_value(tokens).map_err(|e| e.to_string())?,
+    );
+    store.save().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+async fn get_desktop_auth(app: tauri::AppHandle) -> Result<Option<DesktopAuthTokens>, String> {
+    let store = app.store("settings.json").map_err(|e| e.to_string())?;
+    let Some(value) = store.get("desktop_auth") else {
+        return Ok(None);
+    };
+    serde_json::from_value(value).map(Some).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn clear_desktop_auth(app: tauri::AppHandle) -> Result<(), String> {
+    let store = app.store("settings.json").map_err(|e| e.to_string())?;
+    store.delete("desktop_auth");
+    store.save().map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 #[tauri::command]
@@ -237,6 +289,26 @@ fn spawn_sidecar(app: &AppHandle) -> Result<SidecarInfo, Box<dyn std::error::Err
     Ok(SidecarInfo { port, token })
 }
 
+fn is_desktop_auth_callback_url(url: &str) -> bool {
+    url.starts_with(DESKTOP_AUTH_CALLBACK_PREFIX)
+}
+
+fn set_pending_auth_callback(state: &PendingAuthCallback, url: String) -> Result<(), String> {
+    *state.0.lock().map_err(|e| e.to_string())? = Some(url);
+    Ok(())
+}
+
+fn handle_desktop_auth_callback(app: &AppHandle, url: &str) -> Result<(), String> {
+    if !is_desktop_auth_callback_url(url) {
+        return Ok(());
+    }
+
+    let url = url.to_string();
+    set_pending_auth_callback(&app.state::<PendingAuthCallback>(), url.clone())?;
+    let _ = app.emit("desktop-auth-callback", url);
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // 从 repo 根的 .env 加载环境变量（dotenvy 从 CWD 向上搜索）。
@@ -248,9 +320,15 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_deep_link::init())
         .manage(SidecarChild::default())
+        .manage(PendingAuthCallback::default())
         .invoke_handler(tauri::generate_handler![
             get_sidecar_info,
+            get_pending_auth_callback,
+            store_desktop_auth,
+            get_desktop_auth,
+            clear_desktop_auth,
             set_api_key,
             get_default_app,
             reveal_in_folder
@@ -267,6 +345,16 @@ pub fn run() {
             let info = spawn_sidecar(app.handle())?;
             log::info!("[sidecar] spawned on port {}", info.port);
             app.manage(info);
+
+            let app_handle = app.handle().clone();
+            app.deep_link().on_open_url(move |event| {
+                for url in event.urls() {
+                    if let Err(err) = handle_desktop_auth_callback(&app_handle, url.as_str()) {
+                        log::warn!("[auth] failed to handle desktop callback: {err}");
+                    }
+                }
+            });
+
             Ok(())
         })
         .build(tauri::generate_context!())
@@ -278,4 +366,49 @@ pub fn run() {
                 }
             }
         });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn auth_callback_accepts_only_expected_prefix() {
+        assert!(is_desktop_auth_callback_url(
+            "agent-studio://auth/callback?code=abc&state=xyz"
+        ));
+        assert!(is_desktop_auth_callback_url(
+            "agent-studio://auth/callback/extra?code=abc"
+        ));
+
+        assert!(!is_desktop_auth_callback_url(
+            "agent-studio://other/callback?code=abc"
+        ));
+        assert!(!is_desktop_auth_callback_url(
+            "https://example.com/auth/callback?code=abc"
+        ));
+    }
+
+    #[test]
+    fn desktop_auth_tokens_use_expected_store_shape() {
+        let tokens = DesktopAuthTokens {
+            access_token: "access".into(),
+            access_token_expires_at: 1_717_171_717,
+            refresh_token: "refresh".into(),
+            refresh_token_expires_at: 1_818_181_818,
+        };
+
+        let value = serde_json::to_value(&tokens).unwrap();
+
+        assert_eq!(value["access_token"], "access");
+        assert_eq!(value["access_token_expires_at"], 1_717_171_717);
+        assert_eq!(value["refresh_token"], "refresh");
+        assert_eq!(value["refresh_token_expires_at"], 1_818_181_818);
+
+        let restored: DesktopAuthTokens = serde_json::from_value(value).unwrap();
+        assert_eq!(restored.access_token, "access");
+        assert_eq!(restored.access_token_expires_at, 1_717_171_717);
+        assert_eq!(restored.refresh_token, "refresh");
+        assert_eq!(restored.refresh_token_expires_at, 1_818_181_818);
+    }
 }
