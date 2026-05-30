@@ -34,6 +34,7 @@ function makeApp(opts: {
     buildRunRoutes({
       threads: stub() as never,
       messages: stub() as never,
+      agentFolders: stub() as never,
       provider: stub() as never,
       store: { markRunning } as never,
       interruptBus: bus,
@@ -134,6 +135,7 @@ describe("POST /runs — one-run-per-thread guard", () => {
       buildRunRoutes({
         threads: stub() as never,
         messages: stub() as never,
+        agentFolders: stub() as never,
         provider: stub() as never,
         store,
         interruptBus: stub() as never,

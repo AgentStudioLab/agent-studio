@@ -4,6 +4,7 @@ import type { InterruptBus } from "../agui/provider-claude/interrupt-bus";
 import type { ScheduledTask, ScheduledTaskService } from "./scheduledTasks";
 import type { ThreadService } from "./threads";
 import type { MessageService } from "./messages";
+import type { AgentFolderService } from "./agentFolders";
 import type { UsageService } from "./usage";
 
 export interface SchedulerDeps {
@@ -14,6 +15,8 @@ export interface SchedulerDeps {
   provider: AgentProvider;
   interruptBus: InterruptBus;
   usage: UsageService;
+  /** Resolves an agent-bound run's external folders → sandbox roots (P2). */
+  agentFolders?: AgentFolderService;
   /** Resolve an agent workspace's home dir for agent-bound tasks. Returns
    *  null → the spawned conversation falls back to the default workspace cwd. */
   resolveAgentHome?: (agentWorkspaceId: string) => string | null | undefined;
@@ -121,6 +124,7 @@ export class Scheduler {
       store: this.deps.store,
       messages: this.deps.messages,
       threads: this.deps.threads,
+      agentFolders: this.deps.agentFolders,
       provider: this.deps.provider,
       interruptBus: this.deps.interruptBus,
       abortSignal: abort.signal,

@@ -7,8 +7,24 @@ import {
 } from "../agui/core";
 import type { MessageService } from "../services/messages";
 import type { ThreadService } from "../services/threads";
+import type { AgentFolderService } from "../services/agentFolders";
 import type { InterruptBus } from "../agui/provider-claude/interrupt-bus";
 import type { UsageService } from "../services/usage";
+
+/**
+ * P2 sandbox roots from an agent's mounted folders: every folder is readable,
+ * only the writable ones are writable. The provider prepends `cwd` (agent home
+ * / default workspace) to both sets. Exported + pure so the read/write split is
+ * unit-testable without driving a full run.
+ */
+export function computeAgentDirs(
+  folders: { path: string; writable: boolean }[],
+): { additionalReadDirs: string[]; additionalWriteDirs: string[] } {
+  return {
+    additionalReadDirs: folders.map((f) => f.path),
+    additionalWriteDirs: folders.filter((f) => f.writable).map((f) => f.path),
+  };
+}
 
 export interface RunWorkerInput {
   runId: string;
@@ -17,6 +33,9 @@ export interface RunWorkerInput {
   store: RunEventStore;
   messages: MessageService;
   threads: ThreadService;
+  /** Resolves the bound agent's external folders → sandbox read/write roots.
+   *  Omitted (e.g. unit tests) → no agent folder context. */
+  agentFolders?: AgentFolderService;
   provider: AgentProvider;
   interruptBus: InterruptBus;
   abortSignal: AbortSignal;
@@ -44,6 +63,7 @@ export async function runWorker(input: RunWorkerInput): Promise<void> {
     store,
     messages,
     threads,
+    agentFolders,
     provider,
     interruptBus,
     abortSignal,
@@ -164,6 +184,13 @@ export async function runWorker(input: RunWorkerInput): Promise<void> {
   }
   const cwd = thread.workingDir;
 
+  // Agent-bound thread → resolve its external folders into sandbox roots.
+  // Unbound thread (or no folder service) → undefined, provider stays [cwd].
+  const agentDirs =
+    thread.agentWorkspaceId && agentFolders
+      ? computeAgentDirs(agentFolders.listByAgent(thread.agentWorkspaceId))
+      : undefined;
+
   try {
     const initialStream = provider.run({
       runId,
@@ -177,6 +204,8 @@ export async function runWorker(input: RunWorkerInput): Promise<void> {
       autoApproveTools,
       resumeSessionAt,
       freshSession,
+      additionalReadDirs: agentDirs?.additionalReadDirs,
+      additionalWriteDirs: agentDirs?.additionalWriteDirs,
     });
 
     await executeRunLoop({
