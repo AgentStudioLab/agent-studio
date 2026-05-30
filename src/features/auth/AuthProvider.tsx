@@ -83,8 +83,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const tokensRef = useRef<DesktopAuthTokens | null>(null);
   const userRef = useRef<DesktopUser | null>(null);
   const pendingLoginRef = useRef<PendingLogin | null>(null);
+  const authVersionRef = useRef(0);
 
   const applySignedOut = useCallback(() => {
+    authVersionRef.current += 1;
     tokensRef.current = null;
     userRef.current = null;
     setTokens(null);
@@ -93,6 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const applySession = useCallback((nextTokens: DesktopAuthTokens, nextUser: DesktopUser) => {
+    authVersionRef.current += 1;
     tokensRef.current = nextTokens;
     userRef.current = nextUser;
     setTokens(nextTokens);
@@ -220,27 +223,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
 
     async function bootstrap() {
+      const bootstrapVersion = authVersionRef.current;
+      const isStale = () => cancelled || authVersionRef.current !== bootstrapVersion;
       try {
         const storedTokens = await loadStoredAuthTokens();
-        if (cancelled) return;
+        if (isStale()) return;
 
         if (!storedTokens || isRefreshTokenExpired(storedTokens)) {
           if (storedTokens) {
             await clearStoredAuthTokens();
           }
-          if (!cancelled) applySignedOut();
+          if (!isStale()) applySignedOut();
           return;
         }
 
-        const usableTokens = isAccessTokenExpiring(storedTokens)
-          ? await refreshTokens(storedTokens)
-          : storedTokens;
-        if (cancelled) return;
+        let usableTokens = storedTokens;
+        if (isAccessTokenExpiring(storedTokens)) {
+          const refreshed = await refreshAccessToken(storedTokens.refreshToken);
+          if (isStale()) return;
+          usableTokens = { ...storedTokens, ...refreshed };
+          await saveStoredAuthTokens(usableTokens);
+          if (isStale()) return;
+        }
 
         const nextUser = await fetchDesktopMe(usableTokens.accessToken);
-        if (!cancelled) applySession(usableTokens, nextUser);
+        if (!isStale()) applySession(usableTokens, nextUser);
       } catch {
-        if (!cancelled) {
+        if (!isStale()) {
           await clearSessionBestEffort();
         }
       }
