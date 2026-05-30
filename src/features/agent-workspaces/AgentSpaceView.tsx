@@ -18,6 +18,7 @@ import {
 } from "@/components/ai-elements/prompt-input";
 import { SlashEditor } from "@/features/composer/SlashEditor";
 import { ModelPicker } from "@/features/task/ModelPicker";
+import { AgentFoldersCard } from "@/features/agent-workspaces/AgentFoldersCard";
 
 export function AgentSpaceView() {
   const { agentId } = useParams<{ agentId: string }>();
@@ -75,6 +76,7 @@ export function AgentSpaceView() {
                 </PromptInputFooter>
               </PromptInput>
             </div>
+            {agentId && <AgentFoldersCard agentId={agentId} />}
           </section>
         </div>
       }

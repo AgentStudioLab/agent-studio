@@ -1,5 +1,14 @@
 {
   "promptPlaceholder": "在这个智能体空间里开始一个对话…",
   "ask": "询问",
-  "notFound": "智能体不存在"
+  "notFound": "智能体不存在",
+  "folders": {
+    "title": "文件夹",
+    "description": "挂载外部文件夹作为这个智能体的上下文。默认只读，可逐个授权写入。",
+    "add": "添加文件夹",
+    "empty": "还没有挂载文件夹。",
+    "allowWrite": "允许写入",
+    "remove": "移除",
+    "addError": "添加失败"
+  }
 }
