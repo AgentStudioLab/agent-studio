@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { computeAgentDirs } from "./runWorker";
+import { buildAgentAppendContext, computeAgentDirs } from "./runWorker";
 
 describe("computeAgentDirs", () => {
   it("treats every folder as readable", () => {
@@ -32,5 +32,29 @@ describe("computeAgentDirs", () => {
     ]);
     expect(dirs.additionalReadDirs).toEqual(["/x", "/y"]);
     expect(dirs.additionalWriteDirs).toEqual([]);
+  });
+});
+
+describe("buildAgentAppendContext", () => {
+  it("nothing to inject → null", () => {
+    expect(buildAgentAppendContext(null, [])).toBeNull();
+    expect(buildAgentAppendContext("   ", [])).toBeNull();
+  });
+
+  it("CLAUDE.md only → verbatim instructions", () => {
+    const out = buildAgentAppendContext("Always answer in French.", []);
+    expect(out).toBe("Always answer in French.");
+  });
+
+  it("memories only → bulleted memory block", () => {
+    const out = buildAgentAppendContext(null, [{ content: "likes terse replies" }, { content: "prefers TS" }]);
+    expect(out).toContain("Saved memories about this agent workspace:");
+    expect(out).toContain("- likes terse replies");
+    expect(out).toContain("- prefers TS");
+  });
+
+  it("both → CLAUDE.md first, then memories, separated by a blank line", () => {
+    const out = buildAgentAppendContext("# Role\nBe concise.", [{ content: "fact one" }]);
+    expect(out).toBe("# Role\nBe concise.\n\nSaved memories about this agent workspace:\n- fact one");
   });
 });

@@ -204,6 +204,10 @@ function buildProvider() {
       });
       return { id: task.id, name: task.name };
     },
+    // `remember` MCP tool (agent-bound runs) → persist a memory to that agent.
+    onRemember: (content, { agentWorkspaceId }) => {
+      agentMemories.create({ agentWorkspaceId, content, source: "agent" });
+    },
   });
 }
 
@@ -242,6 +246,7 @@ const scheduler = new Scheduler({
   interruptBus,
   usage,
   agentFolders,
+  agentMemories,
   resolveAgentHome: (agentWorkspaceId) => agentWorkspaces.homeDir(agentWorkspaceId),
   canRun: () => !!providerSettings.current().apiKey,
 });
@@ -262,6 +267,7 @@ app.route(
     threads,
     messages,
     agentFolders,
+    agentMemories,
     provider: providerProxy,
     store,
     interruptBus,

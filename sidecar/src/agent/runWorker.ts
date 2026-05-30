@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { EventType } from "@ag-ui/core";
 import {
   executeRunLoop,
@@ -8,6 +10,7 @@ import {
 import type { MessageService } from "../services/messages";
 import type { ThreadService } from "../services/threads";
 import type { AgentFolderService } from "../services/agentFolders";
+import type { AgentMemoryService } from "../services/agentMemories";
 import type { InterruptBus } from "../agui/provider-claude/interrupt-bus";
 import type { UsageService } from "../services/usage";
 
@@ -26,6 +29,26 @@ export function computeAgentDirs(
   };
 }
 
+/**
+ * P3 agent context block injected into systemPrompt.append on agent-bound runs:
+ * the agent's `<home>/CLAUDE.md` instructions (read verbatim) followed by its
+ * saved memories. Exported + pure (file IO is the caller's) so it's testable.
+ * Returns null when there's nothing to inject.
+ */
+export function buildAgentAppendContext(
+  claudeMd: string | null,
+  memories: { content: string }[],
+): string | null {
+  const parts: string[] = [];
+  const md = claudeMd?.trim();
+  if (md) parts.push(md);
+  if (memories.length > 0) {
+    const lines = memories.map((m) => `- ${m.content}`).join("\n");
+    parts.push(`Saved memories about this agent workspace:\n${lines}`);
+  }
+  return parts.length > 0 ? parts.join("\n\n") : null;
+}
+
 export interface RunWorkerInput {
   runId: string;
   threadId: string;
@@ -36,6 +59,9 @@ export interface RunWorkerInput {
   /** Resolves the bound agent's external folders → sandbox read/write roots.
    *  Omitted (e.g. unit tests) → no agent folder context. */
   agentFolders?: AgentFolderService;
+  /** Resolves the bound agent's saved memories → systemPrompt.append.
+   *  Omitted → no memory context. */
+  agentMemories?: AgentMemoryService;
   provider: AgentProvider;
   interruptBus: InterruptBus;
   abortSignal: AbortSignal;
@@ -64,6 +90,7 @@ export async function runWorker(input: RunWorkerInput): Promise<void> {
     messages,
     threads,
     agentFolders,
+    agentMemories,
     provider,
     interruptBus,
     abortSignal,
@@ -184,12 +211,26 @@ export async function runWorker(input: RunWorkerInput): Promise<void> {
   }
   const cwd = thread.workingDir;
 
-  // Agent-bound thread → resolve its external folders into sandbox roots.
-  // Unbound thread (or no folder service) → undefined, provider stays [cwd].
+  // Agent-bound thread → resolve its external folders into sandbox roots and
+  // its CLAUDE.md + memories into the systemPrompt append. Unbound thread (or
+  // no service) → undefined, provider stays at [cwd] with no agent context.
+  const agentWorkspaceId = thread.agentWorkspaceId ?? undefined;
   const agentDirs =
-    thread.agentWorkspaceId && agentFolders
-      ? computeAgentDirs(agentFolders.listByAgent(thread.agentWorkspaceId))
+    agentWorkspaceId && agentFolders
+      ? computeAgentDirs(agentFolders.listByAgent(agentWorkspaceId))
       : undefined;
+
+  let appendContext: string | undefined;
+  if (agentWorkspaceId) {
+    let claudeMd: string | null = null;
+    try {
+      claudeMd = readFileSync(join(cwd, "CLAUDE.md"), "utf8");
+    } catch {
+      // No CLAUDE.md in the agent home → no instructions section.
+    }
+    const memories = agentMemories?.listByAgent(agentWorkspaceId) ?? [];
+    appendContext = buildAgentAppendContext(claudeMd, memories) ?? undefined;
+  }
 
   try {
     const initialStream = provider.run({
@@ -206,6 +247,8 @@ export async function runWorker(input: RunWorkerInput): Promise<void> {
       freshSession,
       additionalReadDirs: agentDirs?.additionalReadDirs,
       additionalWriteDirs: agentDirs?.additionalWriteDirs,
+      appendContext,
+      agentWorkspaceId,
     });
 
     await executeRunLoop({

@@ -10,7 +10,7 @@
 // AbortController. Cancelling a turn does NOT lose multi-turn context,
 // because session_id is captured on the next successful turn's init.
 
-import { query as sdkQuery } from "@anthropic-ai/claude-agent-sdk";
+import { query as sdkQuery, createSdkMcpServer } from "@anthropic-ai/claude-agent-sdk";
 import type { CanUseTool, HookCallback } from "@anthropic-ai/claude-agent-sdk";
 import { claudeSdkToAgui } from "./bridge";
 import { getResumeSessionId, tagThreadSession } from "./session-tag";
@@ -24,11 +24,16 @@ import {
   createSkillInvocationsHook,
 } from "./skill-invocations";
 import {
-  buildScheduledMcpServer,
+  buildScheduledTaskTool,
   SCHEDULED_MCP_SERVER,
   SCHEDULED_TOOL_FQN,
   type CreateScheduledTaskFn,
 } from "./scheduled-tool";
+import {
+  buildRememberTool,
+  REMEMBER_TOOL_FQN,
+  type RememberFn,
+} from "./remember-tool";
 import type {
   AgentProvider,
   RunContext,
@@ -114,6 +119,13 @@ export interface ClaudeProviderOptions {
    * the current run, not chosen by the agent.
    */
   onCreateScheduledTask?: CreateScheduledTaskFn;
+  /**
+   * When provided, an in-process MCP tool `remember` is exposed on agent-bound
+   * runs (RunContext.agentWorkspaceId set). The callback persists the memory
+   * via the host's AgentMemoryService (source='agent'). Mirrors
+   * onCreateScheduledTask's DI shape.
+   */
+  onRemember?: RememberFn;
 }
 
 export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider {
@@ -153,9 +165,11 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
       ...(opts.resolveAllowedTools
         ? opts.resolveAllowedTools(ctx.threadId)
         : opts.allowedTools ?? []),
-      // The schedule MCP tool isn't in the user's built-in allow-list, so the
-      // SDK would never offer it unless we add it here explicitly.
+      // The in-process MCP tools aren't in the user's built-in allow-list, so
+      // the SDK would never offer them unless we add them here explicitly. The
+      // remember tool is agent-scoped — only on a bound run.
       ...(opts.onCreateScheduledTask ? [SCHEDULED_TOOL_FQN] : []),
+      ...(opts.onRemember && ctxRun.agentWorkspaceId ? [REMEMBER_TOOL_FQN] : []),
     ];
 
     // Agent-workspace sandbox roots (P2). cwd (agent home / default workspace)
@@ -277,6 +291,13 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
     // per the profile settings. Resolved fresh each turn so a Settings save
     // takes effect on the very next /runs without provider rebuild.
     const appendPrompt = opts.resolveAppendPrompt?.() ?? null;
+    // Agent-bound context (its CLAUDE.md instructions + saved memories), computed
+    // by runWorker and merged AFTER the per-user profile addition. Both extend
+    // the claude_code preset via `append`.
+    const combinedAppend =
+      [appendPrompt, ctxRun.appendContext]
+        .filter((s): s is string => typeof s === "string" && s.trim().length > 0)
+        .join("\n\n") || null;
 
     // Skill/plugin config — resolved per turn so a toggle from Customize >
     // Skills takes effect on the very next /runs without provider rebuild.
@@ -284,16 +305,35 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
     // by future SDK default-discovery changes.
     const skillsConfig = opts.resolveSkillsConfig?.() ?? null;
 
-    // In-process MCP tool for the `/schedule` skill. Built per-run so the
-    // handler inherits this conversation's cwd + model.
-    const scheduledMcp = opts.onCreateScheduledTask
-      ? buildScheduledMcpServer({
-          threadId: ctx.threadId,
-          cwd: ctx.cwd,
-          model: effectiveModel,
-          onCreate: opts.onCreateScheduledTask,
-        })
-      : null;
+    // In-process `agent_studio` MCP server. Built per-run with whichever tools
+    // apply: `create_scheduled_task` (always, for the /schedule skill) and
+    // `remember` (only on an agent-bound run). Handlers inherit this run's cwd /
+    // model / bound agent — the agent never supplies those.
+    const agentStudioTools = [
+      ...(opts.onCreateScheduledTask
+        ? [
+            buildScheduledTaskTool({
+              threadId: ctx.threadId,
+              cwd: ctx.cwd,
+              model: effectiveModel,
+              onCreate: opts.onCreateScheduledTask,
+            }),
+          ]
+        : []),
+      ...(opts.onRemember && ctxRun.agentWorkspaceId
+        ? [
+            buildRememberTool({
+              agentWorkspaceId: ctxRun.agentWorkspaceId,
+              threadId: ctx.threadId,
+              onRemember: opts.onRemember,
+            }),
+          ]
+        : []),
+    ];
+    const agentStudioMcp =
+      agentStudioTools.length > 0
+        ? createSdkMcpServer({ name: SCHEDULED_MCP_SERVER, tools: agentStudioTools })
+        : null;
 
     const sdkStream = sdkQuery({
       prompt,
@@ -308,8 +348,8 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
         ...(additionalReadDirs.length > 0
           ? { additionalDirectories: additionalReadDirs }
           : {}),
-        ...(scheduledMcp
-          ? { mcpServers: { [SCHEDULED_MCP_SERVER]: scheduledMcp } }
+        ...(agentStudioMcp
+          ? { mcpServers: { [SCHEDULED_MCP_SERVER]: agentStudioMcp } }
           : {}),
         ...(effectiveModel ? { model: effectiveModel } : {}),
         ...(skillsConfig
@@ -325,12 +365,12 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
         // would replace SDK's tool-use guidance. `append` extends, doesn't
         // override. When the user hasn't filled anything in, drop append so
         // the preset prompt runs untouched.
-        ...(appendPrompt
+        ...(combinedAppend
           ? {
               systemPrompt: {
                 type: "preset" as const,
                 preset: "claude_code" as const,
-                append: appendPrompt,
+                append: combinedAppend,
               },
             }
           : {}),

@@ -114,6 +114,19 @@ export interface RunContext {
    */
   additionalReadDirs?: string[];
   additionalWriteDirs?: string[];
+  /**
+   * Bound agent's context block (P3): its `<home>/CLAUDE.md` instructions plus
+   * saved memories, composed by runWorker. The provider merges it into
+   * `systemPrompt.append` after the per-user profile addition. Undefined for a
+   * non-agent thread.
+   */
+  appendContext?: string;
+  /**
+   * The bound agent's id (P3). When set (and the host wired `onRemember`), the
+   * provider exposes the in-process `remember` tool scoped to this agent and
+   * adds its FQN to `allowedTools`. Undefined for a non-agent thread.
+   */
+  agentWorkspaceId?: string;
 }
 
 export interface ResumeContext {

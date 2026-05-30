@@ -1,4 +1,4 @@
-import { createSdkMcpServer, tool } from "@anthropic-ai/claude-agent-sdk";
+import { tool } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
 
 /** Server + tool names. Model-visible tool id is `mcp__<server>__<tool>`. */
@@ -24,18 +24,18 @@ export type CreateScheduledTaskFn = (
 ) => { id: string; name: string } | Promise<{ id: string; name: string }>;
 
 /**
- * In-process MCP server exposing `create_scheduled_task`. Built per-run so the
- * handler can inherit the conversation's working dir + model (the agent never
- * supplies those). Registered in the SDK query's `mcpServers`; the tool id must
- * also be appended to `allowedTools`.
+ * `create_scheduled_task` tool for the in-process `agent_studio` MCP server.
+ * Built per-run so the handler inherits the conversation's working dir + model
+ * (the agent never supplies those). The provider composes this with the
+ * `remember` tool into one server; the tool id must also be in `allowedTools`.
  */
-export function buildScheduledMcpServer(deps: {
+export function buildScheduledTaskTool(deps: {
   threadId: string;
   cwd: string;
   model?: string;
   onCreate: CreateScheduledTaskFn;
 }) {
-  const createScheduledTask = tool(
+  return tool(
     "create_scheduled_task",
     "Create a scheduled task that re-runs a prompt on a cadence (or on demand). " +
       "Use when the user wants something to run automatically on a schedule — e.g. " +
@@ -106,9 +106,4 @@ export function buildScheduledMcpServer(deps: {
       },
     },
   );
-
-  return createSdkMcpServer({
-    name: SCHEDULED_MCP_SERVER,
-    tools: [createScheduledTask],
-  });
 }
