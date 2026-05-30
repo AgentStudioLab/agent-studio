@@ -170,6 +170,19 @@ CREATE TABLE IF NOT EXISTS agent_folders (
   created_at         INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_agent_folders_agent ON agent_folders (agent_workspace_id);
+
+-- agent_memories (P3): linear memory entries for an agent. Written either by
+-- the agent itself (source='agent', via the remember MCP tool) or by the user
+-- (source='user', via the MemoryCard). Injected into systemPrompt.append on
+-- each agent-bound run. Owned by the agent → FK ON DELETE CASCADE.
+CREATE TABLE IF NOT EXISTS agent_memories (
+  id                 TEXT PRIMARY KEY,
+  agent_workspace_id TEXT NOT NULL REFERENCES agent_workspaces(id) ON DELETE CASCADE,
+  content            TEXT NOT NULL,
+  source             TEXT NOT NULL CHECK (source IN ('agent','user')),
+  created_at         INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_agent_memories_agent ON agent_memories (agent_workspace_id);
 `;
 
 interface ColumnInfo {
