@@ -359,6 +359,38 @@ describe("AuthProvider", () => {
     expect(result.current.tokens).toBeNull();
   });
 
+  it("does not let queued logout clear invalidate a newer callback login", async () => {
+    const clear = createDeferred<void>();
+    clearStoredAuthTokens.mockImplementationOnce(async () => clear.promise);
+    const { result } = renderHook(() => useAuthForTest(), { wrapper: wrap });
+    await waitFor(() => expect(result.current.status).toBe("signed-out"));
+
+    let logoutPromise!: Promise<void>;
+    act(() => {
+      logoutPromise = result.current.logout();
+    });
+    await waitFor(() => expect(clearStoredAuthTokens).toHaveBeenCalledTimes(1));
+
+    await act(async () => {
+      await result.current.login();
+    });
+    await act(async () => {
+      await eventHandler?.({
+        payload: "agent-studio://auth/callback?code=code-1&state=state-1",
+      });
+    });
+
+    clear.resolve();
+    await act(async () => {
+      await logoutPromise;
+    });
+    await waitFor(() => expect(result.current.status).toBe("signed-in"));
+
+    expect(result.current.status).toBe("signed-in");
+    expect(result.current.user).toEqual(signedInUser);
+    expectSignedInTokens(result.current.tokens);
+  });
+
   it("keeps an existing session when refreshUser hits a transient API failure", async () => {
     loadStoredAuthTokens.mockImplementationOnce(async () => signedInTokens);
     globalThis.fetch = mock(async () => jsonResponse({ code: 0, data: signedInUser })) as typeof fetch;

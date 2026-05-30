@@ -166,7 +166,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const clearSession = useCallback(async () => {
     applySignedOut();
     await clearStoredAuthTokensQueued();
-    applySignedOut();
   }, [applySignedOut, clearStoredAuthTokensQueued]);
 
   const clearSessionBestEffort = useCallback(async () => {
