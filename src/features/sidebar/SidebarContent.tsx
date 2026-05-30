@@ -48,6 +48,7 @@ import { RecentItem } from "@/features/sidebar/RecentItem";
 import { ScheduledNavItem } from "@/features/sidebar/ScheduledNavItem";
 import { UserBar } from "@/features/sidebar/UserBar";
 import { useScheduledTasks } from "@/lib/data/scheduled-queries";
+import { useAuth } from "@/features/auth/useAuth";
 
 import type { Status } from "@/lib/mock/types";
 import type { ThreadStatusItem } from "@/lib/agui/react/useThreadStatuses";
@@ -142,6 +143,7 @@ export function SidebarContent() {
   const { data: pinnedData = [] } = usePinnedConversations();
   const { data: threadStatuses = [] } = useThreadStatuses();
   const { data: scheduledTasks = [] } = useScheduledTasks();
+  const auth = useAuth();
   const togglePinMutation = useTogglePinMutation();
   const archiveMutation = useArchiveConversationMutation();
   const deleteMutation = useDeleteConversationMutation();
@@ -424,8 +426,14 @@ export function SidebarContent() {
        *  the (now smaller, blended) user row stays out of the task list's way. */}
       <div className="flex shrink-0 flex-col gap-2 px-3 pb-1 pt-4">
         <UserBar
+          signedIn={auth.status === "signed-in"}
+          loading={auth.status === "loading"}
+          name={auth.user?.name}
+          email={auth.user?.email}
+          credits={auth.user?.credits.remainingCredits}
+          onLogin={() => void auth.login()}
           onSettings={() => navigate("/settings")}
-          onLogout={() => console.log("logout")}
+          onLogout={() => void auth.logout()}
         />
       </div>
 

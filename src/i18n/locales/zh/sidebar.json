@@ -42,7 +42,10 @@
   },
   "user": {
     "settings": "设置",
-    "logout": "退出登录"
+    "login": "登录",
+    "logout": "退出登录",
+    "signedOut": "未登录",
+    "credits": "{{count}} 积分"
   },
   "update": {
     "title": "重启以更新"

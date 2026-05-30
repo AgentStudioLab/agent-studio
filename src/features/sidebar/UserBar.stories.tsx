@@ -16,9 +16,29 @@ const meta: Meta<typeof UserBar> = {
 export default meta;
 type Story = StoryObj<typeof UserBar>;
 
-export const Default: Story = {
+export const SignedOut: Story = {
   args: {
+    signedIn: false,
+    onLogin: () => console.log("login"),
     onSettings: () => console.log("settings"),
     onLogout: () => console.log("logout"),
+  },
+};
+
+export const SignedInWithCredits: Story = {
+  args: {
+    signedIn: true,
+    name: "Ada Lovelace",
+    email: "ada@example.test",
+    credits: 42,
+    onSettings: () => console.log("settings"),
+    onLogout: () => console.log("logout"),
+  },
+};
+
+export const Loading: Story = {
+  args: {
+    signedIn: false,
+    loading: true,
   },
 };

@@ -19,7 +19,9 @@ type Story = StoryObj<typeof UserPopover>;
 export const Default: Story = {
   render: () => (
     <UserPopover
-      email="jay.yang@ugreen.com"
+      signedIn={false}
+      email={null}
+      onLogin={() => console.log("login")}
       onSettings={() => console.log("settings")}
       onLogout={() => console.log("logout")}
     >
@@ -34,9 +36,26 @@ export const Open: Story = {
   render: () => (
     <UserPopover
       open
-      email="jay.yang@ugreen.com"
+      signedIn
+      email="ada@example.test"
+      credits={42}
       onSettings={() => console.log("settings")}
       onLogout={() => console.log("logout")}
+    >
+      <button type="button" className="rounded-md border px-3 py-1.5 text-sm">
+        Open user menu
+      </button>
+    </UserPopover>
+  ),
+};
+
+export const SignedOutOpen: Story = {
+  render: () => (
+    <UserPopover
+      open
+      signedIn={false}
+      onLogin={() => console.log("login")}
+      onSettings={() => console.log("settings")}
     >
       <button type="button" className="rounded-md border px-3 py-1.5 text-sm">
         Open user menu

@@ -42,7 +42,10 @@
   },
   "user": {
     "settings": "Settings",
-    "logout": "Logout"
+    "login": "Sign in",
+    "logout": "Logout",
+    "signedOut": "Not signed in",
+    "credits": "{{count}} credits"
   },
   "update": {
     "title": "Relaunch to update"
