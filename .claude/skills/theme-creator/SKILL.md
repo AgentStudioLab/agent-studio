@@ -27,7 +27,7 @@ A theme defines these 9 semantic tokens. Only a few are heavily used today, but 
 
 | Token | Drives | Priority |
 |---|---|---|
-| `--brand-100` | `--primary`, `--ring`, `--sidebar-primary/ring` + the main brand color across the UI | ★★★ |
+| `--brand-100` | `--primary`, `--ring`, `--sidebar-primary/ring`, `--state-selected` (the "selected" highlight across sidebar / settings / lists) + the main brand color across the UI | ★★★ |
 | `--brand-200` | primary-button hover (`--button-bg-hover`) | ★★ |
 | `--brand-000` | reserve (stronger brand); `bg-brand-000` | ★ |
 | `--brand-900` | reserve (deepest; terracotta = pure black) | ☆ |
@@ -36,6 +36,8 @@ A theme defines these 9 semantic tokens. Only a few are heavily used today, but 
 | `--accent-200` | `bg-accent-200` | ★ |
 | `--accent-000` | reserve (stronger accent) | ☆ |
 | `--accent-900` | reserve (faint tinted backgrounds) | ☆ |
+
+**Selected / highlight states come for free — they ride on `--brand-100`.** The app-wide "selected" highlight (`--state-selected`: the active sidebar item, the settings-nav row, list selections in Tasks / Customize / Runs, **and** the highlighted item in shadcn dropdowns / menus / selects — shadcn's `--accent` aliases to `--state-selected`) is defined in `semantic/colors.css` as a low-alpha tint of `--brand-100` (`hsl(var(--brand-100) / 0.16)` light, `/ 0.3` dark), so it tracks your theme automatically — you don't define it. The implication: `--brand-100`'s hue colors the whole "you are here" affordance, not just buttons — pick it with that in mind. Hover (`--state-hover`) deliberately stays a neutral gray overlay (transient, not themed).
 
 ## Rules
 
@@ -113,7 +115,7 @@ registerTheme({
 - `bunx tsc --noEmit -p tsconfig.app.json` — clean (ignore pre-existing `.stories.tsx` errors).
 - `bunx vite build` — the `@import` chain resolves.
 - **Contrast**: confirm white-on-`brand-100` and white-on-`accent-100` pass WCAG AA, in both modes.
-- **Preview**: runtime switching (a settings picker) isn't built yet. To eyeball a theme now, temporarily set `data-brand="<id>"` on `<html>` in `index.html` and run `bun run dev`. Revert before committing — the default theme's id must equal the static `data-brand` in `index.html` (currently `terracotta`).
+- **Preview**: run `bun run dev`, open **Settings → Appearance → Theme color**, and pick the new theme (the `BrandSegment` picker lists every registered theme). Toggle light/dark to check both modes. The default theme's id must stay equal to the static `data-brand` in `index.html` (currently `terracotta`).
 
 ## Files
 

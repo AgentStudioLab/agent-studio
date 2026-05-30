@@ -36,7 +36,12 @@
     "themeDark": "暗黑",
     "brand": "主题色",
     "brands": {
-      "terracotta": "赤陶橙"
+      "terracotta": "Claude",
+      "apple": "Apple",
+      "kraken": "Kraken",
+      "miro": "Miro",
+      "replicate": "Replicate",
+      "mintlify": "Mintlify"
     },
     "language": "语言",
     "languageZh": "中文",

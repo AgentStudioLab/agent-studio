@@ -39,6 +39,44 @@
   --color-blue-700: 210 73.7% 40.2%;
   --color-blue-900: 210 55.9% 24.6%;
 
+  /* ---- Apple (Action Blue — Apple-derived theme; #0066cc) ---- */
+  --color-apple-100: 210 100% 92%;
+  --color-apple-400: 210 100% 60%;
+  --color-apple-500: 210 100% 45%;
+  --color-apple-600: 210 100% 40%;
+  --color-apple-700: 210 100% 33%;
+  --color-apple-900: 210 100% 22%;
+
+  /* ---- Kraken (vivid brand purple — Kraken-derived theme; #7132f5) ---- */
+  --color-kraken-100: 259 90% 94%;
+  --color-kraken-400: 259 91% 64%;
+  --color-kraken-500: 259 91% 58%;
+  --color-kraken-700: 259 75% 45%;
+  --color-kraken-900: 259 65% 28%;
+
+  /* ---- Gold (deep amber — Miro's canary yellow deepened for white text) ---- */
+  --color-gold-100: 44 90% 90%;
+  --color-gold-400: 44 92% 52%;
+  --color-gold-600: 44 96% 30%;
+  --color-gold-700: 42 96% 26%;
+  --color-gold-900: 40 96% 18%;
+
+  /* ---- Vermilion (hot red-orange — Replicate-derived theme; #ea2804) ---- */
+  --color-vermilion-100: 9 90% 92%;
+  --color-vermilion-400: 9 95% 60%;
+  --color-vermilion-500: 9 90% 45%;
+  --color-vermilion-600: 9 92% 43%;
+  --color-vermilion-700: 8 92% 36%;
+  --color-vermilion-900: 7 85% 24%;
+
+  /* ---- Mint (teal-green — Mintlify's mint deepened for white text; #00d4a4) ---- */
+  --color-mint-100: 166 70% 90%;
+  --color-mint-400: 166 85% 42%;
+  --color-mint-500: 167 92% 30%;
+  --color-mint-600: 167 96% 26%;
+  --color-mint-700: 168 95% 22%;
+  --color-mint-900: 170 90% 14%;
+
   /* ---- Purple (accent-pro) ---- */
   --color-purple-100: 251 33.3% 91.8%;
   --color-purple-200: 251 84.6% 74.5%;

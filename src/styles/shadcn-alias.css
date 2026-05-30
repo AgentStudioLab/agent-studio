@@ -19,8 +19,12 @@
     --secondary-foreground: hsl(var(--text-100));
     --muted:                hsl(var(--bg-200));
     --muted-foreground:     hsl(var(--text-400));
-    --accent:               hsl(var(--accent-100));
-    --accent-foreground:    hsl(var(--oncolor-100));
+    /* Highlight/focus on menus, dropdowns, selects — reuse the brand-tinted
+     * selection (--state-selected) so it matches the sidebar/list "selected"
+     * look and tracks the active data-brand theme. Foreground is normal text
+     * (the tint is low-alpha, not a solid fill, so white text would vanish). */
+    --accent:               var(--state-selected);
+    --accent-foreground:    hsl(var(--text-100));
     --destructive:          hsl(var(--danger-100));
     --border:               hsl(var(--border-300) / 0.15);
     --input:                hsl(var(--border-300) / 0.15);

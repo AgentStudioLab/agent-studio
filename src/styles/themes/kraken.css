@@ -1,0 +1,34 @@
+/* ============================================================
+ * Theme · Kraken (Kraken 紫) — extracted from Kraken's web brand
+ * ----------
+ * Near-monochromatic vivid purple: brand AND accent are the same Kraken
+ * Purple (#7132f5). White text on kraken-500 passes WCAG AA (~6:1).
+ * Press/hover darkens (kraken-700 ≈ Kraken's #5b1ecf "deep" variant).
+ * Only the color clusters are themed — radius / spacing / type scale
+ * stay global by design. Registered in registry.ts.
+ * ============================================================ */
+:root[data-brand="kraken"] {
+    /* Brand (Kraken Purple) */
+    --brand-000: var(--color-kraken-500);
+    --brand-100: var(--color-kraken-500);   /* #7132f5 — white text ~6:1 ✓ */
+    --brand-200: var(--color-kraken-700);   /* hover/press → darker (Kraken deep) */
+    --brand-900: var(--color-pure-black);
+    --accent-brand: var(--color-kraken-500);
+
+    /* Accent (same purple — Kraken ships a single brand purple) */
+    --accent-000: var(--color-kraken-700);
+    --accent-100: var(--color-kraken-500);  /* --accent + focus ring — white ~6:1 ✓ */
+    --accent-200: var(--color-kraken-500);
+    --accent-900: var(--color-kraken-100);
+}
+
+:root[data-brand="kraken"][data-mode="dark"] {
+    /* One step lighter on the dark canvas, still white-text-safe
+     * (kraken-400 #8550f7 ~4.7:1). Hover stays darker. */
+    --brand-000: var(--color-kraken-400);
+    --brand-100: var(--color-kraken-400);
+    --brand-200: var(--color-kraken-500);
+
+    --accent-000: var(--color-kraken-400);
+    --accent-900: var(--color-kraken-900);
+}

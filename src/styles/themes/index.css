@@ -6,3 +6,8 @@
  * registerTheme() in registry.ts.
  * ============================================================ */
 @import "./terracotta.css";
+@import "./apple.css";
+@import "./kraken.css";
+@import "./miro.css";
+@import "./replicate.css";
+@import "./mintlify.css";

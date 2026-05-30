@@ -1,0 +1,32 @@
+/* ============================================================
+ * Theme · Miro — deep-gold adaptation of Miro's canary-yellow brand
+ * ----------
+ * Miro's signature is canary yellow, but its actual primary action is a
+ * BLACK pill — the yellow is only a wordmark/accent and can't carry white
+ * text (canary #ffe229 → ~1.3:1). Our --brand-100 fills white-text buttons,
+ * so the yellow is deepened to a white-safe gold (#966f03, ~4.6:1).
+ * Near-monochromatic: brand AND accent share the gold hue. Press/hover
+ * darkens. Only the color clusters are themed — radius / spacing / type
+ * scale stay global by design. Registered in registry.ts.
+ * ============================================================ */
+:root[data-brand="miro"] {
+    /* Brand (deep gold — Miro yellow deepened for white-text legibility) */
+    --brand-000: var(--color-gold-600);
+    --brand-100: var(--color-gold-600);   /* #966f03 — white text ~4.6:1 ✓ */
+    --brand-200: var(--color-gold-700);   /* hover/press → darker */
+    --brand-900: var(--color-pure-black);
+    --accent-brand: var(--color-gold-600);
+
+    /* Accent (same gold — Miro ships a single brand color) */
+    --accent-000: var(--color-gold-700);
+    --accent-100: var(--color-gold-600);  /* --accent + focus ring — white ~4.6:1 ✓ */
+    --accent-200: var(--color-gold-600);
+    --accent-900: var(--color-gold-100);
+}
+
+:root[data-brand="miro"][data-mode="dark"] {
+    /* Brand is intentionally NOT lightened in dark: a brighter gold fails
+     * white-text contrast. Only the faint accent tints flip for the dark canvas. */
+    --accent-000: var(--color-gold-400);
+    --accent-900: var(--color-gold-900);
+}

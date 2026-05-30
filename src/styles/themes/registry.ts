@@ -71,3 +71,38 @@ registerTheme({
   order: 0,
   isDefault: true,
 });
+
+registerTheme({
+  id: "apple",
+  nameKey: "settings.appearance.brands.apple",
+  swatch: { brand: "--color-apple-600", accent: "--color-apple-600" },
+  order: 1,
+});
+
+registerTheme({
+  id: "kraken",
+  nameKey: "settings.appearance.brands.kraken",
+  swatch: { brand: "--color-kraken-500", accent: "--color-kraken-500" },
+  order: 2,
+});
+
+registerTheme({
+  id: "miro",
+  nameKey: "settings.appearance.brands.miro",
+  swatch: { brand: "--color-gold-600", accent: "--color-gold-600" },
+  order: 3,
+});
+
+registerTheme({
+  id: "replicate",
+  nameKey: "settings.appearance.brands.replicate",
+  swatch: { brand: "--color-vermilion-600", accent: "--color-vermilion-600" },
+  order: 4,
+});
+
+registerTheme({
+  id: "mintlify",
+  nameKey: "settings.appearance.brands.mintlify",
+  swatch: { brand: "--color-mint-600", accent: "--color-mint-600" },
+  order: 5,
+});

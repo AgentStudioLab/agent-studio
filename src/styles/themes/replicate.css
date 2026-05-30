@@ -1,0 +1,39 @@
+/* ============================================================
+ * Theme · Replicate — extracted from Replicate's web brand
+ * ----------
+ * Hot vermilion stamp (#ea2804). Near-monochromatic: brand AND accent
+ * share the vermilion hue (Replicate ships one orange accent — "don't
+ * introduce a secondary brand colour"). Light brand is deepened ~4% from
+ * the exact #ea2804 so white text clears AA (the raw hex is 4.37:1; this
+ * is ~5.2:1). Press/hover darkens (Replicate's #c01f00 "Orange Pressed").
+ * Only the color clusters are themed — radius / spacing / type scale stay
+ * global by design. NOTE: Replicate's signature cream canvas (#f9f7f3) is a
+ * surface token (--bg-*), shared across themes on the data-mode axis — out
+ * of a brand theme's scope, so this captures the orange, not the cream.
+ * Registered in registry.ts.
+ * ============================================================ */
+:root[data-brand="replicate"] {
+    /* Brand (Replicate vermilion) */
+    --brand-000: var(--color-vermilion-600);
+    --brand-100: var(--color-vermilion-600);   /* #d32709 — white text ~5.2:1 ✓ */
+    --brand-200: var(--color-vermilion-700);   /* hover/press → darker (Orange Pressed) */
+    --brand-900: var(--color-pure-black);
+    --accent-brand: var(--color-vermilion-600);
+
+    /* Accent (same vermilion — Replicate ships a single brand color) */
+    --accent-000: var(--color-vermilion-700);
+    --accent-100: var(--color-vermilion-600);  /* --accent + focus ring — white ~5.2:1 ✓ */
+    --accent-200: var(--color-vermilion-600);
+    --accent-900: var(--color-vermilion-100);
+}
+
+:root[data-brand="replicate"][data-mode="dark"] {
+    /* One step lighter on the dark canvas, still white-text-safe
+     * (vermilion-500 #da2a0b ~4.9:1). Hover stays darker. */
+    --brand-000: var(--color-vermilion-500);
+    --brand-100: var(--color-vermilion-500);
+    --brand-200: var(--color-vermilion-600);
+
+    --accent-000: var(--color-vermilion-400);
+    --accent-900: var(--color-vermilion-900);
+}

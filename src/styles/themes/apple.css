@@ -1,0 +1,35 @@
+/* ============================================================
+ * Theme · Apple (Apple 蓝) — extracted from Apple's web brand
+ * ----------
+ * Near-monochromatic Action Blue: brand AND accent are the same blue
+ * (#0066cc), echoing Apple's single-blue identity ("no second brand
+ * color exists"). White text on apple-600 passes WCAG AA (~5.6:1).
+ * Press/hover darkens (apple-700, Apple's #003ecc-style active). Only
+ * the color clusters are themed — radius / spacing / type scale stay
+ * global by design. Registered in registry.ts.
+ * ============================================================ */
+:root[data-brand="apple"] {
+    /* Brand (Apple Action Blue) */
+    --brand-000: var(--color-apple-600);
+    --brand-100: var(--color-apple-600);   /* #0066cc — white text ~5.6:1 ✓ */
+    --brand-200: var(--color-apple-700);   /* hover/press → darker (Apple active) */
+    --brand-900: var(--color-pure-black);
+    --accent-brand: var(--color-apple-600);
+
+    /* Accent (same blue — Apple ships a single blue) */
+    --accent-000: var(--color-apple-700);
+    --accent-100: var(--color-apple-600);  /* --accent + focus ring — white ~5.6:1 ✓ */
+    --accent-200: var(--color-apple-600);
+    --accent-900: var(--color-apple-100);
+}
+
+:root[data-brand="apple"][data-mode="dark"] {
+    /* One step lighter on the dark canvas (Apple's Sky-Link-Blue lift),
+     * still white-text-safe (apple-500 #0073e6 ~4.6:1). Hover stays darker. */
+    --brand-000: var(--color-apple-500);
+    --brand-100: var(--color-apple-500);
+    --brand-200: var(--color-apple-600);
+
+    --accent-000: var(--color-apple-400);
+    --accent-900: var(--color-apple-900);
+}

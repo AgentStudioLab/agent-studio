@@ -1,0 +1,33 @@
+/* ============================================================
+ * Theme · Mintlify — deep-emerald adaptation of Mintlify's mint brand
+ * ----------
+ * Mintlify's signature is bright mint #00d4a4. As an accent CTA Mintlify
+ * pairs it with DARK text — at our --brand-100 (white-text button fill) the
+ * raw mint is illegible (~1.9:1). So it's deepened to a white-safe teal-
+ * emerald (#038266, ~4.8:1) that keeps the mint hue. Near-monochromatic:
+ * brand AND accent share the mint hue (Mintlify keeps mint as the lone
+ * accent). Press/hover darkens. Only the color clusters are themed —
+ * radius / spacing / type scale stay global. Registered in registry.ts.
+ * ============================================================ */
+:root[data-brand="mintlify"] {
+    /* Brand (deep mint — Mintlify mint deepened for white-text legibility) */
+    --brand-000: var(--color-mint-600);
+    --brand-100: var(--color-mint-600);   /* #038266 — white text ~4.8:1 ✓ */
+    --brand-200: var(--color-mint-700);   /* hover/press → darker (Deep Mint) */
+    --brand-900: var(--color-pure-black);
+    --accent-brand: var(--color-mint-600);
+
+    /* Accent (same mint — Mintlify ships a single brand accent) */
+    --accent-000: var(--color-mint-700);
+    --accent-100: var(--color-mint-600);  /* --accent + focus ring — white ~4.8:1 ✓ */
+    --accent-200: var(--color-mint-600);
+    --accent-900: var(--color-mint-100);
+}
+
+:root[data-brand="mintlify"][data-mode="dark"] {
+    /* Brand is intentionally NOT lightened in dark: a brighter mint fails
+     * white-text contrast (green sits high on the luminance curve). Only the
+     * faint accent tints flip for the dark canvas. */
+    --accent-000: var(--color-mint-400);
+    --accent-900: var(--color-mint-900);
+}
