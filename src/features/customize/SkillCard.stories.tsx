@@ -33,14 +33,6 @@ export const Active: Story = {
   args: { ...skillArgs, active: true },
 };
 
-export const WithSourcePath: Story = {
-  args: {
-    ...skillArgs,
-    active: true,
-    sourcePath: "/Users/demo/.agent-studio/skills/filesystem",
-  },
-};
-
 export const SideBySide: Story = {
   parameters: { layout: "fullscreen" },
   decorators: [],
@@ -56,11 +48,7 @@ export const SideBySide: Story = {
         style={{ background: "hsl(var(--bg-100))", padding: "2rem" }}
       >
         <div style={{ width: 320 }}>
-          <SkillCard
-            {...skillArgs}
-            active
-            sourcePath="/Users/demo/.agent-studio/skills/filesystem"
-          />
+          <SkillCard {...skillArgs} active />
         </div>
       </div>
     </div>
