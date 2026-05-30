@@ -1,0 +1,8 @@
+/* ============================================================
+ * Themes · index
+ * ----------
+ * @import each brand theme's CSS (the `data-brand` axis). Meta lives in
+ * registry.ts. To add a theme: create `<id>.css`, @import it here, and call
+ * registerTheme() in registry.ts.
+ * ============================================================ */
+@import "./terracotta.css";

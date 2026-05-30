@@ -44,18 +44,7 @@
     --text-400: var(--color-stone-600);
     --text-500: var(--color-stone-600);
 
-    /* Brand (orange terracotta) */
-    --brand-000: var(--color-orange-600);
-    --brand-100: var(--color-orange-600);
-    --brand-200: var(--color-orange-500);
-    --brand-900: var(--color-pure-black);
-    --accent-brand: var(--color-orange-500);
-
-    /* Accent (blue) */
-    --accent-000: var(--color-blue-700);
-    --accent-100: var(--color-blue-600);
-    --accent-200: var(--color-blue-600);
-    --accent-900: var(--color-blue-100);
+    /* Brand + Accent moved to themes/ (data-brand axis). Default = terracotta. */
 
     /* Accent Pro (purple) */
     --accent-pro-000: var(--color-purple-700);
@@ -130,12 +119,7 @@
     --text-400: var(--color-stone-500);
     --text-500: var(--color-stone-500);
 
-    --brand-000: var(--color-orange-600);
-    --brand-100: var(--color-orange-500);
-    --brand-200: var(--color-orange-500);
-
-    --accent-000: var(--color-blue-400);
-    --accent-900: var(--color-blue-900);
+    /* Brand + Accent dark overrides moved to themes/ (data-brand axis). */
 
     --accent-pro-000: var(--color-purple-200);
     --accent-pro-100: var(--color-purple-500);

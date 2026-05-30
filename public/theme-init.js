@@ -14,6 +14,8 @@
  *   - 优先读 localStorage.preferred_theme_mode ("light"/"dark")
  *   - 没有 → 跟随系统 prefers-color-scheme
  *   - OS 切换时 → 仅当用户未显式选择时跟随
+ *   - 另读 localStorage.preferred_brand → 写 data-brand (品牌主题轴);
+ *     没有则保留 index.html 里的静态默认 (terracotta)
  * ============================================================ */
 (() => {
   const STORAGE_KEY = "preferred_theme_mode";
@@ -33,6 +35,16 @@
     applyMode(userPref);
   } else {
     applyMode(media.matches ? "dark" : "light");
+  }
+
+  // ---- 品牌主题 (data-brand 轴) ----
+  // 防闪屏地提前写上用户选择; 没有则保留 index.html 的静态默认 (terracotta).
+  // 有效性 (是否指向已注册主题) 由运行时 useBrandTheme 兜底校验.
+  try {
+    const brand = localStorage.getItem("preferred_brand");
+    if (brand) root.setAttribute("data-brand", brand);
+  } catch {
+    // localStorage 不可用, 忽略 → 用静态默认
   }
 
   // OS 切换跟随 (仅当用户未显式选择时)

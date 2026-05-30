@@ -15,6 +15,14 @@ import type { Preview } from "@storybook/react-vite";
 import { withThemeByDataAttribute } from "@storybook/addon-themes";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import "../src/index.css";
+import { defaultThemeId } from "../src/styles/themes/registry";
+
+// Brand themes live on the `data-brand` axis (the app ships it on <html> in
+// index.html). Storybook has its own <html>, so seed the default brand here —
+// otherwise stories render without their brand/accent colors.
+if (typeof document !== "undefined") {
+  document.documentElement.setAttribute("data-brand", defaultThemeId());
+}
 
 // Data-driven views (e.g. ScheduledListView) call react-query hooks. Storybook
 // has no sidecar, so queries reject and the views show their loading/empty

@@ -1,0 +1,40 @@
+/* ============================================================
+ * Theme · Terracotta (赤陶橙) — the default brand theme
+ * ----------
+ * Brand (orange) + Accent (blue) for the `data-brand` axis. Values are
+ * identical to the pre-extraction semantic defaults. Scoped to
+ * [data-brand="terracotta"]; the dark block (specificity 0,3,0) always
+ * wins over the light block (0,2,0) so dark mode resolves correctly and
+ * other themes never leak in. Registered in registry.ts.
+ * ============================================================ */
+:root[data-brand="terracotta"] {
+    /* Brand (orange terracotta) */
+    --brand-000: var(--color-orange-600);
+    --brand-100: var(--color-orange-600);
+    --brand-200: var(--color-orange-500);
+    --brand-900: var(--color-pure-black);
+    --accent-brand: var(--color-orange-500);
+
+    /* Accent (blue) */
+    --accent-000: var(--color-blue-700);
+    --accent-100: var(--color-blue-600);
+    --accent-200: var(--color-blue-600);
+    --accent-900: var(--color-blue-100);
+}
+
+:root[data-brand="terracotta"][data-mode="dark"] {
+    --brand-000: var(--color-orange-600);
+    --brand-100: var(--color-orange-500);
+    --brand-200: var(--color-orange-500);
+
+    --accent-000: var(--color-blue-400);
+    --accent-900: var(--color-blue-900);
+}
+
+/* Optional: a theme MAY also swap the typeface by setting --font-family-sans
+ * / --font-family-serif / --font-family-mono here — they propagate to <body>
+ * and every Tailwind font utility (font-sans/serif/mono) via @theme inline.
+ * Swap the family ONLY, never the size/weight/leading scale. Terracotta keeps
+ * the global default (Inter / Source Serif 4), so it sets nothing. The font
+ * must also be loaded in index.html. See the theme-creator skill. */
+

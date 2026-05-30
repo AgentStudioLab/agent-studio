@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { ThemeSegment } from "@/shared/atoms/ThemeSegment";
+import { BrandSegment } from "@/shared/atoms/BrandSegment";
 import { LanguageSegment } from "@/shared/atoms/LanguageSegment";
 
 export function AppearanceSection() {
@@ -15,6 +16,12 @@ export function AppearanceSection() {
             {t("settings.appearance.theme")}
           </label>
           <ThemeSegment />
+        </div>
+        <div className="flex flex-col gap-2">
+          <label className="text-sm font-medium text-foreground">
+            {t("settings.appearance.brand")}
+          </label>
+          <BrandSegment />
         </div>
         <div className="flex flex-col gap-2">
           <label className="text-sm font-medium text-foreground">

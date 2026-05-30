@@ -34,6 +34,10 @@
     "themeSystem": "System",
     "themeLight": "Light",
     "themeDark": "Dark",
+    "brand": "Theme color",
+    "brands": {
+      "terracotta": "Terracotta"
+    },
     "language": "Language",
     "languageZh": "中文",
     "languageEn": "English"

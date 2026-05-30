@@ -17,6 +17,9 @@
 @import "./semantic/spacing.css";
 @import "./semantic/radius.css";
 
+/* Tier 2.5: brand themes (data-brand axis — supplies brand + accent tokens) */
+@import "./themes/index.css";
+
 /* Tier 3: components (placeholders) */
 @import "./components/button.css";
 @import "./components/input.css";
