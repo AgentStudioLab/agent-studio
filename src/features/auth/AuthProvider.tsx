@@ -111,6 +111,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const pendingLoginRef = useRef<PendingLogin | null>(null);
   const authVersionRef = useRef(0);
   const mountedRef = useRef(true);
+  const storageQueueRef = useRef(Promise.resolve());
 
   const canApplyAuthResult = useCallback(
     (operationVersion: number, refreshToken?: string) =>
@@ -142,10 +143,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const enqueueStorageOperation = useCallback(<T,>(operation: () => Promise<T>): Promise<T> => {
+    const run = storageQueueRef.current.then(operation, operation);
+    storageQueueRef.current = run.then(
+      () => undefined,
+      () => undefined,
+    );
+    return run;
+  }, []);
+
+  const saveStoredAuthTokensQueued = useCallback(
+    (nextTokens: DesktopAuthTokens) =>
+      enqueueStorageOperation(() => saveStoredAuthTokens(nextTokens)),
+    [enqueueStorageOperation],
+  );
+
+  const clearStoredAuthTokensQueued = useCallback(
+    () => enqueueStorageOperation(clearStoredAuthTokens),
+    [enqueueStorageOperation],
+  );
+
   const clearSession = useCallback(async () => {
-    await clearStoredAuthTokens();
     applySignedOut();
-  }, [applySignedOut]);
+    await clearStoredAuthTokensQueued();
+    applySignedOut();
+  }, [applySignedOut, clearStoredAuthTokensQueued]);
 
   const clearSessionBestEffort = useCallback(async () => {
     try {
@@ -165,7 +187,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const nextTokens = { ...currentTokens, ...refreshed };
-    await saveStoredAuthTokens(nextTokens);
+    await saveStoredAuthTokensQueued(nextTokens);
     if (!canApplyAuthResult(operationVersion, currentTokens.refreshToken)) {
       throw createAuthStaleError();
     }
@@ -175,7 +197,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setTokens(nextTokens);
     }
     return nextTokens;
-  }, [canApplyAuthResult]);
+  }, [canApplyAuthResult, saveStoredAuthTokensQueued]);
 
   const getValidAccessToken = useCallback(async () => {
     const currentTokens = tokensRef.current;
@@ -277,7 +299,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!canApplyAuthResult(operationVersion)) {
           throw createAuthStaleError();
         }
-        await saveStoredAuthTokens(session.tokens);
+        await saveStoredAuthTokensQueued(session.tokens);
         if (!canApplyAuthResult(operationVersion)) {
           throw createAuthStaleError();
         }
@@ -288,7 +310,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
     },
-    [applySession, canApplyAuthResult, clearSessionBestEffort],
+    [applySession, canApplyAuthResult, clearSessionBestEffort, saveStoredAuthTokensQueued],
   );
 
   useEffect(() => {
@@ -311,7 +333,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (!storedTokens || isRefreshTokenExpired(storedTokens)) {
           if (storedTokens) {
-            await clearStoredAuthTokens();
+            await clearStoredAuthTokensQueued();
           }
           if (!isStale()) applySignedOut();
           return;
@@ -322,7 +344,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const refreshed = await refreshAccessToken(storedTokens.refreshToken);
           if (isStale()) return;
           usableTokens = { ...storedTokens, ...refreshed };
-          await saveStoredAuthTokens(usableTokens);
+          await saveStoredAuthTokensQueued(usableTokens);
           if (isStale()) return;
         }
 
@@ -340,7 +362,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [applySession, applySignedOut]);
+  }, [applySession, applySignedOut, clearStoredAuthTokensQueued, saveStoredAuthTokensQueued]);
 
   useEffect(() => {
     let cancelled = false;

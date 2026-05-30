@@ -295,6 +295,70 @@ describe("AuthProvider", () => {
     expect(saveStoredAuthTokens).toHaveBeenCalledTimes(initialSaveCount);
   });
 
+  it("serializes storage so logout clear wins over an in-flight refresh save", async () => {
+    const save = createDeferred<void>();
+    let saveStarted = false;
+    saveStoredAuthTokens.mockImplementationOnce(async () => {});
+    saveStoredAuthTokens.mockImplementationOnce(async () => {
+      saveStarted = true;
+      return save.promise;
+    });
+    globalThis.fetch = mock(async (input) => {
+      if (String(input).endsWith("/api/desktop/oauth/token")) {
+        return jsonResponse({
+          code: 0,
+          data: {
+            accessToken: "server-access-token",
+            expiresIn: 0,
+            refreshToken: signedInTokens.refreshToken,
+            refreshExpiresIn: 7200,
+            user: signedInUser,
+          },
+        });
+      }
+      if (String(input).endsWith("/api/desktop/oauth/refresh")) {
+        return jsonResponse({
+          code: 0,
+          data: { accessToken: "refresh-save-race-token", expiresIn: 3600 },
+        });
+      }
+      throw new Error(`unexpected fetch ${String(input)}`);
+    }) as typeof fetch;
+
+    const { result } = renderHook(() => useAuthForTest(), { wrapper: wrap });
+    await waitFor(() => expect(result.current.status).toBe("signed-out"));
+    await act(async () => {
+      await result.current.login();
+    });
+    await act(async () => {
+      await eventHandler?.({
+        payload: "agent-studio://auth/callback?code=code-1&state=state-1",
+      });
+    });
+    await waitFor(() => expect(result.current.status).toBe("signed-in"));
+
+    const validTokenPromise = result.current.getValidAccessToken().catch((error) => error);
+    await waitFor(() => expect(saveStarted).toBe(true));
+    let logoutPromise!: Promise<void>;
+    act(() => {
+      logoutPromise = result.current.logout();
+    });
+    expect(clearStoredAuthTokens).not.toHaveBeenCalled();
+
+    save.resolve();
+    const staleError = await validTokenPromise;
+    await act(async () => {
+      await logoutPromise;
+    });
+
+    expect(staleError).toBeInstanceOf(Error);
+    expect(staleError.message).toBe("auth_stale");
+    expect(clearStoredAuthTokens).toHaveBeenCalledTimes(1);
+    expect(saveStoredAuthTokens).toHaveBeenCalledTimes(2);
+    expect(result.current.status).toBe("signed-out");
+    expect(result.current.tokens).toBeNull();
+  });
+
   it("keeps an existing session when refreshUser hits a transient API failure", async () => {
     loadStoredAuthTokens.mockImplementationOnce(async () => signedInTokens);
     globalThis.fetch = mock(async () => jsonResponse({ code: 0, data: signedInUser })) as typeof fetch;
@@ -308,5 +372,22 @@ describe("AuthProvider", () => {
     expect(result.current.user).toEqual(signedInUser);
     expectSignedInTokens(result.current.tokens);
     expect(clearStoredAuthTokens).not.toHaveBeenCalled();
+  });
+
+  it("ignores callbacks with the wrong desktop URL shape", async () => {
+    const { result } = renderHook(() => useAuthForTest(), { wrapper: wrap });
+    await waitFor(() => expect(result.current.status).toBe("signed-out"));
+
+    await act(async () => {
+      await result.current.login();
+    });
+    await act(async () => {
+      await eventHandler?.({
+        payload: "agent-studio://auth/callback/extra?code=code-1&state=state-1",
+      });
+    });
+
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    expect(result.current.status).toBe("signed-out");
   });
 });
