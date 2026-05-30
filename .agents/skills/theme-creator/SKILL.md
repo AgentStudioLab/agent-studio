@@ -13,11 +13,11 @@ This skill tells you precisely what to supply and how to wire it. Keep the surfa
 
 A theme changes **brand identity** (color, optionally the typeface). It does **not** change **ergonomics**:
 
-| Theme MAY set | Theme must NOT set | Why |
-|---|---|---|
-| `--brand-*`, `--accent-*` (required) | `--radius-*` (圆角) | Radius is a *personality* axis (sharp/round), orthogonal to color. Same product, different tint → radius shouldn't move. |
-| `--font-family-*` (optional) | `--spacing-*` (间距) | Spacing is a *density* axis (comfortable/compact), orthogonal to color. |
-| | font size / weight / leading scale | That scale is the product's shared rhythm; forking it per-theme reproduces the marketing-catalog mess. |
+| Theme MAY set                        | Theme must NOT set                 | Why                                                                                                                      |
+| ------------------------------------ | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `--brand-*`, `--accent-*` (required) | `--radius-*` (圆角)                | Radius is a _personality_ axis (sharp/round), orthogonal to color. Same product, different tint → radius shouldn't move. |
+| `--font-family-*` (optional)         | `--spacing-*` (间距)               | Spacing is a _density_ axis (comfortable/compact), orthogonal to color.                                                  |
+|                                      | font size / weight / leading scale | That scale is the product's shared rhythm; forking it per-theme reproduces the marketing-catalog mess.                   |
 
 If the user genuinely wants density or shape variants, that is a **separate future axis** (`data-density`, `data-shape`) — not this skill. Don't smuggle radius/spacing into a brand theme; it explodes the authoring burden and lets a theme break layout and accessibility.
 
@@ -25,23 +25,25 @@ If the user genuinely wants density or shape variants, that is a **separate futu
 
 A theme defines these 9 semantic tokens. Only a few are heavily used today, but define all 9 — they're exposed as Tailwind color utilities (`bg-brand-100`, etc.) and keep the cluster whole.
 
-| Token | Drives | Priority |
-|---|---|---|
-| `--brand-100` | `--primary`, `--ring`, `--sidebar-primary/ring` + the main brand color across the UI | ★★★ |
-| `--brand-200` | primary-button hover (`--button-bg-hover`) | ★★ |
-| `--brand-000` | reserve (stronger brand); `bg-brand-000` | ★ |
-| `--brand-900` | reserve (deepest; terracotta = pure black) | ☆ |
-| `--accent-brand` | reserve | ☆ |
-| `--accent-100` | `--accent` + `:focus-visible` outline color | ★★★ |
-| `--accent-200` | `bg-accent-200` | ★ |
-| `--accent-000` | reserve (stronger accent) | ☆ |
-| `--accent-900` | reserve (faint tinted backgrounds) | ☆ |
+| Token            | Drives                                                                                                                                                                | Priority |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| `--brand-100`    | `--primary`, `--ring`, `--sidebar-primary/ring`, `--state-selected` (the "selected" highlight across sidebar / settings / lists) + the main brand color across the UI | ★★★      |
+| `--brand-200`    | primary-button hover (`--button-bg-hover`)                                                                                                                            | ★★       |
+| `--brand-000`    | reserve (stronger brand); `bg-brand-000`                                                                                                                              | ★        |
+| `--brand-900`    | reserve (deepest; terracotta = pure black)                                                                                                                            | ☆        |
+| `--accent-brand` | reserve                                                                                                                                                               | ☆        |
+| `--accent-100`   | `--accent` + `:focus-visible` outline color                                                                                                                           | ★★★      |
+| `--accent-200`   | `bg-accent-200`                                                                                                                                                       | ★        |
+| `--accent-000`   | reserve (stronger accent)                                                                                                                                             | ☆        |
+| `--accent-900`   | reserve (faint tinted backgrounds)                                                                                                                                    | ☆        |
+
+**Selected / highlight states come for free — they ride on `--brand-100`.** The app-wide "selected" highlight (`--state-selected`: the active sidebar item, the settings-nav row, list selections in Tasks / Customize / Runs, **and** the highlighted item in shadcn dropdowns / menus / selects — shadcn's `--accent` aliases to `--state-selected`) is defined in `semantic/colors.css` as a low-alpha tint of `--brand-100` (`hsl(var(--brand-100) / 0.16)` light, `/ 0.3` dark), so it tracks your theme automatically — you don't define it. The implication: `--brand-100`'s hue colors the whole "you are here" affordance, not just buttons — pick it with that in mind. Hover (`--state-hover`) deliberately stays a neutral gray overlay (transient, not themed).
 
 ## Rules
 
 1. **Selectors are fixed.** Light → `:root[data-brand="<id>"]`; dark → `:root[data-brand="<id>"][data-mode="dark"]`. The dark block (specificity 0,3,0) always wins over the light block (0,2,0), so dark resolves correctly and themes never leak into one another.
 2. **Light block defines all 9; the dark block lists only the tokens whose value differs in dark.** Anything the dark block omits inherits the light value — that's intentional, it keeps dark blocks small.
-3. **Reference primitives only — never raw HSL.** Values are `var(--color-<hue>-<step>)`. Note: `themes/*.css` *is* the semantic layer (it assigns the semantic brand/accent tokens), so referencing primitives here is correct — the rule against touching primitives applies to components/features, not to this layer. If your hue isn't in `primitives/colors.css`, add the scale steps first (Tailwind naming `--color-<hue>-<step>`, bare HSL triple `H S% L%`, 50 lightest → 950 darkest). When adding primitives, follow the `design-tokens` skill.
+3. **Reference primitives only — never raw HSL.** Values are `var(--color-<hue>-<step>)`. Note: `themes/*.css` _is_ the semantic layer (it assigns the semantic brand/accent tokens), so referencing primitives here is correct — the rule against touching primitives applies to components/features, not to this layer. If your hue isn't in `primitives/colors.css`, add the scale steps first (Tailwind naming `--color-<hue>-<step>`, bare HSL triple `H S% L%`, 50 lightest → 950 darkest). When adding primitives, follow the `design-tokens` skill.
 4. **Contrast is non-negotiable.** Both `--brand-100` and `--accent-100` carry **white** text (`--primary-foreground` / `--accent-foreground` = `--oncolor-100` = white). They must pass WCAG AA (4.5:1 body, 3:1 large/UI). Heuristic: for a saturated hue keep lightness **L ≤ ~55%** in light mode, ~60% in dark. Picking a pale hue (yellow, mint) makes white text fail — deepen it or that hue isn't viable as a brand. Verify the actual pair, don't eyeball.
 5. **Dark is usually one step lighter than light.** A saturated brand reads better when brightened against a dark canvas. Terracotta: light `--brand-100 = orange-600` (deeper) → dark `orange-500` (brighter); accent light `blue-600` → dark `accent-000 = blue-400`.
 
@@ -65,13 +67,17 @@ Do this deliberately — fonts are heavier than colors:
 :root[data-brand="<id>"] {
   /* Brand */
   --brand-000: var(--color-<hue>-600);
-  --brand-100: var(--color-<hue>-600);   /* ★ white text sits here — verify contrast */
-  --brand-200: var(--color-<hue>-500);   /* primary-button hover */
+  --brand-100: var(
+    --color-<hue>-600
+  ); /* ★ white text sits here — verify contrast */
+  --brand-200: var(--color-<hue>-500); /* primary-button hover */
   --brand-900: var(--color-pure-black);
   --accent-brand: var(--color-<hue>-500);
   /* Accent */
   --accent-000: var(--color-<hue2>-700);
-  --accent-100: var(--color-<hue2>-600); /* ★ white text + focus ring — verify contrast */
+  --accent-100: var(
+    --color-<hue2>-600
+  ); /* ★ white text + focus ring — verify contrast */
   --accent-200: var(--color-<hue2>-600);
   --accent-900: var(--color-<hue2>-100);
   /* Optional font (only if this theme swaps the typeface — and load it in index.html):
@@ -91,10 +97,10 @@ Registry entry — `src/styles/themes/registry.ts`:
 
 ```ts
 registerTheme({
-  id: "<id>",                                  // = data-brand value; unique; never translated
-  nameKey: "settings.appearance.brands.<id>",  // i18n key (add the string in en/zh below)
+  id: "<id>", // = data-brand value; unique; never translated
+  nameKey: "settings.appearance.brands.<id>", // i18n key (add the string in en/zh below)
   swatch: { brand: "--color-<hue>-600", accent: "--color-<hue2>-600" }, // picker chip (primitive names)
-  order: 1,                                     // sort order; default theme is 0
+  order: 1, // sort order; default theme is 0
   // font: "<Family>",                          // only if the theme swaps the typeface
 });
 ```
@@ -113,7 +119,7 @@ registerTheme({
 - `bunx tsc --noEmit -p tsconfig.app.json` — clean (ignore pre-existing `.stories.tsx` errors).
 - `bunx vite build` — the `@import` chain resolves.
 - **Contrast**: confirm white-on-`brand-100` and white-on-`accent-100` pass WCAG AA, in both modes.
-- **Preview**: runtime switching (a settings picker) isn't built yet. To eyeball a theme now, temporarily set `data-brand="<id>"` on `<html>` in `index.html` and run `bun run dev`. Revert before committing — the default theme's id must equal the static `data-brand` in `index.html` (currently `terracotta`).
+- **Preview**: run `bun run dev`, open **Settings → Appearance → Theme color**, and pick the new theme (the `BrandSegment` picker lists every registered theme). Toggle light/dark to check both modes. The default theme's id must stay equal to the static `data-brand` in `index.html` (currently `terracotta`).
 
 ## Files
 
