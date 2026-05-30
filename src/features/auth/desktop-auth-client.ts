@@ -39,7 +39,12 @@ function isNonEmptyString(value: unknown): value is string {
 }
 
 function isDesktopUser(value: unknown): value is DesktopUser {
-  return isRecord(value) && isNonEmptyString(value.id);
+  return (
+    isRecord(value) &&
+    isNonEmptyString(value.id) &&
+    isRecord(value.credits) &&
+    isFiniteNumber(value.credits.remainingCredits)
+  );
 }
 
 function assertTokenResponse(data: TokenResponse): void {

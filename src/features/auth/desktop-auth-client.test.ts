@@ -101,6 +101,31 @@ describe("desktop auth client", () => {
     ).rejects.toThrow("desktop_api_invalid_token_response");
   });
 
+  it("rejects token responses with malformed user credits", async () => {
+    globalThis.fetch = mock(async () =>
+      jsonResponse({
+        code: 0,
+        data: {
+          accessToken: "access-token",
+          expiresIn: 3600,
+          refreshToken: "refresh-token",
+          refreshExpiresIn: 7200,
+          user: {
+            id: "user-1",
+          },
+        },
+      }),
+    ) as typeof fetch;
+
+    await expect(
+      exchangeAuthCode({
+        code: "code",
+        codeVerifier: "verifier",
+        deviceId: "device-1",
+      }),
+    ).rejects.toThrow("desktop_api_invalid_token_response");
+  });
+
   it("fails fast and does not fetch when consume amount is invalid", async () => {
     const fetchSpy = mock(async () => jsonResponse({ code: 0, data: { remainingCredits: 9 } }));
     globalThis.fetch = fetchSpy as typeof fetch;
