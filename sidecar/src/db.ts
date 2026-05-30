@@ -8,7 +8,7 @@ PRAGMA foreign_keys = ON;
 CREATE TABLE IF NOT EXISTS conversations (
   id            TEXT PRIMARY KEY,
   title         TEXT NOT NULL DEFAULT 'New chat',
-  project_id    TEXT,
+  agent_workspace_id TEXT,
   pinned        INTEGER NOT NULL DEFAULT 0,
   working_dir   TEXT,
   created_at    INTEGER NOT NULL,
@@ -124,7 +124,7 @@ CREATE TABLE IF NOT EXISTS scheduled_tasks (
   name               TEXT NOT NULL,
   description        TEXT NOT NULL DEFAULT '',
   prompt             TEXT NOT NULL,
-  project_id         TEXT,
+  agent_workspace_id TEXT,
   working_dir        TEXT,
   model              TEXT,
   permission_mode    TEXT NOT NULL DEFAULT 'ask',
@@ -140,6 +140,20 @@ CREATE TABLE IF NOT EXISTS scheduled_tasks (
   updated_at         INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_sched_next ON scheduled_tasks (enabled, next_run_at);
+
+-- agent_workspaces: a persistent "Agent" — its own home dir (read/write),
+-- plus (P2/P3) external folders, a CLAUDE.md instructions file, and memory.
+-- Conversations + scheduled_tasks reference it via agent_workspace_id (nullable
+-- = the generic/default workspace, i.e. the "new task" behavior).
+CREATE TABLE IF NOT EXISTS agent_workspaces (
+  id          TEXT PRIMARY KEY,
+  name        TEXT NOT NULL,
+  avatar      TEXT,
+  home_dir    TEXT NOT NULL,
+  archived    INTEGER NOT NULL DEFAULT 0,
+  created_at  INTEGER NOT NULL,
+  updated_at  INTEGER NOT NULL
+);
 `;
 
 interface ColumnInfo {
@@ -183,6 +197,8 @@ export function migrate(db: Database): void {
   ensureColumn(db, "scheduled_tasks", "working_dir", "TEXT");
   ensureColumn(db, "scheduled_tasks", "permission_mode", "TEXT NOT NULL DEFAULT 'ask'");
   ensureColumn(db, "scheduled_tasks", "weekday", "INTEGER");
+  ensureColumn(db, "conversations", "agent_workspace_id", "TEXT");
+  ensureColumn(db, "scheduled_tasks", "agent_workspace_id", "TEXT");
 }
 
 export function openDb(path: string): Database {
