@@ -33,14 +33,15 @@ export function UserBar({
     : signedIn
       ? (name || email || t("sidebar.user.signedOut"))
       : t("sidebar.user.signedOut");
-  const secondary = loading
-    ? ""
-    : signedIn && typeof credits === "number"
+  const emailText = !loading && signedIn && name && email ? email : "";
+  const creditsText =
+    !loading && signedIn && typeof credits === "number"
       ? t("sidebar.user.credits", { count: credits })
       : "";
   const avatarInitials =
     initials ||
     (signedIn ? (name || email || "AS").slice(0, 2) : "AS");
+  const hasSecondary = Boolean(emailText || creditsText);
 
   return (
     <UserPopover
@@ -67,19 +68,18 @@ export function UserBar({
         className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-[hsl(var(--bg-100)/0.6)]"
       >
         <InitialsAvatar initials={avatarInitials} size={20} shape="round" tone="subtle" />
-        <span className="flex min-w-0 flex-1 items-center gap-1">
-          <span className="min-w-0 truncate text-[12px] text-[hsl(var(--text-100))]">
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="min-w-0 truncate text-[12px] leading-4 text-[hsl(var(--text-100))]">
             {displayName}
           </span>
-          {secondary && (
-            <>
-              <span className="shrink-0 text-[12px] text-[hsl(var(--text-400))]">
-                ·
-              </span>
-              <span className="shrink-0 text-[12px] text-[hsl(var(--text-300))]">
-                {secondary}
-              </span>
-            </>
+          {hasSecondary && (
+            <span className="flex min-w-0 items-center gap-1 text-[11px] leading-3 text-[hsl(var(--text-300))]">
+              {emailText && <span className="min-w-0 truncate">{emailText}</span>}
+              {emailText && creditsText && (
+                <span className="shrink-0 text-[hsl(var(--text-400))]">·</span>
+              )}
+              {creditsText && <span className="shrink-0">{creditsText}</span>}
+            </span>
           )}
         </span>
       </button>
