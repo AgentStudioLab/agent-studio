@@ -52,9 +52,21 @@ mock.module("react-i18next", () => ({
 mock.module("@/components/ui/dialog", () => ({
   Dialog: ({ open, children }: { open: boolean; children: ReactNode }) =>
     open ? <div>{children}</div> : null,
-  DialogContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  DialogContent: ({
+    children,
+    className,
+  }: {
+    children: ReactNode;
+    className?: string;
+  }) => <div className={className}>{children}</div>,
   DialogDescription: ({ children }: { children: ReactNode }) => <p>{children}</p>,
-  DialogFooter: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  DialogFooter: ({
+    children,
+    className,
+  }: {
+    children: ReactNode;
+    className?: string;
+  }) => <div className={className}>{children}</div>,
   DialogHeader: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   DialogTitle: ({ children }: { children: ReactNode }) => <h2>{children}</h2>,
 }));
@@ -91,5 +103,25 @@ describe("LoginWaitDialog", () => {
     renderDialog();
 
     expect(screen.getByText("Browser failed to open: blocked")).toBeDefined();
+  });
+
+  it("uses a desktop width that fits the login actions", () => {
+    renderDialog();
+
+    const dialogContent = screen.getByText("Waiting for browser authorization")
+      .parentElement?.parentElement;
+    const cancelButton = screen.getByText("Cancel sign in").closest("button");
+    const copyButton = screen.getByText("Copy link").closest("button");
+    const reopenButton = screen.getByText("Reopen browser").closest("button");
+    const footer = cancelButton?.parentElement;
+
+    expect(dialogContent?.className).toContain("sm:max-w-[520px]");
+    expect(footer?.className).toContain("sm:flex-wrap");
+    expect(footer?.className).toContain("sm:justify-end");
+    expect(cancelButton?.className).toContain("sm:mr-auto");
+    expect(copyButton?.className).toContain("max-w-full");
+    expect(reopenButton?.className).toContain(
+      "max-w-full",
+    );
   });
 });

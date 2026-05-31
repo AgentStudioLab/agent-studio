@@ -28,7 +28,7 @@ export function LoginWaitDialog() {
 
   return (
     <Dialog open={open}>
-      <DialogContent showCloseButton={false} className="sm:max-w-[420px]">
+      <DialogContent showCloseButton={false} className="sm:max-w-[520px]">
         <DialogHeader>
           <div className="mb-1 flex size-10 items-center justify-center rounded-full bg-primary/10 text-primary">
             <Loader2 className="size-5 animate-spin" />
@@ -49,21 +49,30 @@ export function LoginWaitDialog() {
           {t("sidebar.user.loginWaitHint")}
         </div>
 
-        <DialogFooter className="gap-2 sm:justify-between">
+        <DialogFooter className="gap-2 sm:flex-wrap sm:justify-end">
           <Button
             type="button"
             variant="ghost"
             onClick={auth.cancelLogin}
-            className="sm:mr-auto"
+            className="max-w-full sm:mr-auto"
           >
             <X className="size-4" />
             {t("sidebar.user.loginWaitCancel")}
           </Button>
-          <Button type="button" variant="outline" onClick={() => void handleCopy()}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => void handleCopy()}
+            className="max-w-full"
+          >
             {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
             {copied ? t("sidebar.user.loginWaitCopied") : t("sidebar.user.loginWaitCopy")}
           </Button>
-          <Button type="button" onClick={() => void auth.reopenLogin()}>
+          <Button
+            type="button"
+            onClick={() => void auth.reopenLogin()}
+            className="max-w-full"
+          >
             <ExternalLink className="size-4" />
             {t("sidebar.user.loginWaitReopen")}
           </Button>
