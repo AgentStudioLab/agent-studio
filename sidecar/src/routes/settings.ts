@@ -29,6 +29,55 @@ function sanitizeCustomModels(raw: unknown): ProfileModel[] | undefined {
   return out;
 }
 
+function modelListUrl(baseUrl: string): string | null {
+  const trimmed = baseUrl.trim();
+  if (!trimmed) return null;
+  try {
+    const url = new URL(trimmed);
+    const pathname = url.pathname.replace(/\/+$/, "");
+    url.pathname = pathname.endsWith("/v1")
+      ? `${pathname}/models`
+      : `${pathname}/v1/models`;
+    url.search = "";
+    url.hash = "";
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
+function normalizeFetchedModels(raw: unknown): ProfileModel[] {
+  const data =
+    raw && typeof raw === "object" && Array.isArray((raw as { data?: unknown }).data)
+      ? (raw as { data: unknown[] }).data
+      : Array.isArray(raw)
+        ? raw
+        : [];
+
+  const seen = new Set<string>();
+  const models: ProfileModel[] = [];
+  for (const item of data) {
+    if (!item || typeof item !== "object") continue;
+    const record = item as Record<string, unknown>;
+    if (typeof record.id !== "string" || !record.id.trim()) continue;
+    const id = record.id.trim();
+    if (seen.has(id)) continue;
+    seen.add(id);
+    const displayName =
+      typeof record.displayName === "string" && record.displayName.trim()
+        ? record.displayName.trim()
+        : typeof record.display_name === "string" && record.display_name.trim()
+          ? record.display_name.trim()
+          : id;
+    const description =
+      typeof record.description === "string" && record.description.trim()
+        ? record.description.trim()
+        : "Fetched from provider";
+    models.push({ id, displayName, description });
+  }
+  return models;
+}
+
 export function buildSettingsRoutes(
   provider: ProviderSettingsState,
   userProfile: UserProfileSettingsState,
@@ -101,6 +150,58 @@ export function buildSettingsRoutes(
       patch.customModels = sanitized;
     }
     const next = provider.update(patch);
+    return c.json({ current: next });
+  });
+
+  app.post("/settings/provider/fetch-models", async (c) => {
+    const body = (await c.req.json().catch(() => null)) as
+      | {
+          profileId?: unknown;
+          baseUrl?: unknown;
+          apiKey?: unknown;
+        }
+      | null;
+    if (!body) return c.json({ error: "invalid_body" }, 400);
+    if (body.profileId !== undefined && !isValidProfileId(body.profileId)) {
+      return c.json({ error: "invalid_profile_id" }, 400);
+    }
+    if (body.baseUrl !== undefined && typeof body.baseUrl !== "string") {
+      return c.json({ error: "invalid_base_url" }, 400);
+    }
+    if (body.apiKey !== undefined && typeof body.apiKey !== "string") {
+      return c.json({ error: "invalid_api_key" }, 400);
+    }
+
+    const current = provider.current();
+    const baseUrl = body.baseUrl ?? current.baseUrl;
+    const apiKey = body.apiKey ?? current.apiKey;
+    const url = modelListUrl(baseUrl);
+    if (!url) return c.json({ error: "invalid_base_url" }, 400);
+
+    let upstream: Response;
+    try {
+      upstream = await fetch(url, {
+        headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : undefined,
+      });
+    } catch {
+      return c.json({ error: "fetch_failed" }, 502);
+    }
+    if (!upstream.ok) {
+      return c.json({ error: "provider_error", status: upstream.status }, 502);
+    }
+
+    const json = (await upstream.json().catch(() => null)) as unknown;
+    const models = normalizeFetchedModels(json);
+    if (models.length === 0) {
+      return c.json({ error: "empty_models" }, 422);
+    }
+
+    const next = provider.update({
+      profileId: "custom",
+      baseUrl,
+      apiKey,
+      customModels: models,
+    });
     return c.json({ current: next });
   });
 

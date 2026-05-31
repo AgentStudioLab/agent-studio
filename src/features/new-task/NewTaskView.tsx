@@ -131,7 +131,7 @@ export function NewTaskView() {
         >
           <div className="flex w-full max-w-[760px] flex-col items-start">
             <div className="mb-3 flex items-center gap-4">
-              <BrandStar size={28} />
+              <BrandStar size={50} />
               <h1 className="font-serif text-[36px] font-normal leading-[1.15] tracking-tight text-foreground">
                 {t("newTask.welcome.heading")}
               </h1>

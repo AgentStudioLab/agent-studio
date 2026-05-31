@@ -76,6 +76,21 @@ export async function setProvider(patch: {
   return json.current;
 }
 
+export async function fetchProviderModels(patch: {
+  profileId?: ProfileId;
+  baseUrl?: string;
+  apiKey?: string;
+}): Promise<ProviderConfig> {
+  const res = await fetchSidecar("/settings/provider/fetch-models", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+  if (!res.ok) throw new Error(`provider_fetch_models_${res.status}`);
+  const json = (await res.json()) as { current: ProviderConfig };
+  return json.current;
+}
+
 // User profile — what the agent calls the user, role, custom instructions.
 // Composed sidecar-side into the SDK's systemPrompt.append on every turn.
 

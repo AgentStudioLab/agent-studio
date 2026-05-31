@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  fetchProviderModels,
   getProvider,
   setProvider,
   type ProfileId,
@@ -33,21 +34,29 @@ export function ModelSection() {
   const [baseUrl, setBaseUrl] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [customModelsText, setCustomModelsText] = useState("");
+  const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
   const [saveMsg, setSaveMsg] = useState<"saved" | "error" | "invalid" | null>(
     null,
   );
+  const [fetchMsg, setFetchMsg] = useState<
+    "success" | "error" | "empty" | null
+  >(null);
   const [saving, setSaving] = useState(false);
+  const [fetchingModels, setFetchingModels] = useState(false);
 
   useEffect(() => {
     if (!data) return;
+    const currentModels =
+      data.current.profileId === "custom" ? data.current.models : [];
     setProfileIdLocal(data.current.profileId);
     setBaseUrl(data.current.baseUrl);
     setApiKey(data.current.apiKey);
     setCustomModelsText(
       data.current.profileId === "custom"
-        ? JSON.stringify(data.current.models, null, 2)
+        ? JSON.stringify(currentModels, null, 2)
         : "",
     );
+    setSelectedModelId(currentModels[0]?.id ?? null);
   }, [data]);
 
   if (isLoading || !data || profileId === null) {
@@ -112,6 +121,39 @@ export function ModelSection() {
     }
   };
 
+  const customModels = parseCustomModels(customModelsText);
+
+  const handleFetchModels = async () => {
+    setFetchingModels(true);
+    setFetchMsg(null);
+    setSaveMsg(null);
+    try {
+      const current = await fetchProviderModels({
+        profileId,
+        baseUrl,
+        apiKey,
+      });
+      const nextText = JSON.stringify(current.models, null, 2);
+      setProfileIdLocal(current.profileId);
+      setBaseUrl(current.baseUrl);
+      setApiKey(current.apiKey);
+      setCustomModelsText(nextText);
+      setSelectedModelId(current.models[0]?.id ?? null);
+      setFetchMsg(current.models.length > 0 ? "success" : "empty");
+      qc.setQueryData(["provider"], {
+        ...data,
+        current,
+      });
+      qc.setQueryData(["models"], current.models);
+      void qc.invalidateQueries({ queryKey: ["provider"] });
+      void qc.invalidateQueries({ queryKey: ["models"] });
+    } catch {
+      setFetchMsg("error");
+    } finally {
+      setFetchingModels(false);
+    }
+  };
+
   return (
     <section className="space-y-5">
       <div>
@@ -166,18 +208,77 @@ export function ModelSection() {
       </Field>
 
       {profileId === "custom" && (
-        <Field
-          label={t("settings.provider.customModelsLabel")}
-          hint={t("settings.provider.customModelsHint")}
-        >
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <label className="text-sm font-medium text-foreground">
+                {t("settings.provider.customModelsLabel")}
+              </label>
+              <p className="text-xs text-muted-foreground">
+                {t("settings.provider.customModelsHint")}
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => void handleFetchModels()}
+              disabled={fetchingModels || !baseUrl.trim()}
+            >
+              {fetchingModels
+                ? t("settings.provider.fetchingModels")
+                : t("settings.provider.fetchModels")}
+            </Button>
+          </div>
+
+          {customModels.length > 0 && (
+            <Field label={t("settings.provider.modelLabel")}>
+              <Select
+                value={selectedModelId ?? customModels[0]?.id}
+                onValueChange={setSelectedModelId}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {customModels.map((model) => (
+                    <SelectItem key={model.id} value={model.id}>
+                      {model.displayName || model.id}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+          )}
+
           <Textarea
             value={customModelsText}
-            onChange={(e) => setCustomModelsText(e.target.value)}
+            onChange={(e) => {
+              setCustomModelsText(e.target.value);
+              setSelectedModelId(parseCustomModels(e.target.value)[0]?.id ?? null);
+            }}
             placeholder={t("settings.provider.customModelsPlaceholder")}
             rows={6}
             className="font-mono text-[12px]"
           />
-        </Field>
+
+          {fetchMsg === "success" && (
+            <span className="text-sm text-muted-foreground">
+              {t("settings.provider.fetchModelsSuccess", {
+                count: customModels.length,
+              })}
+            </span>
+          )}
+          {fetchMsg === "empty" && (
+            <span className="text-sm text-destructive">
+              {t("settings.provider.fetchModelsEmpty")}
+            </span>
+          )}
+          {fetchMsg === "error" && (
+            <span className="text-sm text-destructive">
+              {t("settings.provider.fetchModelsError")}
+            </span>
+          )}
+        </div>
       )}
 
       <div className="flex items-center gap-3">
@@ -202,6 +303,33 @@ export function ModelSection() {
       </div>
     </section>
   );
+}
+
+function parseCustomModels(text: string): ProfileModel[] {
+  try {
+    const parsed = JSON.parse(text || "[]") as unknown;
+    if (!Array.isArray(parsed)) return [];
+    const models: ProfileModel[] = [];
+    for (const item of parsed) {
+      if (!item || typeof item !== "object") continue;
+      const record = item as Record<string, unknown>;
+      if (
+        typeof record.id !== "string" ||
+        typeof record.displayName !== "string" ||
+        typeof record.description !== "string"
+      ) {
+        continue;
+      }
+      models.push({
+        id: record.id,
+        displayName: record.displayName,
+        description: record.description,
+      });
+    }
+    return models;
+  } catch {
+    return [];
+  }
 }
 
 function Field({
