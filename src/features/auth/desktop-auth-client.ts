@@ -1,8 +1,10 @@
 import type { DesktopAuthTokens, DesktopUser } from "./auth-types";
 
-const DEFAULT_WEBSITE_ORIGIN = "https://agentstudio.chat";
 const CLIENT_ID = "agent-studio-desktop";
 const REDIRECT_URI = "agent-studio://auth/callback";
+const DEFAULT_WEBSITE_LOCALE = "zh";
+const SUPPORTED_WEBSITE_LOCALES = ["zh", "en"] as const;
+type WebsiteLocale = (typeof SUPPORTED_WEBSITE_LOCALES)[number];
 
 interface ApiEnvelope<T> {
   code: number;
@@ -19,11 +21,29 @@ interface TokenResponse {
 }
 
 export function getWebsiteOrigin(): string {
-  return import.meta.env.VITE_AGENT_STUDIO_WEBSITE_ORIGIN || DEFAULT_WEBSITE_ORIGIN;
+  const origin = import.meta.env.VITE_AGENT_STUDIO_WEBSITE_ORIGIN?.trim();
+  if (!origin) {
+    throw new Error("desktop_api_missing_website_origin");
+  }
+  return origin;
 }
 
 function buildWebsiteUrl(path: string): string {
   return new URL(path, getWebsiteOrigin()).toString();
+}
+
+function normalizeWebsiteLocale(locale?: string): WebsiteLocale {
+  const language = locale?.split("-")[0]?.toLowerCase();
+  return SUPPORTED_WEBSITE_LOCALES.includes(language as WebsiteLocale)
+    ? (language as WebsiteLocale)
+    : DEFAULT_WEBSITE_LOCALE;
+}
+
+function buildLocalizedWebsitePath(path: string, locale?: string): string {
+  const normalizedLocale = normalizeWebsiteLocale(locale);
+  return normalizedLocale === DEFAULT_WEBSITE_LOCALE
+    ? path
+    : `/${normalizedLocale}${path}`;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -45,6 +65,40 @@ function isDesktopUser(value: unknown): value is DesktopUser {
     isRecord(value.credits) &&
     isFiniteNumber(value.credits.remainingCredits)
   );
+}
+
+function resolveUserImage(image: unknown): string | null {
+  if (typeof image !== "string") {
+    return null;
+  }
+
+  const trimmedImage = image.trim();
+  if (!trimmedImage) {
+    return null;
+  }
+
+  try {
+    const url = new URL(trimmedImage);
+    if (
+      url.protocol === "http:" ||
+      url.protocol === "https:" ||
+      url.protocol === "data:" ||
+      url.protocol === "blob:"
+    ) {
+      return trimmedImage;
+    }
+  } catch {
+    return new URL(trimmedImage, getWebsiteOrigin()).toString();
+  }
+
+  return null;
+}
+
+function normalizeDesktopUser(user: DesktopUser): DesktopUser {
+  return {
+    ...user,
+    image: resolveUserImage(user.image),
+  };
 }
 
 function assertTokenResponse(data: TokenResponse): void {
@@ -90,10 +144,15 @@ export function buildAuthorizeUrl(input: {
   state: string;
   codeChallenge: string;
   deviceId: string;
+  redirectUri?: string;
+  locale?: string;
 }): string {
-  const url = new URL("/desktop/authorize", getWebsiteOrigin());
+  const url = new URL(
+    buildLocalizedWebsitePath("/desktop/authorize", input.locale),
+    getWebsiteOrigin(),
+  );
   url.searchParams.set("client_id", CLIENT_ID);
-  url.searchParams.set("redirect_uri", REDIRECT_URI);
+  url.searchParams.set("redirect_uri", input.redirectUri || REDIRECT_URI);
   url.searchParams.set("state", input.state);
   url.searchParams.set("code_challenge", input.codeChallenge);
   url.searchParams.set("code_challenge_method", "S256");
@@ -105,6 +164,7 @@ export async function exchangeAuthCode(input: {
   code: string;
   codeVerifier: string;
   deviceId: string;
+  redirectUri?: string;
 }): Promise<{ tokens: DesktopAuthTokens; user: DesktopUser }> {
   const data = await fetch(buildWebsiteUrl("/api/desktop/oauth/token"), {
     method: "POST",
@@ -112,7 +172,7 @@ export async function exchangeAuthCode(input: {
     body: JSON.stringify({
       grant_type: "authorization_code",
       client_id: CLIENT_ID,
-      redirect_uri: REDIRECT_URI,
+      redirect_uri: input.redirectUri || REDIRECT_URI,
       code: input.code,
       code_verifier: input.codeVerifier,
       device_id: input.deviceId,
@@ -129,7 +189,7 @@ export async function exchangeAuthCode(input: {
       refreshToken: data.refreshToken,
       refreshTokenExpiresAt: now + data.refreshExpiresIn * 1000,
     },
-    user: data.user,
+    user: normalizeDesktopUser(data.user),
   };
 }
 
@@ -162,9 +222,15 @@ export async function revokeRefreshToken(refreshToken: string): Promise<void> {
 }
 
 export async function fetchDesktopMe(accessToken: string): Promise<DesktopUser> {
-  return fetch(buildWebsiteUrl("/api/desktop/me"), {
+  const user = await fetch(buildWebsiteUrl("/api/desktop/me"), {
     headers: { Authorization: `Bearer ${accessToken}` },
   }).then(readApiResponse<DesktopUser>);
+
+  if (!isDesktopUser(user)) {
+    throw new Error("desktop_api_invalid_user_response");
+  }
+
+  return normalizeDesktopUser(user);
 }
 
 export async function consumeDesktopCredits(input: {

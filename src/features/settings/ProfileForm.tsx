@@ -1,7 +1,8 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Input } from "@/components/ui/input";
+import { open } from "@tauri-apps/plugin-shell";
+import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
@@ -12,6 +13,8 @@ import {
 } from "@/components/ui/select";
 import { InitialsAvatar } from "@/shared/atoms/InitialsAvatar";
 import { getProfile, setProfile } from "@/lib/data/settings";
+import { useAuth } from "@/features/auth/useAuth";
+import { getWebsiteOrigin } from "@/features/auth/desktop-auth-client";
 
 const WORK_KEYS = [
   "engineer",
@@ -28,10 +31,8 @@ function isWorkKey(v: string): v is WorkKey {
   return (WORK_KEYS as readonly string[]).includes(v);
 }
 
-// Derive initials for the avatar. Empty callMe → "?" so the round badge
-// stays visible while the user hasn't filled anything in yet.
-function initialsFrom(callMe: string): string {
-  const trimmed = callMe.trim();
+function initialsFrom(displayName: string): string {
+  const trimmed = displayName.trim();
   if (!trimmed) return "?";
   const parts = trimmed.split(/\s+/).filter(Boolean);
   if (parts.length === 1) return parts[0]!.slice(0, 2).toUpperCase();
@@ -41,6 +42,7 @@ function initialsFrom(callMe: string): string {
 export function ProfileForm() {
   const { t } = useTranslation();
   const qc = useQueryClient();
+  const auth = useAuth();
   const { data, isLoading } = useQuery({
     queryKey: ["profile"],
     queryFn: getProfile,
@@ -50,21 +52,18 @@ export function ProfileForm() {
   // Local editable mirror, primed from server. Saves are debounced via
   // onBlur — typing every keystroke doesn't hit the network, but tab/click
   // away persists. The Select saves immediately on change (no blur event).
-  const [callMe, setCallMe] = useState("");
   const [work, setWork] = useState<WorkKey>("engineer");
   const [instructions, setInstructions] = useState("");
   const [primed, setPrimed] = useState(false);
 
   useEffect(() => {
     if (!data || primed) return;
-    setCallMe(data.callMe);
     setWork(isWorkKey(data.work) ? data.work : "engineer");
     setInstructions(data.instructions);
     setPrimed(true);
   }, [data, primed]);
 
   const save = async (patch: {
-    callMe?: string;
     work?: string;
     instructions?: string;
   }) => {
@@ -72,24 +71,52 @@ export function ProfileForm() {
     void qc.invalidateQueries({ queryKey: ["profile"] });
   };
 
+  const displayName =
+    auth.status === "signed-in"
+      ? (auth.user?.name || auth.user?.email || t("sidebar.user.signedIn"))
+      : t("sidebar.user.signedOut");
+  const avatarInitials = auth.status === "signed-in" ? initialsFrom(displayName) : "AS";
+  const profileUrl = () => new URL("/settings/profile", getWebsiteOrigin()).toString();
+
   if (isLoading || !primed) {
     return <p className="text-sm text-muted-foreground">…</p>;
   }
 
   return (
     <div className="flex flex-col gap-6">
-      <section className="flex items-start justify-between gap-8">
-        <div className="flex flex-1 flex-col gap-5">
-          <FormField label={t("settings.profile.callMe")}>
-            <Input
-              value={callMe}
-              onChange={(e) => setCallMe(e.target.value)}
-              onBlur={() => {
-                if (callMe !== data?.callMe) void save({ callMe });
-              }}
-              placeholder={t("settings.profile.callMePlaceholder")}
-            />
-          </FormField>
+      <section className="flex flex-col gap-5">
+        <FormField label={t("settings.profile.account")}>
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex min-w-0 items-center gap-3">
+              {auth.status === "signed-in" && auth.user?.image ? (
+                <img
+                  src={auth.user.image}
+                  alt=""
+                  className="size-11 shrink-0 rounded-full border border-border object-cover"
+                />
+              ) : (
+                <InitialsAvatar
+                  initials={avatarInitials}
+                  size={44}
+                  shape="round"
+                  tone="subtle"
+                />
+              )}
+              <span className="min-w-0 truncate text-sm font-medium text-foreground">
+                {displayName}
+              </span>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => void open(profileUrl())}
+            >
+              {t("settings.profile.editOnWebsite")}
+            </Button>
+          </div>
+        </FormField>
+        <div className="flex flex-col gap-5">
           <FormField label={t("settings.profile.work")}>
             <Select
               value={work}
@@ -112,7 +139,6 @@ export function ProfileForm() {
             </Select>
           </FormField>
         </div>
-        <InitialsAvatar initials={initialsFrom(callMe)} size={56} shape="round" tone="subtle" />
       </section>
 
       <FormField

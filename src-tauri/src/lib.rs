@@ -1,4 +1,8 @@
-use std::sync::Mutex;
+use std::{
+    io::{Read, Write},
+    net::{SocketAddr, TcpListener, TcpStream},
+    sync::Mutex,
+};
 
 use rand::distr::{Alphanumeric, SampleString};
 use serde::{Deserialize, Serialize};
@@ -11,6 +15,7 @@ use tauri_plugin_shell::{
 use tauri_plugin_store::StoreExt;
 
 const DESKTOP_AUTH_CALLBACK_PREFIX: &str = "agent-studio://auth/callback";
+const LOOPBACK_AUTH_CALLBACK_PATH: &str = "/auth/callback";
 
 #[derive(Clone, Serialize)]
 pub struct SidecarInfo {
@@ -23,6 +28,9 @@ struct SidecarChild(Mutex<Option<CommandChild>>);
 
 #[derive(Default)]
 struct PendingAuthCallback(Mutex<Option<String>>);
+
+#[derive(Clone)]
+struct DesktopAuthRedirectUri(String);
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct DesktopAuthTokens {
@@ -42,6 +50,13 @@ async fn get_pending_auth_callback(
     state: State<'_, PendingAuthCallback>,
 ) -> Result<Option<String>, String> {
     Ok(state.0.lock().map_err(|e| e.to_string())?.take())
+}
+
+#[tauri::command]
+async fn get_desktop_auth_redirect_uri(
+    state: State<'_, DesktopAuthRedirectUri>,
+) -> Result<String, String> {
+    Ok(state.0.clone())
 }
 
 #[tauri::command]
@@ -290,7 +305,28 @@ fn spawn_sidecar(app: &AppHandle) -> Result<SidecarInfo, Box<dyn std::error::Err
 }
 
 fn is_desktop_auth_callback_url(url: &str) -> bool {
-    url.starts_with(DESKTOP_AUTH_CALLBACK_PREFIX)
+    if url.starts_with(DESKTOP_AUTH_CALLBACK_PREFIX) {
+        return true;
+    }
+
+    let Some(rest) = url.strip_prefix("http://") else {
+        return false;
+    };
+    let Some((authority, path_and_query)) = rest.split_once('/') else {
+        return false;
+    };
+    let Some((host, port)) = authority.rsplit_once(':') else {
+        return false;
+    };
+    let Ok(port) = port.parse::<u16>() else {
+        return false;
+    };
+    let path_and_query = format!("/{path_and_query}");
+
+    (host == "127.0.0.1" || host == "localhost")
+        && port > 0
+        && (path_and_query == LOOPBACK_AUTH_CALLBACK_PATH
+            || path_and_query.starts_with(&format!("{LOOPBACK_AUTH_CALLBACK_PATH}?")))
 }
 
 fn set_pending_auth_callback(state: &PendingAuthCallback, url: String) -> Result<(), String> {
@@ -307,6 +343,92 @@ fn handle_desktop_auth_callback(app: &AppHandle, url: &str) -> Result<(), String
     set_pending_auth_callback(&app.state::<PendingAuthCallback>(), url.clone())?;
     let _ = app.emit("desktop-auth-callback", url);
     Ok(())
+}
+
+fn respond_to_loopback_callback(stream: &mut TcpStream, status: &str, body: &str) {
+    let response = format!(
+        "HTTP/1.1 {status}\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+        body.as_bytes().len()
+    );
+    let _ = stream.write_all(response.as_bytes());
+    let _ = stream.flush();
+}
+
+fn handle_loopback_connection(app: &AppHandle, mut stream: TcpStream, addr: SocketAddr) {
+    if !addr.ip().is_loopback() {
+        respond_to_loopback_callback(&mut stream, "403 Forbidden", "Forbidden");
+        return;
+    }
+
+    let mut buffer = [0_u8; 4096];
+    let Ok(size) = stream.read(&mut buffer) else {
+        return;
+    };
+    let request = String::from_utf8_lossy(&buffer[..size]);
+    let Some(request_line) = request.lines().next() else {
+        return;
+    };
+    let mut parts = request_line.split_whitespace();
+    let method = parts.next().unwrap_or_default();
+    let target = parts.next().unwrap_or_default();
+    if method != "GET" || !target.starts_with("/auth/callback") {
+        respond_to_loopback_callback(&mut stream, "404 Not Found", "Not found");
+        return;
+    }
+
+    let Ok(local_addr) = stream.local_addr() else {
+        respond_to_loopback_callback(&mut stream, "500 Internal Server Error", "Server error");
+        return;
+    };
+    let callback_url = format!("http://127.0.0.1:{}{}", local_addr.port(), target);
+    if let Err(err) = handle_desktop_auth_callback(app, &callback_url) {
+        log::warn!("[auth] failed to handle loopback callback: {err}");
+        respond_to_loopback_callback(&mut stream, "500 Internal Server Error", "Server error");
+        return;
+    }
+
+    respond_to_loopback_callback(
+        &mut stream,
+        "200 OK",
+        "<!doctype html><meta charset=\"utf-8\"><title>Agent Studio</title><body style=\"font-family:system-ui;padding:32px;line-height:1.5\"><h1>登录成功</h1><p>可以回到 Agent Studio 继续使用。</p></body>",
+    );
+}
+
+fn spawn_desktop_auth_loopback(app: AppHandle) -> Result<DesktopAuthRedirectUri, String> {
+    let listener = TcpListener::bind(("127.0.0.1", 0)).map_err(|e| e.to_string())?;
+    let redirect_uri = format!(
+        "http://127.0.0.1:{}/auth/callback",
+        listener.local_addr().map_err(|e| e.to_string())?.port()
+    );
+
+    std::thread::spawn(move || {
+        for incoming in listener.incoming() {
+            match incoming {
+                Ok(stream) => {
+                    let Ok(addr) = stream.peer_addr() else {
+                        continue;
+                    };
+                    handle_loopback_connection(&app, stream, addr);
+                }
+                Err(err) => {
+                    log::warn!("[auth] loopback listener failed: {err}");
+                    break;
+                }
+            }
+        }
+    });
+
+    Ok(DesktopAuthRedirectUri(redirect_uri))
+}
+
+fn desktop_auth_redirect_uri(app: AppHandle) -> Result<DesktopAuthRedirectUri, String> {
+    if cfg!(debug_assertions) {
+        spawn_desktop_auth_loopback(app)
+    } else {
+        Ok(DesktopAuthRedirectUri(
+            DESKTOP_AUTH_CALLBACK_PREFIX.to_string(),
+        ))
+    }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -326,6 +448,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_sidecar_info,
             get_pending_auth_callback,
+            get_desktop_auth_redirect_uri,
             store_desktop_auth,
             get_desktop_auth,
             clear_desktop_auth,
@@ -345,6 +468,10 @@ pub fn run() {
             let info = spawn_sidecar(app.handle())?;
             log::info!("[sidecar] spawned on port {}", info.port);
             app.manage(info);
+
+            let redirect_uri = desktop_auth_redirect_uri(app.handle().clone())?;
+            log::info!("[auth] desktop redirect uri {}", redirect_uri.0);
+            app.manage(redirect_uri);
 
             let app_handle = app.handle().clone();
             app.deep_link().on_open_url(move |event| {
@@ -376,6 +503,12 @@ mod tests {
     fn auth_callback_accepts_only_expected_prefix() {
         assert!(is_desktop_auth_callback_url(
             "agent-studio://auth/callback?code=abc&state=xyz"
+        ));
+        assert!(is_desktop_auth_callback_url(
+            "http://127.0.0.1:49152/auth/callback?code=abc&state=xyz"
+        ));
+        assert!(is_desktop_auth_callback_url(
+            "http://localhost:49152/auth/callback?code=abc&state=xyz"
         ));
         assert!(is_desktop_auth_callback_url(
             "agent-studio://auth/callback/extra?code=abc"

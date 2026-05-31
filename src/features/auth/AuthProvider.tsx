@@ -2,7 +2,6 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-shell";
 import {
-  createContext,
   useCallback,
   useEffect,
   useMemo,
@@ -10,7 +9,14 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import type { AuthStatus, DesktopAuthSession, DesktopAuthTokens, DesktopUser } from "./auth-types";
+import { useTranslation } from "react-i18next";
+import type {
+  AuthStatus,
+  DesktopAuthTokens,
+  DesktopLoginRequest,
+  DesktopUser,
+} from "./auth-types";
+import { AuthContext, type AuthContextValue } from "./AuthContext";
 import {
   buildAuthorizeUrl,
   exchangeAuthCode,
@@ -32,20 +38,10 @@ interface PendingLogin {
   state: string;
   verifier: string;
   deviceId: string;
+  redirectUri: string;
 }
 
-export interface AuthContextValue {
-  status: AuthStatus;
-  user: DesktopUser | null;
-  tokens: DesktopAuthTokens | null;
-  login: () => Promise<void>;
-  logout: () => Promise<void>;
-  ensureAuthenticated: () => Promise<DesktopAuthSession>;
-  refreshUser: () => Promise<DesktopUser>;
-  getValidAccessToken: () => Promise<string>;
-}
-
-export const AuthContext = createContext<AuthContextValue | null>(null);
+export { AuthContext, type AuthContextValue } from "./AuthContext";
 
 function isRefreshTokenExpired(tokens: DesktopAuthTokens, now = Date.now()): boolean {
   return tokens.refreshTokenExpiresAt <= now;
@@ -67,11 +63,16 @@ function getDeviceId(): string {
 function parseCallbackUrl(callbackUrl: string): { code: string; state: string } | null {
   try {
     const url = new URL(callbackUrl);
-    if (
+    const isDesktopCallback =
       url.protocol !== "agent-studio:" ||
       url.hostname !== "auth" ||
-      url.pathname !== "/callback"
-    ) {
+      url.pathname !== "/callback";
+    const isLoopbackCallback =
+      (url.protocol === "http:" || url.protocol === "https:") &&
+      (url.hostname === "127.0.0.1" || url.hostname === "localhost") &&
+      url.pathname === "/auth/callback" &&
+      Boolean(url.port);
+    if (isDesktopCallback && !isLoopbackCallback) {
       return null;
     }
     const code = url.searchParams.get("code");
@@ -103,9 +104,12 @@ function shouldClearSessionForAuthError(error: unknown): boolean {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const { i18n } = useTranslation();
   const [status, setStatus] = useState<AuthStatus>("loading");
   const [user, setUser] = useState<DesktopUser | null>(null);
   const [tokens, setTokens] = useState<DesktopAuthTokens | null>(null);
+  const [loginRequest, setLoginRequest] = useState<DesktopLoginRequest | null>(null);
+  const [loginError, setLoginError] = useState<string | null>(null);
   const tokensRef = useRef<DesktopAuthTokens | null>(null);
   const userRef = useRef<DesktopUser | null>(null);
   const pendingLoginRef = useRef<PendingLogin | null>(null);
@@ -125,10 +129,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     authVersionRef.current += 1;
     tokensRef.current = null;
     userRef.current = null;
+    pendingLoginRef.current = null;
     if (mountedRef.current) {
       setTokens(null);
       setUser(null);
       setStatus("signed-out");
+      setLoginRequest(null);
+      setLoginError(null);
     }
   }, []);
 
@@ -136,10 +143,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     authVersionRef.current += 1;
     tokensRef.current = nextTokens;
     userRef.current = nextUser;
+    pendingLoginRef.current = null;
     if (mountedRef.current) {
       setTokens(nextTokens);
       setUser(nextUser);
       setStatus("signed-in");
+      setLoginRequest(null);
+      setLoginError(null);
     }
   }, []);
 
@@ -244,18 +254,60 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async () => {
     const deviceId = getDeviceId();
+    const redirectUri =
+      (await invoke<string | null>("get_desktop_auth_redirect_uri").catch(() => null)) ||
+      "agent-studio://auth/callback";
     const [{ verifier, challenge }, state] = await Promise.all([
       createPkcePair(),
       Promise.resolve(randomBase64Url(32)),
     ]);
 
-    pendingLoginRef.current = { state, verifier, deviceId };
+    pendingLoginRef.current = { state, verifier, deviceId, redirectUri };
     const authorizeUrl = buildAuthorizeUrl({
       state,
       codeChallenge: challenge,
       deviceId,
+      redirectUri,
+      locale: i18n.language,
     });
-    await open(authorizeUrl);
+    if (mountedRef.current) {
+      setLoginRequest({ authorizeUrl, startedAt: Date.now() });
+      setLoginError(null);
+    }
+
+    try {
+      await open(authorizeUrl);
+    } catch (error) {
+      if (mountedRef.current) {
+        setLoginError(getErrorMessage(error));
+      }
+      throw error;
+    }
+  }, [i18n.language]);
+
+  const reopenLogin = useCallback(async () => {
+    const authorizeUrl = loginRequest?.authorizeUrl;
+    if (!authorizeUrl) return;
+
+    try {
+      await open(authorizeUrl);
+      if (mountedRef.current) {
+        setLoginError(null);
+      }
+    } catch (error) {
+      if (mountedRef.current) {
+        setLoginError(getErrorMessage(error));
+      }
+      throw error;
+    }
+  }, [loginRequest?.authorizeUrl]);
+
+  const cancelLogin = useCallback(() => {
+    pendingLoginRef.current = null;
+    if (mountedRef.current) {
+      setLoginRequest(null);
+      setLoginError(null);
+    }
   }, []);
 
   const logout = useCallback(async () => {
@@ -288,12 +340,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       pendingLoginRef.current = null;
+      if (mountedRef.current) {
+        setLoginError(null);
+      }
       const operationVersion = authVersionRef.current;
       try {
         const session = await exchangeAuthCode({
           code: callback.code,
           codeVerifier: pendingLogin.verifier,
           deviceId: pendingLogin.deviceId,
+          redirectUri: pendingLogin.redirectUri,
         });
         if (!canApplyAuthResult(operationVersion)) {
           throw createAuthStaleError();
@@ -306,6 +362,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch (error) {
         if (shouldClearSessionForAuthError(error)) {
           await clearSessionBestEffort();
+        }
+        if (mountedRef.current) {
+          setLoginRequest(null);
+          setLoginError(getErrorMessage(error));
         }
       }
     },
@@ -398,13 +458,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       status,
       user,
       tokens,
+      loginRequest,
+      loginError,
       login,
+      reopenLogin,
+      cancelLogin,
       logout,
       ensureAuthenticated,
       refreshUser,
       getValidAccessToken,
     }),
-    [ensureAuthenticated, getValidAccessToken, login, logout, refreshUser, status, tokens, user],
+    [
+      cancelLogin,
+      ensureAuthenticated,
+      getValidAccessToken,
+      login,
+      loginError,
+      loginRequest,
+      logout,
+      refreshUser,
+      reopenLogin,
+      status,
+      tokens,
+      user,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

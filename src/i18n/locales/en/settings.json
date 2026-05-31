@@ -10,6 +10,8 @@
   "saveButton": "Save",
   "profile": {
     "title": "Profile",
+    "account": "Account profile",
+    "editOnWebsite": "Edit on website",
     "fullName": "Full name",
     "callMe": "What should Agent Studio call you?",
     "callMePlaceholder": "Jay",

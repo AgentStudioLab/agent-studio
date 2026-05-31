@@ -44,8 +44,18 @@
     "settings": "Settings",
     "login": "Sign in",
     "logout": "Logout",
+    "signedIn": "Signed in",
     "signedOut": "Not signed in",
-    "credits": "{{count}} credits"
+    "accountId": "ID {{id}}",
+    "credits": "{{count}} credits",
+    "loginWaitTitle": "Waiting for browser authorization",
+    "loginWaitDescription": "Finish signing in in your browser. Agent Studio will return to the desktop app and sync your account information.",
+    "loginWaitOpenError": "Browser failed to open: {{error}}",
+    "loginWaitHint": "If the browser did not open automatically, reopen the authorization page. If the system does not return to the desktop app, make sure Agent Studio is installed or running.",
+    "loginWaitCancel": "Cancel sign in",
+    "loginWaitCopied": "Copied",
+    "loginWaitCopy": "Copy link",
+    "loginWaitReopen": "Reopen browser"
   },
   "update": {
     "title": "Relaunch to update"

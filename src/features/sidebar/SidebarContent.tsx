@@ -428,8 +428,10 @@ export function SidebarContent() {
         <UserBar
           signedIn={auth.status === "signed-in"}
           loading={auth.status === "loading"}
+          userId={auth.user?.id}
           name={auth.user?.name}
           email={auth.user?.email}
+          image={auth.user?.image}
           credits={auth.user?.credits.remainingCredits}
           onLogin={() => void auth.login()}
           onSettings={() => navigate("/settings")}

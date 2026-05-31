@@ -4,9 +4,11 @@ import { InitialsAvatar } from "@/shared/atoms/InitialsAvatar";
 import { UserPopover } from "@/features/sidebar/UserPopover";
 
 interface UserBarProps {
+  userId?: string | null;
   name?: string | null;
   initials?: string;
   email?: string | null;
+  image?: string | null;
   credits?: number;
   signedIn: boolean;
   loading?: boolean;
@@ -16,9 +18,11 @@ interface UserBarProps {
 }
 
 export function UserBar({
+  userId,
   name,
   initials,
   email,
+  image,
   credits,
   signedIn,
   loading = false,
@@ -31,23 +35,20 @@ export function UserBar({
   const displayName = loading
     ? "..."
     : signedIn
-      ? (name || email || t("sidebar.user.signedOut"))
+      ? (name || email || t("sidebar.user.signedIn"))
       : t("sidebar.user.signedOut");
-  const emailText = !loading && signedIn && name && email ? email : "";
-  const creditsText =
-    !loading && signedIn && typeof credits === "number"
-      ? t("sidebar.user.credits", { count: credits })
-      : "";
   const avatarInitials =
     initials ||
     (signedIn ? (name || email || "AS").slice(0, 2) : "AS");
-  const hasSecondary = Boolean(emailText || creditsText);
 
   return (
     <UserPopover
       open={open}
       onOpenChange={setOpen}
+      userId={userId}
+      name={name}
       email={email}
+      image={image}
       credits={credits}
       signedIn={signedIn}
       onLogin={() => {
@@ -65,22 +66,19 @@ export function UserBar({
     >
       <button
         type="button"
-        className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-[hsl(var(--bg-100)/0.6)]"
+        className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-[hsl(var(--bg-100)/0.6)]"
       >
-        <InitialsAvatar initials={avatarInitials} size={20} shape="round" tone="subtle" />
-        <span className="flex min-w-0 flex-1 flex-col">
-          <span className="min-w-0 truncate text-[12px] leading-4 text-[hsl(var(--text-100))]">
-            {displayName}
-          </span>
-          {hasSecondary && (
-            <span className="flex min-w-0 items-center gap-1 text-[11px] leading-3 text-[hsl(var(--text-300))]">
-              {emailText && <span className="min-w-0 truncate">{emailText}</span>}
-              {emailText && creditsText && (
-                <span className="shrink-0 text-[hsl(var(--text-400))]">·</span>
-              )}
-              {creditsText && <span className="shrink-0">{creditsText}</span>}
-            </span>
-          )}
+        {image ? (
+          <img
+            src={image}
+            alt=""
+            className="size-7 shrink-0 rounded-full border border-border object-cover"
+          />
+        ) : (
+          <InitialsAvatar initials={avatarInitials} size={28} shape="round" tone="subtle" />
+        )}
+        <span className="min-w-0 flex-1 truncate text-sm leading-5 text-[hsl(var(--text-100))]">
+          {displayName}
         </span>
       </button>
     </UserPopover>

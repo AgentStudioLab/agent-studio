@@ -10,6 +10,8 @@
   "saveButton": "保存",
   "profile": {
     "title": "个人资料",
+    "account": "账号资料",
+    "editOnWebsite": "去官网修改",
     "fullName": "姓名",
     "callMe": "请告诉 Agent Studio 怎么称呼你",
     "callMePlaceholder": "Jay",

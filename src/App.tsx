@@ -6,6 +6,7 @@ import { MacTitlebar } from "@/app/MacTitlebar";
 import { RouterView } from "@/app/RouterView";
 import { ScheduledRunWatcher } from "@/features/scheduled/ScheduledRunWatcher";
 import { AuthProvider } from "@/features/auth/AuthProvider";
+import { LoginWaitDialog } from "@/features/auth/LoginWaitDialog";
 
 function App() {
   return (
@@ -42,6 +43,7 @@ function App() {
                 </div>
                 <MacTitlebar />
                 <ScheduledRunWatcher />
+                <LoginWaitDialog />
               </div>
             </TooltipProvider>
           </MessageQueueProvider>

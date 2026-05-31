@@ -3,6 +3,8 @@ import {
   buildAuthorizeUrl,
   consumeDesktopCredits,
   exchangeAuthCode,
+  fetchDesktopMe,
+  getWebsiteOrigin,
 } from "./desktop-auth-client";
 
 const originalFetch = globalThis.fetch;
@@ -62,6 +64,118 @@ describe("desktop auth client", () => {
     expect(new URL(authorizeUrl).pathname).toBe("/desktop/authorize");
     expect(authorizeUrl).toStartWith("https://example.test/desktop/authorize?");
     expect(fetchUrl).toBe("https://example.test/api/desktop/oauth/token");
+  });
+
+  it("uses a locale-prefixed authorize URL for non-default desktop languages", () => {
+    const authorizeUrl = buildAuthorizeUrl({
+      state: "state",
+      codeChallenge: "challenge",
+      deviceId: "device-1",
+      locale: "en",
+    });
+
+    const url = new URL(authorizeUrl);
+    expect(url.pathname).toBe("/en/desktop/authorize");
+  });
+
+  it("uses the unprefixed authorize URL for the default desktop language", () => {
+    const authorizeUrl = buildAuthorizeUrl({
+      state: "state",
+      codeChallenge: "challenge",
+      deviceId: "device-1",
+      locale: "zh",
+    });
+
+    const url = new URL(authorizeUrl);
+    expect(url.pathname).toBe("/desktop/authorize");
+  });
+
+  it("uses a caller-provided redirect URI for loopback development callbacks", async () => {
+    const fetchSpy = mock(async () =>
+      jsonResponse({
+        code: 0,
+        data: {
+          accessToken: "access-token",
+          expiresIn: 3600,
+          refreshToken: "refresh-token",
+          refreshExpiresIn: 7200,
+          user: {
+            id: "user-1",
+            credits: { remainingCredits: 10 },
+          },
+        },
+      }),
+    );
+    globalThis.fetch = fetchSpy as typeof fetch;
+    const redirectUri = "http://127.0.0.1:49152/auth/callback";
+
+    const authorizeUrl = buildAuthorizeUrl({
+      state: "state",
+      codeChallenge: "challenge",
+      deviceId: "device-1",
+      redirectUri,
+    });
+    await exchangeAuthCode({
+      code: "code",
+      codeVerifier: "verifier",
+      deviceId: "device-1",
+      redirectUri,
+    });
+
+    const tokenBody = JSON.parse((fetchSpy.mock.calls[0]?.[1] as RequestInit).body as string);
+    expect(new URL(authorizeUrl).searchParams.get("redirect_uri")).toBe(redirectUri);
+    expect(tokenBody.redirect_uri).toBe(redirectUri);
+  });
+
+  it("resolves relative user avatar URLs against the configured website origin", async () => {
+    const fetchSpy = mock(async () =>
+      jsonResponse({
+        code: 0,
+        data: {
+          accessToken: "access-token",
+          expiresIn: 3600,
+          refreshToken: "refresh-token",
+          refreshExpiresIn: 7200,
+          user: {
+            id: "user-1",
+            image: "/uploads/avatar.png",
+            credits: { remainingCredits: 10 },
+          },
+        },
+      }),
+    );
+    globalThis.fetch = fetchSpy as typeof fetch;
+
+    const result = await exchangeAuthCode({
+      code: "code",
+      codeVerifier: "verifier",
+      deviceId: "device-1",
+    });
+
+    expect(result.user.image).toBe("https://example.test/uploads/avatar.png");
+  });
+
+  it("keeps an empty desktop user avatar empty so the UI can show the default avatar", async () => {
+    globalThis.fetch = mock(async () =>
+      jsonResponse({
+        code: 0,
+        data: {
+          id: "user-1",
+          image: "   ",
+          credits: { remainingCredits: 10 },
+        },
+      }),
+    ) as typeof fetch;
+
+    const user = await fetchDesktopMe("access-token");
+
+    expect(user.image).toBeNull();
+  });
+
+  it("requires the website origin to be configured by environment", () => {
+    import.meta.env.VITE_AGENT_STUDIO_WEBSITE_ORIGIN = "";
+
+    expect(() => getWebsiteOrigin()).toThrow("desktop_api_missing_website_origin");
   });
 
   it("throws a stable status error for non-JSON HTTP errors", async () => {

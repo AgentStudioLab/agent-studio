@@ -44,8 +44,18 @@
     "settings": "设置",
     "login": "登录",
     "logout": "退出登录",
+    "signedIn": "已登录",
     "signedOut": "未登录",
-    "credits": "{{count}} 积分"
+    "accountId": "账号 {{id}}",
+    "credits": "{{count}} 积分",
+    "loginWaitTitle": "正在等待浏览器授权",
+    "loginWaitDescription": "请在浏览器中完成登录。完成后，Agent Studio 会自动回到桌面端并同步你的账号信息。",
+    "loginWaitOpenError": "浏览器打开失败：{{error}}",
+    "loginWaitHint": "如果浏览器没有自动打开，可以重新打开授权页；如果系统没有唤起桌面端，请先确认已安装或正在运行 Agent Studio。",
+    "loginWaitCancel": "取消登录",
+    "loginWaitCopied": "已复制",
+    "loginWaitCopy": "复制链接",
+    "loginWaitReopen": "重新打开浏览器"
   },
   "update": {
     "title": "重启以更新"

@@ -21,3 +21,8 @@ export interface DesktopAuthSession {
 }
 
 export type AuthStatus = "loading" | "signed-out" | "signed-in";
+
+export interface DesktopLoginRequest {
+  authorizeUrl: string;
+  startedAt: number;
+}

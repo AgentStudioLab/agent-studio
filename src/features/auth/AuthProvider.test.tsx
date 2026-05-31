@@ -26,10 +26,16 @@ const createPkcePair = mock(async () => ({
   challenge: "challenge-1",
 }));
 const randomBase64Url = mock((_byteLength = 32) => "random");
+let currentLanguage = "zh";
 
 mock.module("@tauri-apps/plugin-shell", () => ({ open }));
 mock.module("@tauri-apps/api/core", () => ({ invoke }));
 mock.module("@tauri-apps/api/event", () => ({ listen }));
+mock.module("react-i18next", () => ({
+  useTranslation: () => ({
+    i18n: { language: currentLanguage },
+  }),
+}));
 mock.module("./desktop-auth-storage", () => ({
   clearStoredAuthTokens,
   loadStoredAuthTokens,
@@ -103,6 +109,7 @@ function createExpiredAccessTokens(): DesktopAuthTokens {
 describe("AuthProvider", () => {
   beforeEach(() => {
     window.localStorage.clear();
+    currentLanguage = "zh";
     import.meta.env.VITE_AGENT_STUDIO_WEBSITE_ORIGIN = "https://example.test";
     globalThis.fetch = mock(async () =>
       jsonResponse({
@@ -178,6 +185,90 @@ describe("AuthProvider", () => {
     expect(url.searchParams.get("state")).toBe("state-1");
     expect(url.searchParams.get("code_challenge")).toBe("challenge-1");
     expect(url.searchParams.get("device_id")).toBe(deviceId);
+    expect(result.current.loginRequest?.authorizeUrl).toBe(openedUrl);
+    expect(result.current.loginError).toBeNull();
+  });
+
+  it("opens the English website authorization page when the desktop language is English", async () => {
+    currentLanguage = "en";
+    const { result } = renderHook(() => useAuthForTest(), { wrapper: wrap });
+    await waitFor(() => expect(result.current.status).toBe("signed-out"));
+
+    await act(async () => {
+      await result.current.login();
+    });
+
+    const url = new URL(open.mock.calls[0]?.[0] as string);
+    expect(url.pathname).toBe("/en/desktop/authorize");
+  });
+
+  it("uses a loopback redirect URI from Tauri when available in development", async () => {
+    invoke.mockImplementation(async (command) => {
+      if (command === "get_desktop_auth_redirect_uri") {
+        return "http://127.0.0.1:49152/auth/callback";
+      }
+      return null;
+    });
+    const { result } = renderHook(() => useAuthForTest(), { wrapper: wrap });
+    await waitFor(() => expect(result.current.status).toBe("signed-out"));
+
+    await act(async () => {
+      await result.current.login();
+    });
+    await act(async () => {
+      await eventHandler?.({
+        payload: "http://127.0.0.1:49152/auth/callback?code=code-1&state=state-1",
+      });
+    });
+
+    await waitFor(() => expect(result.current.status).toBe("signed-in"));
+    const authorizeUrl = new URL(open.mock.calls[0]?.[0] as string);
+    const fetchCall = (globalThis.fetch as ReturnType<typeof mock>).mock.calls[0];
+    const tokenBody = JSON.parse((fetchCall?.[1] as RequestInit).body as string);
+    expect(authorizeUrl.searchParams.get("redirect_uri")).toBe(
+      "http://127.0.0.1:49152/auth/callback",
+    );
+    expect(tokenBody.redirect_uri).toBe("http://127.0.0.1:49152/auth/callback");
+  });
+
+  it("reopens the current browser authorization without creating a new login request", async () => {
+    const { result } = renderHook(() => useAuthForTest(), { wrapper: wrap });
+    await waitFor(() => expect(result.current.status).toBe("signed-out"));
+
+    await act(async () => {
+      await result.current.login();
+    });
+    const openedUrl = open.mock.calls[0]?.[0] as string;
+
+    await act(async () => {
+      await result.current.reopenLogin();
+    });
+
+    expect(open).toHaveBeenCalledTimes(2);
+    expect(open.mock.calls[1]?.[0]).toBe(openedUrl);
+    expect(createPkcePair).toHaveBeenCalledTimes(1);
+    expect(result.current.loginRequest?.authorizeUrl).toBe(openedUrl);
+  });
+
+  it("cancels a pending browser authorization and ignores its later callback", async () => {
+    const { result } = renderHook(() => useAuthForTest(), { wrapper: wrap });
+    await waitFor(() => expect(result.current.status).toBe("signed-out"));
+
+    await act(async () => {
+      await result.current.login();
+    });
+    await act(async () => {
+      result.current.cancelLogin();
+    });
+    await act(async () => {
+      await eventHandler?.({
+        payload: "agent-studio://auth/callback?code=code-1&state=state-1",
+      });
+    });
+
+    expect(result.current.loginRequest).toBeNull();
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    expect(result.current.status).toBe("signed-out");
   });
 
   it("exchanges a matching callback for tokens and signs in", async () => {
@@ -194,6 +285,7 @@ describe("AuthProvider", () => {
     });
 
     await waitFor(() => expect(result.current.status).toBe("signed-in"));
+    expect(result.current.loginRequest).toBeNull();
     const fetchCall = (globalThis.fetch as ReturnType<typeof mock>).mock.calls[0];
     expect(fetchCall?.[0]).toBe("https://example.test/api/desktop/oauth/token");
     expect(JSON.parse((fetchCall?.[1] as RequestInit).body as string)).toMatchObject({
