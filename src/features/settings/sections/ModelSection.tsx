@@ -18,6 +18,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  parseCustomModels,
+  prioritizeSelectedModel,
+} from "./modelSectionModels";
 
 export function ModelSection() {
   const { t } = useTranslation();
@@ -96,7 +100,7 @@ export function ModelSection() {
             description: r.description,
           });
         }
-        customModels = cleaned;
+        customModels = prioritizeSelectedModel(cleaned, selectedModelId);
       } catch {
         setSaveMsg("invalid");
         setSaving(false);
@@ -105,12 +109,21 @@ export function ModelSection() {
     }
 
     try {
-      await setProvider({
+      const current = await setProvider({
         profileId,
         baseUrl,
         apiKey,
         ...(customModels ? { customModels } : {}),
       });
+      if (profileId === "custom" && customModels) {
+        setCustomModelsText(JSON.stringify(customModels, null, 2));
+        setSelectedModelId(customModels[0]?.id ?? null);
+        qc.setQueryData(["provider"], {
+          ...data,
+          current,
+        });
+        qc.setQueryData(["models"], customModels);
+      }
       setSaveMsg("saved");
       void qc.invalidateQueries({ queryKey: ["provider"] });
       void qc.invalidateQueries({ queryKey: ["models"] });
@@ -303,33 +316,6 @@ export function ModelSection() {
       </div>
     </section>
   );
-}
-
-function parseCustomModels(text: string): ProfileModel[] {
-  try {
-    const parsed = JSON.parse(text || "[]") as unknown;
-    if (!Array.isArray(parsed)) return [];
-    const models: ProfileModel[] = [];
-    for (const item of parsed) {
-      if (!item || typeof item !== "object") continue;
-      const record = item as Record<string, unknown>;
-      if (
-        typeof record.id !== "string" ||
-        typeof record.displayName !== "string" ||
-        typeof record.description !== "string"
-      ) {
-        continue;
-      }
-      models.push({
-        id: record.id,
-        displayName: record.displayName,
-        description: record.description,
-      });
-    }
-    return models;
-  } catch {
-    return [];
-  }
 }
 
 function Field({
