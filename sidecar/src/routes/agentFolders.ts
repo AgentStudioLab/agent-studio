@@ -3,6 +3,7 @@ import { existsSync, statSync } from "node:fs";
 import { basename, isAbsolute } from "node:path";
 import type { AgentFolderService } from "../services/agentFolders";
 import type { AgentWorkspaceService } from "../services/agentWorkspaces";
+import { walkTree, MAX_FILES } from "../lib/fileTree";
 
 export interface MountAgentFolderDeps {
   agentFolders: AgentFolderService;
@@ -15,6 +16,7 @@ export interface MountAgentFolderDeps {
  *   GET    /agents/:id/folders            list this agent's mounted folders
  *   POST   /agents/:id/folders            mount one ({ path, folderName?, writable? })
  *   PATCH  /agents/:id/folders/:folderId  toggle write access ({ writable })
+ *   GET    /agents/:id/folders/:folderId/tree  recursive file tree of the folder
  *   DELETE /agents/:id/folders/:folderId  unmount (the path on disk is untouched)
  *
  * POST validates the path is absolute and an existing directory — the frontend
@@ -65,6 +67,23 @@ export function buildAgentFolderRoutes(deps: MountAgentFolderDeps): Hono {
       return c.json({ error: "invalid_writable" }, 400);
     }
     return c.json(agentFolders.setWritable(folderId, body.writable));
+  });
+
+  // Recursive file tree of a mounted folder (no path shown in the UI — the
+  // tree IS the affordance). Reuses the shared walkTree noise filter + caps.
+  app.get("/agents/:id/folders/:folderId/tree", async (c) => {
+    const id = c.req.param("id");
+    const folderId = c.req.param("folderId");
+    const folder = agentFolders.get(folderId);
+    if (!folder || folder.agentWorkspaceId !== id) {
+      return c.json({ error: "folder_not_found" }, 404);
+    }
+    if (!existsSync(folder.path) || !statSync(folder.path).isDirectory()) {
+      return c.json({ error: "not_a_directory" }, 404);
+    }
+    const counter = { count: 0 };
+    const tree = await walkTree(folder.path, "", 0, counter);
+    return c.json({ folderId, tree, truncated: counter.count >= MAX_FILES });
   });
 
   app.delete("/agents/:id/folders/:folderId", (c) => {

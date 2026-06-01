@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { Database } from "bun:sqlite";
-import { mkdtempSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { migrate } from "../db";
@@ -134,6 +134,41 @@ describe("agent folder routes", () => {
     const res = await app.request(`/agents/${agent.id}/folders/agf_missing`, {
       method: "DELETE",
     });
+    expect(res.status).toBe(404);
+  });
+
+  it("GET /tree returns a nested file tree and skips noise dirs", async () => {
+    const { app, agentWorkspaces, realDir } = harness();
+    const agent = agentWorkspaces.create({ name: "A" });
+    // Lay out: README.md, src/index.ts, node_modules/(skipped), .git/(skipped)
+    writeFileSync(join(realDir, "README.md"), "# hi");
+    mkdirSync(join(realDir, "src"));
+    writeFileSync(join(realDir, "src", "index.ts"), "x");
+    mkdirSync(join(realDir, "node_modules"));
+    writeFileSync(join(realDir, "node_modules", "junk.js"), "x");
+
+    const folder = (await (await postFolder(app, agent.id, { path: realDir })).json()) as {
+      id: string;
+    };
+    const res = await app.request(`/agents/${agent.id}/folders/${folder.id}/tree`);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      tree: { name: string; kind: string; children?: { name: string }[] }[];
+    };
+    const names = body.tree.map((n) => n.name);
+    expect(names).toContain("src"); // dir
+    expect(names).toContain("README.md"); // file
+    expect(names).not.toContain("node_modules"); // skipped
+    const src = body.tree.find((n) => n.name === "src");
+    expect(src?.children?.map((c) => c.name)).toEqual(["index.ts"]);
+  });
+
+  it("GET /tree 404s for a folder of a different agent", async () => {
+    const { app, agentWorkspaces, agentFolders, realDir } = harness();
+    const a1 = agentWorkspaces.create({ name: "A1" });
+    const a2 = agentWorkspaces.create({ name: "A2" });
+    const f = agentFolders.create({ agentWorkspaceId: a1.id, path: realDir, folderName: "x" });
+    const res = await app.request(`/agents/${a2.id}/folders/${f.id}/tree`);
     expect(res.status).toBe(404);
   });
 });
