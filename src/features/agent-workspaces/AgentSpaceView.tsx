@@ -20,7 +20,6 @@ import { SlashEditor } from "@/features/composer/SlashEditor";
 import { ModelPicker } from "@/features/task/ModelPicker";
 import { AgentSpaceHeader } from "@/features/agent-workspaces/AgentSpaceHeader";
 import { AgentRecents } from "@/features/agent-workspaces/AgentRecents";
-import { RailSection } from "@/features/agent-workspaces/RailSection";
 import { InstructionsCard } from "@/features/agent-workspaces/InstructionsCard";
 import { ScheduledRailCard } from "@/features/agent-workspaces/ScheduledRailCard";
 import { ContextCard } from "@/features/agent-workspaces/ContextCard";
@@ -94,9 +93,7 @@ export function AgentSpaceView() {
           {/* Right rail: Instructions / Scheduled / Context */}
           {agentId && (
             <aside className="flex w-[340px] shrink-0 flex-col gap-4 overflow-y-auto border-l border-border p-4 pt-12">
-              <RailSection title={t("agentSpace.instructions.title")}>
-                <InstructionsCard agentId={agentId} />
-              </RailSection>
+              <InstructionsCard agentId={agentId} />
               <ScheduledRailCard agentId={agentId} />
               <ContextCard agentId={agentId} />
             </aside>

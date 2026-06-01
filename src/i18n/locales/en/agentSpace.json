@@ -38,6 +38,10 @@
     "title": "Instructions",
     "description": "Acts as this agent's CLAUDE.md — auto-loaded on every run.",
     "placeholder": "Write instructions this agent should follow…",
+    "edit": "Edit",
+    "editTitle": "Edit instructions",
+    "editPlaceholder": "Tell Claude how to work in this project (optional)",
+    "cancel": "Cancel",
     "save": "Save",
     "saved": "Saved"
   },

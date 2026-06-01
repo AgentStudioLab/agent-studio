@@ -38,6 +38,10 @@
     "title": "说明",
     "description": "作为这个智能体的 CLAUDE.md，每次运行自动加载。",
     "placeholder": "写下这个智能体应遵循的指令…",
+    "edit": "编辑",
+    "editTitle": "编辑说明",
+    "editPlaceholder": "告诉 Claude 在这个智能体里该怎么工作（可选）",
+    "cancel": "取消",
     "save": "保存",
     "saved": "已保存"
   },
