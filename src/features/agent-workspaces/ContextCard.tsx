@@ -10,7 +10,7 @@ import {
 import { useCreateAgentFolderMutation } from "@/lib/data/agent-folder-queries";
 import { RailSection } from "./RailSection";
 import { AgentFoldersCard, type OpenFolderFile } from "./AgentFoldersCard";
-import { MemoryCard } from "./MemoryCard";
+import { MemoryFilesCard } from "./MemoryFilesCard";
 
 /** Context rail card: external folders ("On your computer") + the agent's
  *  Memory, under one collapsible. The ＋ dropdown adds a folder (Add-a-link is
@@ -63,7 +63,7 @@ export function ContextCard({
           <h3 className="text-xs font-medium text-muted-foreground">
             {t("agentSpace.memory.title")}
           </h3>
-          <MemoryCard agentId={agentId} />
+          <MemoryFilesCard agentId={agentId} onOpenFile={onOpenFile} />
         </section>
       </div>
     </RailSection>
