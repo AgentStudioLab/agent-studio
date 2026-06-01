@@ -11,6 +11,10 @@ export interface AGUIApiOptions {
   apiBase?: string;
   /** 自定义 fetch 实现，默认全局 fetch。 */
   fetchImpl?: typeof fetch;
+  /** 当前 UI 语言（如 i18n.language）。每次 postRun/postRegenerate 调用时读取，
+   *  随请求带给 sidecar，用于在 systemPrompt.append 注入"用该语言回答"。
+   *  返回空 → 不带 locale（模型默认英文）。框架无关：React 层注入。 */
+  getLocale?: () => string | undefined;
 }
 
 export interface PostRunRequest {
@@ -75,19 +79,22 @@ export class RunInProgressError extends Error {
 export class AGUIHttpClient {
   private readonly apiBase: string;
   private readonly fetchImpl: typeof fetch;
+  private readonly getLocale?: () => string | undefined;
 
   constructor(opts: AGUIApiOptions = {}) {
     this.apiBase = opts.apiBase ?? "";
     this.fetchImpl =
       opts.fetchImpl ?? ((...a: Parameters<typeof fetch>) => fetch(...a));
+    this.getLocale = opts.getLocale;
   }
 
   /** 启动一次 run。返回服务端确认的 runId（与 req.runId 一致）。 */
   async postRun(req: PostRunRequest): Promise<{ runId: string }> {
+    const locale = this.getLocale?.();
     const res = await this.fetchImpl(`${this.apiBase}/runs`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify(req),
+      body: JSON.stringify(locale ? { ...req, locale } : req),
     });
     if (res.status === 409) {
       const b = (await res.json().catch(() => null)) as { activeRunId?: string } | null;
@@ -104,6 +111,7 @@ export class AGUIHttpClient {
   async postRegenerate(
     req: PostRegenerateRequest,
   ): Promise<{ runId: string }> {
+    const locale = this.getLocale?.();
     const res = await this.fetchImpl(
       `${this.apiBase}/threads/${req.threadId}/regenerate`,
       {
@@ -114,6 +122,7 @@ export class AGUIHttpClient {
           runId: req.runId,
           ...(req.permissionMode ? { permissionMode: req.permissionMode } : {}),
           ...(req.model ? { model: req.model } : {}),
+          ...(locale ? { locale } : {}),
         }),
       },
     );

@@ -43,6 +43,7 @@ import type { AGUIEvent } from "../core/types";
 import type { AGUIInterrupt } from "../core/interrupts";
 import type { InterruptBus } from "./interrupt-bus";
 import type { AuditService } from "../../services/audit";
+import { languageDirective } from "../../lib/composeAppendPrompt";
 
 export interface ClaudeProviderOptions {
   /**
@@ -294,8 +295,12 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
     // Agent-bound context (its CLAUDE.md instructions + saved memories), computed
     // by runWorker and merged AFTER the per-user profile addition. Both extend
     // the claude_code preset via `append`.
+    // Language directive derived from the caller's UI locale. Placed last so
+    // it reads as a trailing default; phrased to defer to explicit user
+    // instructions, so a user who asked for another language still wins.
+    const localeDirective = languageDirective(ctxRun.locale);
     const combinedAppend =
-      [appendPrompt, ctxRun.appendContext]
+      [appendPrompt, ctxRun.appendContext, localeDirective]
         .filter((s): s is string => typeof s === "string" && s.trim().length > 0)
         .join("\n\n") || null;
 

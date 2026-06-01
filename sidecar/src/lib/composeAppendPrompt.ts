@@ -44,3 +44,19 @@ export function composeAppendPrompt(profile: UserProfile): string | null {
   if (parts.length === 0) return null;
   return parts.join("\n\n");
 }
+
+/**
+ * Per-run language directive for `systemPrompt.append`, derived from the
+ * caller's UI locale (the frontend forwards `i18n.language` on each run).
+ * Only emitted for Chinese — English is the model's default, so steering it
+ * would cost tokens for no gain. Phrased to defer to any explicit user
+ * instruction, so it acts as a default rather than an override. Returns null
+ * when no directive is needed.
+ */
+export function languageDirective(locale: string | undefined): string | null {
+  if (typeof locale !== "string") return null;
+  if (locale.toLowerCase().startsWith("zh")) {
+    return "除非用户另有要求，请始终使用简体中文回答，包括你的思考过程（thinking）。";
+  }
+  return null;
+}

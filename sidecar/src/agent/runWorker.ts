@@ -101,6 +101,9 @@ export interface RunWorkerInput {
   resumeSessionAt?: string;
   /** Regenerate of the first turn: skip resume, fresh session (see RunContext). */
   freshSession?: boolean;
+  /** Caller's UI locale (frontend forwards i18n.language) → language directive
+   *  in systemPrompt.append. Omitted for background runs (see RunContext). */
+  locale?: string;
 }
 
 export async function runWorker(input: RunWorkerInput): Promise<void> {
@@ -123,6 +126,7 @@ export async function runWorker(input: RunWorkerInput): Promise<void> {
     userMessageId,
     resumeSessionAt,
     freshSession,
+    locale,
   } = input;
 
   // Buffer the structured messages/tool_calls writes until the run reaches a
@@ -285,6 +289,7 @@ export async function runWorker(input: RunWorkerInput): Promise<void> {
       additionalWriteDirs: agentDirs?.additionalWriteDirs,
       appendContext,
       agentWorkspaceId,
+      locale,
     });
 
     await executeRunLoop({

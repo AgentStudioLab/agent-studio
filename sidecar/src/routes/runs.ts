@@ -57,6 +57,7 @@ export function buildRunRoutes(deps: MountRunsDeps): Hono {
           message?: { role?: string; content?: string };
           permissionMode?: "ask" | "act-without-asking";
           model?: string;
+          locale?: string;
         }
       | null;
     if (
@@ -67,6 +68,8 @@ export function buildRunRoutes(deps: MountRunsDeps): Hono {
     ) {
       return c.json({ error: "invalid_body" }, 400);
     }
+    // UI locale → language directive in systemPrompt.append. Non-string → undefined.
+    const locale = typeof body.locale === "string" ? body.locale : undefined;
     // Unknown / missing permissionMode → default to "ask" (the safe choice).
     const permissionMode: "ask" | "act-without-asking" =
       body.permissionMode === "act-without-asking" ? "act-without-asking" : "ask";
@@ -127,6 +130,7 @@ export function buildRunRoutes(deps: MountRunsDeps): Hono {
       usage: deps.usage,
       permissionMode,
       model,
+      locale,
       userMessageId: userMsg.id,
     }).finally(() => aborters.delete(body.runId!));
 
@@ -146,6 +150,7 @@ export function buildRunRoutes(deps: MountRunsDeps): Hono {
           runId?: string;
           permissionMode?: "ask" | "act-without-asking";
           model?: string;
+          locale?: string;
         }
       | null;
     if (!body?.fromMessageId || !body?.runId) {
@@ -177,6 +182,7 @@ export function buildRunRoutes(deps: MountRunsDeps): Hono {
       typeof body.model === "string" && body.model.length > 0
         ? body.model
         : undefined;
+    const locale = typeof body.locale === "string" ? body.locale : undefined;
 
     const cwd = thread.workingDir;
     const userContent = target.content;
@@ -243,6 +249,7 @@ export function buildRunRoutes(deps: MountRunsDeps): Hono {
           usage: deps.usage,
           permissionMode,
           model,
+          locale,
           userMessageId: newUser.id,
           resumeSessionAt,
           freshSession: resumeSessionAt == null,

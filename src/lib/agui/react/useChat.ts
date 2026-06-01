@@ -12,6 +12,7 @@ import {
   type PendingInterrupt,
 } from "../runtime";
 import { authedFetch } from "@/lib/sidecar-client";
+import i18n from "@/i18n";
 
 export type {
   MessageBlock,
@@ -67,6 +68,8 @@ export function useChat(opts: UseChatOptions) {
       // apiBase blank — authedFetch normalises relative paths.
       apiBase: "",
       fetchImpl: authedFetch,
+      // Read fresh per request so a language switch mid-session takes effect.
+      getLocale: () => i18n.language,
       initialMessages: opts.initialMessages,
       onRunFinished: invalidateAfterRun,
       onRunError: invalidateAfterRun,

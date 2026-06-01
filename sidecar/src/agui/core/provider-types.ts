@@ -127,6 +127,13 @@ export interface RunContext {
    * adds its FQN to `allowedTools`. Undefined for a non-agent thread.
    */
   agentWorkspaceId?: string;
+  /**
+   * Caller's UI locale (the frontend forwards `i18n.language`). The provider
+   * derives a language directive from it and merges it into `systemPrompt.append`
+   * so the model answers (and reasons) in the user's language. Undefined for
+   * background runs (scheduler) → no directive, model default (English).
+   */
+  locale?: string;
 }
 
 export interface ResumeContext {

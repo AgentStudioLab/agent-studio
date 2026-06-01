@@ -81,6 +81,7 @@ export function createChatRuntime(opts: ChatRuntimeOptions): ChatRuntime {
   const http = new AGUIHttpClient({
     apiBase: opts.apiBase,
     fetchImpl: opts.fetchImpl,
+    getLocale: opts.getLocale,
   });
 
   // —— 状态与订阅 ——
