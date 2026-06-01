@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { nanoid } from "nanoid";
+import { INDEX_HEADER, MEMORY_DIR, MEMORY_INDEX } from "./agentMemoryStore";
 
 export interface AgentWorkspace {
   id: string;
@@ -73,17 +74,10 @@ export class AgentWorkspaceService {
     // Create the home dir up front so the SDK never ENOENTs on its first tool.
     mkdirSync(homeDir, { recursive: true });
     // Seed the file-based memory store so the index file always exists.
-    const memDir = join(homeDir, "memory");
+    const memDir = join(homeDir, MEMORY_DIR);
     mkdirSync(memDir, { recursive: true });
-    const memIndex = join(memDir, "MEMORY.md");
-    if (!existsSync(memIndex)) {
-      writeFileSync(
-        memIndex,
-        "# Memory index\n\n<!-- One line per scenario memory: - [Title](slug.md) — hook. " +
-          "Read the linked file for detail. Maintained by the remember tool. -->\n\n",
-        "utf8",
-      );
-    }
+    const memIndex = join(memDir, MEMORY_INDEX);
+    if (!existsSync(memIndex)) writeFileSync(memIndex, INDEX_HEADER, "utf8");
     const now = Date.now();
     this.db
       .prepare(

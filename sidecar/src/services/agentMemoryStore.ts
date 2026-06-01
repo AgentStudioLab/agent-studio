@@ -11,7 +11,7 @@ export const MEMORY_INDEX = "MEMORY.md";
  *  injected, so this caps the always-on cost. */
 export const MEMORY_INDEX_BUDGET = { soft: 2000, warn: 1600, hard: 2800 };
 
-const INDEX_HEADER =
+export const INDEX_HEADER =
   "# Memory index\n\n" +
   "<!-- One line per scenario memory: - [Title](slug.md) — hook. " +
   "Read the linked file for detail. Maintained by the remember tool. -->\n\n";
@@ -158,15 +158,17 @@ export class AgentMemoryStore {
       if (!existsSync(idxPath)) return;
       // Only the host-side backstop: act ONLY past `hard`, leaving a warn→hard
       // band for the agent to self-consolidate. Once triggered, trim to `soft`.
-      if (readFileSync(idxPath, "utf8").length <= MEMORY_INDEX_BUDGET.hard) return;
-      while (readFileSync(idxPath, "utf8").length > MEMORY_INDEX_BUDGET.soft) {
-        const lines = readFileSync(idxPath, "utf8").split("\n");
+      let text = readFileSync(idxPath, "utf8");
+      if (text.length <= MEMORY_INDEX_BUDGET.hard) return;
+      while (text.length > MEMORY_INDEX_BUDGET.soft) {
+        const lines = text.split("\n");
         const i = lines.findIndex((l) => /\]\(([\w.-]+)\.md\)/.test(l));
         if (i < 0) break;
         const slug = lines[i]!.match(/\]\(([\w.-]+)\.md\)/)![1]!;
         rmSync(join(dir, `${slug}.md`), { force: true });
         lines.splice(i, 1);
-        writeAtomic(idxPath, lines.join("\n").replace(/\n*$/, "\n"));
+        text = lines.join("\n").replace(/\n*$/, "\n");
+        writeAtomic(idxPath, text);
       }
     });
   }
