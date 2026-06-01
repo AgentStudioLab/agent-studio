@@ -22,16 +22,12 @@ export function InstructionsCard({ agentId }: { agentId: string }) {
 
   const dirty = draft !== (data ?? "");
 
+  // Body-only: the RailSection ("Instructions") owns the card chrome + title.
   return (
-    <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4">
-      <div>
-        <h2 className="text-sm font-medium text-foreground">
-          {t("agentSpace.instructions.title")}
-        </h2>
-        <p className="mt-0.5 text-xs text-muted-foreground">
-          {t("agentSpace.instructions.description")}
-        </p>
-      </div>
+    <div className="flex flex-col gap-3">
+      <p className="text-xs text-muted-foreground">
+        {t("agentSpace.instructions.description")}
+      </p>
       <Textarea
         value={draft}
         onChange={(e) => setDraft(e.target.value)}

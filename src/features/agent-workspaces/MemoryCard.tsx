@@ -18,20 +18,14 @@ const BLOCK_ORDER: MemoryBlock[] = ["profile", "facts"];
 /** Cross-session memory: agent-written (remember tool) + user-authored entries,
  *  split into 'profile' (about the user) and 'facts' (about the project/work). */
 export function MemoryCard({ agentId }: { agentId: string }) {
-  const { t } = useTranslation();
   const { data: memories } = useAgentMemories(agentId);
   const createMemory = useCreateAgentMemoryMutation(agentId);
   const deleteMemory = useDeleteAgentMemoryMutation(agentId);
   const list = memories ?? [];
 
+  // Body-only: the enclosing Context "Memory" subsection owns the heading.
   return (
-    <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-4">
-      <div>
-        <h2 className="text-sm font-medium text-foreground">{t("agentSpace.memory.title")}</h2>
-        <p className="mt-0.5 text-xs text-muted-foreground">
-          {t("agentSpace.memory.description")}
-        </p>
-      </div>
+    <div className="flex flex-col gap-4">
       {BLOCK_ORDER.map((block) => (
         <MemoryBlockSection
           key={block}

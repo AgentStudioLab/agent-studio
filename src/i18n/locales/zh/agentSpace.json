@@ -2,6 +2,28 @@
   "promptPlaceholder": "在这个智能体空间里开始一个对话…",
   "ask": "询问",
   "notFound": "智能体不存在",
+  "recents": "最近",
+  "recentsEmpty": "还没有对话。",
+  "header": {
+    "pin": "置顶",
+    "unpin": "取消置顶",
+    "editDetails": "编辑详情",
+    "archive": "归档",
+    "moreActions": "更多操作"
+  },
+  "context": {
+    "title": "上下文",
+    "onYourComputer": "本机文件夹",
+    "chooseFolder": "选择文件夹",
+    "add": "添加上下文"
+  },
+  "scheduled": {
+    "title": "定时任务",
+    "description": "为这个智能体设置定时重复任务。",
+    "existingTasks": "已有任务",
+    "createNew": "新建任务",
+    "add": "添加定时任务"
+  },
   "folders": {
     "title": "文件夹",
     "description": "挂载外部文件夹作为这个智能体的上下文。默认只读，可逐个授权写入。",

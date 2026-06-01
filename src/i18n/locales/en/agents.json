@@ -7,9 +7,11 @@
   "empty": "No agents yet — create one from the top right.",
   "modal": {
     "title": "New agent",
+    "editTitle": "Edit agent",
     "name": "Name",
     "namePlaceholder": "e.g. Weekly blog, Q3 market research",
     "cancel": "Cancel",
-    "save": "Create"
+    "save": "Create",
+    "editSave": "Save"
   }
 }

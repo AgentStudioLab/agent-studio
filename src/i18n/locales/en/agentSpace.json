@@ -2,6 +2,28 @@
   "promptPlaceholder": "Start a conversation in this agent space…",
   "ask": "Ask",
   "notFound": "Agent not found",
+  "recents": "Recents",
+  "recentsEmpty": "No conversations yet.",
+  "header": {
+    "pin": "Pin",
+    "unpin": "Unpin",
+    "editDetails": "Edit details",
+    "archive": "Archive",
+    "moreActions": "More actions"
+  },
+  "context": {
+    "title": "Context",
+    "onYourComputer": "On your computer",
+    "chooseFolder": "Choose a folder",
+    "add": "Add context"
+  },
+  "scheduled": {
+    "title": "Scheduled",
+    "description": "Set up recurring tasks for this agent.",
+    "existingTasks": "Existing tasks",
+    "createNew": "Create new task",
+    "add": "Add scheduled task"
+  },
   "folders": {
     "title": "Folders",
     "description": "Mount external folders as context for this agent. Read-only by default; grant write per folder.",

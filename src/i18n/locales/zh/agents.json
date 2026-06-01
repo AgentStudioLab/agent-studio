@@ -7,9 +7,11 @@
   "empty": "还没有智能体，点右上角新建一个。",
   "modal": {
     "title": "新建智能体",
+    "editTitle": "编辑智能体",
     "name": "名称",
     "namePlaceholder": "例如：周更博客、Q3 市场研究",
     "cancel": "取消",
-    "save": "创建"
+    "save": "创建",
+    "editSave": "保存"
   }
 }

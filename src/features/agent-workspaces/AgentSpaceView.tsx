@@ -18,9 +18,12 @@ import {
 } from "@/components/ai-elements/prompt-input";
 import { SlashEditor } from "@/features/composer/SlashEditor";
 import { ModelPicker } from "@/features/task/ModelPicker";
-import { AgentFoldersCard } from "@/features/agent-workspaces/AgentFoldersCard";
+import { AgentSpaceHeader } from "@/features/agent-workspaces/AgentSpaceHeader";
+import { AgentRecents } from "@/features/agent-workspaces/AgentRecents";
+import { RailSection } from "@/features/agent-workspaces/RailSection";
 import { InstructionsCard } from "@/features/agent-workspaces/InstructionsCard";
-import { MemoryCard } from "@/features/agent-workspaces/MemoryCard";
+import { ScheduledRailCard } from "@/features/agent-workspaces/ScheduledRailCard";
+import { ContextCard } from "@/features/agent-workspaces/ContextCard";
 
 export function AgentSpaceView() {
   const { agentId } = useParams<{ agentId: string }>();
@@ -59,33 +62,45 @@ export function AgentSpaceView() {
   return (
     <AppShell
       main={
-        <div className="flex h-full flex-col overflow-y-auto">
-          <header data-tauri-drag-region className="px-12 pb-4 pt-12">
-            <h1 className="font-serif text-[32px] font-normal leading-none text-foreground">
-              {agent?.name ?? t("agentSpace.notFound")}
-            </h1>
-          </header>
-          <section className="flex w-full max-w-[860px] flex-col gap-8 px-12 pb-12">
-            <div className="rounded-2xl bg-background">
-              <PromptInput onSubmit={handleSubmit}>
-                <SlashEditor placeholder={t("agentSpace.promptPlaceholder")} />
-                <PromptInputFooter className="px-4 pb-3">
-                  <PromptInputTools />
-                  <PromptInputTools>
-                    <ModelPicker value={model} onChange={setModel} />
-                    <PromptInputSubmit />
-                  </PromptInputTools>
-                </PromptInputFooter>
-              </PromptInput>
+        <div className="flex min-h-0 flex-1">
+          {/* Left: header + composer + recents */}
+          <div className="flex min-w-0 flex-1 flex-col overflow-y-auto">
+            <div className="px-12 pb-4 pt-12">
+              {agent ? (
+                <AgentSpaceHeader agent={agent} />
+              ) : (
+                <h1 className="font-serif text-[32px] font-normal leading-none text-foreground">
+                  {t("agentSpace.notFound")}
+                </h1>
+              )}
             </div>
-            {agentId && (
-              <>
+            <div className="flex w-full max-w-[860px] flex-col gap-8 px-12 pb-12">
+              <div className="rounded-2xl bg-background">
+                <PromptInput onSubmit={handleSubmit}>
+                  <SlashEditor placeholder={t("agentSpace.promptPlaceholder")} />
+                  <PromptInputFooter className="px-4 pb-3">
+                    <PromptInputTools />
+                    <PromptInputTools>
+                      <ModelPicker value={model} onChange={setModel} />
+                      <PromptInputSubmit />
+                    </PromptInputTools>
+                  </PromptInputFooter>
+                </PromptInput>
+              </div>
+              {agentId && <AgentRecents agentId={agentId} />}
+            </div>
+          </div>
+
+          {/* Right rail: Instructions / Scheduled / Context */}
+          {agentId && (
+            <aside className="flex w-[340px] shrink-0 flex-col gap-4 overflow-y-auto border-l border-border p-4 pt-12">
+              <RailSection title={t("agentSpace.instructions.title")}>
                 <InstructionsCard agentId={agentId} />
-                <AgentFoldersCard agentId={agentId} />
-                <MemoryCard agentId={agentId} />
-              </>
-            )}
-          </section>
+              </RailSection>
+              <ScheduledRailCard agentId={agentId} />
+              <ContextCard agentId={agentId} />
+            </aside>
+          )}
         </div>
       }
     />
