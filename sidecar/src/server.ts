@@ -204,9 +204,23 @@ function buildProvider() {
       });
       return { id: task.id, name: task.name };
     },
-    // `remember` MCP tool (agent-bound runs) → persist a memory to that agent.
-    onRemember: (content, { agentWorkspaceId }) => {
-      agentMemories.create({ agentWorkspaceId, content, source: "agent" });
+    // `remember` MCP tool (agent-bound runs) → mutate that agent's memory.
+    // The tool validates content/match presence before calling, so the
+    // non-null assertions here are guaranteed by its contract.
+    onRemember: (edit, { agentWorkspaceId }) => {
+      if (edit.action === "add") {
+        agentMemories.create({
+          agentWorkspaceId,
+          content: edit.content!,
+          source: "agent",
+          block: edit.block,
+        });
+        return { status: "ok", message: edit.content! };
+      }
+      if (edit.action === "replace") {
+        return agentMemories.replaceAgentRow(agentWorkspaceId, edit.block, edit.match!, edit.content!);
+      }
+      return agentMemories.removeAgentRow(agentWorkspaceId, edit.block, edit.match!);
     },
   });
 }
