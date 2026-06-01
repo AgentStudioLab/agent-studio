@@ -28,6 +28,7 @@ import { buildAgentWorkspaceRoutes } from "./routes/agentWorkspaces";
 import { buildAgentFolderRoutes } from "./routes/agentFolders";
 import { buildAgentMemoryRoutes } from "./routes/agentMemories";
 import { buildAgentInstructionRoutes } from "./routes/agentInstructions";
+import { buildAgentMemoryTreeRoutes } from "./routes/agentMemory";
 import { AuditService } from "./services/audit";
 import { UsageService } from "./services/usage";
 import { SettingsToolsService } from "./services/settings-tools";
@@ -267,6 +268,7 @@ app.route("/", buildScheduledRoutes({ tasks: scheduledTasks, threads, store, sch
 app.route("/", buildAgentWorkspaceRoutes({ agentWorkspaces, threads, scheduledTasks }));
 app.route("/", buildAgentFolderRoutes({ agentFolders, agentWorkspaces }));
 app.route("/", buildAgentMemoryRoutes({ agentMemories, agentWorkspaces }));
+app.route("/", buildAgentMemoryTreeRoutes({ agentMemoryStore, agentWorkspaces }));
 app.route("/", buildAgentInstructionRoutes({ agentWorkspaces }));
 app.route("/", buildMessageRoutes(messages));
 app.route("/", buildSettingsRoutes(providerSettings, userProfileSettings));
