@@ -123,7 +123,7 @@ export interface ClaudeProviderOptions {
   /**
    * When provided, an in-process MCP tool `remember` is exposed on agent-bound
    * runs (RunContext.agentWorkspaceId set). The callback persists the memory
-   * via the host's AgentMemoryService (source='agent'). Mirrors
+   * via the host's file-based memory store (AgentMemoryStore). Mirrors
    * onCreateScheduledTask's DI shape.
    */
   onRemember?: RememberFn;

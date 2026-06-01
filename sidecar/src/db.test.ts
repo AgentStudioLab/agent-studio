@@ -88,12 +88,4 @@ describe("db migrate — Phase 1 SDK leverage schema", () => {
     }
   });
 
-  it("creates agent_memories table with required columns", () => {
-    const db = new Database(":memory:");
-    migrate(db);
-    expect(hasTable(db, "agent_memories")).toBe(true);
-    for (const c of ["id","agent_workspace_id","content","source","created_at"]) {
-      expect(hasColumn(db, "agent_memories", c)).toBe(true);
-    }
-  });
 });
