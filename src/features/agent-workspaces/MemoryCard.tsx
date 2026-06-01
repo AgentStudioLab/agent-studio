@@ -1,8 +1,20 @@
-import { useState } from "react";
-import { Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ChevronRight, MessageCircle, Pencil, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import type { AgentMemory, MemoryBlock } from "@/lib/data/types";
 import {
   useAgentMemories,
@@ -10,123 +22,150 @@ import {
   useDeleteAgentMemoryMutation,
 } from "@/lib/data/agent-memory-queries";
 
-// Soft budgets mirror the sidecar's MEMORY_BUDGETS (services/agentMemories.ts);
-// keep these two numbers in sync with that source of truth.
-const BLOCK_SOFT: Record<MemoryBlock, number> = { profile: 1500, facts: 2500 };
 const BLOCK_ORDER: MemoryBlock[] = ["profile", "facts"];
 
-/** Cross-session memory: agent-written (remember tool) + user-authored entries,
- *  split into 'profile' (about the user) and 'facts' (about the project/work). */
+/** Cross-session memory as a single collapsible "Memory" block; expands to the
+ *  user-profile / facts groups. Entries delete on hover (×); each group adds via
+ *  a hover pencil → modal. No persistent add inputs. */
 export function MemoryCard({ agentId }: { agentId: string }) {
+  const { t } = useTranslation();
   const { data: memories } = useAgentMemories(agentId);
-  const createMemory = useCreateAgentMemoryMutation(agentId);
-  const deleteMemory = useDeleteAgentMemoryMutation(agentId);
   const list = memories ?? [];
 
-  // Body-only: the enclosing Context "Memory" subsection owns the heading.
   return (
-    <div className="flex flex-col gap-4">
-      {BLOCK_ORDER.map((block) => (
-        <MemoryBlockSection
-          key={block}
-          block={block}
-          entries={list.filter((m) => m.block === block)}
-          adding={createMemory.isPending}
-          onAdd={(content) => createMemory.mutate({ content, block })}
-          onDelete={(memId) => deleteMemory.mutate(memId)}
-        />
-      ))}
-    </div>
+    <Collapsible className="group/memory rounded-lg bg-muted/50">
+      <CollapsibleTrigger className="flex w-full items-center gap-1.5 px-2 py-1.5 outline-hidden">
+        <ChevronRight className="size-3.5 shrink-0 text-muted-foreground transition-transform group-data-[state=open]/memory:rotate-90" />
+        <MessageCircle className="size-4 shrink-0 text-muted-foreground" />
+        <span className="text-sm text-foreground">{t("agentSpace.memory.title")}</span>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="flex flex-col gap-3 px-2 pb-2 pl-3">
+        {list.length === 0 && (
+          <p className="text-xs italic text-muted-foreground">
+            {t("agentSpace.memory.emptyHint")}
+          </p>
+        )}
+        {BLOCK_ORDER.map((block) => (
+          <MemoryGroup
+            key={block}
+            agentId={agentId}
+            block={block}
+            entries={list.filter((m) => m.block === block)}
+          />
+        ))}
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 
-function MemoryBlockSection({
+function MemoryGroup({
+  agentId,
   block,
   entries,
-  adding,
-  onAdd,
-  onDelete,
 }: {
+  agentId: string;
   block: MemoryBlock;
   entries: AgentMemory[];
-  adding: boolean;
-  onAdd: (content: string) => void;
-  onDelete: (memId: string) => void;
 }) {
   const { t } = useTranslation();
-  const [draft, setDraft] = useState("");
-  const used = entries.reduce((sum, m) => sum + m.content.length, 0);
-  const soft = BLOCK_SOFT[block];
-  const over = used > soft;
-
-  const handleAdd = () => {
-    const content = draft.trim();
-    if (content.length === 0) return;
-    onAdd(content);
-    setDraft("");
-  };
+  const deleteMemory = useDeleteAgentMemoryMutation(agentId);
+  const [addOpen, setAddOpen] = useState(false);
+  const label =
+    block === "profile"
+      ? t("agentSpace.memory.blockProfile")
+      : t("agentSpace.memory.blockFacts");
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="group/grp flex flex-col gap-1">
       <div className="flex items-center justify-between">
-        <h3 className="text-xs font-medium text-foreground">
-          {block === "profile"
-            ? t("agentSpace.memory.blockProfile")
-            : t("agentSpace.memory.blockFacts")}
-        </h3>
-        <span
-          className={`text-[10px] tabular-nums ${over ? "text-destructive" : "text-muted-foreground"}`}
+        <h4 className="text-xs font-medium text-muted-foreground">{label}</h4>
+        <button
+          type="button"
+          onClick={() => setAddOpen(true)}
+          aria-label={`${t("agentSpace.memory.add")} · ${label}`}
+          className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 outline-hidden hover:bg-state-hover hover:text-foreground group-hover/grp:opacity-100"
         >
-          {used}/{soft}
-        </span>
+          <Pencil className="size-3.5" />
+        </button>
       </div>
-
-      <div className="flex items-center gap-2">
-        <Input
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              handleAdd();
-            }
-          }}
-          placeholder={t("agentSpace.memory.placeholder")}
-          className="text-sm"
-        />
-        <Button size="sm" onClick={handleAdd} disabled={draft.trim().length === 0 || adding}>
-          {t("agentSpace.memory.add")}
-        </Button>
-      </div>
-
-      {entries.length === 0 ? (
-        <p className="py-0.5 text-sm text-muted-foreground">{t("agentSpace.memory.empty")}</p>
-      ) : (
-        <ul className="flex flex-col gap-1">
+      {entries.length > 0 && (
+        <ul className="flex flex-col gap-0.5">
           {entries.map((m) => (
             <li
               key={m.id}
-              className="flex items-start gap-2 rounded-md px-2 py-1.5 hover:bg-state-hover"
+              className="group/row flex items-start gap-2 rounded px-1.5 py-1 hover:bg-state-hover"
             >
-              <span className="mt-0.5 shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                {m.source === "agent"
-                  ? t("agentSpace.memory.sourceAgent")
-                  : t("agentSpace.memory.sourceUser")}
-              </span>
               <span className="min-w-0 flex-1 text-sm text-foreground">{m.content}</span>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => onDelete(m.id)}
+              <button
+                type="button"
+                onClick={() => deleteMemory.mutate(m.id)}
                 aria-label={t("agentSpace.memory.remove")}
-                className="size-6 shrink-0 text-muted-foreground hover:text-foreground"
+                className="mt-0.5 shrink-0 rounded p-0.5 text-muted-foreground opacity-0 outline-hidden hover:text-foreground group-hover/row:opacity-100"
               >
-                <Trash2 className="size-3.5" />
-              </Button>
+                <X className="size-3.5" />
+              </button>
             </li>
           ))}
         </ul>
       )}
+      <AddMemoryModal agentId={agentId} block={block} label={label} open={addOpen} onOpenChange={setAddOpen} />
     </div>
+  );
+}
+
+function AddMemoryModal({
+  agentId,
+  block,
+  label,
+  open,
+  onOpenChange,
+}: {
+  agentId: string;
+  block: MemoryBlock;
+  label: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const { t } = useTranslation();
+  const createMemory = useCreateAgentMemoryMutation(agentId);
+  const [draft, setDraft] = useState("");
+
+  useEffect(() => {
+    if (open) setDraft("");
+  }, [open]);
+
+  const handleSave = () => {
+    const content = draft.trim();
+    if (content.length === 0) return;
+    createMemory.mutate({ content, block }, { onSuccess: () => onOpenChange(false) });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[520px]">
+        <DialogHeader>
+          <DialogTitle>{t("agentSpace.memory.addTitle", { block: label })}</DialogTitle>
+        </DialogHeader>
+        <Textarea
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleSave();
+          }}
+          placeholder={t("agentSpace.memory.addPlaceholder")}
+          rows={4}
+          className="resize-y text-sm"
+          autoFocus
+        />
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>
+            {t("agentSpace.memory.cancel")}
+          </Button>
+          <Button onClick={handleSave} disabled={draft.trim().length === 0 || createMemory.isPending}>
+            {t("agentSpace.memory.add")}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
