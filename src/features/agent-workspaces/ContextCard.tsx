@@ -9,13 +9,19 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useCreateAgentFolderMutation } from "@/lib/data/agent-folder-queries";
 import { RailSection } from "./RailSection";
-import { AgentFoldersCard } from "./AgentFoldersCard";
+import { AgentFoldersCard, type OpenFolderFile } from "./AgentFoldersCard";
 import { MemoryCard } from "./MemoryCard";
 
 /** Context rail card: external folders ("On your computer") + the agent's
  *  Memory, under one collapsible. The ＋ dropdown adds a folder (Add-a-link is
  *  deferred to a later spec, so it's intentionally absent for now). */
-export function ContextCard({ agentId }: { agentId: string }) {
+export function ContextCard({
+  agentId,
+  onOpenFile,
+}: {
+  agentId: string;
+  onOpenFile?: OpenFolderFile;
+}) {
   const { t } = useTranslation();
   const createFolder = useCreateAgentFolderMutation(agentId);
 
@@ -51,7 +57,7 @@ export function ContextCard({ agentId }: { agentId: string }) {
           <h3 className="text-xs font-medium text-muted-foreground">
             {t("agentSpace.context.onYourComputer")}
           </h3>
-          <AgentFoldersCard agentId={agentId} />
+          <AgentFoldersCard agentId={agentId} onOpenFile={onOpenFile} />
         </section>
         <section className="flex flex-col gap-2">
           <h3 className="text-xs font-medium text-muted-foreground">

@@ -23,6 +23,8 @@ import { AgentRecents } from "@/features/agent-workspaces/AgentRecents";
 import { InstructionsCard } from "@/features/agent-workspaces/InstructionsCard";
 import { ScheduledRailCard } from "@/features/agent-workspaces/ScheduledRailCard";
 import { ContextCard } from "@/features/agent-workspaces/ContextCard";
+import { PreviewPane } from "@/features/task/PreviewPane";
+import type { MockFile } from "@/lib/mock/types";
 
 export function AgentSpaceView() {
   const { agentId } = useParams<{ agentId: string }>();
@@ -34,6 +36,9 @@ export function AgentSpaceView() {
   const { data: agent } = useAgentWorkspace(agentId ?? null);
   const [model, setModel] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // File preview opened from a Context folder tree. workingDir = the mounted
+  // folder's path (the /files/content sandbox cwd) so files under it resolve.
+  const [preview, setPreview] = useState<{ file: MockFile; workingDir: string } | null>(null);
 
   const handleSubmit = async ({ text }: PromptInputMessage) => {
     if (!agentId || !agent || text.trim().length === 0 || submitting) return;
@@ -60,6 +65,16 @@ export function AgentSpaceView() {
 
   return (
     <AppShell
+      bareAside={preview !== null}
+      aside={
+        preview ? (
+          <PreviewPane
+            file={preview.file}
+            workingDir={preview.workingDir}
+            onClose={() => setPreview(null)}
+          />
+        ) : undefined
+      }
       main={
         <div className="flex min-h-0 flex-1">
           {/* Left: header + composer + recents */}
@@ -95,7 +110,10 @@ export function AgentSpaceView() {
             <aside className="flex w-[340px] shrink-0 flex-col gap-4 overflow-y-auto border-l border-border p-4 pt-12">
               <InstructionsCard agentId={agentId} />
               <ScheduledRailCard agentId={agentId} />
-              <ContextCard agentId={agentId} />
+              <ContextCard
+                agentId={agentId}
+                onOpenFile={(file, workingDir) => setPreview({ file, workingDir })}
+              />
             </aside>
           )}
         </div>

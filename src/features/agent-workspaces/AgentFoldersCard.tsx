@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { ChevronRight, Folder, Lock, Unlock, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import {
@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 import type { AgentFolder } from "@/lib/data/types";
+import type { MockFile } from "@/lib/mock/types";
 import type { FolderTreeNode } from "@/lib/data/agent-folders";
 import {
   useAgentFolders,
@@ -20,6 +21,29 @@ import {
   useDeleteAgentFolderMutation,
   useSetAgentFolderWritableMutation,
 } from "@/lib/data/agent-folder-queries";
+
+/** Open a file from a folder tree in the preview pane. `workingDir` is the
+ *  mounted folder's path (the /files/content sandbox cwd). */
+export type OpenFolderFile = (file: MockFile, workingDir: string) => void;
+
+function fileTypeFromName(name: string): MockFile["type"] {
+  const lower = name.toLowerCase();
+  if (lower.endsWith(".md") || lower.endsWith(".markdown")) return "markdown";
+  if (lower.endsWith(".html") || lower.endsWith(".htm")) return "html";
+  if (lower.endsWith(".xlsx") || lower.endsWith(".csv")) return "spreadsheet";
+  if (lower.endsWith(".pptx") || lower.endsWith(".key")) return "presentation";
+  if (/\.(png|jpe?g|gif|svg|webp)$/.test(lower)) return "image";
+  if (/\.(ts|tsx|js|jsx|py|rs|go|java|c|cpp|h|hpp|json|css|sh|toml|ya?ml)$/.test(lower)) return "code";
+  return "generic";
+}
+
+function collectFilePaths(nodes: FolderTreeNode[], acc: Set<string>): Set<string> {
+  for (const n of nodes) {
+    if (n.kind === "file") acc.add(n.path);
+    else collectFilePaths(n.children ?? [], acc);
+  }
+  return acc;
+}
 
 function renderNodes(nodes: FolderTreeNode[]): ReactNode {
   return nodes.map((n) =>
@@ -34,8 +58,15 @@ function renderNodes(nodes: FolderTreeNode[]): ReactNode {
 }
 
 /** Body-only: each mounted folder as a collapsible block showing its file tree
- *  (lazy-loaded on expand). No path shown; hover reveals a write toggle + ×. */
-export function AgentFoldersCard({ agentId }: { agentId: string }) {
+ *  (lazy-loaded on expand). No path shown; hover reveals a write toggle + ×.
+ *  Clicking a file calls `onOpenFile` (→ preview pane). */
+export function AgentFoldersCard({
+  agentId,
+  onOpenFile,
+}: {
+  agentId: string;
+  onOpenFile?: OpenFolderFile;
+}) {
   const { t } = useTranslation();
   const { data: folders } = useAgentFolders(agentId);
   const list = folders ?? [];
@@ -51,7 +82,7 @@ export function AgentFoldersCard({ agentId }: { agentId: string }) {
   return (
     <div className="flex flex-col gap-1.5">
       {list.map((f) => (
-        <FolderTreeBlock key={f.id} agentId={agentId} folder={f} />
+        <FolderTreeBlock key={f.id} agentId={agentId} folder={f} onOpenFile={onOpenFile} />
       ))}
     </div>
   );
@@ -60,9 +91,11 @@ export function AgentFoldersCard({ agentId }: { agentId: string }) {
 function FolderTreeBlock({
   agentId,
   folder,
+  onOpenFile,
 }: {
   agentId: string;
   folder: AgentFolder;
+  onOpenFile?: OpenFolderFile;
 }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -70,6 +103,20 @@ function FolderTreeBlock({
   const setWritable = useSetAgentFolderWritableMutation(agentId);
   const deleteFolder = useDeleteAgentFolderMutation(agentId);
   const nodes = tree?.tree ?? [];
+  const filePaths = useMemo(() => collectFilePaths(nodes, new Set<string>()), [nodes]);
+
+  const handleSelect = (relPath: string) => {
+    // FileTree fires onSelect for folders too — only files open a preview.
+    if (!onOpenFile || !filePaths.has(relPath)) return;
+    onOpenFile(
+      {
+        name: relPath.split("/").pop() ?? relPath,
+        path: `${folder.path}/${relPath}`,
+        type: fileTypeFromName(relPath),
+      },
+      folder.path,
+    );
+  };
 
   return (
     <Collapsible
@@ -115,7 +162,7 @@ function FolderTreeBlock({
             {t("agentSpace.folders.emptyFolder")}
           </p>
         ) : (
-          <FileTree>{renderNodes(nodes)}</FileTree>
+          <FileTree onSelect={handleSelect}>{renderNodes(nodes)}</FileTree>
         )}
       </CollapsibleContent>
     </Collapsible>
