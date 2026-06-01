@@ -103,6 +103,15 @@ describe("ScheduledTaskService", () => {
     expect(t.enabled).toBe(true);
   });
 
+  it("list filters by agentWorkspaceId", () => {
+    const svc = new ScheduledTaskService(freshDb());
+    svc.create({ name: "bound", prompt: "x", frequency: "manual", agentWorkspaceId: "agw_1" });
+    svc.create({ name: "other", prompt: "x", frequency: "manual", agentWorkspaceId: "agw_2" });
+    svc.create({ name: "unbound", prompt: "x", frequency: "manual" });
+    expect(svc.list().length).toBe(3);
+    expect(svc.list({ agentWorkspaceId: "agw_1" }).map((t) => t.name)).toEqual(["bound"]);
+  });
+
   it("leaves next_run_at null for manual and disabled tasks", () => {
     const svc = new ScheduledTaskService(freshDb());
     const manual = svc.create({

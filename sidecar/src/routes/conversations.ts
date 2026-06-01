@@ -46,7 +46,8 @@ export function buildConversationRoutes(deps: MountConversationsDeps): Hono {
       archivedParam === "archived" || archivedParam === "all"
         ? archivedParam
         : "active";
-    return c.json(threads.list({ limit, pinnedOnly, archived }));
+    const agentWorkspaceId = c.req.query("agentWorkspaceId") || undefined;
+    return c.json(threads.list({ limit, pinnedOnly, archived, agentWorkspaceId }));
   });
 
   // Status aggregation — one row per conversation with lastRunId + run status.

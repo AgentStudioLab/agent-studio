@@ -132,4 +132,24 @@ describe("conversation ↔ agent binding", () => {
     expect(res.status).toBe(404);
     rmSync(baseDir, { recursive: true, force: true });
   });
+
+  it("GET /conversations?agentWorkspaceId= filters to that agent", async () => {
+    const db = new Database(":memory:");
+    migrate(db);
+    const baseDir = mkdtempSync(join(tmpdir(), "agw-filter-"));
+    const agentWorkspaces = new AgentWorkspaceService(db, { baseDir });
+    const threads = new ThreadService(db);
+    const store = createBunSqliteRunStore(db);
+    const app = buildConversationRoutes({ threads, store, agentWorkspaces });
+    const a1 = agentWorkspaces.create({ name: "A1" });
+    const a2 = agentWorkspaces.create({ name: "A2" });
+    threads.create({ agentWorkspaceId: a1.id, title: "c1" });
+    threads.create({ agentWorkspaceId: a2.id, title: "c2" });
+    threads.create({ title: "unbound" });
+
+    const res = await app.request(`/conversations?agentWorkspaceId=${a1.id}`);
+    const list = (await res.json()) as { title: string }[];
+    expect(list.map((c) => c.title)).toEqual(["c1"]);
+    rmSync(baseDir, { recursive: true, force: true });
+  });
 });

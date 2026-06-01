@@ -45,7 +45,9 @@ export function buildScheduledRoutes(deps: MountScheduledDeps): Hono {
   const { tasks, threads, store, scheduler } = deps;
   const app = new Hono();
 
-  app.get("/scheduled", (c) => c.json(tasks.list()));
+  app.get("/scheduled", (c) =>
+    c.json(tasks.list({ agentWorkspaceId: c.req.query("agentWorkspaceId") || undefined })),
+  );
 
   app.post("/scheduled", async (c) => {
     const body = (await c.req.json().catch(() => null)) as Record<

@@ -254,10 +254,12 @@ export class ScheduledTaskService {
     return row ? rowToTask(row) : null;
   }
 
-  list(): ScheduledTask[] {
+  list(opts: { agentWorkspaceId?: string } = {}): ScheduledTask[] {
+    const where = opts.agentWorkspaceId ? "WHERE agent_workspace_id = ?" : "";
+    const params = opts.agentWorkspaceId ? [opts.agentWorkspaceId] : [];
     const rows = this.db
-      .prepare("SELECT * FROM scheduled_tasks ORDER BY created_at DESC")
-      .all() as ScheduledTaskRow[];
+      .prepare(`SELECT * FROM scheduled_tasks ${where} ORDER BY created_at DESC`)
+      .all(...(params as never[])) as ScheduledTaskRow[];
     return rows.map(rowToTask);
   }
 

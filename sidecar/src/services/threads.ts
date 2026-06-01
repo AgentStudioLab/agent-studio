@@ -127,23 +127,31 @@ export class ThreadService {
       pinnedOnly?: boolean;
       /** Defaults to "active" — archived threads are hidden from the sidebar. */
       archived?: "active" | "archived" | "all";
+      /** Restrict to conversations bound to this agent workspace. */
+      agentWorkspaceId?: string;
     } = {},
   ): Thread[] {
     // Scheduler-spawned conversations are surfaced under the sidebar's
     // "Scheduled" section + each task's Runs tab, NOT in the general
     // Recents/Pinned/Tasks lists — otherwise N daily runs would flood Recents.
     const clauses: string[] = ["scheduled_task_id IS NULL"];
+    const params: unknown[] = [];
     if (opts.pinnedOnly) clauses.push("pinned = 1");
     const archivedFilter = opts.archived ?? "active";
     if (archivedFilter === "active") clauses.push("archived = 0");
     else if (archivedFilter === "archived") clauses.push("archived = 1");
+    if (opts.agentWorkspaceId) {
+      clauses.push("agent_workspace_id = ?");
+      params.push(opts.agentWorkspaceId);
+    }
     const where = clauses.length > 0 ? `WHERE ${clauses.join(" AND ")}` : "";
     const limit = opts.limit ?? 100;
+    params.push(limit);
     const rows = this.db
       .prepare(
         `SELECT * FROM conversations ${where} ORDER BY updated_at DESC LIMIT ?`,
       )
-      .all(limit) as ThreadRow[];
+      .all(...(params as never[])) as ThreadRow[];
     return rows.map(rowToThread);
   }
 
