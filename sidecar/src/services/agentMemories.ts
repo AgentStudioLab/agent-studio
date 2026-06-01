@@ -7,6 +7,24 @@ export type MemorySource = "agent" | "user";
 /** Which budgeted section a memory belongs to (no semantic retrieval — spec). */
 export type MemoryBlock = "profile" | "facts";
 
+export interface BlockBudget {
+  /** Target ceiling (chars). Backstop trims back down to this once `hard` is hit. */
+  soft: number;
+  /** At/over this the injected section nudges the agent to consolidate. */
+  warn: number;
+  /** Past this the host deterministically evicts oldest agent rows (backstop). */
+  hard: number;
+}
+
+/**
+ * Per-block char budgets (chars as a tokenizer-free proxy). Single source of
+ * truth; the frontend MemoryCard mirrors the `soft` values — keep in sync.
+ */
+export const MEMORY_BUDGETS: Record<MemoryBlock, BlockBudget> = {
+  profile: { soft: 1500, warn: 1200, hard: 1800 },
+  facts: { soft: 2500, warn: 2000, hard: 3000 },
+};
+
 export interface AgentMemory {
   id: string;
   agentWorkspaceId: string;

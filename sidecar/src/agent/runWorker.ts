@@ -10,7 +10,12 @@ import {
 import type { MessageService } from "../services/messages";
 import type { ThreadService } from "../services/threads";
 import type { AgentFolderService } from "../services/agentFolders";
-import type { AgentMemoryService } from "../services/agentMemories";
+import {
+  MEMORY_BUDGETS,
+  type AgentMemoryService,
+  type BlockBudget,
+  type MemoryBlock,
+} from "../services/agentMemories";
 import type { InterruptBus } from "../agui/provider-claude/interrupt-bus";
 import type { UsageService } from "../services/usage";
 
@@ -29,22 +34,39 @@ export function computeAgentDirs(
   };
 }
 
+/** Block render order + bilingual section titles for the injected context. */
+const BLOCK_SECTIONS: { block: MemoryBlock; title: string }[] = [
+  { block: "profile", title: "用户画像 / User profile" },
+  { block: "facts", title: "事实约定 / Facts & conventions" },
+];
+
 /**
  * P3 agent context block injected into systemPrompt.append on agent-bound runs:
  * the agent's `<home>/CLAUDE.md` instructions (read verbatim) followed by its
- * saved memories. Exported + pure (file IO is the caller's) so it's testable.
- * Returns null when there's nothing to inject.
+ * two memory blocks (profile/facts). Each non-empty block renders with a
+ * `(used X/soft)` annotation and — at/over the warn threshold — a nudge to
+ * consolidate via the remember tool. Exported + pure (file IO, DB reads, and
+ * the backstop trim are the caller's) so it's testable. Returns null when empty.
  */
 export function buildAgentAppendContext(
   claudeMd: string | null,
-  memories: { content: string }[],
+  blocks: { profile: string[]; facts: string[] },
+  budgets: Record<MemoryBlock, BlockBudget> = MEMORY_BUDGETS,
 ): string | null {
   const parts: string[] = [];
   const md = claudeMd?.trim();
   if (md) parts.push(md);
-  if (memories.length > 0) {
-    const lines = memories.map((m) => `- ${m.content}`).join("\n");
-    parts.push(`Saved memories about this agent workspace:\n${lines}`);
+  for (const { block, title } of BLOCK_SECTIONS) {
+    const entries = blocks[block];
+    if (entries.length === 0) continue;
+    const used = entries.reduce((sum, c) => sum + c.length, 0);
+    const { soft, warn } = budgets[block];
+    const nudge =
+      used >= warn
+        ? " — near capacity, consolidate via the remember tool: merge duplicates, drop stale entries"
+        : "";
+    const lines = entries.map((c) => `- ${c}`).join("\n");
+    parts.push(`## ${title}  (used ${used}/${soft}${nudge})\n${lines}`);
   }
   return parts.length > 0 ? parts.join("\n\n") : null;
 }
@@ -228,8 +250,22 @@ export async function runWorker(input: RunWorkerInput): Promise<void> {
     } catch {
       // No CLAUDE.md in the agent home → no instructions section.
     }
-    const memories = agentMemories?.listByAgent(agentWorkspaceId) ?? [];
-    appendContext = buildAgentAppendContext(claudeMd, memories) ?? undefined;
+    let profile: string[] = [];
+    let facts: string[] = [];
+    if (agentMemories) {
+      // Backstop (deterministic): only PAST the hard cap does the host evict
+      // oldest agent rows — between warn and hard the agent is nudged to
+      // self-consolidate instead (it has room to work before we touch its rows).
+      for (const block of ["profile", "facts"] as const) {
+        const { soft, hard } = MEMORY_BUDGETS[block];
+        if (agentMemories.blockCharLength(agentWorkspaceId, block) > hard) {
+          agentMemories.trimBlockToBudget(agentWorkspaceId, block, soft);
+        }
+      }
+      profile = agentMemories.listByAgentBlock(agentWorkspaceId, "profile").map((m) => m.content);
+      facts = agentMemories.listByAgentBlock(agentWorkspaceId, "facts").map((m) => m.content);
+    }
+    appendContext = buildAgentAppendContext(claudeMd, { profile, facts }) ?? undefined;
   }
 
   try {
