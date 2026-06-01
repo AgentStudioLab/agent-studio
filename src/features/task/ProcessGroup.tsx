@@ -410,40 +410,54 @@ function buildSummary(steps: ProcessStep[]): string {
   const hasReasoning = steps.some((s) => s.kind === "reasoning");
   const tools = steps.flatMap((s) => (s.kind === "tool_call" ? [s.tool] : []));
 
-  const counts: Record<string, number> = {};
-  const family = (name: string): string => {
+  // Aggregate tool calls into verb-led phrases per category, e.g.
+  // "Edited 6 files, read 5 files, ran 3 commands" / "Ran 7 commands, used a skill".
+  const phraseFor = (name: string): { verb: string; noun: string } => {
     switch (name) {
       case "Bash":
-        return "command";
+        return { verb: "ran", noun: "command" };
       case "Read":
-        return "file read";
+        return { verb: "read", noun: "file" };
       case "Write":
-        return "file write";
+        return { verb: "wrote", noun: "file" };
       case "Edit":
       case "MultiEdit":
-        return "file edit";
+      case "NotebookEdit":
+        return { verb: "edited", noun: "file" };
       case "Glob":
       case "Grep":
-        return "search";
+        return { verb: "ran", noun: "search" };
       case "WebFetch":
-        return "web fetch";
+        return { verb: "fetched", noun: "page" };
       case "WebSearch":
-        return "web search";
+        return { verb: "ran", noun: "web search" };
       case "Task":
-        return "subagent";
+        return { verb: "ran", noun: "subagent" };
+      case "Skill":
+        return { verb: "used", noun: "skill" };
       default:
-        return "tool call";
+        return { verb: "ran", noun: "tool call" };
     }
   };
+  // Group by verb+noun, preserving first-occurrence order.
+  const groups = new Map<string, { verb: string; noun: string; count: number }>();
   for (const t of tools) {
-    const f = family(t.toolName);
-    counts[f] = (counts[f] ?? 0) + 1;
+    const { verb, noun } = phraseFor(t.toolName);
+    const key = `${verb} ${noun}`;
+    const g = groups.get(key);
+    if (g) g.count += 1;
+    else groups.set(key, { verb, noun, count: 1 });
   }
-  const phrases = Object.entries(counts).map(([f, n]) =>
-    n === 1 ? `1 ${f}` : `${n} ${f}s`,
+  const plural = (noun: string) =>
+    /(?:ch|sh|s|x|z)$/.test(noun) ? `${noun}es` : `${noun}s`;
+  const article = (noun: string) => (/^[aeiou]/i.test(noun) ? "an" : "a");
+  const phrases = [...groups.values()].map(({ verb, noun, count }) =>
+    count === 1
+      ? `${verb} ${article(noun)} ${noun}`
+      : `${verb} ${count} ${plural(noun)}`,
   );
 
   if (phrases.length === 0) return hasReasoning ? "Thought" : "Working";
-  const ran = `Ran ${phrases.join(", ")}`;
-  return hasReasoning ? `Thought, ${ran.toLowerCase()}` : ran;
+  const joined = phrases.join(", ");
+  return joined.charAt(0).toUpperCase() + joined.slice(1);
 }
