@@ -3,7 +3,6 @@ import { useTranslation } from "react-i18next";
 import {
   Archive,
   ArchiveRestore,
-  FolderInput,
   MoreHorizontal,
   Pencil,
   Pin,
@@ -28,7 +27,9 @@ export interface SidebarItemContextMenuProps {
   onRename?: () => void;
   onArchive?: () => void;
   onDelete?: () => void;
-  onMoveToProject?: () => void;
+  /** Optional "Move to agent space" submenu node (a <DropdownMenuSub>); shown at
+   *  the top. Omit for rows where moving doesn't apply (e.g. pinned agents). */
+  moveSlot?: ReactNode;
   /** Custom trigger element. Defaults to a small "⋯" ghost button. */
   trigger?: ReactNode;
   /** Extra classes for the default trigger (e.g. opacity/group-hover). */
@@ -39,8 +40,9 @@ export interface SidebarItemContextMenuProps {
 }
 
 /**
- * Sidebar item context menu — order matches prototype HTML 463-470:
- *   Move to project / --- / Pin · Rename / --- / Archive · Delete (danger)
+ * Sidebar item context menu. Each item renders only when its handler is
+ * provided, so the same component serves rich conversation rows (move / pin /
+ * rename / archive / delete) and minimal agent rows (just unpin).
  */
 export function SidebarItemContextMenu({
   pinMode,
@@ -49,13 +51,15 @@ export function SidebarItemContextMenu({
   onRename,
   onArchive,
   onDelete,
-  onMoveToProject,
+  moveSlot,
   trigger,
   triggerClassName,
   iconSize = 16,
   align = "end",
 }: SidebarItemContextMenuProps) {
   const { t } = useTranslation();
+  const hasManage = onPinToggle || onRename;
+  const hasDanger = onArchive || onDelete;
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -74,36 +78,41 @@ export function SidebarItemContextMenu({
         )}
       </DropdownMenuTrigger>
       <DropdownMenuContent align={align} className="w-44">
-        <DropdownMenuItem onSelect={onMoveToProject}>
-          <FolderInput className="size-4" />
-          {t("sidebar.contextMenu.moveToProject")}
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={onPinToggle}>
-          {pinMode === "pin" ? <Pin className="size-4" /> : <PinOff className="size-4" />}
-          {pinMode === "pin"
-            ? t("sidebar.contextMenu.pin")
-            : t("sidebar.contextMenu.unpin")}
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={onRename}>
-          <Pencil className="size-4" />
-          {t("sidebar.contextMenu.rename")}
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={onArchive}>
-          {archived ? (
-            <ArchiveRestore className="size-4" />
-          ) : (
-            <Archive className="size-4" />
-          )}
-          {archived
-            ? t("sidebar.contextMenu.unarchive")
-            : t("sidebar.contextMenu.archive")}
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={onDelete} variant="destructive">
-          <Trash2 className="size-4" />
-          {t("sidebar.contextMenu.delete")}
-        </DropdownMenuItem>
+        {moveSlot}
+        {moveSlot && hasManage && <DropdownMenuSeparator />}
+        {onPinToggle && (
+          <DropdownMenuItem onSelect={onPinToggle}>
+            {pinMode === "pin" ? <Pin className="size-4" /> : <PinOff className="size-4" />}
+            {pinMode === "pin"
+              ? t("sidebar.contextMenu.pin")
+              : t("sidebar.contextMenu.unpin")}
+          </DropdownMenuItem>
+        )}
+        {onRename && (
+          <DropdownMenuItem onSelect={onRename}>
+            <Pencil className="size-4" />
+            {t("sidebar.contextMenu.rename")}
+          </DropdownMenuItem>
+        )}
+        {hasManage && hasDanger && <DropdownMenuSeparator />}
+        {onArchive && (
+          <DropdownMenuItem onSelect={onArchive}>
+            {archived ? (
+              <ArchiveRestore className="size-4" />
+            ) : (
+              <Archive className="size-4" />
+            )}
+            {archived
+              ? t("sidebar.contextMenu.unarchive")
+              : t("sidebar.contextMenu.archive")}
+          </DropdownMenuItem>
+        )}
+        {onDelete && (
+          <DropdownMenuItem onSelect={onDelete} variant="destructive">
+            <Trash2 className="size-4" />
+            {t("sidebar.contextMenu.delete")}
+          </DropdownMenuItem>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );

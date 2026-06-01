@@ -8,6 +8,11 @@ import {
   useDeleteConversationMutation,
 } from "@/lib/data/queries";
 import {
+  useAgentWorkspaces,
+  useUpdateAgentWorkspaceMutation,
+} from "@/lib/data/agent-queries";
+import { MoveToAgentSubmenu } from "@/shared/MoveToAgentSubmenu";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -143,8 +148,10 @@ export function SidebarContent() {
   const { data: pinnedData = [] } = usePinnedConversations();
   const { data: threadStatuses = [] } = useThreadStatuses();
   const { data: scheduledTasks = [] } = useScheduledTasks();
+  const { data: agentsData = [] } = useAgentWorkspaces();
   const auth = useAuth();
   const togglePinMutation = useTogglePinMutation();
+  const updateAgentMutation = useUpdateAgentWorkspaceMutation();
   const archiveMutation = useArchiveConversationMutation();
   const deleteMutation = useDeleteConversationMutation();
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
@@ -173,6 +180,12 @@ export function SidebarContent() {
     () =>
       pinnedData.map((c) => toPinnedItem(c, entryByThread.get(c.id), isUnread)),
     [pinnedData, entryByThread, isUnread],
+  );
+  // Pinned agent workspaces ride the same Pinned section, shown above pinned
+  // conversations (Folder/Briefcase glyph vs the conversation status dot).
+  const pinnedAgents = useMemo(
+    () => agentsData.filter((a) => a.pinned),
+    [agentsData],
   );
   // Group scheduler-spawned run threads by their origin task so each sidebar
   // Scheduled row can show its latest run's dot + an unviewed-run count.
@@ -326,7 +339,7 @@ export function SidebarContent() {
       )}
 
       {/* Pinned — collapsible, matching Scheduled / Recents. */}
-      {pinned.length > 0 && (
+      {(pinned.length > 0 || pinnedAgents.length > 0) && (
         <>
           <div className="group/pinned px-3 pb-0.5 pt-3.5">
             <button
@@ -345,19 +358,26 @@ export function SidebarContent() {
           </div>
           {!sidebarCollapsedSections.pinned && (
             <div className="flex shrink-0 flex-col gap-0.5 px-2">
+              {pinnedAgents.map((a) => (
+                <PinnedItem
+                  key={`agent-${a.id}`}
+                  item={{ id: a.id, kind: "project", name: a.name }}
+                  active={pathname === `/agents/${a.id}`}
+                  onClick={() => navigate(`/agents/${a.id}`)}
+                  onUnpin={() =>
+                    updateAgentMutation.mutate({ id: a.id, patch: { pinned: false } })
+                  }
+                />
+              ))}
               {pinned.map((item) => (
                 <PinnedItem
                   key={item.id}
                   item={item}
-                  active={item.kind !== "project" && item.id === selectedTaskId}
+                  active={item.id === selectedTaskId}
                   onClick={() => {
-                    if (item.kind !== "project") {
-                      const runId = entryByThread.get(item.id)?.lastRunId;
-                      if (runId) markRead(item.id, runId);
-                      navigate(`/task/${item.id}`);
-                    } else {
-                      navigate(`/agents/${item.id}`);
-                    }
+                    const runId = entryByThread.get(item.id)?.lastRunId;
+                    if (runId) markRead(item.id, runId);
+                    navigate(`/task/${item.id}`);
                   }}
                   onUnpin={() => void handleUnpin(item)}
                   onRename={() =>
@@ -365,6 +385,12 @@ export function SidebarContent() {
                   }
                   onArchive={() => handleArchive(item.id)}
                   onDelete={() => requestDelete(item.id)}
+                  moveSlot={
+                    <MoveToAgentSubmenu
+                      conversationId={item.id}
+                      label={t("sidebar.contextMenu.moveToAgentSpace")}
+                    />
+                  }
                 />
               ))}
             </div>
@@ -416,6 +442,12 @@ export function SidebarContent() {
               }
               onArchive={() => handleArchive(item.id)}
               onDelete={() => requestDelete(item.id)}
+              moveSlot={
+                <MoveToAgentSubmenu
+                  conversationId={item.id}
+                  label={t("sidebar.contextMenu.moveToAgentSpace")}
+                />
+              }
             />
           ))}
       </div>

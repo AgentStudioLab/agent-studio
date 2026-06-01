@@ -16,7 +16,7 @@
   },
   "contextMenu": {
     "moreActions": "More actions",
-    "moveToProject": "Move to project",
+    "moveToAgentSpace": "Move to agent space",
     "pin": "Pin",
     "unpin": "Unpin",
     "rename": "Rename",

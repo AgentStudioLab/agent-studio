@@ -1,4 +1,5 @@
-import { Folder } from "lucide-react";
+import type { ReactNode } from "react";
+import { Briefcase } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { MockPinnedItem } from "@/lib/mock/types";
 import { SidebarItemContextMenu } from "@/features/sidebar/SidebarItemContextMenu";
@@ -12,7 +13,7 @@ interface PinnedItemProps {
   onRename?: () => void;
   onArchive?: () => void;
   onDelete?: () => void;
-  onMoveToProject?: () => void;
+  moveSlot?: ReactNode;
 }
 
 export function PinnedItem({
@@ -23,7 +24,7 @@ export function PinnedItem({
   onRename,
   onArchive,
   onDelete,
-  onMoveToProject,
+  moveSlot,
 }: PinnedItemProps) {
   const isProject = item.kind === "project";
   return (
@@ -39,7 +40,7 @@ export function PinnedItem({
         )}
       >
         {isProject ? (
-          <Folder
+          <Briefcase
             className={cn(
               "size-[15px] shrink-0",
               active
@@ -60,7 +61,7 @@ export function PinnedItem({
         onRename={onRename}
         onArchive={onArchive}
         onDelete={onDelete}
-        onMoveToProject={onMoveToProject}
+        moveSlot={moveSlot}
         triggerClassName="absolute right-1.5 top-1/2 -translate-y-1/2 size-auto p-1 rounded text-[hsl(var(--text-400))] hover:bg-[hsl(var(--bg-200))] hover:text-[hsl(var(--text-100))] opacity-0 group-hover:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100"
         iconSize={13}
       />

@@ -26,7 +26,6 @@ export const PinMode: Story = {
     onRename: () => console.log("rename"),
     onArchive: () => console.log("archive"),
     onDelete: () => console.log("delete"),
-    onMoveToProject: () => console.log("move"),
   },
 };
 
@@ -37,6 +36,5 @@ export const UnpinMode: Story = {
     onRename: () => console.log("rename"),
     onArchive: () => console.log("archive"),
     onDelete: () => console.log("delete"),
-    onMoveToProject: () => console.log("move"),
   },
 };

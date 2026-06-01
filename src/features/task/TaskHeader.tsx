@@ -2,7 +2,6 @@ import {
   ChevronDown,
   Calendar,
   Wand2,
-  FolderInput,
   Pin,
   Pencil,
   Archive,
@@ -15,21 +14,17 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubTrigger,
-  DropdownMenuSubContent,
 } from "@/components/ui/dropdown-menu";
 import { useTranslation } from "react-i18next";
 import { useAppShell } from "@/app/AppShellContext";
+import { MoveToAgentSubmenu } from "@/shared/MoveToAgentSubmenu";
 import { cn } from "@/lib/utils";
 
 interface TaskHeaderProps {
   conversationId: string;
   title?: string;
-  projects?: { id: string; name: string }[];
   onSchedule?: () => void;
   onTurnIntoSkill?: () => void;
-  onMoveToProject?: (projectId: string) => void;
   onPin?: () => void;
   onRename?: () => void;
   onArchive?: () => void;
@@ -39,19 +34,14 @@ interface TaskHeaderProps {
 export function TaskHeader({
   conversationId,
   title,
-  projects = [],
   onSchedule,
   onTurnIntoSkill,
-  onMoveToProject,
   onPin,
   onRename,
   onArchive,
   onDelete,
 }: TaskHeaderProps) {
   const { toggleAside, sidebarCollapsed } = useAppShell();
-  // conversationId currently unused (kept in signature for future per-task
-  // actions like rename / archive that will need it).
-  void conversationId;
   const { t } = useTranslation();
   return (
     <header
@@ -79,21 +69,10 @@ export function TaskHeader({
           <DropdownMenuItem onSelect={onTurnIntoSkill}>
             <Wand2 /> {t("task.header.turnIntoSkill")}
           </DropdownMenuItem>
-          <DropdownMenuSub>
-            <DropdownMenuSubTrigger>
-              <FolderInput /> {t("task.header.moveToProject")}
-            </DropdownMenuSubTrigger>
-            <DropdownMenuSubContent>
-              {projects.map((p) => (
-                <DropdownMenuItem
-                  key={p.id}
-                  onSelect={() => onMoveToProject?.(p.id)}
-                >
-                  {p.name}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuSubContent>
-          </DropdownMenuSub>
+          <MoveToAgentSubmenu
+            conversationId={conversationId}
+            label={t("task.header.moveToAgentSpace")}
+          />
           <DropdownMenuItem onSelect={onPin}>
             <Pin /> {t("task.header.pin")}
           </DropdownMenuItem>

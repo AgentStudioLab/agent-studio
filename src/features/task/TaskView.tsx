@@ -384,7 +384,6 @@ export function TaskView() {
           <TaskHeader
             conversationId={activeTaskId}
             title={taskTitle}
-            onMoveToProject={() => {}}
             onRename={() => setRenameOpen(true)}
             onArchive={() => {
               navigate("/");
