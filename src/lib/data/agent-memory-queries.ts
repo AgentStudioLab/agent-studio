@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { MemoryBlock } from "./types";
 import {
   createAgentMemory,
   deleteAgentMemory,
@@ -21,7 +22,8 @@ export function useAgentMemories(agentId: string | null) {
 export function useCreateAgentMemoryMutation(agentId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (content: string) => createAgentMemory(agentId, content),
+    mutationFn: ({ content, block }: { content: string; block: MemoryBlock }) =>
+      createAgentMemory(agentId, content, block),
     onSuccess: () => qc.invalidateQueries({ queryKey: agentMemoryKeys.list(agentId) }),
   });
 }

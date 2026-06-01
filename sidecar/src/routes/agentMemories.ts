@@ -12,7 +12,7 @@ export interface MountAgentMemoryDeps {
  * the `remember` MCP tool, not here.
  *
  *   GET    /agents/:id/memories            list (oldest first)
- *   POST   /agents/:id/memories            add a user memory ({ content })
+ *   POST   /agents/:id/memories            add a user memory ({ content, block })
  *   DELETE /agents/:id/memories/:memId     remove one
  */
 export function buildAgentMemoryRoutes(deps: MountAgentMemoryDeps): Hono {
@@ -32,10 +32,16 @@ export function buildAgentMemoryRoutes(deps: MountAgentMemoryDeps): Hono {
     if (typeof body?.content !== "string" || body.content.trim().length === 0) {
       return c.json({ error: "invalid_content" }, 400);
     }
+    const block =
+      body.block === "profile" ? "profile" : body.block === "facts" ? "facts" : null;
+    if (!block) {
+      return c.json({ error: "invalid_block" }, 400);
+    }
     const memory = agentMemories.create({
       agentWorkspaceId: id,
       content: body.content.trim(),
       source: "user",
+      block,
     });
     return c.json(memory, 201);
   });

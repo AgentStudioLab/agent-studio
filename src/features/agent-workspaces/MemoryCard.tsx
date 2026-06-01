@@ -3,37 +3,88 @@ import { Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import type { AgentMemory, MemoryBlock } from "@/lib/data/types";
 import {
   useAgentMemories,
   useCreateAgentMemoryMutation,
   useDeleteAgentMemoryMutation,
 } from "@/lib/data/agent-memory-queries";
 
-/** Cross-session memory: agent-written (remember tool) + user-authored entries. */
+// Soft budgets mirror the sidecar's MEMORY_BUDGETS (services/agentMemories.ts);
+// keep these two numbers in sync with that source of truth.
+const BLOCK_SOFT: Record<MemoryBlock, number> = { profile: 1500, facts: 2500 };
+const BLOCK_ORDER: MemoryBlock[] = ["profile", "facts"];
+
+/** Cross-session memory: agent-written (remember tool) + user-authored entries,
+ *  split into 'profile' (about the user) and 'facts' (about the project/work). */
 export function MemoryCard({ agentId }: { agentId: string }) {
   const { t } = useTranslation();
   const { data: memories } = useAgentMemories(agentId);
   const createMemory = useCreateAgentMemoryMutation(agentId);
   const deleteMemory = useDeleteAgentMemoryMutation(agentId);
-  const [draft, setDraft] = useState("");
-
   const list = memories ?? [];
+
+  return (
+    <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-4">
+      <div>
+        <h2 className="text-sm font-medium text-foreground">{t("agentSpace.memory.title")}</h2>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          {t("agentSpace.memory.description")}
+        </p>
+      </div>
+      {BLOCK_ORDER.map((block) => (
+        <MemoryBlockSection
+          key={block}
+          block={block}
+          entries={list.filter((m) => m.block === block)}
+          adding={createMemory.isPending}
+          onAdd={(content) => createMemory.mutate({ content, block })}
+          onDelete={(memId) => deleteMemory.mutate(memId)}
+        />
+      ))}
+    </div>
+  );
+}
+
+function MemoryBlockSection({
+  block,
+  entries,
+  adding,
+  onAdd,
+  onDelete,
+}: {
+  block: MemoryBlock;
+  entries: AgentMemory[];
+  adding: boolean;
+  onAdd: (content: string) => void;
+  onDelete: (memId: string) => void;
+}) {
+  const { t } = useTranslation();
+  const [draft, setDraft] = useState("");
+  const used = entries.reduce((sum, m) => sum + m.content.length, 0);
+  const soft = BLOCK_SOFT[block];
+  const over = used > soft;
 
   const handleAdd = () => {
     const content = draft.trim();
     if (content.length === 0) return;
-    createMemory.mutate(content, { onSuccess: () => setDraft("") });
+    onAdd(content);
+    setDraft("");
   };
 
   return (
-    <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4">
-      <div>
-        <h2 className="text-sm font-medium text-foreground">
-          {t("agentSpace.memory.title")}
-        </h2>
-        <p className="mt-0.5 text-xs text-muted-foreground">
-          {t("agentSpace.memory.description")}
-        </p>
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center justify-between">
+        <h3 className="text-xs font-medium text-foreground">
+          {block === "profile"
+            ? t("agentSpace.memory.blockProfile")
+            : t("agentSpace.memory.blockFacts")}
+        </h3>
+        <span
+          className={`text-[10px] tabular-nums ${over ? "text-destructive" : "text-muted-foreground"}`}
+        >
+          {used}/{soft}
+        </span>
       </div>
 
       <div className="flex items-center gap-2">
@@ -49,22 +100,16 @@ export function MemoryCard({ agentId }: { agentId: string }) {
           placeholder={t("agentSpace.memory.placeholder")}
           className="text-sm"
         />
-        <Button
-          size="sm"
-          onClick={handleAdd}
-          disabled={draft.trim().length === 0 || createMemory.isPending}
-        >
+        <Button size="sm" onClick={handleAdd} disabled={draft.trim().length === 0 || adding}>
           {t("agentSpace.memory.add")}
         </Button>
       </div>
 
-      {list.length === 0 ? (
-        <p className="py-1 text-sm text-muted-foreground">
-          {t("agentSpace.memory.empty")}
-        </p>
+      {entries.length === 0 ? (
+        <p className="py-0.5 text-sm text-muted-foreground">{t("agentSpace.memory.empty")}</p>
       ) : (
         <ul className="flex flex-col gap-1">
-          {list.map((m) => (
+          {entries.map((m) => (
             <li
               key={m.id}
               className="flex items-start gap-2 rounded-md px-2 py-1.5 hover:bg-state-hover"
@@ -78,7 +123,7 @@ export function MemoryCard({ agentId }: { agentId: string }) {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => deleteMemory.mutate(m.id)}
+                onClick={() => onDelete(m.id)}
                 aria-label={t("agentSpace.memory.remove")}
                 className="size-6 shrink-0 text-muted-foreground hover:text-foreground"
               >

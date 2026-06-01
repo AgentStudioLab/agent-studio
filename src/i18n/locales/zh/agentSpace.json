@@ -25,6 +25,8 @@
     "add": "添加",
     "empty": "还没有记忆。",
     "remove": "删除",
+    "blockProfile": "用户画像",
+    "blockFacts": "事实约定",
     "sourceAgent": "智能体",
     "sourceUser": "你"
   }

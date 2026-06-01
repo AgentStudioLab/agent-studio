@@ -1,5 +1,5 @@
 import { authedFetch } from "../sidecar-client";
-import type { AgentMemory } from "./types";
+import type { AgentMemory, MemoryBlock } from "./types";
 
 async function expectJson<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -19,11 +19,12 @@ export async function listAgentMemories(agentId: string): Promise<AgentMemory[]>
 export async function createAgentMemory(
   agentId: string,
   content: string,
+  block: MemoryBlock,
 ): Promise<AgentMemory> {
   const res = await authedFetch(`/agents/${agentId}/memories`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ content }),
+    body: JSON.stringify({ content, block }),
   });
   return expectJson<AgentMemory>(res);
 }

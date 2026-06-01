@@ -27,14 +27,15 @@ async function postMemory(app: ReturnType<typeof harness>["app"], agentId: strin
 }
 
 describe("agent memory routes", () => {
-  it("POST creates a user memory and GET lists it", async () => {
+  it("POST creates a user memory in the given block and GET lists it", async () => {
     const { app, agentWorkspaces } = harness();
     const agent = agentWorkspaces.create({ name: "A" });
-    const res = await postMemory(app, agent.id, { content: "likes terse replies" });
+    const res = await postMemory(app, agent.id, { content: "likes terse replies", block: "profile" });
     expect(res.status).toBe(201);
-    const m = (await res.json()) as { id: string; content: string; source: string };
+    const m = (await res.json()) as { id: string; content: string; source: string; block: string };
     expect(m.content).toBe("likes terse replies");
     expect(m.source).toBe("user");
+    expect(m.block).toBe("profile");
 
     const list = (await (await app.request(`/agents/${agent.id}/memories`)).json()) as {
       id: string;
@@ -45,18 +46,25 @@ describe("agent memory routes", () => {
   it("POST rejects empty content with 400", async () => {
     const { app, agentWorkspaces } = harness();
     const agent = agentWorkspaces.create({ name: "A" });
-    expect((await postMemory(app, agent.id, { content: "   " })).status).toBe(400);
+    expect((await postMemory(app, agent.id, { content: "   ", block: "facts" })).status).toBe(400);
+  });
+
+  it("POST rejects a missing or invalid block with 400", async () => {
+    const { app, agentWorkspaces } = harness();
+    const agent = agentWorkspaces.create({ name: "A" });
+    expect((await postMemory(app, agent.id, { content: "x" })).status).toBe(400);
+    expect((await postMemory(app, agent.id, { content: "x", block: "bogus" })).status).toBe(400);
   });
 
   it("POST to a non-existent agent returns 404", async () => {
     const { app } = harness();
-    expect((await postMemory(app, "agw_missing", { content: "x" })).status).toBe(404);
+    expect((await postMemory(app, "agw_missing", { content: "x", block: "facts" })).status).toBe(404);
   });
 
   it("DELETE removes the memory", async () => {
     const { app, agentWorkspaces } = harness();
     const agent = agentWorkspaces.create({ name: "A" });
-    const m = (await (await postMemory(app, agent.id, { content: "x" })).json()) as {
+    const m = (await (await postMemory(app, agent.id, { content: "x", block: "facts" })).json()) as {
       id: string;
     };
     const del = await app.request(`/agents/${agent.id}/memories/${m.id}`, { method: "DELETE" });
@@ -69,7 +77,7 @@ describe("agent memory routes", () => {
     const { app, agentWorkspaces } = harness();
     const a1 = agentWorkspaces.create({ name: "A1" });
     const a2 = agentWorkspaces.create({ name: "A2" });
-    const m = (await (await postMemory(app, a1.id, { content: "x" })).json()) as { id: string };
+    const m = (await (await postMemory(app, a1.id, { content: "x", block: "facts" })).json()) as { id: string };
     const del = await app.request(`/agents/${a2.id}/memories/${m.id}`, { method: "DELETE" });
     expect(del.status).toBe(404);
   });

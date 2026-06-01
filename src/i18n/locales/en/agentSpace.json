@@ -25,6 +25,8 @@
     "add": "Add",
     "empty": "No memories yet.",
     "remove": "Remove",
+    "blockProfile": "User profile",
+    "blockFacts": "Facts & conventions",
     "sourceAgent": "Agent",
     "sourceUser": "You"
   }

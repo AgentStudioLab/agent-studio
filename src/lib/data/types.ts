@@ -91,13 +91,19 @@ export interface AgentFolder {
   createdAt: number;
 }
 
+/** Which budgeted block a memory belongs to: 'profile' (about the user) or
+ *  'facts' (about the project/work). */
+export type MemoryBlock = "profile" | "facts";
+
 /** A linear memory entry for an agent (P3). `source` distinguishes entries the
- *  agent saved itself (via the remember tool) from user-authored ones. */
+ *  agent saved itself (via the remember tool) from user-authored ones; `block`
+ *  is which budgeted section it lives in. */
 export interface AgentMemory {
   id: string;
   agentWorkspaceId: string;
   content: string;
   source: "agent" | "user";
+  block: MemoryBlock;
   createdAt: number;
 }
 
