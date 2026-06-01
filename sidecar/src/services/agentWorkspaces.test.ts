@@ -63,4 +63,10 @@ describe("AgentWorkspaceService", () => {
     expect(service.get(a.id)).toBeNull();
     expect(existsSync(a.homeDir)).toBe(true);
   });
+
+  it("create seeds <home>/memory/MEMORY.md", () => {
+    const { service } = svc();
+    const agent = service.create({ name: "Jay" });
+    expect(existsSync(join(agent.homeDir, "memory", "MEMORY.md"))).toBe(true);
+  });
 });
