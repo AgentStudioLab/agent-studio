@@ -47,18 +47,6 @@
   },
   "memory": {
     "title": "Memory",
-    "description": "Points remembered across conversations. The agent saves these automatically; you can add or remove them.",
-    "placeholder": "Add a memory…",
-    "add": "Add",
-    "empty": "No memories yet.",
-    "remove": "Remove",
-    "emptyHint": "Ask Claude to remember something and it'll save it here.",
-    "addTitle": "Add to {{block}}",
-    "addPlaceholder": "A fact to remember about this agent…",
-    "cancel": "Cancel",
-    "blockProfile": "User profile",
-    "blockFacts": "Facts & conventions",
-    "sourceAgent": "Agent",
-    "sourceUser": "You"
+    "empty": "No memories yet."
   }
 }
