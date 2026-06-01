@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import {
   BrainIcon,
-  Check,
   ChevronDown,
+  CircleCheck,
   FileEdit,
   FileText,
   Globe,
@@ -69,16 +69,10 @@ export function ProcessGroup({ steps, done }: ProcessGroupProps) {
   const summary = buildSummary(steps);
 
   return (
-    // Top padding stays fixed so the trigger button doesn't jump on toggle;
-    // bottom padding grows when expanded to leave breathing room under the
-    // last timeline step / DoneRow. Collapsed: 12/12. Expanded: 12/20.
-    <div
-      className={cn("rounded-xl px-5 pt-3", open ? "pb-5" : "pb-3")}
-      style={{
-        background: "hsl(var(--bg-200) / 0.35)",
-        border: "1px solid hsl(var(--border-300) / 0.08)",
-      }}
-    >
+    // No card — the trace reads as quiet inline content (per design) so it
+    // doesn't compete with the answer for attention. Just light vertical
+    // padding; bottom grows a touch when expanded.
+    <div className={cn("pt-1", open ? "pb-2" : "")}>
       <button
         type="button"
         onClick={() => {
@@ -321,15 +315,13 @@ function formatResult(result: unknown): string | null {
 function DoneRow() {
   return (
     <div className="flex items-center gap-3 pt-1">
+      {/* Same icon-slot footprint + size as the brain / tool step icons so
+          Done reads as just another quiet step, not a heavy badge. */}
       <div
-        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full"
-        style={{ border: "1.5px solid hsl(var(--text-300) / 0.5)" }}
+        className="flex h-6 w-6 shrink-0 items-center justify-center"
+        style={{ color: "hsl(var(--text-300))" }}
       >
-        <Check
-          size={11}
-          strokeWidth={2.5}
-          style={{ color: "hsl(var(--text-300))" }}
-        />
+        <CircleCheck size={16} strokeWidth={1.6} />
       </div>
       <span
         className="text-[13.5px]"
