@@ -29,6 +29,7 @@
     "description": "Mount external folders as context for this agent. Read-only by default; grant write per folder.",
     "add": "Add folder",
     "empty": "No folders mounted yet.",
+    "emptyFolder": "Empty folder",
     "allowWrite": "Allow write",
     "remove": "Remove",
     "addError": "Failed to add folder"

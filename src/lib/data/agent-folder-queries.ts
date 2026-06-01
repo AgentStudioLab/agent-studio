@@ -3,12 +3,15 @@ import {
   type CreateAgentFolderArgs,
   createAgentFolder,
   deleteAgentFolder,
+  getAgentFolderTree,
   listAgentFolders,
   setAgentFolderWritable,
 } from "./agent-folders";
 
 export const agentFolderKeys = {
   list: (agentId: string) => ["agents", "detail", agentId, "folders"] as const,
+  tree: (agentId: string, folderId: string) =>
+    ["agents", "detail", agentId, "folders", folderId, "tree"] as const,
 };
 
 export function useAgentFolders(agentId: string | null) {
@@ -17,6 +20,20 @@ export function useAgentFolders(agentId: string | null) {
     queryFn: () => listAgentFolders(agentId!),
     enabled: !!agentId,
     staleTime: 5_000,
+  });
+}
+
+/** Folder file tree — fetched lazily (only when its block is expanded). */
+export function useAgentFolderTree(
+  agentId: string,
+  folderId: string,
+  enabled: boolean,
+) {
+  return useQuery({
+    queryKey: agentFolderKeys.tree(agentId, folderId),
+    queryFn: () => getAgentFolderTree(agentId, folderId),
+    enabled,
+    staleTime: 30_000,
   });
 }
 

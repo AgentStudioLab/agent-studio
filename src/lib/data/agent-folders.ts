@@ -17,6 +17,27 @@ export interface CreateAgentFolderArgs {
   writable?: boolean;
 }
 
+export interface FolderTreeNode {
+  path: string;
+  name: string;
+  kind: "file" | "dir";
+  children?: FolderTreeNode[];
+}
+
+export interface FolderTree {
+  folderId: string;
+  tree: FolderTreeNode[];
+  truncated: boolean;
+}
+
+export async function getAgentFolderTree(
+  agentId: string,
+  folderId: string,
+): Promise<FolderTree> {
+  const res = await authedFetch(`/agents/${agentId}/folders/${folderId}/tree`);
+  return expectJson<FolderTree>(res);
+}
+
 export async function listAgentFolders(agentId: string): Promise<AgentFolder[]> {
   const res = await authedFetch(`/agents/${agentId}/folders`);
   return expectJson<AgentFolder[]>(res);
