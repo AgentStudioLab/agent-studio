@@ -156,6 +156,9 @@ export class AgentMemoryStore {
       if (!dir) return;
       const idxPath = join(dir, MEMORY_INDEX);
       if (!existsSync(idxPath)) return;
+      // Only the host-side backstop: act ONLY past `hard`, leaving a warn→hard
+      // band for the agent to self-consolidate. Once triggered, trim to `soft`.
+      if (readFileSync(idxPath, "utf8").length <= MEMORY_INDEX_BUDGET.hard) return;
       while (readFileSync(idxPath, "utf8").length > MEMORY_INDEX_BUDGET.soft) {
         const lines = readFileSync(idxPath, "utf8").split("\n");
         const i = lines.findIndex((l) => /\]\(([\w.-]+)\.md\)/.test(l));
@@ -164,7 +167,6 @@ export class AgentMemoryStore {
         rmSync(join(dir, `${slug}.md`), { force: true });
         lines.splice(i, 1);
         writeAtomic(idxPath, lines.join("\n").replace(/\n*$/, "\n"));
-        if (readFileSync(idxPath, "utf8").length <= MEMORY_INDEX_BUDGET.soft) break;
       }
     });
   }
