@@ -384,6 +384,7 @@ export function TaskView() {
           <TaskHeader
             conversationId={activeTaskId}
             title={taskTitle}
+            agentWorkspaceId={conversationQuery.data?.agentWorkspaceId ?? null}
             onRename={() => setRenameOpen(true)}
             onArchive={() => {
               navigate("/");

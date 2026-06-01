@@ -16,13 +16,18 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 import { useAppShell } from "@/app/AppShellContext";
+import { useAgentWorkspace } from "@/lib/data/agent-queries";
 import { MoveToAgentSubmenu } from "@/shared/MoveToAgentSubmenu";
 import { cn } from "@/lib/utils";
 
 interface TaskHeaderProps {
   conversationId: string;
   title?: string;
+  /** When the conversation belongs to an agent space, its title shows a
+   *  "<agent> / <title>" breadcrumb. */
+  agentWorkspaceId?: string | null;
   onSchedule?: () => void;
   onTurnIntoSkill?: () => void;
   onPin?: () => void;
@@ -34,6 +39,7 @@ interface TaskHeaderProps {
 export function TaskHeader({
   conversationId,
   title,
+  agentWorkspaceId,
   onSchedule,
   onTurnIntoSkill,
   onPin,
@@ -43,6 +49,8 @@ export function TaskHeader({
 }: TaskHeaderProps) {
   const { toggleAside, sidebarCollapsed } = useAppShell();
   const { t } = useTranslation();
+  const navigate = useNavigate();
+  const { data: agent } = useAgentWorkspace(agentWorkspaceId ?? null);
   return (
     <header
       data-tauri-drag-region
@@ -54,14 +62,27 @@ export function TaskHeader({
         sidebarCollapsed && "pl-28",
       )}
     >
-      <DropdownMenu>
-        <DropdownMenuTrigger
-          aria-label={t("task.header.menu")}
-          className="inline-flex min-w-0 items-center gap-1.5 rounded-md px-2 py-1 text-[14px] font-medium text-foreground outline-hidden hover:bg-state-hover focus-visible:ring-1 focus-visible:ring-ring"
-        >
-          <span className="truncate">{title ?? conversationId}</span>
-          <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
-        </DropdownMenuTrigger>
+      <div className="flex min-w-0 items-center gap-0.5">
+        {agent && (
+          <>
+            <button
+              type="button"
+              onClick={() => navigate(`/agents/${agent.id}`)}
+              className="max-w-[180px] shrink-0 truncate rounded-md px-1.5 py-1 text-[14px] font-medium text-muted-foreground outline-hidden hover:bg-state-hover hover:text-foreground"
+            >
+              {agent.name}
+            </button>
+            <span className="shrink-0 text-[14px] text-muted-foreground">/</span>
+          </>
+        )}
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            aria-label={t("task.header.menu")}
+            className="inline-flex min-w-0 items-center gap-1.5 rounded-md px-2 py-1 text-[14px] font-medium text-foreground outline-hidden hover:bg-state-hover focus-visible:ring-1 focus-visible:ring-ring"
+          >
+            <span className="truncate">{title ?? conversationId}</span>
+            <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
+          </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-56">
           <DropdownMenuItem onSelect={onSchedule}>
             <Calendar /> {t("task.header.schedule")}
@@ -87,7 +108,8 @@ export function TaskHeader({
             <Trash2 /> {t("task.header.delete")}
           </DropdownMenuItem>
         </DropdownMenuContent>
-      </DropdownMenu>
+        </DropdownMenu>
+      </div>
       <div className="flex-1" />
       {/* Stop control lives in the composer (PromptInputSubmit toggles between
           Send icon and Square icon while streaming). No duplicate Stop button
