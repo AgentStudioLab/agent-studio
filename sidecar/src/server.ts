@@ -206,9 +206,9 @@ function buildProvider() {
       });
       return { id: task.id, name: task.name };
     },
-    // `remember` MCP tool (agent-bound runs) → mutate that agent's memory.
-    // The tool validates content/match presence before calling, so the
-    // non-null assertions here are guaranteed by its contract.
+    // `remember` MCP tool (agent-bound runs) → write that agent's file-based
+    // memory. The MemoryEdit union guarantees save fields are present when
+    // action === "save"; remove needs only `file`.
     onRemember: (edit, { agentWorkspaceId }) => {
       if (edit.action === "save") {
         return agentMemoryStore.save(agentWorkspaceId, {

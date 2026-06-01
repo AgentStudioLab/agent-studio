@@ -69,7 +69,7 @@ export function buildRememberTool(deps: {
       file: z.string().describe("scenario slug (kebab-case, no extension), e.g. 'user-profile'."),
       title: z.string().optional().describe("save: human title shown in the index link."),
       hook: z.string().optional().describe("save: one-line hook in the index — what this memory is about (used for recall)."),
-      content: z.string().optional().describe("save: the FULL markdown body of the scenario file."),
+      content: z.string().optional().describe("save (required): the FULL markdown body of the scenario file."),
     },
     async (args): Promise<{ content: { type: "text"; text: string }[] }> => {
       const text = (t: string) => ({ content: [{ type: "text" as const, text: t }] });
