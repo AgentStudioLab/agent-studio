@@ -18,10 +18,12 @@ export const scheduledKeys = {
   runs: (id: string) => ["scheduled", "runs", id] as const,
 };
 
-export function useScheduledTasks() {
+export function useScheduledTasks(agentWorkspaceId?: string) {
   return useQuery({
-    queryKey: scheduledKeys.list,
-    queryFn: () => listScheduledTasks(),
+    queryKey: agentWorkspaceId
+      ? [...scheduledKeys.list, agentWorkspaceId]
+      : scheduledKeys.list,
+    queryFn: () => listScheduledTasks(agentWorkspaceId),
     staleTime: 5_000,
   });
 }

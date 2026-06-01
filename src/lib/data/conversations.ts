@@ -40,8 +40,14 @@ export async function createConversation(
   return expectJson<Conversation>(res);
 }
 
-export async function listRecents(limit = 20): Promise<Conversation[]> {
-  const res = await authedFetch(`/conversations?limit=${limit}`);
+export async function listRecents(
+  limit = 20,
+  agentWorkspaceId?: string,
+): Promise<Conversation[]> {
+  const q = agentWorkspaceId
+    ? `?limit=${limit}&agentWorkspaceId=${encodeURIComponent(agentWorkspaceId)}`
+    : `?limit=${limit}`;
+  const res = await authedFetch(`/conversations${q}`);
   return expectJson<Conversation[]>(res);
 }
 
@@ -110,6 +116,20 @@ export async function archiveConversation(
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ archived }),
+  });
+  return expectJson<Conversation>(res);
+}
+
+/** Move a conversation into an agent space (or out, with null). Backend
+ *  re-resolves working_dir to the agent's home. */
+export async function moveConversationToAgent(
+  id: string,
+  agentWorkspaceId: string | null,
+): Promise<Conversation> {
+  const res = await authedFetch(`/conversations/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ agentWorkspaceId }),
   });
   return expectJson<Conversation>(res);
 }

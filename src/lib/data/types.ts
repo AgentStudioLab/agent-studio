@@ -76,6 +76,8 @@ export interface AgentWorkspace {
   avatar: string | null;
   homeDir: string;
   archived: boolean;
+  /** Pinned → surfaced in the sidebar Pinned section. */
+  pinned: boolean;
   createdAt: number;
   updatedAt: number;
 }

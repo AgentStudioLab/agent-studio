@@ -33,8 +33,13 @@ export interface CreateScheduledTaskArgs {
 
 export type UpdateScheduledTaskArgs = Partial<CreateScheduledTaskArgs>;
 
-export async function listScheduledTasks(): Promise<ScheduledTask[]> {
-  const res = await authedFetch("/scheduled");
+export async function listScheduledTasks(
+  agentWorkspaceId?: string,
+): Promise<ScheduledTask[]> {
+  const q = agentWorkspaceId
+    ? `?agentWorkspaceId=${encodeURIComponent(agentWorkspaceId)}`
+    : "";
+  const res = await authedFetch(`/scheduled${q}`);
   return expectJson<ScheduledTask[]>(res);
 }
 

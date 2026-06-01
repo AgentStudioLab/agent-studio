@@ -17,6 +17,7 @@ export interface CreateAgentWorkspaceArgs {
 }
 export type UpdateAgentWorkspaceArgs = Partial<CreateAgentWorkspaceArgs> & {
   archived?: boolean;
+  pinned?: boolean;
 };
 
 export async function listAgentWorkspaces(): Promise<AgentWorkspace[]> {

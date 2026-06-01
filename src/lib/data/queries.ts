@@ -10,6 +10,7 @@ import {
   listConversations,
   listPinned,
   listRecents,
+  moveConversationToAgent,
   renameConversation,
   togglePin,
 } from "./conversations";
@@ -35,10 +36,10 @@ export function useConversation(id: string | null) {
   });
 }
 
-export function useRecentConversations(limit = 20) {
+export function useRecentConversations(limit = 20, agentWorkspaceId?: string) {
   return useQuery({
-    queryKey: [...queryKeys.recents, limit],
-    queryFn: () => listRecents(limit),
+    queryKey: [...queryKeys.recents, limit, agentWorkspaceId ?? null],
+    queryFn: () => listRecents(limit, agentWorkspaceId),
     staleTime: 5_000,
     // Poll so the sidebar reflects server-side title changes (auto-title) and
     // newly-created conversations promptly.
@@ -121,5 +122,17 @@ export function useDeleteConversationMutation() {
   return useMutation({
     mutationFn: (id: string) => deleteConversation(id),
     onSuccess: () => invalidateConversationLists(qc),
+  });
+}
+
+export function useMoveConversationToAgentMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { id: string; agentWorkspaceId: string | null }) =>
+      moveConversationToAgent(vars.id, vars.agentWorkspaceId),
+    onSuccess: (updated) => {
+      invalidateConversationLists(qc);
+      qc.invalidateQueries({ queryKey: queryKeys.detail(updated.id) });
+    },
   });
 }
