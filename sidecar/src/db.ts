@@ -142,7 +142,8 @@ CREATE TABLE IF NOT EXISTS scheduled_tasks (
 CREATE INDEX IF NOT EXISTS idx_sched_next ON scheduled_tasks (enabled, next_run_at);
 
 -- agent_workspaces: a persistent "Agent" — its own home dir (read/write),
--- plus (P2/P3) external folders, a CLAUDE.md instructions file, and memory.
+-- plus (P2/P3) external folders, a CLAUDE.md instructions file, and file-based
+-- memory (<home>/memory/, managed by AgentMemoryStore — not a DB table).
 -- Conversations + scheduled_tasks reference it via agent_workspace_id (nullable
 -- = the generic/default workspace, i.e. the "new task" behavior).
 CREATE TABLE IF NOT EXISTS agent_workspaces (
@@ -173,7 +174,6 @@ CREATE TABLE IF NOT EXISTS agent_folders (
 CREATE INDEX IF NOT EXISTS idx_agent_folders_agent ON agent_folders (agent_workspace_id);
 
 `;
-
 
 interface ColumnInfo {
   name: string;
