@@ -23,6 +23,7 @@ import { buildScheduledRoutes } from "./routes/scheduled";
 import { AgentWorkspaceService } from "./services/agentWorkspaces";
 import { AgentFolderService } from "./services/agentFolders";
 import { AgentMemoryService } from "./services/agentMemories";
+import { AgentMemoryStore } from "./services/agentMemoryStore";
 import { buildAgentWorkspaceRoutes } from "./routes/agentWorkspaces";
 import { buildAgentFolderRoutes } from "./routes/agentFolders";
 import { buildAgentMemoryRoutes } from "./routes/agentMemories";
@@ -97,6 +98,7 @@ const scheduledTasks = new ScheduledTaskService(db);
 const agentWorkspaces = new AgentWorkspaceService(db);
 const agentFolders = new AgentFolderService(db);
 const agentMemories = new AgentMemoryService(db);
+const agentMemoryStore = new AgentMemoryStore(agentWorkspaces);
 const store = createBunSqliteRunStore(db);
 const interruptBus = createInterruptBus({ store });
 const audit = new AuditService(db);
@@ -208,19 +210,12 @@ function buildProvider() {
     // The tool validates content/match presence before calling, so the
     // non-null assertions here are guaranteed by its contract.
     onRemember: (edit, { agentWorkspaceId }) => {
-      if (edit.action === "add") {
-        agentMemories.create({
-          agentWorkspaceId,
-          content: edit.content!,
-          source: "agent",
-          block: edit.block,
+      if (edit.action === "save") {
+        return agentMemoryStore.save(agentWorkspaceId, {
+          file: edit.file, title: edit.title, hook: edit.hook, content: edit.content,
         });
-        return { status: "ok", message: edit.content! };
       }
-      if (edit.action === "replace") {
-        return agentMemories.replaceAgentRow(agentWorkspaceId, edit.block, edit.match!, edit.content!);
-      }
-      return agentMemories.removeAgentRow(agentWorkspaceId, edit.block, edit.match!);
+      return agentMemoryStore.remove(agentWorkspaceId, edit.file);
     },
   });
 }

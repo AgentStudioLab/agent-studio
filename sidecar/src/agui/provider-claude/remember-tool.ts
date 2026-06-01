@@ -1,76 +1,54 @@
 import { tool } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
-import type { MemoryBlock, MemoryEditResult } from "../../services/agentMemories";
+import type { MemoryEditResult } from "../../services/agentMemoryStore";
 
-/** Model-visible id of the remember tool (server is shared `agent_studio`). */
 export const REMEMBER_TOOL_FQN = "mcp__agent_studio__remember";
 
-/** One edit the agent issues against its own memory. */
-export interface MemoryEdit {
-  action: "add" | "replace" | "remove";
-  block: MemoryBlock;
-  /** add: the new memory. replace: the replacement text. */
-  content?: string;
-  /** replace/remove: substring locating the agent-written entry to target. */
-  match?: string;
-}
+export type MemoryEdit =
+  | { action: "save"; file: string; title: string; hook: string; content: string }
+  | { action: "remove"; file: string };
 
-/** Host-supplied persister (wired in server.ts to AgentMemoryService). */
 export type RememberFn = (
   edit: MemoryEdit,
   ctx: { agentWorkspaceId: string; threadId: string },
 ) => MemoryEditResult | Promise<MemoryEditResult>;
 
-/**
- * Validate the action/content/match combo. Returns an error string to show the
- * model (so it self-corrects), or null when the args are usable. Pure + exported
- * for testing.
- */
+/** Returns an error string for the model, or null when args are usable. Pure. */
 export function validateMemoryEditArgs(args: {
-  action: MemoryEdit["action"];
+  action: "save" | "remove";
+  file?: string;
+  title?: string;
+  hook?: string;
   content?: string;
-  match?: string;
 }): string | null {
-  if ((args.action === "add" || args.action === "replace") && !args.content?.trim()) {
-    return "`content` is required for add and replace.";
-  }
-  if ((args.action === "replace" || args.action === "remove") && !args.match?.trim()) {
-    return "`match` is required for replace and remove.";
+  if (!args.file?.trim()) return "`file` (the scenario slug) is required.";
+  if (args.action === "save") {
+    if (!args.title?.trim()) return "`title` is required for save.";
+    if (!args.hook?.trim()) return "`hook` is required for save.";
+    if (!args.content?.trim()) return "`content` is required for save.";
   }
   return null;
 }
 
-/** Turn a persistence result into the text the model reads back. Pure + exported. */
+/** Model-facing text. Pure. */
 export function resultToText(edit: MemoryEdit, result: MemoryEditResult): string {
-  if (result.status === "no_match") {
-    return `No agent-written memory in "${edit.block}" matches "${edit.match}". (Memories you didn't write yourself can't be edited via this tool — leave them be.)`;
+  if (result.status === "not_found") {
+    return `No memory file "${edit.file}" found. List the memory index first; use an existing slug to edit, or a new slug to create.`;
   }
-  if (result.status === "ambiguous") {
-    const list = result.matches.map((m) => `  - ${m}`).join("\n");
-    return `"${edit.match}" matches ${result.matches.length} entries in "${edit.block}" — be more specific:\n${list}`;
-  }
-  switch (edit.action) {
-    case "add":
-      return `Saved to ${edit.block} memory: ${result.message}`;
-    case "replace":
-      return `Updated a ${edit.block} memory → ${result.message}`;
-    case "remove":
-      return `Removed from ${edit.block} memory: ${result.message}`;
-  }
+  return edit.action === "save"
+    ? `Saved memory "${result.message}" → ${edit.file}.md (indexed in MEMORY.md).`
+    : `Removed memory ${edit.file}.md from MEMORY.md.`;
 }
 
 /**
- * `remember` tool for the in-process `agent_studio` MCP server. Built per-run
- * and capturing the bound agentWorkspaceId. The agent manages its own memory in
- * two budgeted blocks — `profile` (about the user) and `facts` (about the
- * project/work) — via three actions:
- *   - add:     write a new memory
- *   - replace: rewrite an existing memory you wrote, located by substring
- *   - remove:  delete an existing memory you wrote, located by substring
- * Only memories you wrote are editable (user-authored ones are read-only). When
- * a block nears its budget (shown in your context) consolidate it: replace
- * duplicates with one entry, remove stale facts. Exposed ONLY on agent-bound
- * runs; the FQN must also be in `allowedTools`.
+ * `remember` tool for the in-process `agent_studio` MCP server. The agent manages
+ * its own memory as markdown files under <home>/memory/: a MEMORY.md index +
+ * per-scenario <slug>.md files. The index is in your context — consult it first.
+ *   - save:   write a scenario file + upsert its index line. To extend an existing
+ *             scenario, Read its file, merge, and save the FULL content under the
+ *             same `file`; for a new scenario pick a new `file` slug.
+ *   - remove: delete a scenario file + its index line.
+ * Exposed ONLY on agent-bound runs; FQN must also be in allowedTools.
  */
 export function buildRememberTool(deps: {
   agentWorkspaceId: string;
@@ -79,52 +57,34 @@ export function buildRememberTool(deps: {
 }) {
   return tool(
     "remember",
-    "Manage durable memory about THIS agent workspace, split into two blocks: " +
-      "'profile' (facts/preferences about the user) and 'facts' (conventions/" +
-      "decisions about the project or work). action='add' saves a new memory; " +
-      "'replace' rewrites one you previously saved (located by the `match` " +
-      "substring); 'remove' deletes one you saved. Only memories you wrote are " +
-      "editable. Save sparingly — things worth recalling in future sessions, " +
-      "not transient task details. When a block nears capacity (shown in your " +
-      "context), consolidate: merge duplicates via replace, drop stale via remove.",
+    "Manage durable memory for THIS agent as markdown files: a MEMORY.md index " +
+      "(in your context) + per-scenario <slug>.md files. action='save' writes a " +
+      "scenario file and upserts its index line; to add to an existing scenario, " +
+      "Read that file, merge, and save the full content under the same `file`; " +
+      "use a new `file` slug for a new scenario. action='remove' deletes a scenario " +
+      "file + its index line. Save sparingly — durable facts worth recalling in " +
+      "future sessions, not transient task details.",
     {
-      action: z
-        .enum(["add", "replace", "remove"])
-        .describe("add a new memory, replace one you wrote, or remove one you wrote."),
-      block: z
-        .enum(["profile", "facts"])
-        .describe("'profile' = about the user; 'facts' = about the project/work."),
-      content: z
-        .string()
-        .optional()
-        .describe("For add: the new memory, as a short standalone sentence. For replace: the replacement text."),
-      match: z
-        .string()
-        .optional()
-        .describe("For replace/remove: a substring uniquely identifying the existing memory you wrote."),
+      action: z.enum(["save", "remove"]).describe("save a scenario memory file, or remove one."),
+      file: z.string().describe("scenario slug (kebab-case, no extension), e.g. 'user-profile'."),
+      title: z.string().optional().describe("save: human title shown in the index link."),
+      hook: z.string().optional().describe("save: one-line hook in the index — what this memory is about (used for recall)."),
+      content: z.string().optional().describe("save: the FULL markdown body of the scenario file."),
     },
     async (args): Promise<{ content: { type: "text"; text: string }[] }> => {
       const text = (t: string) => ({ content: [{ type: "text" as const, text: t }] });
       const invalid = validateMemoryEditArgs(args);
       if (invalid) return text(invalid);
-      const edit: MemoryEdit = {
-        action: args.action,
-        block: args.block,
-        content: args.content,
-        match: args.match,
-      };
+      const edit: MemoryEdit =
+        args.action === "save"
+          ? { action: "save", file: args.file, title: args.title!, hook: args.hook!, content: args.content! }
+          : { action: "remove", file: args.file };
       const result = await deps.onRemember(edit, {
         agentWorkspaceId: deps.agentWorkspaceId,
         threadId: deps.threadId,
       });
       return text(resultToText(edit, result));
     },
-    {
-      annotations: {
-        readOnlyHint: false,
-        destructiveHint: false,
-        openWorldHint: false,
-      },
-    },
+    { annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false } },
   );
 }
