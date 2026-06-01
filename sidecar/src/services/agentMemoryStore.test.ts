@@ -75,4 +75,46 @@ describe("AgentMemoryStore", () => {
     const names = (await s.tree("a1")).map((n) => n.name).sort();
     expect(names).toEqual(["MEMORY.md", "p.md"]);
   });
+
+  test("save with reserved/dotfile slugs does not clobber the index and stays visible", async () => {
+    const s = makeStore(base);
+    await s.save("a1", { file: "x", title: "X", hook: "h", content: "first" });
+    // 'MEMORY' would collide with MEMORY.md on case-insensitive FS → must remap.
+    await s.save("a1", { file: "MEMORY", title: "M", hook: "h", content: "scenario body" });
+    expect(s.indexText("a1")).toContain("(x.md)"); // index intact
+    expect(s.indexText("a1")).not.toContain("scenario body");
+    // '.hidden' must not become an invisible dotfile.
+    await s.save("a1", { file: ".hidden", title: "H", hook: "h", content: "z" });
+    const names = (await s.tree("a1")).map((n) => n.name);
+    expect(names.every((n) => !n.startsWith("."))).toBe(true);
+    expect(names).toContain("memory-file.md"); // MEMORY remapped to memory-file
+  });
+
+  test("upsert/remove are not fooled by a slug name inside another entry's hook", async () => {
+    const s = makeStore(base);
+    await s.save("a1", { file: "alpha", title: "Alpha", hook: "see ](beta.md) for more", content: "a" });
+    await s.save("a1", { file: "beta", title: "Beta", hook: "hb", content: "b" });
+    // removing beta must NOT delete alpha (whose hook mentions beta.md)
+    await s.remove("a1", "beta");
+    const idx = s.indexText("a1");
+    expect(idx).toContain("(alpha.md)");
+    // beta's entry line must be gone; alpha's entry (whose hook contains "(beta.md)") must remain
+    expect(idx).not.toMatch(/^- \[[^\]]*\]\(beta\.md\)/m);
+  });
+
+  test("enforceIndexBudget evicts oldest entries + files past the hard cap", async () => {
+    const s = makeStore(base);
+    // Each hook is long so few entries exceed hard (2800 chars).
+    const big = "x".repeat(400);
+    for (let i = 0; i < 12; i++) {
+      await s.save("a1", { file: `s${i}`, title: `T${i}`, hook: big, content: "c" });
+    }
+    expect(s.indexText("a1").length).toBeGreaterThan(2800);
+    await s.enforceIndexBudget("a1");
+    expect(s.indexText("a1").length).toBeLessThanOrEqual(2000);
+    // oldest (s0) gone, newest (s11) kept
+    expect(s.indexText("a1")).not.toContain("(s0.md)");
+    expect(s.indexText("a1")).toContain("(s11.md)");
+    expect(existsSync(join(base, "a1", "memory", "s0.md"))).toBe(false);
+  });
 });

@@ -30,13 +30,16 @@ export interface MemorySaveInput {
 
 /** kebab-case, strip path separators / .md / unsafe chars. */
 export function sanitizeSlug(file: string): string {
-  return file
+  const s = file
     .trim()
     .replace(/\.md$/i, "")
     .replace(/[^\w.-]+/g, "-")
-    .replace(/^-+|-+$/g, "")
+    .replace(/^[.-]+|[.-]+$/g, "") // strip leading/trailing dots+dashes (no dotfiles)
     .toLowerCase()
-    .slice(0, 80) || "memory";
+    .slice(0, 80);
+  // Empty after sanitizing, or "memory" (collides with MEMORY.md on
+  // case-insensitive macOS/Windows filesystems) → safe fallback.
+  return s && s !== "memory" ? s : "memory-file";
 }
 
 function writeAtomic(path: string, text: string): void {
@@ -45,16 +48,25 @@ function writeAtomic(path: string, text: string): void {
   renameSync(tmp, path);
 }
 
-/** Upsert a `- [title](slug.md) — hook` line keyed by `(slug.md)`. */
+/** Matches a `- [title](slug.md) — hook` line, anchored to the link so a slug
+ *  name inside another entry's hook/title can't false-match. */
+function entryLineRe(slug: string): RegExp {
+  const esc = slug.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`^- \\[[^\\]]*\\]\\(${esc}\\.md\\)`);
+}
+
+/** Upsert a `- [title](slug.md) — hook` line keyed by the slug link. */
 export function upsertIndexLine(indexPath: string, slug: string, title: string, hook: string): void {
   const line = `- [${title}](${slug}.md) — ${hook}`;
   const cur = existsSync(indexPath) ? readFileSync(indexPath, "utf8") : INDEX_HEADER;
-  const needle = `](${slug}.md)`;
+  const re = entryLineRe(slug);
   const lines = cur.split("\n");
-  const i = lines.findIndex((l) => l.includes(needle));
-  if (i >= 0) lines[i] = line;
-  else {
-    if (cur.length > 0 && !cur.endsWith("\n")) lines.push("");
+  const i = lines.findIndex((l) => re.test(l));
+  if (i >= 0) {
+    lines[i] = line;
+  } else {
+    // Drop trailing blank lines so entries stay contiguous (no blank-line drift).
+    while (lines.length > 0 && lines[lines.length - 1]!.trim() === "") lines.pop();
     lines.push(line);
   }
   writeAtomic(indexPath, lines.join("\n").replace(/\n*$/, "\n"));
@@ -62,8 +74,8 @@ export function upsertIndexLine(indexPath: string, slug: string, title: string, 
 
 export function removeIndexLine(indexPath: string, slug: string): void {
   if (!existsSync(indexPath)) return;
-  const needle = `](${slug}.md)`;
-  const kept = readFileSync(indexPath, "utf8").split("\n").filter((l) => !l.includes(needle));
+  const re = entryLineRe(slug);
+  const kept = readFileSync(indexPath, "utf8").split("\n").filter((l) => !re.test(l));
   writeAtomic(indexPath, kept.join("\n").replace(/\n*$/, "\n"));
 }
 
@@ -144,7 +156,7 @@ export class AgentMemoryStore {
       if (!dir) return;
       const idxPath = join(dir, MEMORY_INDEX);
       if (!existsSync(idxPath)) return;
-      while (readFileSync(idxPath, "utf8").length > MEMORY_INDEX_BUDGET.hard) {
+      while (readFileSync(idxPath, "utf8").length > MEMORY_INDEX_BUDGET.soft) {
         const lines = readFileSync(idxPath, "utf8").split("\n");
         const i = lines.findIndex((l) => /\]\(([\w.-]+)\.md\)/.test(l));
         if (i < 0) break;
