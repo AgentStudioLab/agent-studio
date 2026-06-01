@@ -36,23 +36,32 @@ describe("computeAgentDirs", () => {
 });
 
 describe("buildAgentAppendContext", () => {
-  it("returns CLAUDE.md + memory index", () => {
-    const out = buildAgentAppendContext("Be terse.", "- [User](user.md) — Jay");
-    expect(out).toContain("Be terse.");
-    expect(out).toContain("## Memory index");
-    expect(out).toContain("- [User](user.md) — Jay");
+  const INDEX = "# Memory index\n\n- [User](user.md) — Jay, 前端工程师";
+
+  it("returns CLAUDE.md first, then the memory index verbatim", () => {
+    const out = buildAgentAppendContext("Be terse.", INDEX);
+    expect(out).not.toBeNull();
+    expect(out!.startsWith("Be terse.")).toBe(true);
+    expect(out).toContain("# Memory index");
+    expect(out).toContain("- [User](user.md) — Jay, 前端工程师");
+    // single heading — no double "## Memory index" wrapper
+    expect(out).not.toContain("## Memory index");
   });
-  it("returns null when both empty", () => {
+  it("returns null when both empty / whitespace-only", () => {
     expect(buildAgentAppendContext(null, "")).toBeNull();
-    expect(buildAgentAppendContext("   ", "")).toBeNull();
+    expect(buildAgentAppendContext("   ", "  \n\n")).toBeNull();
   });
-  it("appends a nudge near budget", () => {
-    const big = "- x\n".repeat(500); // 2000 chars > warn (1600)
-    expect(buildAgentAppendContext(null, big)).toContain("consolidate");
-  });
-  it("CLAUDE.md only, no memory section when index empty", () => {
+  it("CLAUDE.md only — no memory section when index empty", () => {
     const out = buildAgentAppendContext("# Role\nBe concise.", "");
     expect(out).toContain("Be concise.");
     expect(out).not.toContain("Memory index");
+  });
+  it("no nudge below the warn threshold", () => {
+    const out = buildAgentAppendContext(null, INDEX); // short, well under warn
+    expect(out).not.toContain("consolidate");
+  });
+  it("appends a consolidate nudge at/over the warn threshold", () => {
+    const big = "- x\n".repeat(500); // 2000 chars >= warn (1600)
+    expect(buildAgentAppendContext(null, big)).toContain("consolidate");
   });
 });

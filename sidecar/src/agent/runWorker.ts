@@ -45,11 +45,13 @@ export function buildAgentAppendContext(
   if (md) parts.push(md);
   const idx = memoryIndex.trim();
   if (idx) {
+    // The index file carries its own `# Memory index` heading, so inject it
+    // verbatim (no extra host heading). Nudge gate measures the injected text.
     const nudge =
-      memoryIndex.length >= MEMORY_INDEX_BUDGET.warn
+      idx.length >= MEMORY_INDEX_BUDGET.warn
         ? "\n\n<!-- Memory index near capacity — consolidate: merge or remove stale scenario files via the remember tool. -->"
         : "";
-    parts.push(`## Memory index\n${idx}${nudge}`);
+    parts.push(`${idx}${nudge}`);
   }
   return parts.length > 0 ? parts.join("\n\n") : null;
 }
