@@ -65,18 +65,8 @@ export function AgentSpaceView() {
 
   return (
     <AppShell
-      bareAside={preview !== null}
-      aside={
-        preview ? (
-          <PreviewPane
-            file={preview.file}
-            workingDir={preview.workingDir}
-            onClose={() => setPreview(null)}
-          />
-        ) : undefined
-      }
       main={
-        <div className="flex min-h-0 flex-1">
+        <div className="relative flex min-h-0 flex-1">
           {/* Left: header + composer + recents */}
           <div className="flex min-w-0 flex-1 flex-col overflow-y-auto">
             <div className="px-12 pb-4 pt-12">
@@ -115,6 +105,18 @@ export function AgentSpaceView() {
                 onOpenFile={(file, workingDir) => setPreview({ file, workingDir })}
               />
             </aside>
+          )}
+
+          {/* File preview — floats over the right side (covers the rail), it
+           *  does not compress the layout. */}
+          {preview && (
+            <div className="absolute inset-y-0 right-0 z-20 flex shadow-2xl">
+              <PreviewPane
+                file={preview.file}
+                workingDir={preview.workingDir}
+                onClose={() => setPreview(null)}
+              />
+            </div>
           )}
         </div>
       }
