@@ -5,7 +5,7 @@ import type { ScheduledTask, ScheduledTaskService } from "./scheduledTasks";
 import type { ThreadService } from "./threads";
 import type { MessageService } from "./messages";
 import type { AgentFolderService } from "./agentFolders";
-import type { AgentMemoryService } from "./agentMemories";
+import type { AgentMemoryStore } from "./agentMemoryStore";
 import type { UsageService } from "./usage";
 
 export interface SchedulerDeps {
@@ -18,8 +18,8 @@ export interface SchedulerDeps {
   usage: UsageService;
   /** Resolves an agent-bound run's external folders → sandbox roots (P2). */
   agentFolders?: AgentFolderService;
-  /** Resolves an agent-bound run's saved memories → systemPrompt.append (P3). */
-  agentMemories?: AgentMemoryService;
+  /** Resolves an agent-bound run's file-based memory index → systemPrompt.append. */
+  agentMemoryStore?: AgentMemoryStore;
   /** Resolve an agent workspace's home dir for agent-bound tasks. Returns
    *  null → the spawned conversation falls back to the default workspace cwd. */
   resolveAgentHome?: (agentWorkspaceId: string) => string | null | undefined;
@@ -128,7 +128,7 @@ export class Scheduler {
       messages: this.deps.messages,
       threads: this.deps.threads,
       agentFolders: this.deps.agentFolders,
-      agentMemories: this.deps.agentMemories,
+      agentMemoryStore: this.deps.agentMemoryStore,
       provider: this.deps.provider,
       interruptBus: this.deps.interruptBus,
       abortSignal: abort.signal,

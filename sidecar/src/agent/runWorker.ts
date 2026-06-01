@@ -10,12 +10,7 @@ import {
 import type { MessageService } from "../services/messages";
 import type { ThreadService } from "../services/threads";
 import type { AgentFolderService } from "../services/agentFolders";
-import {
-  MEMORY_BUDGETS,
-  type AgentMemoryService,
-  type BlockBudget,
-  type MemoryBlock,
-} from "../services/agentMemories";
+import { MEMORY_INDEX_BUDGET, type AgentMemoryStore } from "../services/agentMemoryStore";
 import type { InterruptBus } from "../agui/provider-claude/interrupt-bus";
 import type { UsageService } from "../services/usage";
 
@@ -34,39 +29,27 @@ export function computeAgentDirs(
   };
 }
 
-/** Block render order + bilingual section titles for the injected context. */
-const BLOCK_SECTIONS: { block: MemoryBlock; title: string }[] = [
-  { block: "profile", title: "用户画像 / User profile" },
-  { block: "facts", title: "事实约定 / Facts & conventions" },
-];
-
 /**
- * P3 agent context block injected into systemPrompt.append on agent-bound runs:
- * the agent's `<home>/CLAUDE.md` instructions (read verbatim) followed by its
- * two memory blocks (profile/facts). Each non-empty block renders with a
- * `(used X/soft)` annotation and — at/over the warn threshold — a nudge to
- * consolidate via the remember tool. Exported + pure (file IO, DB reads, and
- * the backstop trim are the caller's) so it's testable. Returns null when empty.
+ * Agent context injected into systemPrompt.append on agent-bound runs: the
+ * agent's <home>/CLAUDE.md instructions (verbatim) + its memory index
+ * (<home>/memory/MEMORY.md). Scenario file bodies are NOT injected — the agent
+ * Reads them on demand. Near the index budget, append a consolidation nudge.
+ * Pure (IO is the caller's). Returns null when both are empty.
  */
 export function buildAgentAppendContext(
   claudeMd: string | null,
-  blocks: { profile: string[]; facts: string[] },
-  budgets: Record<MemoryBlock, BlockBudget> = MEMORY_BUDGETS,
+  memoryIndex: string,
 ): string | null {
   const parts: string[] = [];
   const md = claudeMd?.trim();
   if (md) parts.push(md);
-  for (const { block, title } of BLOCK_SECTIONS) {
-    const entries = blocks[block];
-    if (entries.length === 0) continue;
-    const used = entries.reduce((sum, c) => sum + c.length, 0);
-    const { soft, warn } = budgets[block];
+  const idx = memoryIndex.trim();
+  if (idx) {
     const nudge =
-      used >= warn
-        ? " — near capacity, consolidate via the remember tool: merge duplicates, drop stale entries"
+      memoryIndex.length >= MEMORY_INDEX_BUDGET.warn
+        ? "\n\n<!-- Memory index near capacity — consolidate: merge or remove stale scenario files via the remember tool. -->"
         : "";
-    const lines = entries.map((c) => `- ${c}`).join("\n");
-    parts.push(`## ${title}  (used ${used}/${soft}${nudge})\n${lines}`);
+    parts.push(`## Memory index\n${idx}${nudge}`);
   }
   return parts.length > 0 ? parts.join("\n\n") : null;
 }
@@ -81,9 +64,9 @@ export interface RunWorkerInput {
   /** Resolves the bound agent's external folders → sandbox read/write roots.
    *  Omitted (e.g. unit tests) → no agent folder context. */
   agentFolders?: AgentFolderService;
-  /** Resolves the bound agent's saved memories → systemPrompt.append.
+  /** File-based memory store → MEMORY.md index injected into append.
    *  Omitted → no memory context. */
-  agentMemories?: AgentMemoryService;
+  agentMemoryStore?: AgentMemoryStore;
   provider: AgentProvider;
   interruptBus: InterruptBus;
   abortSignal: AbortSignal;
@@ -115,7 +98,7 @@ export async function runWorker(input: RunWorkerInput): Promise<void> {
     messages,
     threads,
     agentFolders,
-    agentMemories,
+    agentMemoryStore,
     provider,
     interruptBus,
     abortSignal,
@@ -254,22 +237,13 @@ export async function runWorker(input: RunWorkerInput): Promise<void> {
     } catch {
       // No CLAUDE.md in the agent home → no instructions section.
     }
-    let profile: string[] = [];
-    let facts: string[] = [];
-    if (agentMemories) {
-      // Backstop (deterministic): only PAST the hard cap does the host evict
-      // oldest agent rows — between warn and hard the agent is nudged to
-      // self-consolidate instead (it has room to work before we touch its rows).
-      for (const block of ["profile", "facts"] as const) {
-        const { soft, hard } = MEMORY_BUDGETS[block];
-        if (agentMemories.blockCharLength(agentWorkspaceId, block) > hard) {
-          agentMemories.trimBlockToBudget(agentWorkspaceId, block, soft);
-        }
-      }
-      profile = agentMemories.listByAgentBlock(agentWorkspaceId, "profile").map((m) => m.content);
-      facts = agentMemories.listByAgentBlock(agentWorkspaceId, "facts").map((m) => m.content);
+    let memoryIndex = "";
+    if (agentMemoryStore) {
+      // Host backstop: evict oldest entries only past the hard cap (see store).
+      await agentMemoryStore.enforceIndexBudget(agentWorkspaceId);
+      memoryIndex = agentMemoryStore.indexText(agentWorkspaceId);
     }
-    appendContext = buildAgentAppendContext(claudeMd, { profile, facts }) ?? undefined;
+    appendContext = buildAgentAppendContext(claudeMd, memoryIndex) ?? undefined;
   }
 
   try {

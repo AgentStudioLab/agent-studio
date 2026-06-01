@@ -255,7 +255,7 @@ const scheduler = new Scheduler({
   interruptBus,
   usage,
   agentFolders,
-  agentMemories,
+  agentMemoryStore,
   resolveAgentHome: (agentWorkspaceId) => agentWorkspaces.homeDir(agentWorkspaceId),
   canRun: () => !!providerSettings.current().apiKey,
 });
@@ -276,7 +276,7 @@ app.route(
     threads,
     messages,
     agentFolders,
-    agentMemories,
+    agentMemoryStore,
     provider: providerProxy,
     store,
     interruptBus,
