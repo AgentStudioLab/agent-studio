@@ -47,7 +47,7 @@ export function MemoryFilesCard({
 }) {
   const { t } = useTranslation();
   const { data: agent } = useAgentWorkspace(agentId);
-  const { data: tree } = useAgentMemoryTree(agentId);
+  const { data: tree, isLoading } = useAgentMemoryTree(agentId);
   const nodes = tree ?? [];
   const filePaths = useMemo(() => collectFilePaths(nodes, new Set<string>()), [nodes]);
   // memory dir = <home>/memory; the /files/content preview sandbox uses it as workingDir.
@@ -66,6 +66,8 @@ export function MemoryFilesCard({
     );
   };
 
+  // Don't flash the empty state before the tree query resolves.
+  if (isLoading) return null;
   if (nodes.length === 0) {
     return (
       <p className="py-0.5 text-sm text-muted-foreground">{t("agentSpace.memory.empty")}</p>
