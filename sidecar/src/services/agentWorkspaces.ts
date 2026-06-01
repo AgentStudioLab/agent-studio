@@ -12,6 +12,8 @@ export interface AgentWorkspace {
   /** Absolute path to this agent's home dir (read/write workspace). */
   homeDir: string;
   archived: boolean;
+  /** Pinned → surfaced in the sidebar Pinned section. */
+  pinned: boolean;
   createdAt: number;
   updatedAt: number;
 }
@@ -22,6 +24,7 @@ interface AgentWorkspaceRow {
   avatar: string | null;
   home_dir: string;
   archived: number;
+  pinned: number;
   created_at: number;
   updated_at: number;
 }
@@ -33,6 +36,7 @@ function rowToAgent(r: AgentWorkspaceRow): AgentWorkspace {
     avatar: r.avatar,
     homeDir: r.home_dir,
     archived: r.archived === 1,
+    pinned: r.pinned === 1,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -48,6 +52,7 @@ export interface UpdateAgentWorkspaceInput {
   name?: string;
   avatar?: string | null;
   archived?: boolean;
+  pinned?: boolean;
 }
 
 /** Default root for per-agent home dirs: ~/.agent-studio/agent-workspaces/<id>/ */
@@ -70,8 +75,8 @@ export class AgentWorkspaceService {
     const now = Date.now();
     this.db
       .prepare(
-        `INSERT INTO agent_workspaces (id, name, avatar, home_dir, archived, created_at, updated_at)
-         VALUES (?, ?, ?, ?, 0, ?, ?)`,
+        `INSERT INTO agent_workspaces (id, name, avatar, home_dir, archived, pinned, created_at, updated_at)
+         VALUES (?, ?, ?, ?, 0, 0, ?, ?)`,
       )
       .run(id, input.name, input.avatar ?? null, homeDir, now, now);
     return this.get(id)!;
@@ -111,6 +116,10 @@ export class AgentWorkspaceService {
     if (patch.archived !== undefined) {
       sets.push("archived = ?");
       vals.push(patch.archived ? 1 : 0);
+    }
+    if (patch.pinned !== undefined) {
+      sets.push("pinned = ?");
+      vals.push(patch.pinned ? 1 : 0);
     }
     sets.push("updated_at = ?");
     vals.push(Date.now());

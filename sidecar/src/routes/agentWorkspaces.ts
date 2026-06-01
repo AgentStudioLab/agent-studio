@@ -57,6 +57,7 @@ export function buildAgentWorkspaceRoutes(deps: MountAgentWorkspaceDeps): Hono {
           ? (body.avatar as string | null)
           : undefined,
       archived: typeof body.archived === "boolean" ? body.archived : undefined,
+      pinned: typeof body.pinned === "boolean" ? body.pinned : undefined,
     });
     return c.json(updated);
   });

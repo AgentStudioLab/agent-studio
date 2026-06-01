@@ -47,6 +47,15 @@ describe("AgentWorkspaceService", () => {
     expect(updated?.archived).toBe(true);
   });
 
+  it("create defaults pinned false; update toggles it", () => {
+    const { service } = svc();
+    const a = service.create({ name: "P" });
+    expect(a.pinned).toBe(false);
+    expect(service.update(a.id, { pinned: true })?.pinned).toBe(true);
+    expect(service.get(a.id)?.pinned).toBe(true);
+    expect(service.update(a.id, { pinned: false })?.pinned).toBe(false);
+  });
+
   it("delete() removes the row (home dir is left on disk)", () => {
     const { service } = svc();
     const a = service.create({ name: "X" });

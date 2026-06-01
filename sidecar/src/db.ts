@@ -151,6 +151,7 @@ CREATE TABLE IF NOT EXISTS agent_workspaces (
   avatar      TEXT,
   home_dir    TEXT NOT NULL,
   archived    INTEGER NOT NULL DEFAULT 0,
+  pinned      INTEGER NOT NULL DEFAULT 0,
   created_at  INTEGER NOT NULL,
   updated_at  INTEGER NOT NULL
 );
@@ -232,6 +233,7 @@ export function migrate(db: Database): void {
   ensureColumn(db, "conversations", "agent_workspace_id", "TEXT");
   ensureColumn(db, "scheduled_tasks", "agent_workspace_id", "TEXT");
   ensureColumn(db, "agent_memories", "block", "TEXT NOT NULL DEFAULT 'facts'");
+  ensureColumn(db, "agent_workspaces", "pinned", "INTEGER NOT NULL DEFAULT 0");
 }
 
 export function openDb(path: string): Database {

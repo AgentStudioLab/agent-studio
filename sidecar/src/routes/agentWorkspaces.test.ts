@@ -69,6 +69,19 @@ describe("agent workspace routes", () => {
     expect(reloaded).not.toBeNull();
     expect(reloaded?.agentWorkspaceId).toBeNull();
   });
+
+  it("PATCH /agents/:id toggles pinned", async () => {
+    const { app, agentWorkspaces } = harness();
+    const agent = agentWorkspaces.create({ name: "Pinnable" });
+    const res = await app.request(`/agents/${agent.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pinned: true }),
+    });
+    expect(res.status).toBe(200);
+    expect((await res.json() as { pinned: boolean }).pinned).toBe(true);
+    expect(agentWorkspaces.get(agent.id)?.pinned).toBe(true);
+  });
 });
 
 describe("conversation ↔ agent binding", () => {
