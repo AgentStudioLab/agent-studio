@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/app/AppShell";
+import { PageColumn } from "@/shared/layout/PageColumn";
 import { useAppShell } from "@/app/AppShellContext";
 import { useAgentWorkspace } from "@/lib/data/agent-queries";
 import { createConversation } from "@/lib/data/conversations";
@@ -85,31 +86,39 @@ export function AgentSpaceView() {
     <AppShell
       main={
         <div className="relative flex min-h-0 flex-1">
-          {/* Left: header + composer + recents */}
-          <div className="flex min-w-0 flex-1 flex-col overflow-y-auto">
+          {/* Left: fixed header + composer, with only the recents list scrolling. */}
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
             <div className="px-12 pb-4 pt-12">
-              {agent ? (
-                <AgentSpaceHeader agent={agent} />
-              ) : (
-                <h1 className="font-serif text-[32px] font-normal leading-none text-foreground">
-                  {t("agentSpace.notFound")}
-                </h1>
-              )}
+              <PageColumn className="max-w-[860px]">
+                {agent ? (
+                  <AgentSpaceHeader agent={agent} />
+                ) : (
+                  <h1 className="font-serif text-[32px] font-normal leading-none text-foreground">
+                    {t("agentSpace.notFound")}
+                  </h1>
+                )}
+              </PageColumn>
             </div>
-            <div className="flex w-full max-w-[860px] flex-col gap-8 px-12 pb-12">
-              <div className="rounded-2xl bg-background">
-                <PromptInput onSubmit={handleSubmit}>
-                  <SlashEditor placeholder={t("agentSpace.promptPlaceholder")} />
-                  <PromptInputFooter className="px-4 pb-3">
-                    <PromptInputTools />
-                    <PromptInputTools>
-                      <ModelPicker value={model} onChange={setModel} />
-                      <PromptInputSubmit />
-                    </PromptInputTools>
-                  </PromptInputFooter>
-                </PromptInput>
-              </div>
-              {agentId && <AgentRecents agentId={agentId} />}
+            <div className="px-12 pb-8">
+              <PageColumn className="max-w-[860px]">
+                <div className="rounded-2xl bg-background">
+                  <PromptInput onSubmit={handleSubmit}>
+                    <SlashEditor placeholder={t("agentSpace.promptPlaceholder")} />
+                    <PromptInputFooter className="px-4 pb-3">
+                      <PromptInputTools />
+                      <PromptInputTools>
+                        <ModelPicker value={model} onChange={setModel} />
+                        <PromptInputSubmit />
+                      </PromptInputTools>
+                    </PromptInputFooter>
+                  </PromptInput>
+                </div>
+              </PageColumn>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto px-12 pb-12">
+              <PageColumn className="max-w-[860px]">
+                {agentId && <AgentRecents agentId={agentId} />}
+              </PageColumn>
             </div>
           </div>
 
