@@ -6,15 +6,20 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
+import { InitialsAvatar } from "@/shared/atoms/InitialsAvatar";
+import { AVATAR_HUES, type AvatarHue, initialsFromName } from "@/shared/atoms/agent-avatar";
 
 interface NewAgentModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSave?: (data: { name: string }) => void;
+  onSave?: (data: { name: string; avatar: string | null }) => void;
   /** "create" (default) or "edit" — only changes the title + initial value. */
   mode?: "create" | "edit";
   /** Seeds the name field when opening in edit mode. */
   initialName?: string;
+  /** Seeds the hue picker when opening in edit mode. */
+  initialAvatar?: string | null;
 }
 
 const INPUT_CLASS =
@@ -27,19 +32,24 @@ export function NewAgentModal({
   onSave,
   mode = "create",
   initialName,
+  initialAvatar,
 }: NewAgentModalProps) {
   const { t } = useTranslation();
   const [name, setName] = useState("");
+  const [avatar, setAvatar] = useState<AvatarHue | null>(null);
   const canSave = name.trim().length > 0;
 
-  // Seed (or reset) the field each time the modal opens.
+  // Seed (or reset) the fields each time the modal opens.
   useEffect(() => {
-    if (open) setName(initialName ?? "");
-  }, [open, initialName]);
+    if (open) {
+      setName(initialName ?? "");
+      setAvatar(AVATAR_HUES.find((h) => h === initialAvatar) ?? null);
+    }
+  }, [open, initialName, initialAvatar]);
 
   const handleSave = () => {
     if (!canSave) return;
-    onSave?.({ name: name.trim() });
+    onSave?.({ name: name.trim(), avatar });
     onOpenChange(false);
   };
 
@@ -63,6 +73,30 @@ export function NewAgentModal({
             placeholder={t("agents.modal.namePlaceholder")}
             className={INPUT_CLASS}
           />
+        </div>
+        <div className="mt-5">
+          <span className={LABEL_CLASS}>{t("agents.modal.color")}</span>
+          <div
+            className="flex flex-wrap gap-2"
+            role="radiogroup"
+            aria-label={t("agents.modal.color")}
+          >
+            {AVATAR_HUES.map((h) => (
+              <button
+                key={h}
+                type="button"
+                role="radio"
+                aria-checked={avatar === h}
+                onClick={() => setAvatar(h)}
+                className={cn(
+                  "rounded-md outline-hidden ring-offset-2 ring-offset-background transition",
+                  avatar === h && "ring-2 ring-ring",
+                )}
+              >
+                <InitialsAvatar initials={initialsFromName(name)} hue={h} size={32} />
+              </button>
+            ))}
+          </div>
         </div>
         <div className="mt-6 flex items-center justify-end gap-2">
           <button

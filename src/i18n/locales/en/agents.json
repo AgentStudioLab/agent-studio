@@ -10,6 +10,7 @@
     "editTitle": "Edit agent",
     "name": "Name",
     "namePlaceholder": "e.g. Weekly blog, Q3 market research",
+    "color": "Color",
     "cancel": "Cancel",
     "save": "Create",
     "editSave": "Save"

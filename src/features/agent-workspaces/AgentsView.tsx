@@ -17,8 +17,8 @@ export function AgentsView() {
   const createMutation = useCreateAgentWorkspaceMutation();
   const [modalOpen, setModalOpen] = useState(false);
 
-  const handleSave = (data: { name: string }) => {
-    createMutation.mutate({ name: data.name });
+  const handleSave = (data: { name: string; avatar: string | null }) => {
+    createMutation.mutate({ name: data.name, avatar: data.avatar });
   };
 
   return (

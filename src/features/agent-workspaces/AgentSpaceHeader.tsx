@@ -11,6 +11,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import type { AgentWorkspace } from "@/lib/data/types";
 import { useUpdateAgentWorkspaceMutation } from "@/lib/data/agent-queries";
+import { InitialsAvatar } from "@/shared/atoms/InitialsAvatar";
+import { hueForAgent, initialsFromName } from "@/shared/atoms/agent-avatar";
 import { NewAgentModal } from "./NewAgentModal";
 
 const ICON_BTN =
@@ -34,9 +36,16 @@ export function AgentSpaceHeader({ agent }: { agent: AgentWorkspace }) {
 
   return (
     <header data-tauri-drag-region className="flex items-start justify-between gap-3">
-      <h1 className="font-serif text-[32px] font-normal leading-none text-foreground">
-        {agent.name}
-      </h1>
+      <div className="flex min-w-0 items-center gap-3">
+        <InitialsAvatar
+          initials={initialsFromName(agent.name)}
+          hue={hueForAgent(agent)}
+          size={40}
+        />
+        <h1 className="truncate font-serif text-[32px] font-normal leading-none text-foreground">
+          {agent.name}
+        </h1>
+      </div>
       <div className="flex items-center gap-1">
         <button
           type="button"
@@ -75,7 +84,8 @@ export function AgentSpaceHeader({ agent }: { agent: AgentWorkspace }) {
         onOpenChange={setEditOpen}
         mode="edit"
         initialName={agent.name}
-        onSave={({ name }) => update.mutate({ id: agent.id, patch: { name } })}
+        initialAvatar={agent.avatar}
+        onSave={({ name, avatar }) => update.mutate({ id: agent.id, patch: { name, avatar } })}
       />
     </header>
   );

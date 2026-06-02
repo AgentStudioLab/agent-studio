@@ -10,6 +10,7 @@
     "editTitle": "编辑智能体",
     "name": "名称",
     "namePlaceholder": "例如：周更博客、Q3 市场研究",
+    "color": "颜色",
     "cancel": "取消",
     "save": "创建",
     "editSave": "保存"
