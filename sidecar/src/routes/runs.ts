@@ -6,6 +6,7 @@ import type { RunEventStore, AgentProvider } from "../agui/core";
 import type { ThreadService } from "../services/threads";
 import type { MessageService } from "../services/messages";
 import type { AgentFolderService } from "../services/agentFolders";
+import type { AgentLinkService } from "../services/agentLinks";
 import type { AgentMemoryStore } from "../services/agentMemoryStore";
 import type { InterruptBus } from "../agui/provider-claude/interrupt-bus";
 import type { UsageService } from "../services/usage";
@@ -14,6 +15,7 @@ export interface MountRunsDeps {
   threads: ThreadService;
   messages: MessageService;
   agentFolders: AgentFolderService;
+  agentLinks: AgentLinkService;
   agentMemoryStore: AgentMemoryStore;
   provider: AgentProvider;
   store: RunEventStore;
@@ -123,6 +125,7 @@ export function buildRunRoutes(deps: MountRunsDeps): Hono {
       messages: deps.messages,
       threads: deps.threads,
       agentFolders: deps.agentFolders,
+      agentLinks: deps.agentLinks,
       agentMemoryStore: deps.agentMemoryStore,
       provider: deps.provider,
       interruptBus: deps.interruptBus,
@@ -242,6 +245,7 @@ export function buildRunRoutes(deps: MountRunsDeps): Hono {
           messages: deps.messages,
           threads: deps.threads,
           agentFolders: deps.agentFolders,
+          agentLinks: deps.agentLinks,
           agentMemoryStore: deps.agentMemoryStore,
           provider: deps.provider,
           interruptBus: deps.interruptBus,

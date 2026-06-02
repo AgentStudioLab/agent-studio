@@ -22,9 +22,11 @@ import { Scheduler } from "./services/scheduler";
 import { buildScheduledRoutes } from "./routes/scheduled";
 import { AgentWorkspaceService } from "./services/agentWorkspaces";
 import { AgentFolderService } from "./services/agentFolders";
+import { AgentLinkService } from "./services/agentLinks";
 import { AgentMemoryStore } from "./services/agentMemoryStore";
 import { buildAgentWorkspaceRoutes } from "./routes/agentWorkspaces";
 import { buildAgentFolderRoutes } from "./routes/agentFolders";
+import { buildAgentLinkRoutes } from "./routes/agentLinks";
 import { buildAgentInstructionRoutes } from "./routes/agentInstructions";
 import { buildAgentMemoryTreeRoutes } from "./routes/agentMemory";
 import { AuditService } from "./services/audit";
@@ -96,6 +98,7 @@ const messages = new MessageService(db);
 const scheduledTasks = new ScheduledTaskService(db);
 const agentWorkspaces = new AgentWorkspaceService(db);
 const agentFolders = new AgentFolderService(db);
+const agentLinks = new AgentLinkService(db);
 const agentMemoryStore = new AgentMemoryStore(agentWorkspaces);
 const store = createBunSqliteRunStore(db);
 const interruptBus = createInterruptBus({ store });
@@ -254,6 +257,7 @@ const scheduler = new Scheduler({
   interruptBus,
   usage,
   agentFolders,
+  agentLinks,
   agentMemoryStore,
   resolveAgentHome: (agentWorkspaceId) => agentWorkspaces.homeDir(agentWorkspaceId),
   canRun: () => !!providerSettings.current().apiKey,
@@ -265,6 +269,7 @@ app.route("/", buildConversationRoutes({ threads, store, agentWorkspaces }));
 app.route("/", buildScheduledRoutes({ tasks: scheduledTasks, threads, store, scheduler }));
 app.route("/", buildAgentWorkspaceRoutes({ agentWorkspaces, threads, scheduledTasks }));
 app.route("/", buildAgentFolderRoutes({ agentFolders, agentWorkspaces }));
+app.route("/", buildAgentLinkRoutes({ agentLinks, agentWorkspaces }));
 app.route("/", buildAgentMemoryTreeRoutes({ agentMemoryStore, agentWorkspaces }));
 app.route("/", buildAgentInstructionRoutes({ agentWorkspaces }));
 app.route("/", buildMessageRoutes(messages));
@@ -275,6 +280,7 @@ app.route(
     threads,
     messages,
     agentFolders,
+    agentLinks,
     agentMemoryStore,
     provider: providerProxy,
     store,

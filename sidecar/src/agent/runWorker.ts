@@ -10,6 +10,7 @@ import {
 import type { MessageService } from "../services/messages";
 import type { ThreadService } from "../services/threads";
 import type { AgentFolderService } from "../services/agentFolders";
+import type { AgentLink, AgentLinkService } from "../services/agentLinks";
 import { MEMORY_INDEX_BUDGET, type AgentMemoryStore } from "../services/agentMemoryStore";
 import type { InterruptBus } from "../agui/provider-claude/interrupt-bus";
 import type { UsageService } from "../services/usage";
@@ -36,9 +37,17 @@ export function computeAgentDirs(
  * Reads them on demand. Near the index budget, append a consolidation nudge.
  * Pure (IO is the caller's). Returns null when both are empty.
  */
+/** Reference-links section for the append, or "" when there are none. */
+function buildLinksBlock(links: AgentLink[]): string {
+  if (links.length === 0) return "";
+  const lines = links.map((l) => `- [${l.title}](${l.url})`).join("\n");
+  return `## Reference links\nUse WebFetch to read any of these when relevant:\n${lines}`;
+}
+
 export function buildAgentAppendContext(
   claudeMd: string | null,
   memoryIndex: string,
+  links: AgentLink[] = [],
 ): string | null {
   const parts: string[] = [];
   const md = claudeMd?.trim();
@@ -53,6 +62,8 @@ export function buildAgentAppendContext(
         : "";
     parts.push(`${idx}${nudge}`);
   }
+  const linksBlock = buildLinksBlock(links);
+  if (linksBlock) parts.push(linksBlock);
   return parts.length > 0 ? parts.join("\n\n") : null;
 }
 
@@ -66,6 +77,9 @@ export interface RunWorkerInput {
   /** Resolves the bound agent's external folders → sandbox read/write roots.
    *  Omitted (e.g. unit tests) → no agent folder context. */
   agentFolders?: AgentFolderService;
+  /** Reference links → a one-line list injected into append (P3).
+   *  Omitted → no link context. */
+  agentLinks?: AgentLinkService;
   /** File-based memory store → MEMORY.md index injected into append.
    *  Omitted → no memory context. */
   agentMemoryStore?: AgentMemoryStore;
@@ -100,6 +114,7 @@ export async function runWorker(input: RunWorkerInput): Promise<void> {
     messages,
     threads,
     agentFolders,
+    agentLinks,
     agentMemoryStore,
     provider,
     interruptBus,
@@ -245,7 +260,8 @@ export async function runWorker(input: RunWorkerInput): Promise<void> {
       await agentMemoryStore.enforceIndexBudget(agentWorkspaceId);
       memoryIndex = agentMemoryStore.indexText(agentWorkspaceId);
     }
-    appendContext = buildAgentAppendContext(claudeMd, memoryIndex) ?? undefined;
+    const links = agentLinks ? agentLinks.listByAgent(agentWorkspaceId) : [];
+    appendContext = buildAgentAppendContext(claudeMd, memoryIndex, links) ?? undefined;
   }
 
   try {

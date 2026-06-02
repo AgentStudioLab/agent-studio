@@ -64,4 +64,17 @@ describe("buildAgentAppendContext", () => {
     const big = "- x\n".repeat(500); // 2000 chars >= warn (1600)
     expect(buildAgentAppendContext(null, big)).toContain("consolidate");
   });
+  it("appends a reference-links section with one line per link", () => {
+    const out = buildAgentAppendContext(null, "", [
+      { id: "alk_1", agentWorkspaceId: "a", url: "https://docs.example.com", title: "Docs", createdAt: 0 },
+      { id: "alk_2", agentWorkspaceId: "a", url: "https://api.example.com", title: "API", createdAt: 0 },
+    ]);
+    expect(out).toContain("## Reference links");
+    expect(out).toContain("- [Docs](https://docs.example.com)");
+    expect(out).toContain("- [API](https://api.example.com)");
+    expect(out).toContain("WebFetch");
+  });
+  it("no links section when the list is empty", () => {
+    expect(buildAgentAppendContext("Be terse.", "", [])).not.toContain("Reference links");
+  });
 });

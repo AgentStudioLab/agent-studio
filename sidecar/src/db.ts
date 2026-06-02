@@ -173,6 +173,19 @@ CREATE TABLE IF NOT EXISTS agent_folders (
 );
 CREATE INDEX IF NOT EXISTS idx_agent_folders_agent ON agent_folders (agent_workspace_id);
 
+-- agent_links (P3): URLs mounted into an agent as on-demand reference context.
+-- Stored only — injected into systemPrompt.append as a one-line list; the agent
+-- fetches them with WebFetch when relevant (no fetch-on-add, no RAG). OWNED by
+-- the agent (FK ON DELETE CASCADE), same as agent_folders.
+CREATE TABLE IF NOT EXISTS agent_links (
+  id                 TEXT PRIMARY KEY,
+  agent_workspace_id TEXT NOT NULL REFERENCES agent_workspaces(id) ON DELETE CASCADE,
+  url                TEXT NOT NULL,
+  title              TEXT NOT NULL,
+  created_at         INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_agent_links_agent ON agent_links (agent_workspace_id);
+
 `;
 
 interface ColumnInfo {
