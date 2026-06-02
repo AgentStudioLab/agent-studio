@@ -2,6 +2,7 @@ import { Brain, ChevronLeft, Palette, ShieldCheck, User } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import { PageColumn } from "@/shared/layout/PageColumn";
 
 const NAV_ITEMS = [
   { to: "account", labelKey: "settings.nav.account", icon: User },
@@ -61,9 +62,9 @@ export function SettingsLayout() {
           })}
         </nav>
         <main className="flex min-w-0 flex-1 flex-col overflow-y-auto bg-background px-8 py-8">
-          <div className="flex max-w-2xl flex-col gap-10">
+          <PageColumn className="flex max-w-2xl flex-col gap-10">
             <Outlet />
-          </div>
+          </PageColumn>
         </main>
       </div>
     </div>
