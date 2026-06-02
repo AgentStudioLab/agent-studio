@@ -38,7 +38,7 @@ describe("computeAgentDirs", () => {
 describe("buildAgentAppendContext", () => {
   const INDEX = "# Memory index\n\n- [User](user.md) — Jay, 前端工程师";
 
-  it("returns CLAUDE.md first, then the memory index verbatim", () => {
+  it("returns CLAUDE.md first, then the memory directive + index verbatim", () => {
     const out = buildAgentAppendContext("Be terse.", INDEX);
     expect(out).not.toBeNull();
     expect(out!.startsWith("Be terse.")).toBe(true);
@@ -46,15 +46,22 @@ describe("buildAgentAppendContext", () => {
     expect(out).toContain("- [User](user.md) — Jay, 前端工程师");
     // single heading — no double "## Memory index" wrapper
     expect(out).not.toContain("## Memory index");
+    // redirect directive present (use our memory, not the preset default)
+    expect(out).toContain("remember");
+    expect(out).toContain("memory/<slug>.md");
   });
-  it("returns null when both empty / whitespace-only", () => {
-    expect(buildAgentAppendContext(null, "")).toBeNull();
-    expect(buildAgentAppendContext("   ", "  \n\n")).toBeNull();
+  it("always emits the memory redirect directive, even with no CLAUDE.md or index", () => {
+    const out = buildAgentAppendContext(null, "");
+    expect(out).not.toBeNull();
+    expect(out).toContain("memory/");
+    expect(out).toContain("No memories saved yet.");
+    expect(out).not.toContain("# Memory index"); // no index heading when empty
   });
-  it("CLAUDE.md only — no memory section when index empty", () => {
+  it("CLAUDE.md + memory directive (empty note) when the index is empty", () => {
     const out = buildAgentAppendContext("# Role\nBe concise.", "");
     expect(out).toContain("Be concise.");
-    expect(out).not.toContain("Memory index");
+    expect(out).toContain("No memories saved yet.");
+    expect(out).not.toContain("# Memory index");
   });
   it("no nudge below the warn threshold", () => {
     const out = buildAgentAppendContext(null, INDEX); // short, well under warn

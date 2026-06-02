@@ -44,6 +44,16 @@ function buildLinksBlock(links: AgentLink[]): string {
   return `## Reference links\nUse WebFetch to read any of these when relevant:\n${lines}`;
 }
 
+/** Redirects the agent to OUR file-based memory instead of the claude_code
+ *  preset's default memory directory (which lives outside the workspace sandbox
+ *  and is unrelated). Always present on agent-bound runs. */
+const MEMORY_DIRECTIVE =
+  "This agent's durable memory lives in `memory/` in your working directory and is " +
+  "managed ONLY through the `remember` tool. It is your single source of memory — do " +
+  "not look for, read, or create memory in any other location (ignore any default " +
+  "memory directory outside this workspace). To recall a saved scenario, Read " +
+  "`memory/<slug>.md`.";
+
 export function buildAgentAppendContext(
   claudeMd: string | null,
   memoryIndex: string,
@@ -52,16 +62,22 @@ export function buildAgentAppendContext(
   const parts: string[] = [];
   const md = claudeMd?.trim();
   if (md) parts.push(md);
+
+  // Memory section — always present on agent-bound runs so the agent uses our
+  // file-based memory (the `remember` tool + the index below) and not the
+  // preset's out-of-workspace default. The index carries its own
+  // `# Memory index` heading, so it's injected verbatim after the directive.
   const idx = memoryIndex.trim();
   if (idx) {
-    // The index file carries its own `# Memory index` heading, so inject it
-    // verbatim (no extra host heading). Nudge gate measures the injected text.
     const nudge =
       idx.length >= MEMORY_INDEX_BUDGET.warn
         ? "\n\n<!-- Memory index near capacity — consolidate: merge or remove stale scenario files via the remember tool. -->"
         : "";
-    parts.push(`${idx}${nudge}`);
+    parts.push(`${MEMORY_DIRECTIVE}\n\n${idx}${nudge}`);
+  } else {
+    parts.push(`${MEMORY_DIRECTIVE}\n\nNo memories saved yet.`);
   }
+
   const linksBlock = buildLinksBlock(links);
   if (linksBlock) parts.push(linksBlock);
   return parts.length > 0 ? parts.join("\n\n") : null;
