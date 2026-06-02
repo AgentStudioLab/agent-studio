@@ -518,7 +518,11 @@ export function TaskView() {
       }
       aside={
         previewOpen ? (
-          <PreviewPane file={preview.file!} workingDir={cwd} onClose={closePreview} />
+          <PreviewPane
+            file={preview.file!}
+            workingDir={preview.workingDir ?? cwd}
+            onClose={closePreview}
+          />
         ) : (
           <TaskRightPanel
             state={state}
@@ -528,6 +532,7 @@ export function TaskView() {
             scheduledTaskName={conversationQuery.data?.title ?? null}
             workingDir={cwd}
             onOpenFile={(file) => openPreview(touchedFileToPreview(file))}
+            onOpenAgentFile={(file, wd) => openPreview(file, wd)}
             tab={rightTab}
             onTabChange={setRightTab}
           />

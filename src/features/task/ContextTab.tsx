@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
-import { Clock, ExternalLink, FileText, Folder, ScrollText } from "lucide-react";
+import { Clock, ExternalLink, ScrollText } from "lucide-react";
 import { open as shellOpen } from "@tauri-apps/plugin-shell";
 import { cn } from "@/lib/utils";
 import { useThreadContext, type ContextMcpServer } from "@/lib/agui/react/useThreadContext";
@@ -8,6 +8,8 @@ import { useAgentLinks } from "@/lib/data/agent-link-queries";
 import { useAgentFolders } from "@/lib/data/agent-folder-queries";
 import { useAgentMemoryTree } from "@/lib/data/agent-memory-tree-queries";
 import type { MemoryTreeNode } from "@/lib/data/agent-memory-tree";
+import { AgentFoldersCard, type OpenFolderFile } from "@/shared/agent-context/AgentFoldersCard";
+import { MemoryFilesCard } from "@/shared/agent-context/MemoryFilesCard";
 
 interface ContextTabProps {
   threadId: string | null;
@@ -16,6 +18,8 @@ interface ContextTabProps {
   /** When set, the conversation is a scheduled run — show a link back to the task. */
   scheduledTaskId?: string | null;
   scheduledTaskName?: string | null;
+  /** Open a folder/memory file in the preview pane (with its sandbox cwd). */
+  onOpenFile?: OpenFolderFile;
 }
 
 /** in-process MCP server always mounted on agent-bound runs (remember +
@@ -104,6 +108,7 @@ export function ContextTab({
   agentWorkspaceId,
   scheduledTaskId,
   scheduledTaskName,
+  onOpenFile,
 }: ContextTabProps) {
   const { t } = useTranslation();
   const { context, isLoading } = useThreadContext(threadId);
@@ -241,19 +246,10 @@ export function ContextTab({
         </div>
       )}
 
-      {folderList.length > 0 && (
+      {agentWorkspaceId && folderList.length > 0 && (
         <>
           <SectionHeading label={t("task.contextTab.folders")} count={String(folderList.length)} />
-          <div className="flex flex-col gap-1">
-            {folderList.map((f) => (
-              <ChipRow
-                key={f.id}
-                icon={<Folder className="size-3.5" style={iconStyle} />}
-                label={f.folderName}
-                title={f.path}
-              />
-            ))}
-          </div>
+          <AgentFoldersCard agentId={agentWorkspaceId} onOpenFile={onOpenFile} />
         </>
       )}
 
@@ -275,14 +271,10 @@ export function ContextTab({
         </>
       )}
 
-      {memoryFiles.length > 0 && (
+      {agentWorkspaceId && memoryFiles.length > 0 && (
         <>
           <SectionHeading label={t("task.contextTab.memory")} count={String(memoryFiles.length)} />
-          <div className="flex flex-col gap-1">
-            {memoryFiles.map((name) => (
-              <ChipRow key={name} icon={<FileText className="size-3.5" style={iconStyle} />} label={name} />
-            ))}
-          </div>
+          <MemoryFilesCard agentId={agentWorkspaceId} onOpenFile={onOpenFile} />
         </>
       )}
     </div>

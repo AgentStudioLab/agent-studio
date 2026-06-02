@@ -8,6 +8,7 @@ import { ContextTab } from "@/features/task/ContextTab";
 import { RunsTab } from "@/features/task/RunsTab";
 import type { TouchedFile } from "@/lib/agui/runtime/derivations";
 import type { ChatState } from "@/lib/agui/runtime/types";
+import type { OpenFolderFile } from "@/shared/agent-context/AgentFoldersCard";
 
 export type TaskRightTabId = "runs" | "process" | "files" | "context";
 
@@ -28,6 +29,9 @@ interface TaskRightPanelProps {
   workingDir: string | null;
   /** Called when a Files Tab entry is clicked — opens PreviewPane. */
   onOpenFile?: (file: TouchedFile) => void;
+  /** Called when a Context tab folder/memory file is clicked — opens PreviewPane
+   *  with the file's own sandbox cwd (folders live outside the conversation cwd). */
+  onOpenAgentFile?: OpenFolderFile;
   /**
    * Controlled tab state. Lifted to TaskView so the selection survives
    * unmount cycles (e.g. when PreviewPane temporarily takes over the aside
@@ -72,6 +76,7 @@ export function TaskRightPanel({
   scheduledTaskName,
   workingDir,
   onOpenFile,
+  onOpenAgentFile,
   tab,
   onTabChange,
 }: TaskRightPanelProps) {
@@ -150,6 +155,7 @@ export function TaskRightPanel({
             agentWorkspaceId={agentWorkspaceId}
             scheduledTaskId={scheduledTaskId}
             scheduledTaskName={scheduledTaskName}
+            onOpenFile={onOpenAgentFile}
           />
         )}
       </div>

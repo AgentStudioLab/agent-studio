@@ -10,10 +10,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useCreateAgentFolderMutation } from "@/lib/data/agent-folder-queries";
 import { RailSection } from "./RailSection";
-import { AgentFoldersCard, type OpenFolderFile } from "./AgentFoldersCard";
+import { AgentFoldersCard, type OpenFolderFile } from "@/shared/agent-context/AgentFoldersCard";
 import { AgentLinksCard } from "./AgentLinksCard";
 import { AddLinkModal } from "./AddLinkModal";
-import { MemoryFilesCard } from "./MemoryFilesCard";
+import { MemoryFilesCard } from "@/shared/agent-context/MemoryFilesCard";
 
 /** Context rail card: external folders ("On your computer"), reference Links,
  *  and the agent's Memory, under one collapsible. The ＋ dropdown adds a folder

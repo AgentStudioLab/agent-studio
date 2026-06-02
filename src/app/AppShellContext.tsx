@@ -18,6 +18,9 @@ const FULLSCREEN_ROUTES = ["/customize", "/settings"];
 interface PreviewState {
   file: MockFile | null;
   open: boolean;
+  /** Sandbox cwd for `/files/content`. Omitted → caller uses the conversation
+   *  cwd; set when previewing a file outside cwd (e.g. a mounted folder). */
+  workingDir?: string | null;
 }
 
 /** Collapsible sidebar section groups (all default-expanded). */
@@ -43,7 +46,7 @@ interface AppShellContextValue {
   asideOpen: boolean;
   toggleAside: () => void;
   preview: PreviewState;
-  openPreview: (file: MockFile) => void;
+  openPreview: (file: MockFile, workingDir?: string | null) => void;
   closePreview: () => void;
   // NewTaskView → TaskView handoff: NewTaskView creates a thread, drops the
   // prompt here + navigates. TaskView reads it once and POST /ag-ui/run, clears.
@@ -93,7 +96,8 @@ export function AppShellProvider({ children }: { children: ReactNode }) {
     setSidebarCollapsedSections((s) => ({ ...s, [section]: !s[section] }));
   }, []);
   const openPreview = useCallback(
-    (file: MockFile) => setPreview({ file, open: true }),
+    (file: MockFile, workingDir?: string | null) =>
+      setPreview({ file, open: true, workingDir: workingDir ?? null }),
     [],
   );
   const closePreview = useCallback(
