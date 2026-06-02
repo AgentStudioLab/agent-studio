@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
@@ -8,6 +8,7 @@ import { useAgentWorkspace } from "@/lib/data/agent-queries";
 import { createConversation } from "@/lib/data/conversations";
 import { queryKeys } from "@/lib/data/queries";
 import { threadStatusKey } from "@/lib/agui/react/useChat";
+import { agentMemoryKeys } from "@/lib/data/agent-memory-tree-queries";
 import { useAvailableModels } from "@/lib/models";
 import {
   PromptInput,
@@ -39,6 +40,23 @@ export function AgentSpaceView() {
   // File preview opened from a Context folder tree. workingDir = the mounted
   // folder's path (the /files/content sandbox cwd) so files under it resolve.
   const [preview, setPreview] = useState<{ file: MockFile; workingDir: string } | null>(null);
+
+  // Memory files change server-side when the agent runs (the `remember` tool in
+  // TaskView or a scheduled run), so the cached tree + open preview go stale
+  // after a round-trip. Re-entering the agent space — or refocusing the window —
+  // invalidates both so the latest shows without the preview's manual refresh.
+  // (invalidate refetches active observers regardless of useFileContent's
+  // staleTime:Infinity, leaving its manual-refresh default intact for TaskView.)
+  useEffect(() => {
+    if (!agentId) return;
+    const refresh = () => {
+      void qc.invalidateQueries({ queryKey: agentMemoryKeys.tree(agentId) });
+      void qc.invalidateQueries({ queryKey: ["file-content"] });
+    };
+    refresh();
+    window.addEventListener("focus", refresh);
+    return () => window.removeEventListener("focus", refresh);
+  }, [agentId, qc]);
 
   const handleSubmit = async ({ text }: PromptInputMessage) => {
     if (!agentId || !agent || text.trim().length === 0 || submitting) return;
