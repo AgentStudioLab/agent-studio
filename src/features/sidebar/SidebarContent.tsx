@@ -251,7 +251,7 @@ export function SidebarContent() {
         <NavItem
           icon={Briefcase}
           label={t("sidebar.nav.agents")}
-          active={pathname.startsWith("/agents")}
+          active={pathname === "/agents"}
           onClick={() => navigate("/agents")}
         />
         <NavItem
