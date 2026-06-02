@@ -523,6 +523,7 @@ export function TaskView() {
           <TaskRightPanel
             state={state}
             threadId={activeTaskId}
+            agentWorkspaceId={conversationQuery.data?.agentWorkspaceId ?? null}
             scheduledTaskId={conversationQuery.data?.scheduledTaskId ?? null}
             scheduledTaskName={conversationQuery.data?.title ?? null}
             workingDir={cwd}

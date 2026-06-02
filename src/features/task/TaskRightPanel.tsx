@@ -16,6 +16,9 @@ interface TaskRightPanelProps {
   state: ChatState | null;
   /** threadId for ContextTab (TanStack Query-backed, doesn't need state). */
   threadId: string | null;
+  /** Bound agent (when this conversation runs in an agent space) → Context tab
+   *  surfaces the agent's folders / links / memory + the agent_studio MCP. */
+  agentWorkspaceId?: string | null;
   /** Origin scheduled task (when this conversation is a scheduled run). Enables
    *  the Runs tab + the Context tab's scheduled-task entry. */
   scheduledTaskId?: string | null;
@@ -64,6 +67,7 @@ function TabButton({ id, label, icon, active, onClick }: TabButtonProps) {
 export function TaskRightPanel({
   state,
   threadId,
+  agentWorkspaceId,
   scheduledTaskId,
   scheduledTaskName,
   workingDir,
@@ -143,6 +147,7 @@ export function TaskRightPanel({
         {activeTab === "context" && (
           <ContextTab
             threadId={threadId}
+            agentWorkspaceId={agentWorkspaceId}
             scheduledTaskId={scheduledTaskId}
             scheduledTaskName={scheduledTaskName}
           />
