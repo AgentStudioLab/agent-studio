@@ -34,6 +34,9 @@ export function PermissionsSection() {
 
   return (
     <>
+      <h2 className="font-serif text-[32px] font-normal leading-none text-foreground">
+        {t("settings.permissions.title")}
+      </h2>
       <section className="space-y-3">
         <div>
           <h2 className="text-[18px] font-semibold text-foreground">

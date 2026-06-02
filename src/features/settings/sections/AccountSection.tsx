@@ -5,7 +5,7 @@ export function AccountSection() {
   const { t } = useTranslation();
   return (
     <section>
-      <h2 className="mb-6 text-[18px] font-semibold text-foreground">
+      <h2 className="mb-6 font-serif text-[32px] font-normal leading-none text-foreground">
         {t("settings.profile.title")}
       </h2>
       <ProfileForm />

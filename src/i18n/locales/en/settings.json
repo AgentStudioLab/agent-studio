@@ -84,6 +84,9 @@
     "saveError": "Save failed",
     "invalidJson": "JSON parse failed — please check the syntax."
   },
+  "permissions": {
+    "title": "Permissions"
+  },
   "hitl": {
     "title": "Always-allowed tools",
     "description": "Tools you've marked “always allow” skip the approval card. Remove anytime.",

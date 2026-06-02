@@ -66,7 +66,7 @@ export function ModelSection() {
   if (isLoading || !data || profileId === null) {
     return (
       <section>
-        <h2 className="text-[18px] font-semibold text-foreground">
+        <h2 className="font-serif text-[32px] font-normal leading-none text-foreground">
           {t("settings.provider.title")}
         </h2>
         <p className="mt-2 text-sm text-muted-foreground">…</p>
@@ -170,7 +170,7 @@ export function ModelSection() {
   return (
     <section className="space-y-5">
       <div>
-        <h2 className="text-[18px] font-semibold text-foreground">
+        <h2 className="font-serif text-[32px] font-normal leading-none text-foreground">
           {t("settings.provider.title")}
         </h2>
         <p className="text-sm text-muted-foreground">

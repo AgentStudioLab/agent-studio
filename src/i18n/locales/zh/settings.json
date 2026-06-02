@@ -84,6 +84,9 @@
     "saveError": "保存失败",
     "invalidJson": "JSON 解析失败，请检查格式。"
   },
+  "permissions": {
+    "title": "权限"
+  },
   "hitl": {
     "title": "已允许的工具",
     "description": "勾选过“始终允许”的工具会跳过审批卡片。可随时移除。",
