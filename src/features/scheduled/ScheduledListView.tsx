@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { ArrowUpDown, CalendarDays, ChevronDown, Coffee, Plus, Search } from "lucide-react";
 import { AppShell } from "@/app/AppShell";
+import { PageColumn } from "@/shared/layout/PageColumn";
 import { ScheduledCard } from "@/features/scheduled/ScheduledCard";
 import { KeepAwakeBanner } from "@/features/scheduled/KeepAwakeBanner";
 import {
@@ -96,88 +97,97 @@ export function ScheduledListView() {
     <AppShell
       main={
         <div className="flex h-full flex-col overflow-y-auto">
-          <header
-            data-tauri-drag-region
-            className="flex items-start justify-between gap-4 px-12 pt-12 pb-4"
-          >
-            <div>
-              <h1 className="font-serif text-[32px] font-normal leading-none text-foreground">
-                {t("scheduled.title")}
-              </h1>
-              <p className="mt-2 max-w-xl text-sm text-muted-foreground">
-                {t("scheduled.subtitle")}{" "}
-                <code className="rounded-sm bg-muted px-1 font-mono text-xs">/schedule</code>{" "}
-                {t("scheduled.subtitleSuffix")}
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                className="rounded-md p-2 text-muted-foreground hover:bg-state-hover hover:text-foreground"
-                aria-label={t("scheduled.toolbar.sort")}
-              >
-                <ArrowUpDown className="size-4" />
-              </button>
-              <button
-                type="button"
-                className="rounded-md p-2 text-muted-foreground hover:bg-state-hover hover:text-foreground"
-                aria-label={t("scheduled.toolbar.search")}
-              >
-                <Search className="size-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setModalOpen(true)}
-                className="inline-flex items-center gap-1.5 rounded-md bg-foreground px-3 py-1.5 text-sm font-medium text-background hover:bg-foreground/90"
-              >
-                <Plus className="size-4" /> {t("scheduled.toolbar.newTask")} <ChevronDown className="size-3" />
-              </button>
-            </div>
-          </header>
-          <div className="px-12 pb-4 pt-6">
-            <KeepAwakeBanner />
-          </div>
-          {!isLoading && tasks.length === 0 ? (
-            <p className="px-12 py-12 text-center text-sm text-muted-foreground">
-              {t("scheduled.empty")}
-            </p>
-          ) : (
-            <section className="grid grid-cols-1 gap-4 px-12 pb-8 sm:grid-cols-2 xl:grid-cols-3">
-              {tasks.map((task) => (
-                <ScheduledCard
-                  key={task.id}
-                  task={task}
-                  enabled={task.enabled}
-                  needsAttention={awaitingTaskIds.has(task.id)}
-                  needsAttentionLabel={t("scheduled.badge.awaiting")}
-                  onClick={() => openTask(task.id)}
-                  onRunNow={() => runNowMutation.mutate(task.id)}
-                  onToggleEnabled={(next) =>
-                    updateMutation.mutate({ id: task.id, patch: { enabled: next } })
-                  }
-                  onEdit={() => setEditTask(task)}
-                  onDelete={() => setDeleteTask(task)}
-                />
-              ))}
-            </section>
-          )}
-          <section className="flex flex-col items-center gap-3 px-12 pb-12 pt-6 text-center">
-            <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              {t("scheduled.moreIdeas.label")}
-            </h3>
-            <div className="flex flex-wrap items-center justify-center gap-2">
-              {moreIdeas.map(({ id, label, icon: Icon }) => (
+          <header data-tauri-drag-region className="px-12 pt-12 pb-4">
+            <PageColumn className="flex items-start justify-between gap-4">
+              <div>
+                <h1 className="font-serif text-[32px] font-normal leading-none text-foreground">
+                  {t("scheduled.title")}
+                </h1>
+                <p className="mt-2 max-w-xl text-sm text-muted-foreground">
+                  {t("scheduled.subtitle")}{" "}
+                  <code className="rounded-sm bg-muted px-1 font-mono text-xs">/schedule</code>{" "}
+                  {t("scheduled.subtitleSuffix")}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
                 <button
-                  key={id}
+                  type="button"
+                  className="rounded-md p-2 text-muted-foreground hover:bg-state-hover hover:text-foreground"
+                  aria-label={t("scheduled.toolbar.sort")}
+                >
+                  <ArrowUpDown className="size-4" />
+                </button>
+                <button
+                  type="button"
+                  className="rounded-md p-2 text-muted-foreground hover:bg-state-hover hover:text-foreground"
+                  aria-label={t("scheduled.toolbar.search")}
+                >
+                  <Search className="size-4" />
+                </button>
+                <button
                   type="button"
                   onClick={() => setModalOpen(true)}
-                  className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-1.5 text-sm hover:bg-muted"
+                  className="inline-flex items-center gap-1.5 rounded-md bg-foreground px-3 py-1.5 text-sm font-medium text-background hover:bg-foreground/90"
                 >
-                  <Icon className="size-4 text-muted-foreground" />
-                  {label}
+                  <Plus className="size-4" /> {t("scheduled.toolbar.newTask")} <ChevronDown className="size-3" />
                 </button>
-              ))}
+              </div>
+            </PageColumn>
+          </header>
+          <div className="px-12 pb-4 pt-6">
+            <PageColumn>
+              <KeepAwakeBanner />
+            </PageColumn>
+          </div>
+          {!isLoading && tasks.length === 0 ? (
+            <div className="px-12 py-12">
+              <PageColumn>
+                <p className="text-center text-sm text-muted-foreground">
+                  {t("scheduled.empty")}
+                </p>
+              </PageColumn>
             </div>
+          ) : (
+            <section className="px-12 pb-8">
+              <PageColumn className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                {tasks.map((task) => (
+                  <ScheduledCard
+                    key={task.id}
+                    task={task}
+                    enabled={task.enabled}
+                    needsAttention={awaitingTaskIds.has(task.id)}
+                    needsAttentionLabel={t("scheduled.badge.awaiting")}
+                    onClick={() => openTask(task.id)}
+                    onRunNow={() => runNowMutation.mutate(task.id)}
+                    onToggleEnabled={(next) =>
+                      updateMutation.mutate({ id: task.id, patch: { enabled: next } })
+                    }
+                    onEdit={() => setEditTask(task)}
+                    onDelete={() => setDeleteTask(task)}
+                  />
+                ))}
+              </PageColumn>
+            </section>
+          )}
+          <section className="px-12 pb-12 pt-6">
+            <PageColumn className="flex flex-col items-center gap-3 text-center">
+              <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                {t("scheduled.moreIdeas.label")}
+              </h3>
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                {moreIdeas.map(({ id, label, icon: Icon }) => (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setModalOpen(true)}
+                    className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-1.5 text-sm hover:bg-muted"
+                  >
+                    <Icon className="size-4 text-muted-foreground" />
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </PageColumn>
           </section>
 
           <NewScheduledModal
