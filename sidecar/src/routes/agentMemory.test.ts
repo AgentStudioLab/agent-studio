@@ -24,7 +24,7 @@ describe("GET /agents/:id/memory/tree", () => {
   it("returns the memory file tree", async () => {
     const { app, agents, store } = setup();
     const a = agents.create({ name: "A" });
-    await store.save(a.id, { file: "p", title: "P", hook: "h", content: "x" });
+    await store.save(a.id, { originThreadId: "t1", file: "p", title: "P", hook: "h", content: "x" });
     const res = await app.request(`/agents/${a.id}/memory/tree`);
     expect(res.status).toBe(200);
     const names = ((await res.json()) as { name: string }[]).map((n) => n.name).sort();

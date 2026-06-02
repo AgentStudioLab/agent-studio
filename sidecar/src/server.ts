@@ -207,10 +207,11 @@ function buildProvider() {
     // `remember` MCP tool (agent-bound runs) → write that agent's file-based
     // memory. The MemoryEdit union guarantees save fields are present when
     // action === "save"; remove needs only `file`.
-    onRemember: (edit, { agentWorkspaceId }) => {
+    onRemember: (edit, { agentWorkspaceId, threadId }) => {
       if (edit.action === "save") {
         return agentMemoryStore.save(agentWorkspaceId, {
           file: edit.file, title: edit.title, hook: edit.hook, content: edit.content,
+          originThreadId: threadId, type: edit.type,
         });
       }
       return agentMemoryStore.remove(agentWorkspaceId, edit.file);

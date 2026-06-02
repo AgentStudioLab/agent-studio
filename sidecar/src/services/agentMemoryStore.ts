@@ -26,6 +26,11 @@ export interface MemorySaveInput {
   title: string;
   hook: string;
   content: string;
+  /** Thread (conversation) id this memory originated from — written into the
+   *  file's frontmatter so it can be traced back to its source chat later. */
+  originThreadId: string;
+  /** Optional cowork-style classification: user | feedback | project | reference. */
+  type?: string;
 }
 
 /** kebab-case, strip path separators / .md / unsafe chars. */
@@ -40,6 +45,34 @@ export function sanitizeSlug(file: string): string {
   // Empty after sanitizing, or "memory" (collides with MEMORY.md on
   // case-insensitive macOS/Windows filesystems) → safe fallback.
   return s && s !== "memory" ? s : "memory-file";
+}
+
+/** Strip chars that would break the `[title](slug.md)` markdown link, and
+ *  collapse whitespace. Without this, a `[` / `]` / `(` / `)` in the title
+ *  corrupts the link so the relative path is silently lost in the rendered index. */
+export function sanitizeTitle(title: string): string {
+  return title.replace(/[[\]()]/g, "").replace(/\s+/g, " ").trim();
+}
+
+/** YAML double-quoted scalar — safe for hooks containing `:` / quotes / newlines. */
+function yamlQuote(s: string): string {
+  return `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\s+/g, " ").trim()}"`;
+}
+
+/** cowork-style YAML frontmatter for a scenario file (carries its origin thread). */
+function buildFrontmatter(slug: string, input: MemorySaveInput, createdAt: string): string {
+  return [
+    "---",
+    `name: ${slug}`,
+    `description: ${yamlQuote(input.hook)}`,
+    "metadata:",
+    "  node_type: memory",
+    ...(input.type ? [`  type: ${input.type}`] : []),
+    `  originThreadId: ${input.originThreadId}`,
+    `  createdAt: ${createdAt}`,
+    "---",
+    "",
+  ].join("\n");
 }
 
 function writeAtomic(path: string, text: string): void {
@@ -57,7 +90,7 @@ function entryLineRe(slug: string): RegExp {
 
 /** Upsert a `- [title](slug.md) — hook` line keyed by the slug link. */
 export function upsertIndexLine(indexPath: string, slug: string, title: string, hook: string): void {
-  const line = `- [${title}](${slug}.md) — ${hook}`;
+  const line = `- [${sanitizeTitle(title)}](${slug}.md) — ${hook.replace(/\s+/g, " ").trim()}`;
   const cur = existsSync(indexPath) ? readFileSync(indexPath, "utf8") : INDEX_HEADER;
   const re = entryLineRe(slug);
   const lines = cur.split("\n");
@@ -128,8 +161,9 @@ export class AgentMemoryStore {
       const dir = this.ensure(agentId);
       if (!dir) return { status: "not_found" as const };
       const slug = sanitizeSlug(input.file);
+      const frontmatter = buildFrontmatter(slug, input, new Date().toISOString());
       const body = input.content.endsWith("\n") ? input.content : `${input.content}\n`;
-      writeAtomic(join(dir, `${slug}.md`), body);
+      writeAtomic(join(dir, `${slug}.md`), `${frontmatter}\n${body}`);
       upsertIndexLine(join(dir, MEMORY_INDEX), slug, input.title, input.hook);
       return { status: "ok" as const, message: input.title };
     });

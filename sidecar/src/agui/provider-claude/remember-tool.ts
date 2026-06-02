@@ -5,7 +5,7 @@ import type { MemoryEditResult } from "../../services/agentMemoryStore";
 export const REMEMBER_TOOL_FQN = "mcp__agent_studio__remember";
 
 export type MemoryEdit =
-  | { action: "save"; file: string; title: string; hook: string; content: string }
+  | { action: "save"; file: string; title: string; hook: string; content: string; type?: string }
   | { action: "remove"; file: string };
 
 export type RememberFn = (
@@ -20,6 +20,7 @@ export function validateMemoryEditArgs(args: {
   title?: string;
   hook?: string;
   content?: string;
+  type?: string;
 }): string | null {
   if (!args.file?.trim()) return "`file` (the scenario slug) is required.";
   if (args.action === "save") {
@@ -70,6 +71,10 @@ export function buildRememberTool(deps: {
       title: z.string().optional().describe("save: human title shown in the index link."),
       hook: z.string().optional().describe("save: one-line hook in the index — what this memory is about (used for recall)."),
       content: z.string().optional().describe("save (required): the FULL markdown body of the scenario file."),
+      type: z
+        .enum(["user", "feedback", "project", "reference"])
+        .optional()
+        .describe("save (optional): classify this memory — user | feedback | project | reference."),
     },
     async (args): Promise<{ content: { type: "text"; text: string }[] }> => {
       const text = (t: string) => ({ content: [{ type: "text" as const, text: t }] });
@@ -77,7 +82,7 @@ export function buildRememberTool(deps: {
       if (invalid) return text(invalid);
       const edit: MemoryEdit =
         args.action === "save"
-          ? { action: "save", file: args.file, title: args.title!, hook: args.hook!, content: args.content! }
+          ? { action: "save", file: args.file, title: args.title!, hook: args.hook!, content: args.content!, type: args.type }
           : { action: "remove", file: args.file };
       const result = await deps.onRemember(edit, {
         agentWorkspaceId: deps.agentWorkspaceId,
