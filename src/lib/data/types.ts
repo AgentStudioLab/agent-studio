@@ -93,6 +93,16 @@ export interface AgentFolder {
   createdAt: number;
 }
 
+/** A URL mounted into an agent as on-demand reference context (P3). Injected
+ *  into systemPrompt.append; the agent fetches it with WebFetch when relevant. */
+export interface AgentLink {
+  id: string;
+  agentWorkspaceId: string;
+  url: string;
+  title: string;
+  createdAt: number;
+}
+
 /** One spawned run in a scheduled task's history. */
 export interface ScheduledRun {
   threadId: string;

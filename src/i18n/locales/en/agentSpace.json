@@ -14,8 +14,23 @@
   "context": {
     "title": "Context",
     "onYourComputer": "On your computer",
+    "links": "Links",
     "chooseFolder": "Choose a folder",
+    "addLink": "Add a link",
     "add": "Add context"
+  },
+  "links": {
+    "empty": "No links yet.",
+    "remove": "Remove"
+  },
+  "addLinkModal": {
+    "title": "Add a link",
+    "urlPlaceholder": "https://…",
+    "titleLabel": "Title (optional)",
+    "titlePlaceholder": "Defaults to the site host",
+    "invalidUrl": "Enter a valid http(s) URL.",
+    "cancel": "Cancel",
+    "add": "Add"
   },
   "scheduled": {
     "title": "Scheduled",

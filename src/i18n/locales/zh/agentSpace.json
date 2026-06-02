@@ -14,8 +14,23 @@
   "context": {
     "title": "上下文",
     "onYourComputer": "本机文件夹",
+    "links": "链接",
     "chooseFolder": "选择文件夹",
+    "addLink": "添加链接",
     "add": "添加上下文"
+  },
+  "links": {
+    "empty": "还没有链接。",
+    "remove": "移除"
+  },
+  "addLinkModal": {
+    "title": "添加链接",
+    "urlPlaceholder": "https://…",
+    "titleLabel": "标题（可选）",
+    "titlePlaceholder": "默认用站点域名",
+    "invalidUrl": "请输入有效的 http(s) 链接。",
+    "cancel": "取消",
+    "add": "添加"
   },
   "scheduled": {
     "title": "定时任务",

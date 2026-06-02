@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Plus } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
@@ -10,11 +11,13 @@ import {
 import { useCreateAgentFolderMutation } from "@/lib/data/agent-folder-queries";
 import { RailSection } from "./RailSection";
 import { AgentFoldersCard, type OpenFolderFile } from "./AgentFoldersCard";
+import { AgentLinksCard } from "./AgentLinksCard";
+import { AddLinkModal } from "./AddLinkModal";
 import { MemoryFilesCard } from "./MemoryFilesCard";
 
-/** Context rail card: external folders ("On your computer") + the agent's
- *  Memory, under one collapsible. The ＋ dropdown adds a folder (Add-a-link is
- *  deferred to a later spec, so it's intentionally absent for now). */
+/** Context rail card: external folders ("On your computer"), reference Links,
+ *  and the agent's Memory, under one collapsible. The ＋ dropdown adds a folder
+ *  or a link. */
 export function ContextCard({
   agentId,
   onOpenFile,
@@ -24,6 +27,7 @@ export function ContextCard({
 }) {
   const { t } = useTranslation();
   const createFolder = useCreateAgentFolderMutation(agentId);
+  const [addLinkOpen, setAddLinkOpen] = useState(false);
 
   const handleChooseFolder = async () => {
     try {
@@ -46,6 +50,9 @@ export function ContextCard({
         <DropdownMenuItem onSelect={handleChooseFolder}>
           {t("agentSpace.context.chooseFolder")}
         </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => setAddLinkOpen(true)}>
+          {t("agentSpace.context.addLink")}
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -61,11 +68,18 @@ export function ContextCard({
         </section>
         <section className="flex flex-col gap-2">
           <h3 className="text-xs font-medium text-muted-foreground">
+            {t("agentSpace.context.links")}
+          </h3>
+          <AgentLinksCard agentId={agentId} />
+        </section>
+        <section className="flex flex-col gap-2">
+          <h3 className="text-xs font-medium text-muted-foreground">
             {t("agentSpace.memory.title")}
           </h3>
           <MemoryFilesCard agentId={agentId} onOpenFile={onOpenFile} />
         </section>
       </div>
+      <AddLinkModal agentId={agentId} open={addLinkOpen} onOpenChange={setAddLinkOpen} />
     </RailSection>
   );
 }
