@@ -20,6 +20,7 @@ import { code } from "@streamdown/code";
 import { math } from "@streamdown/math";
 import { mermaid } from "@streamdown/mermaid";
 import { STREAMDOWN_COMPONENTS } from "./MarkdownCodeBlock";
+import { stripFrontmatter } from "./frontmatter";
 
 const STREAMDOWN_PLUGINS = { cjk, code, math, mermaid };
 
@@ -32,7 +33,7 @@ export function MarkdownView({ content, className }: MarkdownViewProps) {
   return (
     <div className={className}>
       <Streamdown plugins={STREAMDOWN_PLUGINS} components={STREAMDOWN_COMPONENTS}>
-        {content}
+        {stripFrontmatter(content)}
       </Streamdown>
     </div>
   );
