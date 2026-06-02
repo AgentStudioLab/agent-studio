@@ -20,7 +20,8 @@ import { code } from "@streamdown/code";
 import { math } from "@streamdown/math";
 import { mermaid } from "@streamdown/mermaid";
 import { STREAMDOWN_COMPONENTS } from "./MarkdownCodeBlock";
-import { stripFrontmatter } from "./frontmatter";
+import { splitFrontmatter } from "./frontmatter";
+import { FrontmatterPanel } from "./FrontmatterPanel";
 
 const STREAMDOWN_PLUGINS = { cjk, code, math, mermaid };
 
@@ -30,10 +31,15 @@ export interface MarkdownViewProps {
 }
 
 export function MarkdownView({ content, className }: MarkdownViewProps) {
+  // Leading YAML frontmatter renders as its own metadata panel (Streamdown
+  // would otherwise mis-render the block as a giant heading); the body streams
+  // through Streamdown as usual.
+  const { frontmatter, body } = splitFrontmatter(content);
   return (
     <div className={className}>
+      {frontmatter !== null && <FrontmatterPanel raw={frontmatter} />}
       <Streamdown plugins={STREAMDOWN_PLUGINS} components={STREAMDOWN_COMPONENTS}>
-        {stripFrontmatter(content)}
+        {body}
       </Streamdown>
     </div>
   );

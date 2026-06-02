@@ -1,35 +1,53 @@
 import { describe, expect, test } from "bun:test";
-import { stripFrontmatter } from "./frontmatter";
+import { parseFrontmatter, splitFrontmatter } from "./frontmatter";
 
-describe("stripFrontmatter", () => {
-  test("removes a leading YAML frontmatter block, keeps the body", () => {
+describe("splitFrontmatter", () => {
+  test("splits a leading frontmatter block from the body", () => {
     const md = [
       "---",
       "name: gentle-tone",
       'description: "用户要求语气像温柔的小猫咪"',
       "metadata:",
-      "  node_type: memory",
       "  type: feedback",
       "  originThreadId: thr_PCqXZ9kyOg_b",
       "---",
       "",
       "用户要求走温柔小猫咪路线。",
     ].join("\n");
-    expect(stripFrontmatter(md)).toBe("\n用户要求走温柔小猫咪路线。");
+    const { frontmatter, body } = splitFrontmatter(md);
+    expect(frontmatter).toBe(
+      'name: gentle-tone\ndescription: "用户要求语气像温柔的小猫咪"\nmetadata:\n  type: feedback\n  originThreadId: thr_PCqXZ9kyOg_b',
+    );
+    expect(body).toBe("\n用户要求走温柔小猫咪路线。");
   });
 
-  test("leaves content without frontmatter unchanged", () => {
+  test("returns null frontmatter + original body when there's none", () => {
     const md = "# Title\n\nbody text";
-    expect(stripFrontmatter(md)).toBe(md);
+    expect(splitFrontmatter(md)).toEqual({ frontmatter: null, body: md });
   });
 
-  test("does not strip a `---` that isn't at the very start", () => {
+  test("ignores a `---` that isn't at the very start", () => {
     const md = "intro paragraph\n\n---\nname: x\n---\n";
-    expect(stripFrontmatter(md)).toBe(md);
+    expect(splitFrontmatter(md).frontmatter).toBeNull();
+  });
+});
+
+describe("parseFrontmatter", () => {
+  test("parses scalars + a nested map, unquoting values", () => {
+    const raw =
+      'name: gentle-tone\ndescription: "soft kitten"\nmetadata:\n  type: feedback\n  originThreadId: thr_1';
+    expect(parseFrontmatter(raw)).toEqual([
+      { key: "name", value: "gentle-tone", depth: 0 },
+      { key: "description", value: "soft kitten", depth: 0 },
+      { key: "metadata", value: "", depth: 0 },
+      { key: "type", value: "feedback", depth: 1 },
+      { key: "originThreadId", value: "thr_1", depth: 1 },
+    ]);
   });
 
-  test("preserves a horizontal rule inside the body", () => {
-    const md = "---\nname: x\n---\n\nabove\n\n---\n\nbelow";
-    expect(stripFrontmatter(md)).toBe("\nabove\n\n---\n\nbelow");
+  test("keeps colons inside a value (timestamps)", () => {
+    expect(parseFrontmatter("createdAt: 2026-06-02T02:22:39.025Z")).toEqual([
+      { key: "createdAt", value: "2026-06-02T02:22:39.025Z", depth: 0 },
+    ]);
   });
 });
