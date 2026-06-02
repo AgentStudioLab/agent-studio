@@ -25,17 +25,21 @@ export function AgentRecents({ agentId }: { agentId: string }) {
 
   return (
     <section className="flex flex-col gap-2">
-      <h2 className="text-sm text-muted-foreground">{t("agentSpace.recents")}</h2>
+      <h2 className="text-sm text-muted-foreground">
+        {t("agentSpace.recents")}
+      </h2>
       {list.length === 0 ? (
-        <p className="text-sm text-muted-foreground">{t("agentSpace.recentsEmpty")}</p>
+        <p className="text-sm text-muted-foreground">
+          {t("agentSpace.recentsEmpty")}
+        </p>
       ) : (
-        <ul className="flex flex-col gap-1">
+        <ul className="flex flex-col gap-3">
           {list.map((c) => (
             <li key={c.id}>
               <button
                 type="button"
                 onClick={() => navigate(`/task/${c.id}`)}
-                className="flex w-full items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 text-left outline-hidden hover:bg-state-hover"
+                className="flex w-full items-center gap-3 rounded-xl border border-border bg-card px-4 py-4 text-left outline-hidden hover:bg-state-hover"
               >
                 <MessageSquare className="size-4 shrink-0 text-muted-foreground" />
                 <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
