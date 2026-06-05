@@ -79,6 +79,29 @@ function sniff(buf: Buffer): { ext: string; type: "file" | "image" } {
   return { ext: ".bin", type: "file" };
 }
 
+function decodeAesKey(data: WeixinMediaData | undefined): Buffer | null {
+  const aesKeyHex = data?.aeskey;
+  if (aesKeyHex) return Buffer.from(aesKeyHex, "hex");
+  const aesKeyB64 = data?.media?.aes_key;
+  if (!aesKeyB64) return null;
+  const decoded = Buffer.from(aesKeyB64, "base64");
+  if (decoded.length === 16) return decoded;
+  if (decoded.length === 32) return Buffer.from(decoded.toString("ascii"), "hex");
+  return null;
+}
+
+function encryptAesEcb(buffer: Buffer, key: Buffer): Buffer {
+  const cipher = crypto.createCipheriv("aes-128-ecb", key, null);
+  cipher.setAutoPadding(true);
+  return Buffer.concat([cipher.update(buffer), cipher.final()]);
+}
+
+function decryptAesEcb(buffer: Buffer, key: Buffer): Buffer {
+  const decipher = crypto.createDecipheriv("aes-128-ecb", key, null);
+  decipher.setAutoPadding(true);
+  return Buffer.concat([decipher.update(buffer), decipher.final()]);
+}
+
 async function apiPost<T>(
   opts: {
     baseUrl: string;
@@ -177,7 +200,9 @@ async function downloadMedia(
     `${CDN_BASE_URL}/download?encrypted_query_param=${encodeURIComponent(query)}`,
   );
   if (!resp.ok) throw new Error(`CDN HTTP ${resp.status}`);
-  const buf = Buffer.from(await resp.arrayBuffer());
+  const raw = Buffer.from(await resp.arrayBuffer());
+  const aesKey = decodeAesKey(data);
+  const buf = aesKey ? decryptAesEcb(raw, aesKey) : raw;
   const { ext, type } = sniff(buf);
   const declaredName = String(data?.file_name ?? (type === "image" ? "image" : "file"));
   const safeMsg = msgId.replace(/[^a-zA-Z0-9._-]/g, "_");
@@ -210,17 +235,22 @@ export async function sendWeixinOutgoing(input: {
     }
     const st = statSync(file.path);
     if (!st.isFile()) throw new Error(`not a file: ${file.path}`);
+    const raw = readFileSync(file.path);
+    const aesKey = crypto.randomBytes(16);
+    const aesKeyHex = aesKey.toString("hex");
+    const ciphertext = encryptAesEcb(raw, aesKey);
+    const fileKey = crypto.randomBytes(16).toString("hex");
     const upload = await apiPost<{ upload_full_url?: string }>({
       baseUrl: input.baseUrl,
       endpoint: "ilink/bot/getuploadurl",
       body: {
-        filekey: crypto.randomBytes(16).toString("hex"),
+        filekey: fileKey,
         media_type: file.type === "image" ? 1 : 3,
         to_user_id: input.chatId,
         rawsize: st.size,
-        rawfilemd5: "experimental",
-        filesize: st.size,
-        aeskey: crypto.randomBytes(16).toString("hex"),
+        rawfilemd5: crypto.createHash("md5").update(raw).digest("hex"),
+        filesize: ciphertext.length,
+        aeskey: aesKeyHex,
         base_info: {},
       },
       token: input.token,
@@ -232,7 +262,7 @@ export async function sendWeixinOutgoing(input: {
     const cdn = await fetchImpl(uploadUrl, {
       method: "POST",
       headers: { "Content-Type": "application/octet-stream" },
-      body: new Uint8Array(readFileSync(file.path)),
+      body: new Uint8Array(ciphertext),
     });
     if (!cdn.ok) throw new Error(`CDN upload HTTP ${cdn.status}`);
     const downloadParam = cdn.headers.get("x-encrypted-param") ?? "";
@@ -250,13 +280,25 @@ export async function sendWeixinOutgoing(input: {
             file.type === "image"
               ? {
                   type: IMAGE_ITEM_TYPE,
-                  image_item: { media: { encrypt_query_param: downloadParam } },
+                  image_item: {
+                    media: {
+                      encrypt_query_param: downloadParam,
+                      aes_key: Buffer.from(aesKeyHex, "utf8").toString("base64"),
+                      encrypt_type: 1,
+                    },
+                    mid_size: ciphertext.length,
+                  },
                 }
               : {
                   type: FILE_ITEM_TYPE,
                   file_item: {
                     file_name: file.fileName ?? basename(file.path),
-                    media: { encrypt_query_param: downloadParam },
+                    len: String(st.size),
+                    media: {
+                      encrypt_query_param: downloadParam,
+                      aes_key: Buffer.from(aesKeyHex, "utf8").toString("base64"),
+                      encrypt_type: 1,
+                    },
                   },
                 },
           ],
