@@ -12,7 +12,11 @@ import { ChannelSessionService } from "../core/ChannelSessionService";
 import { PluginRegistry } from "../core/PluginRegistry";
 import { ChannelManager } from "../core/ChannelManager";
 import { RemoteTaskAggregator } from "../tasks/RemoteTaskAggregator";
-import { RemoteTaskService, type RemoteTaskRunInput } from "../tasks/RemoteTaskService";
+import {
+  RemoteTaskService,
+  type RemoteTaskRunInput,
+  type RemoteTaskSendInput,
+} from "../tasks/RemoteTaskService";
 import { FakeChannelPlugin } from "../plugins/fake/FakeChannelPlugin";
 
 describe("fake remote task E2E", () => {
@@ -30,7 +34,8 @@ describe("fake remote task E2E", () => {
       const fake = new FakeChannelPlugin();
       registry.register(fake);
       let capturedRun: RemoteTaskRunInput | null = null;
-      const tasks = new RemoteTaskService({
+      let manager!: ChannelManager;
+      const tasks: RemoteTaskService = new RemoteTaskService({
         db,
         dataDir: root,
         connections,
@@ -41,9 +46,10 @@ describe("fake remote task E2E", () => {
         startRun: async (input) => {
           capturedRun = input;
         },
-        sendResult: async (input) => manager.sendRemoteTaskResult(input),
+        sendResult: async (input: RemoteTaskSendInput): Promise<void> =>
+          manager.sendRemoteTaskResult(input),
       });
-      const manager = new ChannelManager({
+      manager = new ChannelManager({
         connections,
         registry,
         aggregator: new RemoteTaskAggregator({ sessions }),
@@ -72,7 +78,7 @@ describe("fake remote task E2E", () => {
       });
 
       expect(capturedRun).not.toBeNull();
-      const task = tasks.listRecent()[0];
+      const task = tasks.listRecent()[0]!;
       mkdirSync(task.outputDir, { recursive: true });
       const outputFile = join(task.outputDir, "result.txt");
       writeFileSync(outputFile, "done");
@@ -87,7 +93,7 @@ describe("fake remote task E2E", () => {
         replyState: "sent",
       });
       expect(fake.sentMessages).toHaveLength(1);
-      expect(fake.sentMessages[0].message).toMatchObject({
+      expect(fake.sentMessages[0]!.message).toMatchObject({
         type: "files",
         text: "Done",
         files: [expect.objectContaining({ type: "file" })],

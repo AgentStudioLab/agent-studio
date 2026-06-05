@@ -45,7 +45,7 @@ describe("ChannelConnectionService", () => {
       config: { permissionStrategy: "auto_execute" },
     });
 
-    expect(svc.list()[0].credentials).toBeUndefined();
+    expect(svc.list()[0]!.credentials).toBeUndefined();
     expect(svc.get(created.id)?.credentials).toBeUndefined();
     expect(svc.getInternal(created.id)?.credentials).toEqual({
       accountId: "wx_1",

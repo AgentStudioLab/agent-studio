@@ -14,6 +14,7 @@ import { PluginRegistry } from "../core/PluginRegistry";
 import { ChannelManager } from "../core/ChannelManager";
 import { RemoteTaskAggregator } from "../tasks/RemoteTaskAggregator";
 import { RemoteTaskService } from "../tasks/RemoteTaskService";
+import type { RemoteTaskSendInput } from "../tasks/RemoteTaskService";
 import { FakeChannelPlugin } from "../plugins/fake/FakeChannelPlugin";
 import { buildChannelConnectionRoutes } from "./channelConnections";
 import { buildRemoteTaskRoutes } from "./remoteTasks";
@@ -30,7 +31,8 @@ function makeApp() {
   const registry = new PluginRegistry();
   const fake = new FakeChannelPlugin();
   registry.register(fake);
-  const tasks = new RemoteTaskService({
+  let manager!: ChannelManager;
+  const tasks: RemoteTaskService = new RemoteTaskService({
     db,
     dataDir: root,
     connections,
@@ -39,9 +41,10 @@ function makeApp() {
     messages,
     store,
     startRun: async () => {},
-    sendResult: async (input) => manager.sendRemoteTaskResult(input),
+    sendResult: async (input: RemoteTaskSendInput): Promise<void> =>
+      manager.sendRemoteTaskResult(input),
   });
-  const manager = new ChannelManager({
+  manager = new ChannelManager({
     connections,
     registry,
     aggregator: new RemoteTaskAggregator({ sessions }),

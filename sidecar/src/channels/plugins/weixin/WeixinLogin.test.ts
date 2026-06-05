@@ -34,7 +34,7 @@ describe("WeixinLogin", () => {
           onDone: resolve,
           onError: reject,
         },
-        { fetchImpl, pollDelayMs: 0 },
+        { fetchImpl: fetchImpl as unknown as typeof fetch, pollDelayMs: 0 },
       );
     });
 
@@ -65,7 +65,7 @@ describe("WeixinLogin", () => {
           onDone: () => {},
           onError: resolve,
         },
-        { fetchImpl, pollDelayMs: 0 },
+        { fetchImpl: fetchImpl as unknown as typeof fetch, pollDelayMs: 0 },
       );
     });
 

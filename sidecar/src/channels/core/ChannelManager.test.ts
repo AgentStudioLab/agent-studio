@@ -12,6 +12,7 @@ import { ChannelSessionService } from "./ChannelSessionService";
 import { PluginRegistry } from "./PluginRegistry";
 import { RemoteTaskAggregator } from "../tasks/RemoteTaskAggregator";
 import { RemoteTaskService } from "../tasks/RemoteTaskService";
+import type { RemoteTaskSendInput } from "../tasks/RemoteTaskService";
 import { ChannelManager } from "./ChannelManager";
 import { FakeChannelPlugin } from "../plugins/fake/FakeChannelPlugin";
 
@@ -34,7 +35,8 @@ function makeManager() {
   const registry = new PluginRegistry();
   const fake = new FakeChannelPlugin();
   registry.register(fake);
-  const tasks = new RemoteTaskService({
+  let manager!: ChannelManager;
+  const tasks: RemoteTaskService = new RemoteTaskService({
     db,
     dataDir: root,
     connections,
@@ -43,9 +45,10 @@ function makeManager() {
     messages,
     store,
     startRun: async () => {},
-    sendResult: async (input) => manager.sendRemoteTaskResult(input),
+    sendResult: async (input: RemoteTaskSendInput): Promise<void> =>
+      manager.sendRemoteTaskResult(input),
   });
-  const manager = new ChannelManager({
+  manager = new ChannelManager({
     connections,
     registry,
     aggregator: new RemoteTaskAggregator({ sessions, waitMs: 30_000 }),
@@ -114,7 +117,7 @@ describe("ChannelManager", () => {
       attachments: [{ type: "file", path: import.meta.path, name: "file.txt" }],
       timestamp: 1,
     });
-    const task = tasks.listRecent()[0];
+    const task = tasks.listRecent()[0]!;
     await fake.emitIncoming({
       id: "msg_2",
       connectionId: connection.id,

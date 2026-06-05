@@ -21,7 +21,7 @@ afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
 
-function response(data: unknown, headers?: HeadersInit): Response {
+function response(data: unknown, headers?: Record<string, string>): Response {
   return new Response(JSON.stringify(data), {
     status: 200,
     headers: { "content-type": "application/json", ...(headers ?? {}) },
@@ -32,8 +32,8 @@ describe("WeixinMonitor", () => {
   it("sends getupdates with auth headers and persists get_updates_buf", async () => {
     const root = makeRoot();
     const requests: Request[] = [];
-    const fetchImpl = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
-      requests.push(new Request(input, init));
+    const fetchImpl = mock(async (input: string | URL | Request, init?: RequestInit) => {
+      requests.push(new Request(String(input), init));
       return response({ get_updates_buf: "buf_next", msgs: [] });
     });
     const monitor = createWeixinMonitor({
@@ -41,17 +41,17 @@ describe("WeixinMonitor", () => {
       token: "token_1",
       accountId: "bot_1",
       dataDir: root,
-      fetchImpl,
+      fetchImpl: fetchImpl as unknown as typeof fetch,
     });
 
     await monitor.pollOnce();
     await monitor.pollOnce();
 
-    expect(requests[0].url).toBe("https://ilink.example/ilink/bot/getupdates");
-    expect(requests[0].headers.get("AuthorizationType")).toBe("ilink_bot_token");
-    expect(requests[0].headers.get("Authorization")).toBe("Bearer token_1");
-    expect(requests[0].headers.get("X-WECHAT-UIN")).toBeTruthy();
-    expect(await requests[1].json()).toMatchObject({ get_updates_buf: "buf_next" });
+    expect(requests[0]!.url).toBe("https://ilink.example/ilink/bot/getupdates");
+    expect(requests[0]!.headers.get("AuthorizationType")).toBe("ilink_bot_token");
+    expect(requests[0]!.headers.get("Authorization")).toBe("Bearer token_1");
+    expect(requests[0]!.headers.get("X-WECHAT-UIN")).toBeTruthy();
+    expect(await requests[1]!.json()).toMatchObject({ get_updates_buf: "buf_next" });
     expect(readFileSync(join(root, "weixin-monitor", "bot_1.buf"), "utf8")).toBe(
       "buf_next",
     );
@@ -60,7 +60,7 @@ describe("WeixinMonitor", () => {
   it("converts text and downloaded image/file items to unified incoming messages", async () => {
     const root = makeRoot();
     const downloadedBytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1, 2, 3]);
-    const fetchImpl = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const fetchImpl = mock(async (input: string | URL | Request, init?: RequestInit) => {
       const url = String(input);
       if (url.includes("/download?")) return new Response(downloadedBytes);
       return response({
@@ -90,8 +90,10 @@ describe("WeixinMonitor", () => {
       token: "token_1",
       accountId: "bot_1",
       dataDir: root,
-      fetchImpl,
-      onMessage: async (message) => incoming.push(message),
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      onMessage: async (message) => {
+        incoming.push(message);
+      },
     });
 
     await monitor.pollOnce();
@@ -111,7 +113,7 @@ describe("WeixinMonitor", () => {
     const file = join(root, "out.txt");
     writeFileSync(file, "hello");
     const urls: string[] = [];
-    const fetchImpl = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const fetchImpl = mock(async (input: string | URL | Request, init?: RequestInit) => {
       urls.push(String(input));
       if (String(input).includes("getuploadurl")) {
         return response({ upload_full_url: "https://cdn.example/upload" });
@@ -133,7 +135,7 @@ describe("WeixinMonitor", () => {
       contextToken: "ctx_1",
       text: "Done",
       files: [{ type: "file", path: file, fileName: "out.txt" }],
-      fetchImpl,
+      fetchImpl: fetchImpl as unknown as typeof fetch,
     });
 
     expect(urls).toEqual([
