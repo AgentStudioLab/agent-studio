@@ -35,7 +35,7 @@ describe("settings provider routes", () => {
         { status: 200, headers: { "Content-Type": "application/json" } },
       );
     });
-    globalThis.fetch = fetchMock as typeof fetch;
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
 
     const res = await app.request("/settings/provider/fetch-models", {
       method: "POST",

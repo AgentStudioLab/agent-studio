@@ -22,7 +22,27 @@ export async function setApiKey(key: string): Promise<void> {
   if (!res.ok) throw new Error(`api_key_sidecar_${res.status}`);
 }
 
-export type ProfileId = "anthropic" | "deepseek" | "custom";
+export type ProfileId =
+  | "anthropic"
+  | "deepseek"
+  | "gemini"
+  | "openai"
+  | "minimax"
+  | "openrouter"
+  | "novita"
+  | "bedrock"
+  | "dashscope"
+  | "siliconflow-cn"
+  | "siliconflow"
+  | "zhipu"
+  | "moonshot-cn"
+  | "moonshot-global"
+  | "doubao"
+  | "volcengine-ark"
+  | "bailian"
+  | "qianfan"
+  | "hunyuan"
+  | "custom";
 
 export interface ProfileModel {
   id: string;
@@ -36,12 +56,19 @@ export interface ProviderConfig {
   baseUrl: string;
   apiKey: string;
   models: ProfileModel[];
+  remoteModelsFetchedAt: string;
+  selectedModelId: string | null;
+  supportsRemoteModels: boolean;
+  compatibilityNote?: string;
 }
 
 export interface BuiltInProfile {
-  id: ProfileId;
+  id: Exclude<ProfileId, "custom">;
   label: string;
+  region?: "Global" | "China" | "Cloud";
   baseUrl: string;
+  supportsRemoteModels: boolean;
+  compatibilityNote?: string;
   models: ProfileModel[];
 }
 
@@ -64,7 +91,7 @@ export async function setProvider(patch: {
   profileId?: ProfileId;
   baseUrl?: string;
   apiKey?: string;
-  customModels?: ProfileModel[];
+  selectedModelId?: string | null;
 }): Promise<ProviderConfig> {
   const res = await fetchSidecar("/settings/provider", {
     method: "POST",
