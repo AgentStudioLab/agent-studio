@@ -6,7 +6,6 @@ import type {
 } from "../core/PluginRegistry";
 
 interface PendingAggregate {
-  session: ChannelSession;
   connectionId: string;
   chatId: string;
   senderId: string;
@@ -26,7 +25,7 @@ type AggregatorResult =
       instructionText: string;
       attachments: UnifiedIncomingAttachment[];
       contextToken?: string;
-      session: ChannelSession;
+      session?: ChannelSession;
     };
 
 type ExpiredAggregate =
@@ -66,15 +65,12 @@ export class RemoteTaskAggregator {
     const hasAttachments = message.attachments.length > 0;
     if (!hasText && !hasAttachments) return { type: "ignored" };
 
-    const session = await this.deps.sessions.getOrCreate({
-      connectionId: message.connectionId,
-      channelType: message.channelType,
-      chatId: message.chatId,
-      senderId: message.senderId,
-      displayName: message.displayName,
-      conversationId: `remote_${message.connectionId}_${message.chatId}_${message.senderId}`,
-    });
-    if (session.activeTaskId) {
+    const session = this.deps.sessions.find(
+      message.connectionId,
+      message.chatId,
+      message.senderId,
+    );
+    if (session?.activeTaskId) {
       return {
         type: "busy",
         text: "当前会话已有远程任务在执行，请等待完成后再发送新任务。",
@@ -84,7 +80,6 @@ export class RemoteTaskAggregator {
 
     const key = this.key(message.connectionId, message.chatId, message.senderId);
     const pending = this.pending.get(key) ?? {
-      session,
       connectionId: message.connectionId,
       chatId: message.chatId,
       senderId: message.senderId,
@@ -96,7 +91,6 @@ export class RemoteTaskAggregator {
     if (hasAttachments) pending.attachments.push(...message.attachments);
     if (message.contextToken) pending.contextToken = message.contextToken;
     pending.updatedAt = this.now();
-    pending.session = session;
     this.pending.set(key, pending);
 
     if (pending.instructionText && pending.attachments.length > 0) {
@@ -106,7 +100,7 @@ export class RemoteTaskAggregator {
         instructionText: pending.instructionText,
         attachments: pending.attachments,
         contextToken: pending.contextToken,
-        session,
+        ...(session ? { session } : {}),
       };
     }
 

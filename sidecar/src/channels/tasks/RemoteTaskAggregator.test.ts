@@ -6,7 +6,8 @@ import type { UnifiedIncomingMessage } from "../core/PluginRegistry";
 
 class FakeSessions {
   activeTaskId: string | null = null;
-  async getOrCreate(): Promise<ChannelSession> {
+  find(): ChannelSession | null {
+    if (!this.activeTaskId) return null;
     return {
       id: "chs_1",
       connectionId: "conn_1",
@@ -59,7 +60,6 @@ describe("RemoteTaskAggregator", () => {
       instructionText: "summarize",
       attachments: [{ type: "file", path: "/tmp/a.txt", name: "a.txt" }],
       contextToken: "ctx_2",
-      session: expect.objectContaining({ id: "chs_1" }),
     });
   });
 
