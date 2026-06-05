@@ -10,6 +10,12 @@ function openAIProfile(): ProviderProfile {
     region: "Global",
     baseUrl: "https://api.openai.test/v1",
     modelList: { strategy: "openai-compatible", path: "/models" },
+    agentRuntime: {
+      protocol: "openai-compatible",
+      baseUrl: "https://api.openai.test/v1",
+      auth: "bearer",
+      capabilities: { text: true, tools: false, fileCheckpoint: false },
+    },
     supportsRemoteModels: true,
     models: [],
   };

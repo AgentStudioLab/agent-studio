@@ -51,6 +51,62 @@ describe("providerProfiles", () => {
     });
   });
 
+  it("configures SiliconFlow model list and runtime as OpenAI-compatible", () => {
+    const cn = getBuiltInProfile("siliconflow-cn");
+    const global = getBuiltInProfile("siliconflow");
+
+    expect(cn?.baseUrl).toBe("https://api.siliconflow.cn/v1");
+    expect(cn?.modelList).toEqual({
+      strategy: "openai-compatible",
+      path: "/models",
+    });
+    expect(cn?.agentRuntime).toEqual({
+      protocol: "openai-compatible",
+      baseUrl: "https://api.siliconflow.cn/v1",
+      auth: "bearer",
+      capabilities: {
+        text: true,
+        tools: false,
+        fileCheckpoint: false,
+      },
+    });
+
+    expect(global?.baseUrl).toBe("https://api.siliconflow.com/v1");
+    expect(global?.agentRuntime).toEqual({
+      protocol: "openai-compatible",
+      baseUrl: "https://api.siliconflow.com/v1",
+      auth: "bearer",
+      capabilities: {
+        text: true,
+        tools: false,
+        fileCheckpoint: false,
+      },
+    });
+  });
+
+  it("configures OpenAI-compatible providers with OpenAI text runtime", () => {
+    const openai = getBuiltInProfile("openai");
+    const dashscope = getBuiltInProfile("dashscope");
+
+    expect(openai?.agentRuntime).toEqual({
+      protocol: "openai-compatible",
+      baseUrl: "https://api.openai.com/v1",
+      auth: "bearer",
+      capabilities: {
+        text: true,
+        tools: false,
+        fileCheckpoint: false,
+      },
+    });
+
+    expect(dashscope?.agentRuntime.protocol).toBe("openai-compatible");
+    expect(dashscope?.agentRuntime.capabilities).toEqual({
+      text: true,
+      tools: false,
+      fileCheckpoint: false,
+    });
+  });
+
   it("keeps a curated fallback model list for every built-in provider", () => {
     for (const profile of BUILT_IN_PROFILES) {
       expect(profile.models.length).toBeGreaterThan(0);
@@ -62,9 +118,14 @@ describe("providerProfiles", () => {
     }
   });
 
-  it("marks non-runtime-compatible presets with a compatibility note", () => {
+  it("marks non-anthropic-runtime presets with a compatibility note", () => {
     for (const profile of BUILT_IN_PROFILES) {
-      if (profile.id === "anthropic" || profile.id === "deepseek") continue;
+      if (
+        profile.agentRuntime.protocol === "anthropic" ||
+        profile.id === "openai"
+      ) {
+        continue;
+      }
       expect(profile.compatibilityNote).toBeTruthy();
     }
   });

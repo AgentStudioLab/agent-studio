@@ -82,6 +82,12 @@
     "refreshError": "Model refresh failed",
     "lastRefreshed": "Last refreshed: {{time}}",
     "compatibilityNote": "Compatibility note",
+    "runtimeLabel": "Agent runtime",
+    "runtimeAnthropic": "Anthropic-compatible",
+    "runtimeOpenAI": "OpenAI-compatible",
+    "runtimeTextOnly": "Text streaming is available; tool calls and file rewind are not connected yet.",
+    "runtimeUnsupported": "Agent runtime not implemented",
+    "runtimeBaseUrl": "Runtime Base URL: {{baseUrl}}",
     "save": "Save",
     "saved": "Saved",
     "saveError": "Save failed"

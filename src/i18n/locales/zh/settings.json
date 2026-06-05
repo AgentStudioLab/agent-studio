@@ -82,6 +82,12 @@
     "refreshError": "模型刷新失败",
     "lastRefreshed": "上次刷新：{{time}}",
     "compatibilityNote": "兼容性提示",
+    "runtimeLabel": "Agent runtime",
+    "runtimeAnthropic": "Anthropic-compatible",
+    "runtimeOpenAI": "OpenAI-compatible",
+    "runtimeTextOnly": "文本流可用；工具调用和文件回滚暂未接入。",
+    "runtimeUnsupported": "Agent runtime 暂未接入",
+    "runtimeBaseUrl": "运行时 Base URL：{{baseUrl}}",
     "save": "保存",
     "saved": "已保存",
     "saveError": "保存失败"

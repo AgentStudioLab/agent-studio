@@ -57,6 +57,58 @@ describe("settings provider routes", () => {
     expect(provider.current().selectedModelId).toBe("gpt-5.1");
   });
 
+  it("returns agent runtime metadata for SiliconFlow and OpenAI providers", async () => {
+    const { app } = makeApp();
+
+    const saveSf = await app.request("/settings/provider", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        profileId: "siliconflow-cn",
+        baseUrl: "https://api.siliconflow.cn/v1",
+        apiKey: "sf-key",
+      }),
+    });
+    expect(saveSf.status).toBe(200);
+
+    const sfBody = (await (
+      await app.request("/settings/provider")
+    ).json()) as {
+      current: {
+        agentRuntime: { protocol: string; baseUrl?: string; auth?: string };
+      };
+    };
+    expect(sfBody.current.agentRuntime).toMatchObject({
+      protocol: "openai-compatible",
+      baseUrl: "https://api.siliconflow.cn/v1",
+      auth: "bearer",
+    });
+
+    const saveOpenAI = await app.request("/settings/provider", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        profileId: "openai",
+        baseUrl: "https://api.openai.com/v1",
+        apiKey: "openai-key",
+      }),
+    });
+    expect(saveOpenAI.status).toBe(200);
+
+    const openaiBody = (await (
+      await app.request("/settings/provider")
+    ).json()) as {
+      current: {
+        agentRuntime: { protocol: string; baseUrl?: string; auth?: string };
+      };
+    };
+    expect(openaiBody.current.agentRuntime).toMatchObject({
+      protocol: "openai-compatible",
+      baseUrl: "https://api.openai.com/v1",
+      auth: "bearer",
+    });
+  });
+
   it("POST /settings/provider rejects model source fields", async () => {
     const { app } = makeApp();
 

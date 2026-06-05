@@ -36,20 +36,88 @@ export type ModelListStrategy =
   | { strategy: "gemini" }
   | { strategy: "bedrock" };
 
+export interface AgentRuntimeCapabilities {
+  text: boolean;
+  tools: boolean;
+  fileCheckpoint: boolean;
+}
+
+export type AgentRuntime =
+  | {
+      protocol: "anthropic";
+      baseUrl: string;
+      auth: "x-api-key" | "bearer";
+      capabilities: AgentRuntimeCapabilities;
+    }
+  | {
+      protocol: "openai-compatible";
+      baseUrl: string;
+      auth: "bearer";
+      capabilities: AgentRuntimeCapabilities;
+    }
+  | {
+      protocol: "unsupported";
+      reason: string;
+      capabilities: AgentRuntimeCapabilities;
+    };
+
 export interface ProviderProfile {
   id: Exclude<ProviderProfileId, "custom">;
   label: string;
   region?: "Global" | "China" | "Cloud";
   baseUrl: string;
   modelList: ModelListStrategy;
+  agentRuntime: AgentRuntime;
   supportsRemoteModels: boolean;
   compatibilityNote?: string;
   models: ProfileModel[];
 }
 
-type ProviderProfileInput = Omit<ProviderProfile, "supportsRemoteModels">;
+type ProviderProfileInput =
+  Omit<ProviderProfile, "supportsRemoteModels" | "agentRuntime"> & {
+    agentRuntime?: AgentRuntime;
+  };
 const RUNTIME_COMPATIBILITY_NOTE =
-  "当前运行时仍使用 Anthropic-compatible SDK；该 provider 仅支持设置和模型列表拉取。";
+  "OpenAI-compatible runtime currently supports text streaming only; tool calls and file rewind are not connected yet.";
+
+const ANTHROPIC_FULL_CAPABILITIES: AgentRuntimeCapabilities = {
+  text: true,
+  tools: true,
+  fileCheckpoint: true,
+};
+
+const OPENAI_TEXT_CAPABILITIES: AgentRuntimeCapabilities = {
+  text: true,
+  tools: false,
+  fileCheckpoint: false,
+};
+
+const UNSUPPORTED_CAPABILITIES: AgentRuntimeCapabilities = {
+  text: false,
+  tools: false,
+  fileCheckpoint: false,
+};
+
+function anthropicRuntime(
+  baseUrl: string,
+  auth: "x-api-key" | "bearer" = "x-api-key",
+): AgentRuntime {
+  return {
+    protocol: "anthropic",
+    baseUrl,
+    auth,
+    capabilities: ANTHROPIC_FULL_CAPABILITIES,
+  };
+}
+
+function openAICompatibleRuntime(baseUrl: string): AgentRuntime {
+  return {
+    protocol: "openai-compatible",
+    baseUrl,
+    auth: "bearer",
+    capabilities: OPENAI_TEXT_CAPABILITIES,
+  };
+}
 
 function fallbackModel(id: string, displayName: string): ProfileModel {
   return {
@@ -62,6 +130,13 @@ function fallbackModel(id: string, displayName: string): ProfileModel {
 function defineProfile(profile: ProviderProfileInput): ProviderProfile {
   return {
     ...profile,
+    agentRuntime:
+      profile.agentRuntime ??
+      ({
+        protocol: "unsupported",
+        reason: "Agent runtime is not implemented for this provider.",
+        capabilities: UNSUPPORTED_CAPABILITIES,
+      } satisfies AgentRuntime),
     compatibilityNote:
       profile.compatibilityNote ??
       (profile.id === "anthropic" || profile.id === "deepseek"
@@ -77,6 +152,7 @@ export const ANTHROPIC_PROFILE: ProviderProfile = defineProfile({
   region: "Global",
   baseUrl: "https://api.anthropic.com",
   modelList: { strategy: "static" },
+  agentRuntime: anthropicRuntime("https://api.anthropic.com", "x-api-key"),
   models: [
     {
       id: "claude-opus-4-7",
@@ -102,6 +178,10 @@ export const DEEPSEEK_PROFILE: ProviderProfile = defineProfile({
   region: "Global",
   baseUrl: "https://api.deepseek.com/anthropic",
   modelList: { strategy: "static" },
+  agentRuntime: anthropicRuntime(
+    "https://api.deepseek.com/anthropic",
+    "x-api-key",
+  ),
   compatibilityNote: "Uses DeepSeek's Anthropic-compatible endpoint.",
   models: [
     {
@@ -134,6 +214,7 @@ const PROFILE_INPUTS: ProviderProfileInput[] = [
     region: "Global",
     baseUrl: "https://api.openai.com/v1",
     modelList: { strategy: "openai-compatible", path: "/models" },
+    agentRuntime: openAICompatibleRuntime("https://api.openai.com/v1"),
     models: [fallbackModel("gpt-5.1", "GPT-5.1")],
   },
   {
@@ -142,6 +223,7 @@ const PROFILE_INPUTS: ProviderProfileInput[] = [
     region: "Global",
     baseUrl: "https://api.minimax.io/v1",
     modelList: { strategy: "openai-compatible", path: "/models" },
+    agentRuntime: openAICompatibleRuntime("https://api.minimax.io/v1"),
     models: [fallbackModel("MiniMax-M1", "MiniMax M1")],
   },
   {
@@ -150,6 +232,7 @@ const PROFILE_INPUTS: ProviderProfileInput[] = [
     region: "Global",
     baseUrl: "https://openrouter.ai/api/v1",
     modelList: { strategy: "openai-compatible", path: "/models" },
+    agentRuntime: openAICompatibleRuntime("https://openrouter.ai/api/v1"),
     models: [fallbackModel("openai/gpt-5.1", "OpenAI GPT-5.1")],
   },
   {
@@ -158,6 +241,7 @@ const PROFILE_INPUTS: ProviderProfileInput[] = [
     region: "Global",
     baseUrl: "https://api.novita.ai/v3/openai",
     modelList: { strategy: "openai-compatible", path: "/models" },
+    agentRuntime: openAICompatibleRuntime("https://api.novita.ai/v3/openai"),
     models: [fallbackModel("deepseek/deepseek-v3-0324", "DeepSeek V3 0324")],
   },
   {
@@ -174,6 +258,9 @@ const PROFILE_INPUTS: ProviderProfileInput[] = [
     region: "China",
     baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
     modelList: { strategy: "openai-compatible", path: "/models" },
+    agentRuntime: openAICompatibleRuntime(
+      "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    ),
     models: [fallbackModel("qwen-plus", "Qwen Plus")],
   },
   {
@@ -182,6 +269,7 @@ const PROFILE_INPUTS: ProviderProfileInput[] = [
     region: "China",
     baseUrl: "https://api.siliconflow.cn/v1",
     modelList: { strategy: "openai-compatible", path: "/models" },
+    agentRuntime: openAICompatibleRuntime("https://api.siliconflow.cn/v1"),
     models: [fallbackModel("deepseek-ai/DeepSeek-V3", "DeepSeek V3")],
   },
   {
@@ -190,6 +278,7 @@ const PROFILE_INPUTS: ProviderProfileInput[] = [
     region: "Global",
     baseUrl: "https://api.siliconflow.com/v1",
     modelList: { strategy: "openai-compatible", path: "/models" },
+    agentRuntime: openAICompatibleRuntime("https://api.siliconflow.com/v1"),
     models: [fallbackModel("deepseek-ai/DeepSeek-V3", "DeepSeek V3")],
   },
   {
@@ -198,6 +287,7 @@ const PROFILE_INPUTS: ProviderProfileInput[] = [
     region: "China",
     baseUrl: "https://open.bigmodel.cn/api/paas/v4",
     modelList: { strategy: "openai-compatible", path: "/models" },
+    agentRuntime: openAICompatibleRuntime("https://open.bigmodel.cn/api/paas/v4"),
     models: [fallbackModel("glm-4.6", "GLM-4.6")],
   },
   {
@@ -206,6 +296,7 @@ const PROFILE_INPUTS: ProviderProfileInput[] = [
     region: "China",
     baseUrl: "https://api.moonshot.cn/v1",
     modelList: { strategy: "openai-compatible", path: "/models" },
+    agentRuntime: openAICompatibleRuntime("https://api.moonshot.cn/v1"),
     models: [fallbackModel("kimi-k2-0711-preview", "Kimi K2 0711 Preview")],
   },
   {
@@ -214,6 +305,7 @@ const PROFILE_INPUTS: ProviderProfileInput[] = [
     region: "Global",
     baseUrl: "https://api.moonshot.ai/v1",
     modelList: { strategy: "openai-compatible", path: "/models" },
+    agentRuntime: openAICompatibleRuntime("https://api.moonshot.ai/v1"),
     models: [fallbackModel("kimi-k2-0711-preview", "Kimi K2 0711 Preview")],
   },
   {
@@ -222,6 +314,9 @@ const PROFILE_INPUTS: ProviderProfileInput[] = [
     region: "China",
     baseUrl: "https://ark.cn-beijing.volces.com/api/v3",
     modelList: { strategy: "openai-compatible", path: "/models" },
+    agentRuntime: openAICompatibleRuntime(
+      "https://ark.cn-beijing.volces.com/api/v3",
+    ),
     models: [fallbackModel("doubao-seed-1-6", "Doubao Seed 1.6")],
   },
   {
@@ -230,6 +325,9 @@ const PROFILE_INPUTS: ProviderProfileInput[] = [
     region: "Cloud",
     baseUrl: "https://ark.cn-beijing.volces.com/api/v3",
     modelList: { strategy: "openai-compatible", path: "/models" },
+    agentRuntime: openAICompatibleRuntime(
+      "https://ark.cn-beijing.volces.com/api/v3",
+    ),
     models: [fallbackModel("doubao-seed-1-6", "Doubao Seed 1.6")],
   },
   {
@@ -238,6 +336,9 @@ const PROFILE_INPUTS: ProviderProfileInput[] = [
     region: "Cloud",
     baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
     modelList: { strategy: "openai-compatible", path: "/models" },
+    agentRuntime: openAICompatibleRuntime(
+      "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    ),
     models: [fallbackModel("qwen-max", "Qwen Max")],
   },
   {
@@ -246,6 +347,7 @@ const PROFILE_INPUTS: ProviderProfileInput[] = [
     region: "Cloud",
     baseUrl: "https://qianfan.baidubce.com/v2",
     modelList: { strategy: "openai-compatible", path: "/models" },
+    agentRuntime: openAICompatibleRuntime("https://qianfan.baidubce.com/v2"),
     models: [fallbackModel("ernie-4.5-turbo-128k", "ERNIE 4.5 Turbo 128K")],
   },
   {
@@ -254,6 +356,7 @@ const PROFILE_INPUTS: ProviderProfileInput[] = [
     region: "Cloud",
     baseUrl: "https://api.hunyuan.cloud.tencent.com/v1",
     modelList: { strategy: "openai-compatible", path: "/models" },
+    agentRuntime: openAICompatibleRuntime("https://api.hunyuan.cloud.tencent.com/v1"),
     models: [fallbackModel("hunyuan-turbos-latest", "Hunyuan TurboS")],
   },
 ];

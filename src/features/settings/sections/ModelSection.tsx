@@ -300,6 +300,38 @@ export function ModelSection() {
         )}
       </Field>
 
+      {data.current.agentRuntime && (
+        <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+          <div className="font-medium text-foreground">
+            {t("settings.provider.runtimeLabel")}
+          </div>
+          {data.current.agentRuntime.protocol === "anthropic" ? (
+            <div>
+              {t("settings.provider.runtimeAnthropic")}
+              <span className="block text-xs text-muted-foreground">
+                {t("settings.provider.runtimeBaseUrl", {
+                  baseUrl: data.current.agentRuntime.baseUrl,
+                })}
+              </span>
+            </div>
+          ) : data.current.agentRuntime.protocol === "openai-compatible" ? (
+            <div>
+              {t("settings.provider.runtimeOpenAI")}
+              <span className="block text-xs text-muted-foreground">
+                {t("settings.provider.runtimeTextOnly")}
+              </span>
+            </div>
+          ) : (
+            <div>
+              {t("settings.provider.runtimeUnsupported")}
+              <span className="block text-xs text-muted-foreground">
+                {data.current.agentRuntime.reason}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+
       {compatibilityNote && (
         <div className="text-sm text-muted-foreground">
           <span className="font-medium">

@@ -20,6 +20,12 @@ const CUSTOM_OPENAI_COMPATIBLE_PROFILE: ProviderProfile = {
   label: "Custom",
   baseUrl: "",
   modelList: { strategy: "openai-compatible", path: "/models" },
+  agentRuntime: {
+    protocol: "openai-compatible",
+    baseUrl: "",
+    auth: "bearer",
+    capabilities: { text: true, tools: false, fileCheckpoint: false },
+  },
   supportsRemoteModels: true,
   models: [],
 };

@@ -182,4 +182,62 @@ describe("providerSettings", () => {
     expect(current.models.some((m) => m.id === "entitled-model")).toBe(false);
     expect(current.remoteModelsFetchedAt).toBe("");
   });
+
+  it("resolves SiliconFlow runtime through its OpenAI-compatible /v1 base URL", () => {
+    const settings = createProviderSettings(makeDb(), {});
+
+    settings.update({
+      profileId: "siliconflow-cn",
+      baseUrl: "https://api.siliconflow.cn/v1",
+      apiKey: "sf-key",
+    });
+
+    const current = settings.current();
+    expect(current.baseUrl).toBe("https://api.siliconflow.cn/v1");
+    expect(current.agentRuntime).toMatchObject({
+      protocol: "openai-compatible",
+      baseUrl: "https://api.siliconflow.cn/v1",
+      auth: "bearer",
+    });
+  });
+
+  it("resolves OpenAI-compatible runtime for OpenAI providers", () => {
+    const settings = createProviderSettings(makeDb(), {});
+
+    settings.update({
+      profileId: "openai",
+      baseUrl: "https://api.openai.com/v1",
+      apiKey: "openai-key",
+    });
+
+    expect(settings.current().agentRuntime).toMatchObject({
+      protocol: "openai-compatible",
+      baseUrl: "https://api.openai.com/v1",
+      auth: "bearer",
+    });
+  });
+
+  it("normalizes custom baseUrl as OpenAI-compatible runtime for custom providers", () => {
+    const settings = createProviderSettings(makeDb(), {});
+
+    settings.update({
+      profileId: "custom",
+      baseUrl: "https://gateway.example",
+      apiKey: "custom-key",
+    });
+
+    expect(settings.current().agentRuntime).toMatchObject({
+      protocol: "openai-compatible",
+      baseUrl: "https://gateway.example/v1",
+      auth: "bearer",
+    });
+
+    settings.update({ baseUrl: "https://gateway.example/v1" });
+
+    expect(settings.current().agentRuntime).toMatchObject({
+      protocol: "openai-compatible",
+      baseUrl: "https://gateway.example/v1",
+      auth: "bearer",
+    });
+  });
 });

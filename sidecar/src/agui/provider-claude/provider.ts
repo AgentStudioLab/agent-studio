@@ -45,6 +45,8 @@ import type { InterruptBus } from "./interrupt-bus";
 import type { AuditService } from "../../services/audit";
 import { languageDirective } from "../../lib/composeAppendPrompt";
 
+export type ClaudeProviderAuthMode = "x-api-key" | "bearer";
+
 export interface ClaudeProviderOptions {
   /**
    * API key required by claude-agent-sdk. Forwarded through `options.env`
@@ -53,6 +55,8 @@ export interface ClaudeProviderOptions {
   apiKey: string;
   /** Forwarded to the SDK CLI env. Useful for DeepSeek-compat endpoints. */
   baseUrl?: string;
+  /** Selects how the SDK CLI authenticates to ANTHROPIC_BASE_URL. */
+  authMode?: ClaudeProviderAuthMode;
   /** Forwarded to the SDK CLI env. */
   model?: string;
   /**
@@ -129,13 +133,51 @@ export interface ClaudeProviderOptions {
   onRemember?: RememberFn;
 }
 
-export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider {
-  function buildEnv(): Record<string, string> {
-    const env: Record<string, string> = { ...(process.env as Record<string, string>) };
+export function buildClaudeProviderEnv(
+  baseEnv: Record<string, string | undefined>,
+  opts: {
+    apiKey: string;
+    baseUrl?: string;
+    authMode?: ClaudeProviderAuthMode;
+    model?: string;
+  },
+): Record<string, string | undefined> {
+  const env: Record<string, string | undefined> = { ...baseEnv };
+  if ((opts.authMode ?? "x-api-key") === "bearer") {
+    env.ANTHROPIC_AUTH_TOKEN = opts.apiKey;
+    delete env.ANTHROPIC_API_KEY;
+  } else {
     env.ANTHROPIC_API_KEY = opts.apiKey;
-    if (opts.baseUrl) env.ANTHROPIC_BASE_URL = opts.baseUrl;
-    if (opts.model) env.ANTHROPIC_MODEL = opts.model;
-    return env;
+    delete env.ANTHROPIC_AUTH_TOKEN;
+  }
+  if (opts.baseUrl) env.ANTHROPIC_BASE_URL = opts.baseUrl;
+  else delete env.ANTHROPIC_BASE_URL;
+  if (opts.model) env.ANTHROPIC_MODEL = opts.model;
+  else delete env.ANTHROPIC_MODEL;
+  return env;
+}
+
+function compactEnv(
+  env: Record<string, string | undefined>,
+): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(env).filter((entry): entry is [string, string] => {
+      return typeof entry[1] === "string";
+    }),
+  );
+}
+
+export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider {
+  function buildEnv(): Record<string, string | undefined> {
+    return buildClaudeProviderEnv(
+      process.env as Record<string, string | undefined>,
+      {
+        apiKey: opts.apiKey,
+        baseUrl: opts.baseUrl,
+        authMode: opts.authMode,
+        model: opts.model,
+      },
+    );
   }
 
   async function runTurn(
@@ -520,7 +562,7 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
       return rewindSessionFiles({
         sessionId,
         cwd: input.cwd,
-        env: buildEnv(),
+        env: compactEnv(buildEnv()),
         model: opts.model,
         checkpointUuid: input.checkpointUuid,
         signal: input.signal,
