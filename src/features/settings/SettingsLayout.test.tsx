@@ -12,6 +12,7 @@ mock.module("react-i18next", () => ({
         "settings.nav.model": "Model",
         "settings.nav.permissions": "Permissions",
         "settings.nav.appearance": "Appearance",
+        "settings.nav.remoteConnections": "Remote Connections",
       };
       return translations[key] ?? key;
     },
@@ -29,6 +30,7 @@ function renderSettingsLayout(path = "/settings/account") {
           <Route path="model" element={<div>Model panel</div>} />
           <Route path="permissions" element={<div>Permissions panel</div>} />
           <Route path="appearance" element={<div>Appearance panel</div>} />
+          <Route path="remote-connections" element={<div>Remote Connections panel</div>} />
         </Route>
       </Routes>
     </MemoryRouter>,
@@ -45,5 +47,6 @@ describe("SettingsLayout", () => {
     expect(screen.getByRole("link", { name: "Model" }).querySelector("svg")).not.toBeNull();
     expect(screen.getByRole("link", { name: "Permissions" }).querySelector("svg")).not.toBeNull();
     expect(screen.getByRole("link", { name: "Appearance" }).querySelector("svg")).not.toBeNull();
+    expect(screen.getByRole("link", { name: "Remote Connections" }).querySelector("svg")).not.toBeNull();
   });
 });

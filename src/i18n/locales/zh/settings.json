@@ -5,6 +5,7 @@
     "account": "账号",
     "model": "模型",
     "permissions": "权限",
+    "remoteConnections": "远程连接",
     "appearance": "外观"
   },
   "saveButton": "保存",
@@ -94,6 +95,25 @@
   },
   "permissions": {
     "title": "权限"
+  },
+  "remoteConnections": {
+    "title": "远程连接",
+    "description": "微信适配器为实验性能力，需要手工 smoke；自动化端到端使用 Fake Channel。",
+    "empty": "暂无远程连接。",
+    "permissionStrategy": "权限策略",
+    "autoExecute": "自动执行",
+    "interactiveUnsupported": "暂不支持 interactive approval",
+    "enable": "启用",
+    "disable": "停用",
+    "fakeTrigger": "发送 fake 入站",
+    "startWeixin": "开始微信登录",
+    "experimental": "实验性",
+    "status": {
+      "waiting": "等待扫码",
+      "scanned": "已扫码",
+      "confirmed": "已确认",
+      "error": "登录错误"
+    }
   },
   "hitl": {
     "title": "已允许的工具",

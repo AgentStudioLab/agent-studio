@@ -5,6 +5,7 @@
     "account": "Account",
     "model": "Model",
     "permissions": "Permissions",
+    "remoteConnections": "Remote Connections",
     "appearance": "Appearance"
   },
   "saveButton": "Save",
@@ -94,6 +95,25 @@
   },
   "permissions": {
     "title": "Permissions"
+  },
+  "remoteConnections": {
+    "title": "Remote Connections",
+    "description": "Experimental WeChat adapter requires manual smoke testing. Automated E2E uses Fake Channel.",
+    "empty": "No remote connections yet.",
+    "permissionStrategy": "Permission strategy",
+    "autoExecute": "Auto execute",
+    "interactiveUnsupported": "Interactive approval is not supported",
+    "enable": "Enable",
+    "disable": "Disable",
+    "fakeTrigger": "Send fake incoming",
+    "startWeixin": "Start WeChat login",
+    "experimental": "Experimental",
+    "status": {
+      "waiting": "Waiting for scan",
+      "scanned": "Scanned",
+      "confirmed": "Confirmed",
+      "error": "Login error"
+    }
   },
   "hitl": {
     "title": "Always-allowed tools",
