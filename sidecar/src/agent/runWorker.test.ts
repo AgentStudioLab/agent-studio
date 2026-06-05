@@ -1,5 +1,12 @@
-import { describe, expect, it } from "bun:test";
-import { buildAgentAppendContext, computeAgentDirs } from "./runWorker";
+import { describe, expect, it, mock } from "bun:test";
+import { Database } from "bun:sqlite";
+import { EventType } from "@ag-ui/core";
+import { buildAgentAppendContext, computeAgentDirs, runWorker } from "./runWorker";
+import { migrate } from "../db";
+import type { AGUIEvent } from "../agui/core";
+import { ThreadService } from "../services/threads";
+import { MessageService } from "../services/messages";
+import { createBunSqliteRunStore } from "../agui/store-sqlite/createBunSqliteRunStore";
 
 describe("computeAgentDirs", () => {
   it("treats every folder as readable", () => {
@@ -83,5 +90,125 @@ describe("buildAgentAppendContext", () => {
   });
   it("no links section when the list is empty", () => {
     expect(buildAgentAppendContext("Be terse.", "", [])).not.toContain("Reference links");
+  });
+});
+
+describe("runWorker remote task extensions", () => {
+  async function runWithEvents(
+    events: AGUIEvent[],
+    opts: {
+      appendContextExtra?: string;
+      onTerminalResult?: Parameters<typeof runWorker>[0]["onTerminalResult"];
+      assistantText?: string;
+    } = {},
+  ) {
+    const db = new Database(":memory:");
+    migrate(db);
+    const threads = new ThreadService(db);
+    const messages = new MessageService(db);
+    const store = createBunSqliteRunStore(db);
+    threads.create({ id: "thr_1", workingDir: "/tmp" });
+    await store.createRun("run_1", "thr_1");
+    const seen: Array<string | undefined> = [];
+    const provider = {
+      name: "fake",
+      run(ctx: { appendContext?: string; callbacks?: { onMessageEnd?: (msg: { id: string; content: string }) => void } }) {
+        seen.push(ctx.appendContext);
+        return (async function* () {
+          if (opts.assistantText) {
+            ctx.callbacks?.onMessageEnd?.({
+              id: "msg_assistant",
+              content: opts.assistantText,
+            });
+          }
+          for (const event of events) yield event;
+        })();
+      },
+      resume: async function* () {},
+      getPendingInterrupts: async () => [],
+    };
+
+    await runWorker({
+      runId: "run_1",
+      threadId: "thr_1",
+      userMessage: { role: "user", content: "hello" },
+      store,
+      messages,
+      threads,
+      provider: provider as never,
+      interruptBus: { cancelAll: () => {} } as never,
+      abortSignal: new AbortController().signal,
+      usage: { recordRun: () => {} } as never,
+      ...opts,
+    });
+
+    return { seen, messages };
+  }
+
+  it("appends appendContextExtra to provider appendContext", async () => {
+    const { seen } = await runWithEvents(
+      [
+        { type: EventType.RUN_STARTED, threadId: "thr_1", runId: "run_1" } as never,
+        { type: EventType.RUN_FINISHED, threadId: "thr_1", runId: "run_1" } as never,
+      ],
+      { appendContextExtra: "Remote task context" },
+    );
+
+    expect(seen[0]).toBe("Remote task context");
+  });
+
+  it("calls onTerminalResult after terminal flush with assistant text", async () => {
+    const terminal = mock(async () => {});
+
+    await runWithEvents(
+      [
+        { type: EventType.RUN_STARTED, threadId: "thr_1", runId: "run_1" } as never,
+        { type: EventType.RUN_FINISHED, threadId: "thr_1", runId: "run_1" } as never,
+      ],
+      { onTerminalResult: terminal, assistantText: "done" },
+    );
+
+    expect(terminal).toHaveBeenCalledWith({
+      status: "completed",
+      assistantText: "done",
+      errorMsg: undefined,
+    });
+  });
+
+  it("reports run error status and message to onTerminalResult", async () => {
+    const terminal = mock(async () => {});
+
+    await runWithEvents(
+      [
+        { type: EventType.RUN_STARTED, threadId: "thr_1", runId: "run_1" } as never,
+        {
+          type: EventType.RUN_ERROR,
+          threadId: "thr_1",
+          runId: "run_1",
+          message: "provider failed",
+        } as never,
+      ],
+      { onTerminalResult: terminal },
+    );
+
+    expect(terminal).toHaveBeenCalledWith({
+      status: "error",
+      assistantText: "",
+      errorMsg: "provider failed",
+    });
+  });
+
+  it("does not let onTerminalResult errors break terminal run state", async () => {
+    await runWithEvents(
+      [
+        { type: EventType.RUN_STARTED, threadId: "thr_1", runId: "run_1" } as never,
+        { type: EventType.RUN_FINISHED, threadId: "thr_1", runId: "run_1" } as never,
+      ],
+      {
+        onTerminalResult: async () => {
+          throw new Error("remote callback failed");
+        },
+      },
+    );
   });
 });

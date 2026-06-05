@@ -119,6 +119,14 @@ export interface RunWorkerInput {
   /** Caller's UI locale (frontend forwards i18n.language) → language directive
    *  in systemPrompt.append. Omitted for background runs (see RunContext). */
   locale?: string;
+  /** Internal callers may add task-specific context after normal agent context. */
+  appendContextExtra?: string;
+  /** Internal completion callback for remote tasks. Public routes never expose it. */
+  onTerminalResult?: (result: {
+    status: "completed" | "error" | "cancelled" | "awaiting_approval";
+    assistantText: string;
+    errorMsg?: string;
+  }) => Promise<void>;
 }
 
 export async function runWorker(input: RunWorkerInput): Promise<void> {
@@ -143,6 +151,8 @@ export async function runWorker(input: RunWorkerInput): Promise<void> {
     resumeSessionAt,
     freshSession,
     locale,
+    appendContextExtra,
+    onTerminalResult,
   } = input;
 
   // Buffer the structured messages/tool_calls writes until the run reaches a
@@ -192,6 +202,26 @@ export async function runWorker(input: RunWorkerInput): Promise<void> {
     assistantBuffer.length = 0;
     toolCallBuffer.length = 0;
     toolResultBuffer.length = 0;
+  }
+
+  function assistantTextFromBuffer(): string {
+    return assistantBuffer.map((m) => m.content).filter(Boolean).join("\n\n");
+  }
+
+  async function notifyTerminalResult(
+    status: "completed" | "error" | "cancelled" | "awaiting_approval",
+    assistantText: string,
+    errorMsg?: string,
+  ): Promise<void> {
+    if (!onTerminalResult) return;
+    try {
+      await onTerminalResult({ status, assistantText, errorMsg });
+    } catch (err) {
+      console.warn(
+        "[runWorker] onTerminalResult failed:",
+        err instanceof Error ? err.message : String(err),
+      );
+    }
   }
 
   const callbacks: ProviderCallbacks = {
@@ -279,6 +309,10 @@ export async function runWorker(input: RunWorkerInput): Promise<void> {
     const links = agentLinks ? agentLinks.listByAgent(agentWorkspaceId) : [];
     appendContext = buildAgentAppendContext(claudeMd, memoryIndex, links) ?? undefined;
   }
+  const extra = appendContextExtra?.trim();
+  if (extra) {
+    appendContext = appendContext ? `${appendContext}\n\n${extra}` : extra;
+  }
 
   try {
     const initialStream = provider.run({
@@ -308,7 +342,7 @@ export async function runWorker(input: RunWorkerInput): Promise<void> {
       initialStream,
       callbacks,
       abortSignal,
-      onTerminal: async (status) => {
+      onTerminal: async (status, errorMsg) => {
         // Reject any still-pending HITL approvals for this run so the SDK
         // unblocks (canUseTool resolves as deny → SDK aborts the tool +
         // emits its own terminal). Safe to call when no deferreds exist.
@@ -317,6 +351,7 @@ export async function runWorker(input: RunWorkerInput): Promise<void> {
         // cancelPendingToolCallsForThread (which marks any still-pending
         // tool_calls as error) and before the system note, so chronological
         // order via createdAt is correct.
+        const assistantText = assistantTextFromBuffer();
         flushMessagesBuffers();
         messages.cancelPendingToolCallsForThread(threadId);
         if (status === "cancelled") {
@@ -324,6 +359,7 @@ export async function runWorker(input: RunWorkerInput): Promise<void> {
           await provider.notifyCancelled?.(threadId);
         }
         threads.touch(threadId);
+        await notifyTerminalResult(status, assistantText, errorMsg);
       },
     });
   } catch (err) {
@@ -332,6 +368,7 @@ export async function runWorker(input: RunWorkerInput): Promise<void> {
     // store writes, unexpected exceptions). Flush whatever made it into the
     // buffer so the user sees the partial state on next /messages load —
     // losing it silently is worse than persisting a half-turn.
+    const assistantText = assistantTextFromBuffer();
     flushMessagesBuffers();
     const msg = err instanceof Error ? err.message : String(err);
     await store.appendEvent(runId, {
@@ -347,5 +384,10 @@ export async function runWorker(input: RunWorkerInput): Promise<void> {
         /* best-effort */
       }
     }
+    await notifyTerminalResult(
+      abortSignal.aborted ? "cancelled" : "error",
+      assistantText,
+      msg,
+    );
   }
 }
