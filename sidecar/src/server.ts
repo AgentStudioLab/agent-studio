@@ -52,6 +52,7 @@ import { ChannelManager } from "./channels/core/ChannelManager";
 import { RemoteTaskAggregator } from "./channels/tasks/RemoteTaskAggregator";
 import { RemoteTaskService } from "./channels/tasks/RemoteTaskService";
 import { FakeChannelPlugin } from "./channels/plugins/fake/FakeChannelPlugin";
+import { WeixinPlugin } from "./channels/plugins/weixin/WeixinPlugin";
 import { buildChannelConnectionRoutes } from "./channels/routes/channelConnections";
 import { buildRemoteTaskRoutes } from "./channels/routes/remoteTasks";
 import { runWorker } from "./agent/runWorker";
@@ -264,6 +265,7 @@ const providerProxy: AgentProvider = {
 const channelRegistry = new PluginRegistry();
 const fakeChannelPlugin = new FakeChannelPlugin();
 channelRegistry.register(fakeChannelPlugin);
+channelRegistry.register(new WeixinPlugin());
 const remoteTaskAggregator = new RemoteTaskAggregator({ sessions: channelSessions });
 let channelManager: ChannelManager;
 const remoteTaskService = new RemoteTaskService({

@@ -62,13 +62,25 @@ export class ChannelManager {
 
   async sendRemoteTaskResult(input: RemoteTaskSendInput): Promise<void> {
     const plugin = this.deps.registry.require(input.channelType);
-    await plugin.send(input.connectionId, {
+    const message = {
       chatId: input.chatId,
       ...(input.contextToken ? { contextToken: input.contextToken } : {}),
       ...(input.files.length > 0
         ? { type: "files" as const, text: input.text, files: input.files }
         : { type: "text" as const, text: input.text }),
-    });
+    };
+    const withConnection = plugin as typeof plugin & {
+      sendWithConnection?: (
+        connection: NonNullable<ReturnType<ChannelConnectionService["getInternal"]>>,
+        message: Parameters<typeof plugin.send>[1],
+      ) => Promise<void>;
+    };
+    const connection = this.deps.connections.getInternal(input.connectionId);
+    if (connection && withConnection.sendWithConnection) {
+      await withConnection.sendWithConnection(connection, message);
+      return;
+    }
+    await plugin.send(input.connectionId, message);
   }
 
   async recoverRemoteTasksOnBoot(): Promise<void> {

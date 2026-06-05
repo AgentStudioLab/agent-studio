@@ -3,6 +3,15 @@ import type { ChannelConnectionService } from "../core/ChannelConnectionService"
 import type { ChannelManager } from "../core/ChannelManager";
 import type { ChannelConnectionConfig } from "../core/ChannelTypes";
 import type { FakeChannelPlugin } from "../plugins/fake/FakeChannelPlugin";
+import { startLogin } from "../plugins/weixin/WeixinLogin";
+
+type WeixinLoginState =
+  | { status: "waiting"; qrUrl?: string; qrData?: string }
+  | { status: "scanned"; qrUrl?: string; qrData?: string }
+  | { status: "confirmed"; connectionId: string }
+  | { status: "error"; error: string };
+
+const weixinLoginStates = new Map<string, WeixinLoginState>();
 
 export function buildChannelConnectionRoutes(deps: {
   connections: ChannelConnectionService;
@@ -105,6 +114,48 @@ export function buildChannelConnectionRoutes(deps: {
       timestamp: Date.now(),
     });
     return c.json({ ok: true }, 202);
+  });
+
+  app.post("/channels/weixin/login/start", (c) => {
+    const id = `wxl_${Date.now()}`;
+    weixinLoginStates.set(id, { status: "waiting" });
+    startLogin({
+      onQR: (qrUrl, qrData) => {
+        weixinLoginStates.set(id, { status: "waiting", qrUrl, qrData });
+      },
+      onScanned: () => {
+        const prev = weixinLoginStates.get(id);
+        weixinLoginStates.set(id, {
+          status: "scanned",
+          ...(prev && "qrUrl" in prev ? { qrUrl: prev.qrUrl, qrData: prev.qrData } : {}),
+        });
+      },
+      onDone: (result) => {
+        const connection = deps.connections.create({
+          type: "weixin",
+          name: "WeChat",
+          enabled: false,
+          status: "stopped",
+          credentials: {
+            accountId: result.accountId,
+            botToken: result.botToken,
+            baseUrl: result.baseUrl,
+          },
+          config: { permissionStrategy: "auto_execute" },
+        });
+        weixinLoginStates.set(id, { status: "confirmed", connectionId: connection.id });
+      },
+      onError: (error) => {
+        weixinLoginStates.set(id, { status: "error", error: error.message });
+      },
+    });
+    return c.json({ loginId: id, status: weixinLoginStates.get(id) });
+  });
+
+  app.get("/channels/weixin/login/:id/status", (c) => {
+    const state = weixinLoginStates.get(c.req.param("id"));
+    if (!state) return c.json({ error: "not_found" }, 404);
+    return c.json({ status: state });
   });
 
   return app;
