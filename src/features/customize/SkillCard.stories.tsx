@@ -48,7 +48,10 @@ export const SideBySide: Story = {
         style={{ background: "hsl(var(--bg-100))", padding: "2rem" }}
       >
         <div style={{ width: 320 }}>
-          <SkillCard {...skillArgs} active />
+          <SkillCard
+            {...skillArgs}
+            active
+          />
         </div>
       </div>
     </div>

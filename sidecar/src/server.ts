@@ -3,6 +3,7 @@ import { cors } from "hono/cors";
 import path from "node:path";
 import { openDb } from "./db";
 import { ensureAgentStudioHome } from "./lib/agentStudioHome";
+import { createRequestLogger } from "./lib/requestLogger";
 import { healthRoutes } from "./routes/health";
 import { buildConversationRoutes } from "./routes/conversations";
 import { buildMessageRoutes } from "./routes/messages";
@@ -155,6 +156,8 @@ app.use(
     maxAge: 600,
   }),
 );
+
+app.use("*", createRequestLogger());
 
 app.use("*", async (c, next) => {
   const auth = c.req.header("Authorization");

@@ -3,20 +3,25 @@ import {
   BUILT_IN_PROFILES,
   getBuiltInProfile,
   type ProfileModel,
-  type ProviderProfile,
+  type ProviderProfileId,
 } from "../lib/providerProfiles";
 
 // Persisted shape — JSON-encoded into settings.value under key "provider".
 // `apiKey` lives here too so all provider-related state is one row. The
 // existing settings.value column is TEXT NOT NULL so we always write JSON.
 //
-// `customModels` is meaningful only when profileId = "custom". For built-in
-// profiles we ignore it (and don't even surface the textarea on the frontend).
-interface PersistedProvider {
-  profileId: "anthropic" | "deepseek" | "custom";
+// Models are only persisted after a successful remote refresh. The cache is
+// scoped by provider id and base URL so a fetched OpenAI list is never exposed
+// after switching to another provider or endpoint.
+export interface PersistedProvider {
+  profileId: ProviderProfileId;
   baseUrl: string;
   apiKey: string;
-  customModels: ProfileModel[];
+  remoteModels: ProfileModel[];
+  remoteModelsProviderId: ProviderProfileId | "";
+  remoteModelsBaseUrl: string;
+  remoteModelsFetchedAt: string;
+  selectedModelId: string | null;
 }
 
 export interface ProviderSettingsState {
@@ -31,14 +36,102 @@ export interface ProviderSettingsState {
 }
 
 export interface ResolvedProvider {
-  profileId: PersistedProvider["profileId"];
+  profileId: ProviderProfileId;
   label: string;
   baseUrl: string;
   apiKey: string;
   models: ProfileModel[];
+  remoteModelsFetchedAt: string;
+  selectedModelId: string | null;
+  supportsRemoteModels: boolean;
+  compatibilityNote?: string;
 }
 
 const KEY = "provider";
+const DEFAULT_PROFILE_ID: ProviderProfileId = "anthropic";
+
+function isProviderProfileId(value: string): value is ProviderProfileId {
+  return value === "custom" || getBuiltInProfile(value) !== undefined;
+}
+
+function sanitizeProviderProfileId(value: unknown): ProviderProfileId | null {
+  if (typeof value !== "string") return null;
+  if (!isProviderProfileId(value)) return null;
+  return value;
+}
+
+function sanitizeRemoteModelsProviderId(
+  value: unknown,
+): ProviderProfileId | "" {
+  if (value === "") return "";
+  return sanitizeProviderProfileId(value) ?? "";
+}
+
+function sanitizeModels(value: unknown): ProfileModel[] {
+  if (!Array.isArray(value)) return [];
+  const out: ProfileModel[] = [];
+  for (const item of value) {
+    if (!item || typeof item !== "object") continue;
+    const raw = item as Record<string, unknown>;
+    if (
+      typeof raw.id !== "string" ||
+      typeof raw.displayName !== "string" ||
+      typeof raw.description !== "string"
+    ) {
+      continue;
+    }
+    const model: ProfileModel = {
+      id: raw.id,
+      displayName: raw.displayName,
+      description: raw.description,
+    };
+    out.push(model);
+  }
+  return out;
+}
+
+function defaultPersistedProvider(envFallback: {
+  apiKey?: string;
+  baseUrl?: string;
+}): PersistedProvider {
+  return {
+    profileId: DEFAULT_PROFILE_ID,
+    baseUrl: envFallback.baseUrl ?? "",
+    apiKey: envFallback.apiKey ?? "",
+    remoteModels: [],
+    remoteModelsProviderId: "",
+    remoteModelsBaseUrl: "",
+    remoteModelsFetchedAt: "",
+    selectedModelId: null,
+  };
+}
+
+function normalizePersistedProvider(value: unknown): PersistedProvider | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const profileId = sanitizeProviderProfileId(raw.profileId);
+  if (!profileId) return null;
+  if (typeof raw.baseUrl !== "string" || typeof raw.apiKey !== "string") {
+    return null;
+  }
+  return {
+    profileId,
+    baseUrl: raw.baseUrl,
+    apiKey: raw.apiKey,
+    remoteModels: sanitizeModels(raw.remoteModels),
+    remoteModelsProviderId: sanitizeRemoteModelsProviderId(
+      raw.remoteModelsProviderId,
+    ),
+    remoteModelsBaseUrl:
+      typeof raw.remoteModelsBaseUrl === "string" ? raw.remoteModelsBaseUrl : "",
+    remoteModelsFetchedAt:
+      typeof raw.remoteModelsFetchedAt === "string"
+        ? raw.remoteModelsFetchedAt
+        : "",
+    selectedModelId:
+      typeof raw.selectedModelId === "string" ? raw.selectedModelId : null,
+  };
+}
 
 function readRow(db: Database): PersistedProvider | null {
   const row = db
@@ -46,18 +139,9 @@ function readRow(db: Database): PersistedProvider | null {
     .get(KEY) as { value: string } | undefined;
   if (!row) return null;
   try {
-    const parsed = JSON.parse(row.value) as PersistedProvider;
-    // Defensive validation. A corrupted row shouldn't crash the sidecar —
-    // fall back to defaults and the user can re-save from Settings.
-    if (
-      typeof parsed.profileId !== "string" ||
-      typeof parsed.baseUrl !== "string" ||
-      typeof parsed.apiKey !== "string" ||
-      !Array.isArray(parsed.customModels)
-    ) {
-      return null;
-    }
-    return parsed;
+    // Defensive validation. A corrupted row shouldn't crash the sidecar. Rows
+    // from the old shape are hydrated with defaults for newly added fields.
+    return normalizePersistedProvider(JSON.parse(row.value));
   } catch {
     return null;
   }
@@ -72,34 +156,61 @@ function writeRow(db: Database, value: PersistedProvider): void {
 
 function resolve(persisted: PersistedProvider): ResolvedProvider {
   if (persisted.profileId === "custom") {
+    const remoteCacheMatches =
+      persisted.remoteModelsProviderId === "custom" &&
+      persisted.remoteModelsBaseUrl === persisted.baseUrl;
+    const activeRemoteModels = remoteCacheMatches ? persisted.remoteModels : [];
+    const remoteModelsFetchedAt = remoteCacheMatches
+      ? persisted.remoteModelsFetchedAt
+      : "";
     return {
       profileId: "custom",
       label: "Custom",
       baseUrl: persisted.baseUrl,
       apiKey: persisted.apiKey,
-      models: persisted.customModels,
+      models: activeRemoteModels,
+      remoteModelsFetchedAt,
+      selectedModelId: persisted.selectedModelId,
+      supportsRemoteModels: true,
     };
   }
   const builtIn = getBuiltInProfile(persisted.profileId);
   if (!builtIn) {
     // Profile id removed in a future release — degrade gracefully to Anthropic.
+    const fallback = BUILT_IN_PROFILES[0]!;
     return {
-      profileId: "anthropic",
-      label: "Anthropic",
-      baseUrl: persisted.baseUrl || BUILT_IN_PROFILES[0]!.baseUrl,
+      profileId: fallback.id,
+      label: fallback.label,
+      baseUrl: persisted.baseUrl || fallback.baseUrl,
       apiKey: persisted.apiKey,
-      models: BUILT_IN_PROFILES[0]!.models,
+      models: fallback.models,
+      remoteModelsFetchedAt: "",
+      selectedModelId: persisted.selectedModelId,
+      supportsRemoteModels: fallback.supportsRemoteModels,
+      compatibilityNote: fallback.compatibilityNote,
     };
   }
   // For built-in profiles the baseUrl in persisted is *suggested*; user can
   // override (e.g. self-hosted Anthropic-compat gateway). Empty string falls
   // back to the profile's default.
+  const baseUrl = persisted.baseUrl || builtIn.baseUrl;
+  const remoteCacheMatches =
+    persisted.remoteModelsProviderId === builtIn.id &&
+    persisted.remoteModelsBaseUrl === baseUrl;
+  const activeRemoteModels = remoteCacheMatches ? persisted.remoteModels : [];
+  const remoteModelsFetchedAt = remoteCacheMatches
+    ? persisted.remoteModelsFetchedAt
+    : "";
   return {
     profileId: builtIn.id,
     label: builtIn.label,
-    baseUrl: persisted.baseUrl || builtIn.baseUrl,
+    baseUrl,
     apiKey: persisted.apiKey,
-    models: builtIn.models,
+    models: activeRemoteModels.length > 0 ? activeRemoteModels : builtIn.models,
+    remoteModelsFetchedAt,
+    selectedModelId: persisted.selectedModelId,
+    supportsRemoteModels: builtIn.supportsRemoteModels,
+    compatibilityNote: builtIn.compatibilityNote,
   };
 }
 
@@ -107,12 +218,8 @@ export function createProviderSettings(
   db: Database,
   envFallback: { apiKey?: string; baseUrl?: string },
 ): ProviderSettingsState {
-  let cache: PersistedProvider = readRow(db) ?? {
-    profileId: "anthropic",
-    baseUrl: envFallback.baseUrl ?? "",
-    apiKey: envFallback.apiKey ?? "",
-    customModels: [],
-  };
+  let cache: PersistedProvider =
+    readRow(db) ?? defaultPersistedProvider(envFallback);
 
   const listeners = new Set<() => void>();
   const notify = () => {
@@ -127,11 +234,59 @@ export function createProviderSettings(
       return cache.apiKey;
     },
     update(patch): ResolvedProvider {
+      const nextProfileId =
+        patch.profileId !== undefined
+          ? sanitizeProviderProfileId(patch.profileId) ?? cache.profileId
+          : cache.profileId;
+      const profileChanged = nextProfileId !== cache.profileId;
+      const nextBaseUrl =
+        typeof patch.baseUrl === "string" ? patch.baseUrl : cache.baseUrl;
+      const nextApiKey =
+        typeof patch.apiKey === "string" ? patch.apiKey : cache.apiKey;
+      const configChanged =
+        profileChanged || nextBaseUrl !== cache.baseUrl || nextApiKey !== cache.apiKey;
+      const writesRemoteCache = patch.remoteModels !== undefined;
+      const nextEffectiveBaseUrl =
+        nextProfileId === "custom"
+          ? nextBaseUrl
+          : nextBaseUrl || getBuiltInProfile(nextProfileId)?.baseUrl || "";
       cache = {
-        profileId: patch.profileId ?? cache.profileId,
-        baseUrl: patch.baseUrl ?? cache.baseUrl,
-        apiKey: patch.apiKey ?? cache.apiKey,
-        customModels: patch.customModels ?? cache.customModels,
+        profileId: nextProfileId,
+        baseUrl: nextBaseUrl,
+        apiKey: nextApiKey,
+        remoteModels:
+          patch.remoteModels !== undefined
+            ? sanitizeModels(patch.remoteModels)
+            : configChanged
+              ? []
+              : cache.remoteModels,
+        remoteModelsProviderId:
+          patch.remoteModelsProviderId !== undefined
+            ? sanitizeRemoteModelsProviderId(patch.remoteModelsProviderId)
+            : configChanged
+              ? ""
+              : cache.remoteModelsProviderId,
+        remoteModelsBaseUrl:
+          typeof patch.remoteModelsBaseUrl === "string"
+            ? patch.remoteModelsBaseUrl
+            : writesRemoteCache
+              ? nextEffectiveBaseUrl
+              : configChanged
+                ? ""
+                : cache.remoteModelsBaseUrl,
+        remoteModelsFetchedAt:
+          typeof patch.remoteModelsFetchedAt === "string"
+            ? patch.remoteModelsFetchedAt
+            : configChanged
+              ? ""
+              : cache.remoteModelsFetchedAt,
+        selectedModelId:
+          patch.selectedModelId === null ||
+          typeof patch.selectedModelId === "string"
+            ? patch.selectedModelId
+            : profileChanged
+              ? null
+              : cache.selectedModelId,
       };
       writeRow(db, cache);
       notify();

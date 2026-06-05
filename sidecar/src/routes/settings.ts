@@ -1,32 +1,15 @@
 import { Hono } from "hono";
 import type { ProviderSettingsState } from "../services/providerSettings";
 import type { UserProfileSettingsState } from "../services/userProfileSettings";
-import { BUILT_IN_PROFILES, type ProfileModel } from "../lib/providerProfiles";
+import {
+  BUILT_IN_PROFILES,
+  isBuiltInProfileId,
+  type ProfileModel,
+  type ProviderProfileId,
+} from "../lib/providerProfiles";
 
-function isValidProfileId(v: unknown): v is "anthropic" | "deepseek" | "custom" {
-  return v === "anthropic" || v === "deepseek" || v === "custom";
-}
-
-function sanitizeCustomModels(raw: unknown): ProfileModel[] | undefined {
-  if (!Array.isArray(raw)) return undefined;
-  const out: ProfileModel[] = [];
-  for (const item of raw) {
-    if (!item || typeof item !== "object") continue;
-    const r = item as Record<string, unknown>;
-    if (
-      typeof r.id !== "string" ||
-      typeof r.displayName !== "string" ||
-      typeof r.description !== "string"
-    ) {
-      continue;
-    }
-    out.push({
-      id: r.id,
-      displayName: r.displayName,
-      description: r.description,
-    });
-  }
-  return out;
+function isValidProfileId(v: unknown): v is ProviderProfileId {
+  return typeof v === "string" && (isBuiltInProfileId(v) || v === "custom");
 }
 
 function modelListUrl(baseUrl: string): string | null {
@@ -118,10 +101,14 @@ export function buildSettingsRoutes(
           profileId?: unknown;
           baseUrl?: unknown;
           apiKey?: unknown;
+          selectedModelId?: unknown;
           customModels?: unknown;
+          customModelSource?: unknown;
         }
       | null;
-    if (!body) return c.json({ error: "invalid_body" }, 400);
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return c.json({ error: "invalid_body" }, 400);
+    }
 
     const patch: Parameters<ProviderSettingsState["update"]>[0] = {};
     if (body.profileId !== undefined) {
@@ -142,12 +129,20 @@ export function buildSettingsRoutes(
       }
       patch.apiKey = body.apiKey;
     }
+    if (body.customModelSource !== undefined) {
+      return c.json({ error: "unsupported_model_source" }, 400);
+    }
     if (body.customModels !== undefined) {
-      const sanitized = sanitizeCustomModels(body.customModels);
-      if (!sanitized) {
-        return c.json({ error: "invalid_custom_models" }, 400);
+      return c.json({ error: "unsupported_custom_models" }, 400);
+    }
+    if (body.selectedModelId !== undefined) {
+      if (
+        body.selectedModelId !== null &&
+        typeof body.selectedModelId !== "string"
+      ) {
+        return c.json({ error: "invalid_selected_model_id" }, 400);
       }
-      patch.customModels = sanitized;
+      patch.selectedModelId = body.selectedModelId;
     }
     const next = provider.update(patch);
     return c.json({ current: next });
@@ -173,8 +168,10 @@ export function buildSettingsRoutes(
     }
 
     const current = provider.current();
-    const baseUrl = body.baseUrl ?? current.baseUrl;
-    const apiKey = body.apiKey ?? current.apiKey;
+    const baseUrl =
+      typeof body.baseUrl === "string" ? body.baseUrl : current.baseUrl;
+    const apiKey =
+      typeof body.apiKey === "string" ? body.apiKey : current.apiKey;
     const url = modelListUrl(baseUrl);
     if (!url) return c.json({ error: "invalid_base_url" }, 400);
 
@@ -200,7 +197,11 @@ export function buildSettingsRoutes(
       profileId: "custom",
       baseUrl,
       apiKey,
-      customModels: models,
+      remoteModels: models,
+      remoteModelsProviderId: "custom",
+      remoteModelsBaseUrl: baseUrl,
+      remoteModelsFetchedAt: new Date().toISOString(),
+      selectedModelId: models[0]?.id ?? null,
     });
     return c.json({ current: next });
   });

@@ -2,15 +2,13 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  fetchProviderModels,
   getProvider,
   setProvider,
   type ProfileId,
-  type ProfileModel,
 } from "@/lib/data/settings";
+import { refreshModels, useAvailableModels } from "@/lib/models";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -18,14 +16,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  parseCustomModels,
-  prioritizeSelectedModel,
-} from "./modelSectionModels";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { EyeIcon, EyeOffIcon } from "lucide-react";
 
 export function ModelSection() {
   const { t } = useTranslation();
   const qc = useQueryClient();
+  const { models, defaultModelId } = useAvailableModels();
   const { data, isLoading } = useQuery({
     queryKey: ["provider"],
     queryFn: getProvider,
@@ -37,30 +34,21 @@ export function ModelSection() {
   const [profileId, setProfileIdLocal] = useState<ProfileId | null>(null);
   const [baseUrl, setBaseUrl] = useState("");
   const [apiKey, setApiKey] = useState("");
-  const [customModelsText, setCustomModelsText] = useState("");
+  const [showApiKey, setShowApiKey] = useState(false);
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
-  const [saveMsg, setSaveMsg] = useState<"saved" | "error" | "invalid" | null>(
-    null,
-  );
-  const [fetchMsg, setFetchMsg] = useState<
-    "success" | "error" | "empty" | null
+  const [refreshMsg, setRefreshMsg] = useState<
+    "success" | "missing" | "unsupported" | "error" | null
   >(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [saveMsg, setSaveMsg] = useState<"saved" | "error" | null>(null);
   const [saving, setSaving] = useState(false);
-  const [fetchingModels, setFetchingModels] = useState(false);
 
   useEffect(() => {
     if (!data) return;
-    const currentModels =
-      data.current.profileId === "custom" ? data.current.models : [];
     setProfileIdLocal(data.current.profileId);
     setBaseUrl(data.current.baseUrl);
     setApiKey(data.current.apiKey);
-    setCustomModelsText(
-      data.current.profileId === "custom"
-        ? JSON.stringify(currentModels, null, 2)
-        : "",
-    );
-    setSelectedModelId(currentModels[0]?.id ?? null);
+    setSelectedModelId(data.current.selectedModelId);
   }, [data]);
 
   if (isLoading || !data || profileId === null) {
@@ -74,56 +62,90 @@ export function ModelSection() {
     );
   }
 
+  const selectedBuiltIn = data.builtIn.find((p) => p.id === profileId);
+  const visibleModels =
+    profileId === "custom"
+      ? data.current.profileId === "custom"
+        ? models
+        : []
+      : profileId === data.current.profileId
+        ? models
+        : (selectedBuiltIn?.models ?? []);
+  const selectedModelIsVisible =
+    selectedModelId !== null &&
+    visibleModels.some((model) => model.id === selectedModelId);
+  const defaultModelIsVisible =
+    defaultModelId !== null &&
+    visibleModels.some((model) => model.id === defaultModelId);
+  const effectiveSelectedModelId = selectedModelIsVisible
+    ? selectedModelId
+    : defaultModelIsVisible
+      ? defaultModelId
+      : (visibleModels[0]?.id ?? null);
+  const selectedModelValue = effectiveSelectedModelId ?? "";
+  const compatibilityNote =
+    profileId === data.current.profileId
+      ? data.current.compatibilityNote ?? selectedBuiltIn?.compatibilityNote
+      : selectedBuiltIn?.compatibilityNote;
+
+  const handleProfileChange = (value: string) => {
+    const nextProfileId = value as ProfileId;
+    setProfileIdLocal(nextProfileId);
+    setRefreshMsg(null);
+
+    if (nextProfileId === "custom") {
+      setSelectedModelId(null);
+      return;
+    }
+
+    const nextProfile = data.builtIn.find((p) => p.id === nextProfileId);
+    if (!nextProfile) return;
+    setBaseUrl(nextProfile.baseUrl);
+    setSelectedModelId(nextProfile.models[0]?.id ?? null);
+  };
+
+  const providerPatchForSave = () => {
+    const nextSelectedModelId =
+      visibleModels.some((model) => model.id === selectedModelId)
+        ? selectedModelId
+        : (visibleModels[0]?.id ?? null);
+    return {
+      profileId,
+      baseUrl,
+      apiKey,
+      selectedModelId: nextSelectedModelId,
+    };
+  };
+
+  const handleRefreshModels = async () => {
+    setRefreshing(true);
+    setRefreshMsg(null);
+    try {
+      await setProvider(providerPatchForSave());
+      await refreshModels();
+      setRefreshMsg("success");
+      void qc.invalidateQueries({ queryKey: ["provider"] });
+      void qc.invalidateQueries({ queryKey: ["models"] });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "";
+      if (message === "missing_api_key") {
+        setRefreshMsg("missing");
+      } else if (message === "unsupported_remote_models") {
+        setRefreshMsg("unsupported");
+      } else {
+        setRefreshMsg("error");
+      }
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   const handleSave = async () => {
     setSaving(true);
     setSaveMsg(null);
 
-    let customModels: ProfileModel[] | undefined;
-    if (profileId === "custom") {
-      try {
-        const parsed = JSON.parse(customModelsText || "[]") as unknown;
-        if (!Array.isArray(parsed)) throw new Error("not_array");
-        const cleaned: ProfileModel[] = [];
-        for (const item of parsed) {
-          if (!item || typeof item !== "object") continue;
-          const r = item as Record<string, unknown>;
-          if (
-            typeof r.id !== "string" ||
-            typeof r.displayName !== "string" ||
-            typeof r.description !== "string"
-          ) {
-            continue;
-          }
-          cleaned.push({
-            id: r.id,
-            displayName: r.displayName,
-            description: r.description,
-          });
-        }
-        customModels = prioritizeSelectedModel(cleaned, selectedModelId);
-      } catch {
-        setSaveMsg("invalid");
-        setSaving(false);
-        return;
-      }
-    }
-
     try {
-      const current = await setProvider({
-        profileId,
-        baseUrl,
-        apiKey,
-        ...(customModels ? { customModels } : {}),
-      });
-      if (profileId === "custom" && customModels) {
-        setCustomModelsText(JSON.stringify(customModels, null, 2));
-        setSelectedModelId(customModels[0]?.id ?? null);
-        qc.setQueryData(["provider"], {
-          ...data,
-          current,
-        });
-        qc.setQueryData(["models"], customModels);
-      }
+      await setProvider(providerPatchForSave());
       setSaveMsg("saved");
       void qc.invalidateQueries({ queryKey: ["provider"] });
       void qc.invalidateQueries({ queryKey: ["models"] });
@@ -131,39 +153,6 @@ export function ModelSection() {
       setSaveMsg("error");
     } finally {
       setSaving(false);
-    }
-  };
-
-  const customModels = parseCustomModels(customModelsText);
-
-  const handleFetchModels = async () => {
-    setFetchingModels(true);
-    setFetchMsg(null);
-    setSaveMsg(null);
-    try {
-      const current = await fetchProviderModels({
-        profileId,
-        baseUrl,
-        apiKey,
-      });
-      const nextText = JSON.stringify(current.models, null, 2);
-      setProfileIdLocal(current.profileId);
-      setBaseUrl(current.baseUrl);
-      setApiKey(current.apiKey);
-      setCustomModelsText(nextText);
-      setSelectedModelId(current.models[0]?.id ?? null);
-      setFetchMsg(current.models.length > 0 ? "success" : "empty");
-      qc.setQueryData(["provider"], {
-        ...data,
-        current,
-      });
-      qc.setQueryData(["models"], current.models);
-      void qc.invalidateQueries({ queryKey: ["provider"] });
-      void qc.invalidateQueries({ queryKey: ["models"] });
-    } catch {
-      setFetchMsg("error");
-    } finally {
-      setFetchingModels(false);
     }
   };
 
@@ -179,20 +168,25 @@ export function ModelSection() {
       </div>
 
       <Field label={t("settings.provider.profileLabel")}>
-        <Select
-          value={profileId}
-          onValueChange={(v) => setProfileIdLocal(v as ProfileId)}
-        >
-          <SelectTrigger className="w-full">
+        <Select value={profileId} onValueChange={handleProfileChange}>
+          <SelectTrigger
+            aria-label={t("settings.provider.profileLabel")}
+            className="w-full"
+          >
             <SelectValue />
           </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="anthropic">
-              {t("settings.provider.profile.anthropic")}
-            </SelectItem>
-            <SelectItem value="deepseek">
-              {t("settings.provider.profile.deepseek")}
-            </SelectItem>
+          <SelectContent
+            align="start"
+            side="bottom"
+            position="popper"
+            avoidCollisions={false}
+            className="[&_[data-position=popper]]:!h-auto"
+          >
+            {data.builtIn.map((profile) => (
+              <SelectItem key={profile.id} value={profile.id}>
+                {profile.label}
+              </SelectItem>
+            ))}
             <SelectItem value="custom">
               {t("settings.provider.profile.custom")}
             </SelectItem>
@@ -212,85 +206,106 @@ export function ModelSection() {
       </Field>
 
       <Field label={t("settings.provider.apiKeyLabel")}>
-        <Input
-          type="password"
-          value={apiKey}
-          onChange={(e) => setApiKey(e.target.value)}
-          placeholder={t("settings.apiKey.placeholder")}
-        />
+        <div className="relative">
+          <Input
+            type={showApiKey ? "text" : "password"}
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value)}
+            placeholder={t("settings.apiKey.placeholder")}
+            className="pr-10"
+          />
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label={
+                  showApiKey
+                    ? t("settings.provider.hideApiKey")
+                    : t("settings.provider.showApiKey")
+                }
+                aria-pressed={showApiKey}
+                className="absolute top-1/2 right-1 -translate-y-1/2 active:!-translate-y-1/2"
+                onClick={() => setShowApiKey((value) => !value)}
+              >
+                {showApiKey ? <EyeOffIcon /> : <EyeIcon />}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              {showApiKey
+                ? t("settings.provider.hideApiKey")
+                : t("settings.provider.showApiKey")}
+            </TooltipContent>
+          </Tooltip>
+        </div>
       </Field>
 
-      {profileId === "custom" && (
-        <div className="space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <label className="text-sm font-medium text-foreground">
-                {t("settings.provider.customModelsLabel")}
-              </label>
-              <p className="text-xs text-muted-foreground">
-                {t("settings.provider.customModelsHint")}
-              </p>
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => void handleFetchModels()}
-              disabled={fetchingModels || !baseUrl.trim()}
+      <Field label={t("settings.provider.modelLabel")}>
+        <div className="flex items-center gap-2">
+          <Select
+            value={selectedModelValue}
+            onValueChange={(v) => setSelectedModelId(v)}
+          >
+            <SelectTrigger
+              aria-label={t("settings.provider.modelLabel")}
+              className="w-full"
             >
-              {fetchingModels
-                ? t("settings.provider.fetchingModels")
-                : t("settings.provider.fetchModels")}
-            </Button>
-          </div>
+              <SelectValue placeholder={t("settings.provider.modelPlaceholder")} />
+            </SelectTrigger>
+            <SelectContent>
+              {visibleModels.map((model) => (
+                <SelectItem key={model.id} value={model.id}>
+                  {model.displayName}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            variant="outline"
+            onClick={() => void handleRefreshModels()}
+            disabled={refreshing}
+          >
+            {refreshing
+              ? t("settings.provider.refreshingModels")
+              : t("settings.provider.refreshModels")}
+          </Button>
+        </div>
+        {refreshMsg === "success" && (
+          <span className="text-sm text-muted-foreground">
+            {t("settings.provider.refreshSuccess")}
+          </span>
+        )}
+        {refreshMsg === "unsupported" && (
+          <span className="text-sm text-destructive">
+            {t("settings.provider.refreshUnsupported")}
+          </span>
+        )}
+        {refreshMsg === "missing" && (
+          <span className="text-sm text-destructive">
+            {t("settings.provider.refreshMissingKey")}
+          </span>
+        )}
+        {refreshMsg === "error" && (
+          <span className="text-sm text-destructive">
+            {t("settings.provider.refreshError")}
+          </span>
+        )}
+        {data.current.remoteModelsFetchedAt && (
+          <span className="text-xs text-muted-foreground">
+            {t("settings.provider.lastRefreshed", {
+              time: new Date(data.current.remoteModelsFetchedAt).toLocaleString(),
+            })}
+          </span>
+        )}
+      </Field>
 
-          {customModels.length > 0 && (
-            <Field label={t("settings.provider.modelLabel")}>
-              <Select
-                value={selectedModelId ?? customModels[0]?.id}
-                onValueChange={setSelectedModelId}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {customModels.map((model) => (
-                    <SelectItem key={model.id} value={model.id}>
-                      {model.displayName || model.id}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
-          )}
-
-          <Textarea
-            value={customModelsText}
-            onChange={(e) => {
-              setCustomModelsText(e.target.value);
-              setSelectedModelId(parseCustomModels(e.target.value)[0]?.id ?? null);
-            }}
-            placeholder={t("settings.provider.customModelsPlaceholder")}
-            rows={6}
-            className="font-mono text-[12px]"
-          />
-
-          {fetchMsg === "success" && (
-            <span className="text-sm text-muted-foreground">
-              {t("settings.provider.fetchModelsSuccess", {
-                count: customModels.length,
-              })}
-            </span>
-          )}
-          {fetchMsg === "empty" && (
-            <span className="text-sm text-destructive">
-              {t("settings.provider.fetchModelsEmpty")}
-            </span>
-          )}
-          {fetchMsg === "error" && (
-            <span className="text-sm text-destructive">
-              {t("settings.provider.fetchModelsError")}
-            </span>
-          )}
+      {compatibilityNote && (
+        <div className="text-sm text-muted-foreground">
+          <span className="font-medium">
+            {t("settings.provider.compatibilityNote")}:
+          </span>{" "}
+          {compatibilityNote}
         </div>
       )}
 
@@ -306,11 +321,6 @@ export function ModelSection() {
         {saveMsg === "error" && (
           <span className="text-sm text-destructive">
             {t("settings.provider.saveError")}
-          </span>
-        )}
-        {saveMsg === "invalid" && (
-          <span className="text-sm text-destructive">
-            {t("settings.provider.invalidJson")}
           </span>
         )}
       </div>

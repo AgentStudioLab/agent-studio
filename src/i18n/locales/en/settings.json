@@ -64,25 +64,27 @@
     "profile": {
       "anthropic": "Anthropic",
       "deepseek": "DeepSeek",
-      "custom": "Custom (Anthropic-compatible)"
+      "custom": "Custom (OpenAI-compatible)"
     },
     "baseUrlLabel": "Base URL",
     "baseUrlPlaceholder": "https://api.example.com",
     "baseUrlHint": "Leave empty to use the selected provider's default.",
     "apiKeyLabel": "API Key",
+    "showApiKey": "Show API key",
+    "hideApiKey": "Hide API key",
     "modelLabel": "Model",
-    "fetchModels": "Fetch model list",
-    "fetchingModels": "Fetching…",
-    "fetchModelsSuccess": "Fetched {{count}} models and saved them as the custom model list.",
-    "fetchModelsEmpty": "The provider returned no usable models.",
-    "fetchModelsError": "Failed to fetch models. Check the Base URL and API key.",
-    "customModelsLabel": "Custom Model List (JSON)",
-    "customModelsPlaceholder": "[{\"id\":\"model-id\",\"displayName\":\"Display Name\",\"description\":\"Short blurb\"}]",
-    "customModelsHint": "JSON array. Each item must include string fields: id, displayName, description.",
+    "modelPlaceholder": "Select a model",
+    "refreshModels": "Refresh models",
+    "refreshingModels": "Refreshing…",
+    "refreshSuccess": "Model list refreshed",
+    "refreshUnsupported": "This provider does not support remote model refresh",
+    "refreshMissingKey": "Enter an API key first",
+    "refreshError": "Model refresh failed",
+    "lastRefreshed": "Last refreshed: {{time}}",
+    "compatibilityNote": "Compatibility note",
     "save": "Save",
     "saved": "Saved",
-    "saveError": "Save failed",
-    "invalidJson": "JSON parse failed — please check the syntax."
+    "saveError": "Save failed"
   },
   "permissions": {
     "title": "Permissions"

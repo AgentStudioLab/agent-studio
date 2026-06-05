@@ -118,7 +118,7 @@ describe("GET /files/content", () => {
       `/files/content?path=${encodeURIComponent(bigFile)}&cwd=${encodeURIComponent(tmpRoot)}`,
     );
     expect(res.status).toBe(413);
-    const body = await res.json();
+    const body = (await res.json()) as { error: string; size: number };
     expect(body.error).toBe("file too large");
     expect(body.size).toBe(2 * 1024 * 1024 + 1);
   });
