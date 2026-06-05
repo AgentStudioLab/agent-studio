@@ -50,6 +50,31 @@ export interface ProfileModel {
   description: string;
 }
 
+export interface AgentRuntimeCapabilities {
+  text: boolean;
+  tools: boolean;
+  fileCheckpoint: boolean;
+}
+
+export type AgentRuntime =
+  | {
+      protocol: "anthropic";
+      baseUrl: string;
+      auth: "x-api-key" | "bearer";
+      capabilities: AgentRuntimeCapabilities;
+    }
+  | {
+      protocol: "openai-compatible";
+      baseUrl: string;
+      auth: "bearer";
+      capabilities: AgentRuntimeCapabilities;
+    }
+  | {
+      protocol: "unsupported";
+      reason: string;
+      capabilities: AgentRuntimeCapabilities;
+    };
+
 export interface ProviderConfig {
   profileId: ProfileId;
   label: string;
@@ -59,6 +84,7 @@ export interface ProviderConfig {
   remoteModelsFetchedAt: string;
   selectedModelId: string | null;
   supportsRemoteModels: boolean;
+  agentRuntime: AgentRuntime;
   compatibilityNote?: string;
 }
 
@@ -68,6 +94,7 @@ export interface BuiltInProfile {
   region?: "Global" | "China" | "Cloud";
   baseUrl: string;
   supportsRemoteModels: boolean;
+  agentRuntime: AgentRuntime;
   compatibilityNote?: string;
   models: ProfileModel[];
 }

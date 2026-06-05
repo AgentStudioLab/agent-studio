@@ -177,6 +177,13 @@ void testI18n.use(initReactI18next).init({
             refreshError: "Model refresh failed",
             lastRefreshed: "Last refreshed: {{time}}",
             compatibilityNote: "Compatibility note",
+            runtimeLabel: "Agent runtime",
+            runtimeAnthropic: "Anthropic-compatible",
+            runtimeOpenAI: "OpenAI-compatible",
+            runtimeTextOnly:
+              "Text streaming is available; tool calls and file rewind are not connected yet.",
+            runtimeUnsupported: "Agent runtime not implemented",
+            runtimeBaseUrl: "Runtime Base URL: {{baseUrl}}",
           },
         },
       },
@@ -218,6 +225,12 @@ function providerFixture(
       remoteModelsFetchedAt: "2026-05-29T08:00:00.000Z",
       selectedModelId: "openrouter/auto",
       supportsRemoteModels: true,
+      agentRuntime: {
+        protocol: "openai-compatible",
+        baseUrl: "https://openrouter.ai/api/v1",
+        auth: "bearer",
+        capabilities: { text: true, tools: false, fileCheckpoint: false },
+      },
       ...overrides,
     },
     builtIn: [
@@ -226,6 +239,12 @@ function providerFixture(
         label: "OpenRouter Catalog",
         baseUrl: "https://openrouter.ai/api/v1",
         supportsRemoteModels: true,
+        agentRuntime: {
+          protocol: "openai-compatible",
+          baseUrl: "https://openrouter.ai/api/v1",
+          auth: "bearer",
+          capabilities: { text: true, tools: false, fileCheckpoint: false },
+        },
         models: modelsState.data,
       },
       {
@@ -233,6 +252,11 @@ function providerFixture(
         label: "Gemini Live",
         baseUrl: "https://generativelanguage.googleapis.com/v1beta",
         supportsRemoteModels: true,
+        agentRuntime: {
+          protocol: "unsupported",
+          reason: "Agent runtime is not implemented for this provider.",
+          capabilities: { text: false, tools: false, fileCheckpoint: false },
+        },
         compatibilityNote: "Requires OpenAI-compatible mode.",
         models: [
           {
@@ -334,6 +358,66 @@ describe("ModelSection", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Hide API key" }));
     expect(input.getAttribute("type")).toBe("password");
+  });
+
+  it("shows OpenAI-compatible runtime limitations for SiliconFlow", async () => {
+    renderModelSection(
+      providerFixture({
+        profileId: "siliconflow-cn",
+        label: "SiliconFlow China",
+        baseUrl: "https://api.siliconflow.cn/v1",
+        apiKey: "sf-key",
+        models: [
+          {
+            id: "deepseek-ai/DeepSeek-V3.2",
+            displayName: "DeepSeek V3.2",
+            description: "Remote model",
+          },
+        ],
+        remoteModelsFetchedAt: "2026-06-05T01:47:12.552Z",
+        selectedModelId: "deepseek-ai/DeepSeek-V3.2",
+        agentRuntime: {
+          protocol: "openai-compatible",
+          baseUrl: "https://api.siliconflow.cn/v1",
+          auth: "bearer",
+          capabilities: { text: true, tools: false, fileCheckpoint: false },
+        },
+      }),
+    );
+
+    expect(await screen.findByText("Agent runtime")).toBeDefined();
+    expect(screen.getByText("OpenAI-compatible")).toBeDefined();
+    expect(screen.getByText(/Text streaming is available/)).toBeDefined();
+  });
+
+  it("shows OpenAI-compatible runtime limitations", async () => {
+    renderModelSection(
+      providerFixture({
+        profileId: "openai",
+        label: "OpenAI",
+        baseUrl: "https://api.openai.com/v1",
+        apiKey: "openai-key",
+        models: [
+          {
+            id: "gpt-5.1",
+            displayName: "GPT-5.1",
+            description: "Remote model",
+          },
+        ],
+        remoteModelsFetchedAt: "",
+        selectedModelId: "gpt-5.1",
+        agentRuntime: {
+          protocol: "openai-compatible",
+          baseUrl: "https://api.openai.com/v1",
+          auth: "bearer",
+          capabilities: { text: true, tools: false, fileCheckpoint: false },
+        },
+      }),
+    );
+
+    expect(await screen.findByText("Agent runtime")).toBeDefined();
+    expect(screen.getByText("OpenAI-compatible")).toBeDefined();
+    expect(screen.getByText(/Text streaming is available/)).toBeDefined();
   });
 
   it("keeps the API key visibility toggle anchored while pressed", async () => {

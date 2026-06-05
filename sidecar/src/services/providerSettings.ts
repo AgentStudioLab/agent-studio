@@ -2,6 +2,7 @@ import type { Database } from "bun:sqlite";
 import {
   BUILT_IN_PROFILES,
   getBuiltInProfile,
+  type AgentRuntime,
   type ProfileModel,
   type ProviderProfileId,
 } from "../lib/providerProfiles";
@@ -43,12 +44,50 @@ export interface ResolvedProvider {
   models: ProfileModel[];
   remoteModelsFetchedAt: string;
   selectedModelId: string | null;
+  agentRuntime: AgentRuntime;
   supportsRemoteModels: boolean;
   compatibilityNote?: string;
 }
 
+const OPENAI_TEXT_CAPABILITIES = {
+  text: true,
+  tools: false,
+  fileCheckpoint: false,
+} satisfies AgentRuntime["capabilities"];
+
 const KEY = "provider";
 const DEFAULT_PROFILE_ID: ProviderProfileId = "anthropic";
+
+function normalizeOpenAICompatibleBaseUrl(baseUrl: string): string {
+  const trimmed = baseUrl.trim();
+  try {
+    const url = new URL(trimmed);
+    const path = url.pathname.replace(/\/+$/, "");
+    if (path === "") {
+      url.pathname = "/v1";
+    }
+    url.search = "";
+    url.hash = "";
+    return url.toString().replace(/\/+$/, "");
+  } catch {
+    return trimmed;
+  }
+}
+
+function resolveRuntimeBaseUrl(runtime: AgentRuntime, baseUrl: string): AgentRuntime {
+  if (runtime.protocol === "unsupported") return runtime;
+  if (!baseUrl.trim()) return runtime;
+  if (runtime.protocol === "openai-compatible") {
+    return {
+      ...runtime,
+      baseUrl: normalizeOpenAICompatibleBaseUrl(baseUrl),
+    };
+  }
+  return {
+    ...runtime,
+    baseUrl: baseUrl.trim().replace(/\/+$/, ""),
+  };
+}
 
 function isProviderProfileId(value: string): value is ProviderProfileId {
   return value === "custom" || getBuiltInProfile(value) !== undefined;
@@ -171,6 +210,12 @@ function resolve(persisted: PersistedProvider): ResolvedProvider {
       models: activeRemoteModels,
       remoteModelsFetchedAt,
       selectedModelId: persisted.selectedModelId,
+      agentRuntime: {
+        protocol: "openai-compatible",
+        baseUrl: normalizeOpenAICompatibleBaseUrl(persisted.baseUrl),
+        auth: "bearer",
+        capabilities: OPENAI_TEXT_CAPABILITIES,
+      },
       supportsRemoteModels: true,
     };
   }
@@ -186,6 +231,7 @@ function resolve(persisted: PersistedProvider): ResolvedProvider {
       models: fallback.models,
       remoteModelsFetchedAt: "",
       selectedModelId: persisted.selectedModelId,
+      agentRuntime: resolveRuntimeBaseUrl(fallback.agentRuntime, persisted.baseUrl),
       supportsRemoteModels: fallback.supportsRemoteModels,
       compatibilityNote: fallback.compatibilityNote,
     };
@@ -209,6 +255,7 @@ function resolve(persisted: PersistedProvider): ResolvedProvider {
     models: activeRemoteModels.length > 0 ? activeRemoteModels : builtIn.models,
     remoteModelsFetchedAt,
     selectedModelId: persisted.selectedModelId,
+    agentRuntime: resolveRuntimeBaseUrl(builtIn.agentRuntime, baseUrl),
     supportsRemoteModels: builtIn.supportsRemoteModels,
     compatibilityNote: builtIn.compatibilityNote,
   };

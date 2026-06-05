@@ -35,10 +35,9 @@ import { UsageService } from "./services/usage";
 import { SettingsToolsService } from "./services/settings-tools";
 import { buildSettingsToolsRoutes } from "./routes/settings-tools";
 import { createBunSqliteRunStore } from "./agui/store-sqlite";
-import {
-  createClaudeProvider,
-  createInterruptBus,
-} from "./agui/provider-claude";
+import type { AgentProvider } from "./agui/core";
+import { createAgentProviderForRuntime } from "./agui/provider-factory";
+import { createInterruptBus } from "./agui/provider-claude";
 import { SessionMetadataStore } from "./services/sessionMetadata";
 import { buildThreadContextRoutes } from "./routes/threadContext";
 import { buildFileContentRoutes } from "./routes/fileContent";
@@ -167,7 +166,7 @@ app.use("*", async (c, next) => {
   await next();
 });
 
-// Build provider lazily — single instance per (apiKey, baseUrl) tuple.
+// Build provider lazily — single instance per active runtime settings tuple.
 // Sessions live inside the provider, so we cache. When the user changes
 // provider config via /settings/provider, providerSettings.onChange fires
 // and we invalidate the cache so the next run picks up the new endpoint.
@@ -178,54 +177,56 @@ function buildProvider() {
     const override = threads.getAllowedTools(threadId);
     return override ?? settingsTools.getDefault();
   };
-  return createClaudeProvider({
+  return createAgentProviderForRuntime({
+    runtime: current.agentRuntime,
     apiKey: current.apiKey,
-    baseUrl: current.baseUrl || undefined,
-    model: process.env.ANTHROPIC_MODEL,
-    resolveAllowedTools,
-    interruptBus,
-    audit,
-    resolveAppendPrompt: () =>
-      composeAppendPrompt(userProfileSettings.current()),
-    onInitMetadata: (threadId, meta) => sessionMetadata.upsert(threadId, meta),
-    resolveSkillsConfig: () => ({
-      enabledSkills: skillRegistry.listEnabledIds(),
-      pluginPath: skillRegistry.builtinPluginPath(),
-    }),
-    skillInvocationsStore: skillInvocations,
-    // `/schedule` skill → in-process MCP tool persists through the same service
-    // the scheduler reads. Working dir + model are injected by the provider
-    // from the live run; the agent only supplies name/prompt/cadence.
-    onCreateScheduledTask: (input) => {
-      const task = scheduledTasks.create({
-        name: input.name,
-        description: input.description ?? "",
-        prompt: input.prompt,
-        frequency: input.frequency,
-        timeOfDay: input.timeOfDay ?? null,
-        weekday: input.weekday ?? null,
-        workingDir: input.workingDir ?? null,
-        model: input.model ?? null,
-        permissionMode: "ask",
-      });
-      return { id: task.id, name: task.name };
-    },
-    // `remember` MCP tool (agent-bound runs) → write that agent's file-based
-    // memory. The MemoryEdit union guarantees save fields are present when
-    // action === "save"; remove needs only `file`.
-    onRemember: (edit, { agentWorkspaceId, threadId }) => {
-      if (edit.action === "save") {
-        return agentMemoryStore.save(agentWorkspaceId, {
-          file: edit.file, title: edit.title, hook: edit.hook, content: edit.content,
-          originThreadId: threadId, type: edit.type,
+    defaultModel: current.selectedModelId ?? process.env.ANTHROPIC_MODEL,
+    common: {
+      resolveAllowedTools,
+      interruptBus,
+      audit,
+      resolveAppendPrompt: () =>
+        composeAppendPrompt(userProfileSettings.current()),
+      onInitMetadata: (threadId, meta) => sessionMetadata.upsert(threadId, meta),
+      resolveSkillsConfig: () => ({
+        enabledSkills: skillRegistry.listEnabledIds(),
+        pluginPath: skillRegistry.builtinPluginPath(),
+      }),
+      skillInvocationsStore: skillInvocations,
+      // `/schedule` skill → in-process MCP tool persists through the same service
+      // the scheduler reads. Working dir + model are injected by the provider
+      // from the live run; the agent only supplies name/prompt/cadence.
+      onCreateScheduledTask: (input) => {
+        const task = scheduledTasks.create({
+          name: input.name,
+          description: input.description ?? "",
+          prompt: input.prompt,
+          frequency: input.frequency,
+          timeOfDay: input.timeOfDay ?? null,
+          weekday: input.weekday ?? null,
+          workingDir: input.workingDir ?? null,
+          model: input.model ?? null,
+          permissionMode: "ask",
         });
-      }
-      return agentMemoryStore.remove(agentWorkspaceId, edit.file);
+        return { id: task.id, name: task.name };
+      },
+      // `remember` MCP tool (agent-bound runs) → write that agent's file-based
+      // memory. The MemoryEdit union guarantees save fields are present when
+      // action === "save"; remove needs only `file`.
+      onRemember: (edit, { agentWorkspaceId, threadId }) => {
+        if (edit.action === "save") {
+          return agentMemoryStore.save(agentWorkspaceId, {
+            file: edit.file, title: edit.title, hook: edit.hook, content: edit.content,
+            originThreadId: threadId, type: edit.type,
+          });
+        }
+        return agentMemoryStore.remove(agentWorkspaceId, edit.file);
+      },
     },
   });
 }
 
-let providerInstance: ReturnType<typeof createClaudeProvider> | null = null;
+let providerInstance: AgentProvider | null = null;
 function getProvider() {
   if (!providerInstance) providerInstance = buildProvider();
   return providerInstance;
@@ -237,15 +238,15 @@ providerSettings.onChange(() => {
   providerInstance = null;
 });
 // Lazy proxy so routes can wire it as a stable reference.
-const providerProxy = {
-  get name() { return "claude-agent-sdk"; },
-  run: ((ctx) => getProvider().run(ctx)) as ReturnType<typeof createClaudeProvider>["run"],
-  resume: ((ctx) => getProvider().resume(ctx)) as ReturnType<typeof createClaudeProvider>["resume"],
-  getPendingInterrupts: ((tid, rid) => getProvider().getPendingInterrupts(tid, rid)) as ReturnType<typeof createClaudeProvider>["getPendingInterrupts"],
-  notifyCancelled: ((tid) => getProvider().notifyCancelled?.(tid) ?? Promise.resolve()) as ReturnType<typeof createClaudeProvider>["notifyCancelled"],
+const providerProxy: AgentProvider = {
+  get name() { return getProvider().name; },
+  run: (ctx) => getProvider().run(ctx),
+  resume: (ctx) => getProvider().resume(ctx),
+  getPendingInterrupts: (tid, rid) => getProvider().getPendingInterrupts(tid, rid),
+  notifyCancelled: (tid) => getProvider().notifyCancelled?.(tid) ?? Promise.resolve(),
   rewindFiles: ((input) =>
     getProvider().rewindFiles?.(input) ??
-    Promise.resolve({ canRewind: false, error: "unsupported" })) as ReturnType<typeof createClaudeProvider>["rewindFiles"],
+    Promise.resolve({ canRewind: false, error: "unsupported" })),
 };
 
 // Scheduled-task engine. Polls scheduled_tasks.next_run_at every minute and
