@@ -7,22 +7,24 @@ afterEach(() => {
 });
 
 describe("BrandStar", () => {
-  it("uses theme tokens for the logo background gradient", () => {
+  it("renders the shared logo PNG asset", () => {
     const { container } = render(<BrandStar />);
 
-    const stops = Array.from(container.querySelectorAll("linearGradient stop")).map((stop) =>
-      stop.getAttribute("stop-color"),
-    );
+    const image = container.querySelector("img");
 
-    expect(stops).toEqual(["hsl(var(--brand-100))", "hsl(var(--accent-100))"]);
+    expect(image?.getAttribute("src")).toBe("/logo/logo.png");
+    expect(image?.getAttribute("alt")).toBe("Agent Studio brand mark");
   });
 
-  it("does not fill outlined logo strokes with the default black fill", () => {
+  it("keeps explicit dimensions and supports the spinning state", () => {
     const { container } = render(<BrandStar />);
 
-    const outlinedPaths = Array.from(container.querySelectorAll("path[stroke]"));
+    const image = container.querySelector("img");
 
-    expect(outlinedPaths.length).toBeGreaterThan(0);
-    expect(outlinedPaths.every((path) => path.getAttribute("fill") === "none")).toBe(true);
+    expect(image?.getAttribute("width")).toBe("16");
+    expect(image?.getAttribute("height")).toBe("16");
+
+    const { container: spinningContainer } = render(<BrandStar spinning />);
+    expect(spinningContainer.querySelector("img")?.className).toContain("animate-spin-slow");
   });
 });
