@@ -27,6 +27,8 @@ const auth: AuthContextValue = {
 };
 
 mock.module("react-i18next", () => ({
+  I18nextProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
+  initReactI18next: { type: "3rdParty", init: () => {} },
   useTranslation: () => ({
     t: (key: string, params?: Record<string, unknown>) => {
       const translations: Record<string, string> = {

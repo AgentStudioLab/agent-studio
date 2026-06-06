@@ -5,6 +5,7 @@ import {
   notifyManager,
 } from "@tanstack/react-query";
 import { cleanup, render, screen } from "@testing-library/react";
+import type { ReactNode } from "react";
 
 notifyManager.setScheduler(queueMicrotask);
 
@@ -31,8 +32,10 @@ mock.module("@/lib/data/channel-connections-queries", () => ({
 }));
 
 mock.module("react-i18next", () => ({
+  I18nextProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
+  initReactI18next: { type: "3rdParty", init: () => {} },
   useTranslation: () => ({
-    t: (key: string) => {
+    t: (key: string, params?: Record<string, unknown>) => {
       const translations: Record<string, string> = {
         "settings.remoteConnections.title": "Remote Connections",
         "settings.remoteConnections.empty": "No remote connections yet.",
@@ -52,6 +55,16 @@ mock.module("react-i18next", () => ({
         "settings.remoteConnections.status.scanned": "Scanned",
         "settings.remoteConnections.status.confirmed": "Confirmed",
         "settings.remoteConnections.status.error": "Login error",
+        "task.askUser.pageOf": `${String(params?.page ?? "")} of ${String(params?.total ?? "")}`,
+        "task.askUser.somethingElse": "Something else",
+        "task.askUser.somethingElsePlaceholder": "type",
+        "task.askUser.selectedCount": `${String(params?.count ?? "")} selected`,
+        "task.askUser.skip": "Skip",
+        "task.askUser.send": "Send",
+        "task.askUser.next": "Next",
+        "task.askUser.close": "Close",
+        "task.askUser.prevPage": "Prev",
+        "task.askUser.nextPage": "Next page",
       };
       return translations[key] ?? key;
     },

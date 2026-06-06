@@ -21,6 +21,27 @@ const setProfile = mock(async (patch: Record<string, unknown>) => ({
   ...patch,
 }));
 const open = mock(async (_url: string) => {});
+const getProvider = mock(async () => ({
+  version: 3,
+  current: {},
+  activePresetId: "",
+  presets: [],
+  defaultSelection: null,
+  connections: [],
+  enabledModels: [],
+  builtIn: [],
+}));
+const providerMutation = mock(async () => ({
+  version: 3,
+  current: {},
+  activePresetId: "",
+  presets: [],
+  defaultSelection: null,
+  connections: [],
+  enabledModels: [],
+  builtIn: [],
+  connection: {},
+}));
 
 const authState = {
   status: "signed-in",
@@ -50,13 +71,31 @@ const authState = {
 };
 
 mock.module("@/lib/data/settings", () => ({
+  getProvider,
   getProfile,
   setProfile,
+  getProviderConnection: mock(async () => ({})),
+  createProviderConnection: providerMutation,
+  updateProviderConnection: providerMutation,
+  deleteProviderConnection: mock(async () => ({
+    version: 3,
+    current: {},
+    activePresetId: "",
+    presets: [],
+    defaultSelection: null,
+    connections: [],
+    enabledModels: [],
+    builtIn: [],
+  })),
+  refreshProviderConnectionModels: providerMutation,
+  setProviderConnectionEnabledModels: providerMutation,
 }));
 
 mock.module("@tauri-apps/plugin-shell", () => ({ open }));
 
 mock.module("react-i18next", () => ({
+  I18nextProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
+  initReactI18next: { type: "3rdParty", init: () => {} },
   useTranslation: () => ({
     t: (key: string) => {
       const translations: Record<string, string> = {
@@ -128,6 +167,8 @@ function renderProfileForm() {
 
 beforeEach(() => {
   import.meta.env.VITE_AGENT_STUDIO_WEBSITE_ORIGIN = "http://www.agentstudio.chat:3000";
+  getProvider.mockClear();
+  providerMutation.mockClear();
   getProfile.mockClear();
   setProfile.mockClear();
   open.mockClear();
