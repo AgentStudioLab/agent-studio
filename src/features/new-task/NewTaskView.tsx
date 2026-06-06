@@ -5,7 +5,6 @@ import { useNavigate } from "react-router-dom";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { AppShell } from "@/app/AppShell";
 import { useAppShell } from "@/app/AppShellContext";
-import { BrandStar } from "@/shared/atoms/BrandStar";
 import {
   PromptInput,
   PromptInputButton,
@@ -127,22 +126,27 @@ export function NewTaskView() {
       main={
         <div
           data-tauri-drag-region
-          className="bg-dot-grid flex h-full flex-col items-center overflow-y-auto px-12 pt-[18%]"
+          className="bg-dot-grid flex h-full flex-col items-center overflow-y-auto px-8 pt-[18vh]"
         >
-          <div className="flex w-full max-w-[760px] flex-col items-start">
-            <div className="mb-3 flex items-center gap-4">
-              <BrandStar size={50} />
-              <h1 className="font-serif text-[36px] font-normal leading-[1.15] tracking-tight text-foreground">
+          <div className="flex w-full max-w-[900px] flex-col items-center">
+            <div className="mb-8 flex flex-col items-center text-center">
+              <img
+                src="/logo/agent-studio-lockup.svg"
+                alt="Agent Studio"
+                className="mb-8 h-16 w-auto max-w-[238px] shrink-0 object-contain"
+                draggable={false}
+              />
+              <h1 className="max-w-[780px] font-serif text-[44px] font-normal leading-[1.12] tracking-tight text-foreground">
                 {t("newTask.welcome.heading")}
               </h1>
+              <a
+                href="#"
+                className="mt-5 inline-flex items-center gap-1 text-sm text-muted-foreground underline-offset-4 hover:underline"
+              >
+                {t("newTask.welcome.learnMore")}
+                <ExternalLink className="size-3" />
+              </a>
             </div>
-            <a
-              href="#"
-              className="mb-10 ml-12 inline-flex items-center gap-1 text-sm text-muted-foreground underline-offset-4 hover:underline"
-            >
-              {t("newTask.welcome.learnMore")}
-              <ExternalLink className="size-3" />
-            </a>
             <div className="w-full">
               {/* Solid backplate occludes the dot-grid behind the prompt
                   card. The InputGroup (rendered by PromptInput) uses a
