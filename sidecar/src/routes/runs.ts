@@ -10,6 +10,7 @@ import type { AgentLinkService } from "../services/agentLinks";
 import type { AgentMemoryStore } from "../services/agentMemoryStore";
 import type { InterruptBus } from "../agui/provider-claude/interrupt-bus";
 import type { UsageService } from "../services/usage";
+import type { ProviderModelSelection } from "../services/providerSettings";
 
 export interface MountRunsDeps {
   threads: ThreadService;
@@ -18,6 +19,7 @@ export interface MountRunsDeps {
   agentLinks: AgentLinkService;
   agentMemoryStore: AgentMemoryStore;
   provider: AgentProvider;
+  resolveProvider?: (selection?: ProviderModelSelection | null) => AgentProvider;
   store: RunEventStore;
   interruptBus: InterruptBus;
   usage: UsageService;
@@ -31,6 +33,16 @@ export interface MountRunsDeps {
     prompt: string;
     model?: string;
   }) => void;
+}
+
+function parseProviderSelection(value: unknown): ProviderModelSelection | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const raw = value as Record<string, unknown>;
+  if (typeof raw.providerId !== "string" || typeof raw.modelId !== "string") {
+    return undefined;
+  }
+  if (raw.providerId.length === 0 || raw.modelId.length === 0) return undefined;
+  return { providerId: raw.providerId, modelId: raw.modelId };
 }
 
 /**
@@ -59,6 +71,7 @@ export function buildRunRoutes(deps: MountRunsDeps): Hono {
           message?: { role?: string; content?: string };
           permissionMode?: "ask" | "act-without-asking";
           model?: string;
+          providerSelection?: unknown;
           locale?: string;
         }
       | null;
@@ -82,6 +95,7 @@ export function buildRunRoutes(deps: MountRunsDeps): Hono {
       typeof body.model === "string" && body.model.length > 0
         ? body.model
         : undefined;
+    const providerSelection = parseProviderSelection(body.providerSelection);
 
     // Refuse to start a second run on a thread that already has one in flight
     // (a scheduled run, or a send from another window). Two runs resuming the
@@ -128,6 +142,8 @@ export function buildRunRoutes(deps: MountRunsDeps): Hono {
       agentLinks: deps.agentLinks,
       agentMemoryStore: deps.agentMemoryStore,
       provider: deps.provider,
+      providerSelection,
+      resolveProvider: deps.resolveProvider,
       interruptBus: deps.interruptBus,
       abortSignal: abort.signal,
       usage: deps.usage,
@@ -153,6 +169,7 @@ export function buildRunRoutes(deps: MountRunsDeps): Hono {
           runId?: string;
           permissionMode?: "ask" | "act-without-asking";
           model?: string;
+          providerSelection?: unknown;
           locale?: string;
         }
       | null;
@@ -185,6 +202,7 @@ export function buildRunRoutes(deps: MountRunsDeps): Hono {
       typeof body.model === "string" && body.model.length > 0
         ? body.model
         : undefined;
+    const providerSelection = parseProviderSelection(body.providerSelection);
     const locale = typeof body.locale === "string" ? body.locale : undefined;
 
     const cwd = thread.workingDir;
@@ -248,6 +266,8 @@ export function buildRunRoutes(deps: MountRunsDeps): Hono {
           agentLinks: deps.agentLinks,
           agentMemoryStore: deps.agentMemoryStore,
           provider: deps.provider,
+          providerSelection,
+          resolveProvider: deps.resolveProvider,
           interruptBus: deps.interruptBus,
           abortSignal: abort.signal,
           usage: deps.usage,

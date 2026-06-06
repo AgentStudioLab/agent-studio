@@ -9,17 +9,234 @@ function makeDb() {
   return db;
 }
 
+function readProviderRow(db: Database) {
+  const row = db
+    .prepare("SELECT value FROM settings WHERE key = ?")
+    .get("provider") as { value: string } | undefined;
+  if (!row) throw new Error("missing provider row");
+  return JSON.parse(row.value) as { activePresetId?: string };
+}
+
 describe("providerSettings", () => {
   it("defaults to anthropic with empty model cache", () => {
     const settings = createProviderSettings(makeDb(), {});
     expect(settings.current()).toMatchObject({
       profileId: "anthropic",
+      presetName: "Anthropic",
       selectedModelId: null,
       remoteModelsFetchedAt: "",
     });
+    expect(typeof settings.current().presetId).toBe("string");
     expect("customModelSource" in settings.current()).toBe(false);
     expect("customModels" in settings.current()).toBe(false);
     expect(settings.current().models.length).toBeGreaterThan(0);
+  });
+
+  it("migrates a legacy single provider row into an active preset", () => {
+    const db = makeDb();
+    db.prepare("INSERT INTO settings(key, value) VALUES(?, ?)").run(
+      "provider",
+      JSON.stringify({
+        profileId: "openai",
+        baseUrl: "https://api.openai.com/v1",
+        apiKey: "openai-key",
+        remoteModels: [
+          { id: "gpt-5.1", displayName: "GPT-5.1", description: "Remote model" },
+        ],
+        remoteModelsProviderId: "openai",
+        remoteModelsBaseUrl: "https://api.openai.com/v1",
+        remoteModelsFetchedAt: "2026-06-06T00:00:00.000Z",
+        selectedModelId: "gpt-5.1",
+      }),
+    );
+
+    const settings = createProviderSettings(db, {});
+    const current = settings.current();
+
+    expect(current).toMatchObject({
+      profileId: "openai",
+      presetName: "OpenAI",
+      apiKey: "openai-key",
+      selectedModelId: "gpt-5.1",
+      remoteModelsFetchedAt: "2026-06-06T00:00:00.000Z",
+    });
+    expect(typeof current.presetId).toBe("string");
+    expect(settings.listPresets()).toHaveLength(1);
+    expect(settings.listPresets()[0]).toMatchObject({
+      id: current.presetId,
+      name: "OpenAI",
+      selectedModelId: "gpt-5.1",
+    });
+  });
+
+  it("persists migrated legacy preset ids before the next update", () => {
+    const db = makeDb();
+    db.prepare("INSERT INTO settings(key, value) VALUES(?, ?)").run(
+      "provider",
+      JSON.stringify({
+        profileId: "openai",
+        baseUrl: "https://api.openai.com/v1",
+        apiKey: "openai-key",
+        remoteModels: [],
+        remoteModelsProviderId: "",
+        remoteModelsBaseUrl: "",
+        remoteModelsFetchedAt: "",
+        selectedModelId: null,
+      }),
+    );
+
+    const firstSettings = createProviderSettings(db, {});
+    const firstPresetId = firstSettings.current().presetId;
+
+    const secondSettings = createProviderSettings(db, {});
+
+    expect(secondSettings.current().presetId).toBe(firstPresetId);
+    expect(secondSettings.listPresets()[0]?.id).toBe(firstPresetId);
+  });
+
+  it("creates a default Anthropic preset when the provider row is missing", () => {
+    const settings = createProviderSettings(makeDb(), {
+      apiKey: "env-key",
+      baseUrl: "https://env.example",
+    });
+
+    expect(settings.current()).toMatchObject({
+      profileId: "anthropic",
+      presetName: "Anthropic",
+      apiKey: "env-key",
+      baseUrl: "https://env.example",
+    });
+    expect(settings.listPresets()).toHaveLength(1);
+  });
+
+  it("migrates v2 presets into v3 provider connections with enabled models", () => {
+    const db = makeDb();
+    db.prepare("INSERT INTO settings(key, value) VALUES(?, ?)").run(
+      "provider",
+      JSON.stringify({
+        version: 2,
+        activePresetId: "preset-openai",
+        presets: [
+          {
+            id: "preset-openai",
+            name: "OpenAI",
+            profileId: "openai",
+            baseUrl: "https://api.openai.com/v1",
+            apiKey: "openai-key",
+            remoteModels: [
+              {
+                id: "gpt-5.1",
+                displayName: "GPT-5.1",
+                description: "Remote",
+              },
+              {
+                id: "gpt-5.1-mini",
+                displayName: "GPT-5.1 Mini",
+                description: "Remote",
+              },
+            ],
+            remoteModelsProviderId: "openai",
+            remoteModelsBaseUrl: "https://api.openai.com/v1",
+            remoteModelsFetchedAt: "2026-06-06T00:00:00.000Z",
+            selectedModelId: "gpt-5.1",
+            createdAt: "2026-06-06T00:00:00.000Z",
+            updatedAt: "2026-06-06T00:00:00.000Z",
+          },
+        ],
+      }),
+    );
+
+    const settings = createProviderSettings(db, {});
+
+    expect(settings.currentStoreVersion()).toBe(3);
+    expect(settings.getDefaultSelection()).toEqual({
+      providerId: "preset-openai",
+      modelId: "gpt-5.1",
+    });
+    expect(settings.listConnections()[0]).toMatchObject({
+      id: "preset-openai",
+      name: "OpenAI",
+      profileId: "openai",
+      enabled: true,
+      modelCount: 2,
+      enabledModelCount: 1,
+      defaultModelId: "gpt-5.1",
+    });
+    expect(settings.listEnabledModelSelections()).toEqual([
+      expect.objectContaining({
+        providerId: "preset-openai",
+        modelId: "gpt-5.1",
+        providerName: "OpenAI",
+        modelLabel: "GPT-5.1",
+      }),
+    ]);
+  });
+
+  it("creates a default Anthropic connection with env fallback", () => {
+    const settings = createProviderSettings(makeDb(), {
+      apiKey: "env-key",
+      baseUrl: "https://env.example",
+    });
+
+    const [connection] = settings.listConnections();
+    expect(connection).toMatchObject({
+      name: "Anthropic",
+      profileId: "anthropic",
+      enabled: true,
+      hasApiKey: true,
+    });
+    expect(settings.resolveSelection()).toMatchObject({
+      providerId: connection?.id,
+      modelId: connection?.defaultModelId,
+      apiKey: "env-key",
+      baseUrl: "https://env.example",
+    });
+  });
+
+  it("heals stale v2 active preset ids during initialization and mutation", () => {
+    const db = makeDb();
+    const preset = {
+      id: "preset-1",
+      name: "Preset One",
+      createdAt: "2026-06-06T00:00:00.000Z",
+      updatedAt: "2026-06-06T00:00:00.000Z",
+      profileId: "anthropic",
+      baseUrl: "",
+      apiKey: "preset-key",
+      remoteModels: [],
+      remoteModelsProviderId: "",
+      remoteModelsBaseUrl: "",
+      remoteModelsFetchedAt: "",
+      selectedModelId: null,
+    };
+    db.prepare("INSERT INTO settings(key, value) VALUES(?, ?)").run(
+      "provider",
+      JSON.stringify({
+        version: 2,
+        activePresetId: "missing",
+        presets: [preset],
+      }),
+    );
+
+    const settings = createProviderSettings(db, {});
+
+    expect(settings.current().presetId).toBe("preset-1");
+    expect(settings.listPresets()[0]?.id).toBe("preset-1");
+    expect(readProviderRow(db).activePresetId).toBe("preset-1");
+
+    const reloaded = createProviderSettings(db, {});
+    expect(reloaded.current().presetId).toBe("preset-1");
+    expect(readProviderRow(db).activePresetId).toBe("preset-1");
+
+    let notifications = 0;
+    reloaded.onChange(() => {
+      notifications += 1;
+    });
+    reloaded.updatePreset("preset-1", { apiKey: "updated-key" });
+
+    expect(reloaded.current().apiKey).toBe("updated-key");
+    expect(readProviderRow(db).activePresetId).toBe("preset-1");
+    expect(notifications).toBe(1);
   });
 
   it("reads legacy provider rows without losing existing fields", () => {
@@ -220,6 +437,312 @@ describe("providerSettings", () => {
 
     settings.update({ apiKey: "key-b" });
     expect(settings.current().selectedModelId).toBe("gpt-5.1");
+  });
+
+  it("uses stale selected model ids as preset summary labels after cache invalidation", () => {
+    const settings = createProviderSettings(makeDb(), {});
+
+    settings.update({
+      profileId: "openai",
+      baseUrl: "https://api.openai.com/v1",
+      apiKey: "key-a",
+      selectedModelId: "missing-selected-model",
+      remoteModels: [
+        {
+          id: "available-before-cache-clear",
+          displayName: "Available Before Cache Clear",
+          description: "Remote model",
+        },
+      ],
+      remoteModelsProviderId: "openai",
+      remoteModelsBaseUrl: "https://api.openai.com/v1",
+      remoteModelsFetchedAt: "2026-05-29T00:00:00.000Z",
+    });
+
+    settings.update({ apiKey: "key-b" });
+
+    const [summary] = settings.listPresets();
+    expect(settings.current().selectedModelId).toBe("missing-selected-model");
+    expect(settings.current().remoteModelsFetchedAt).toBe("");
+    expect(summary?.selectedModelId).toBe("missing-selected-model");
+    expect(summary?.selectedModelLabel).toBe("missing-selected-model");
+  });
+
+  it("creates a preset by copying active settings without activating it", () => {
+    const db = makeDb();
+    const settings = createProviderSettings(db, {});
+    settings.update({
+      profileId: "openai",
+      baseUrl: "https://api.openai.com/v1",
+      apiKey: "openai-key",
+      selectedModelId: "gpt-5.1",
+      remoteModels: [
+        { id: "gpt-5.1", displayName: "GPT-5.1", description: "Remote model" },
+      ],
+      remoteModelsProviderId: "openai",
+      remoteModelsBaseUrl: "https://api.openai.com/v1",
+      remoteModelsFetchedAt: "2026-06-06T00:00:00.000Z",
+    });
+    const active = settings.current();
+    let notifications = 0;
+    settings.onChange(() => {
+      notifications += 1;
+    });
+
+    const created = settings.createPreset({ name: "OpenAI Backup" });
+
+    expect(created).toMatchObject({
+      presetName: "OpenAI Backup",
+      profileId: "openai",
+      apiKey: "openai-key",
+      selectedModelId: "gpt-5.1",
+      remoteModelsFetchedAt: "2026-06-06T00:00:00.000Z",
+    });
+    expect(created.presetId).not.toBe(active.presetId);
+    expect(settings.current().presetId).toBe(active.presetId);
+    expect(settings.listPresets()).toHaveLength(2);
+    expect(notifications).toBe(0);
+
+    const reloaded = createProviderSettings(db, {});
+    expect(reloaded.getPreset(created.presetId)?.presetName).toBe(
+      "OpenAI Backup",
+    );
+  });
+
+  it("creates a preset by copying a valid non-active source preset", () => {
+    const settings = createProviderSettings(makeDb(), {});
+    const originalActiveId = settings.current().presetId;
+    const source = settings.createPreset({ name: "Source Preset" });
+    settings.updatePreset(source.presetId, {
+      profileId: "openai",
+      apiKey: "source-key",
+      selectedModelId: "source-model",
+    });
+
+    const created = settings.createPreset({
+      copyFromPresetId: source.presetId,
+      name: "Copied From Source",
+    });
+
+    expect(created).toMatchObject({
+      presetName: "Copied From Source",
+      profileId: "openai",
+      apiKey: "source-key",
+      selectedModelId: "source-model",
+    });
+    expect(created.presetId).not.toBe(source.presetId);
+    expect(settings.current().presetId).toBe(originalActiveId);
+  });
+
+  it("falls back to the active preset when createPreset copy source is invalid", () => {
+    const settings = createProviderSettings(makeDb(), {});
+    settings.update({
+      profileId: "deepseek",
+      apiKey: "active-key",
+      selectedModelId: "deepseek-chat",
+    });
+    const activeId = settings.current().presetId;
+    const inactive = settings.createPreset({ name: "Inactive Preset" });
+    settings.updatePreset(inactive.presetId, {
+      profileId: "openai",
+      apiKey: "inactive-key",
+    });
+
+    const created = settings.createPreset({
+      copyFromPresetId: "missing",
+      name: "Copied From Active",
+    });
+
+    expect(created).toMatchObject({
+      presetName: "Copied From Active",
+      profileId: "deepseek",
+      apiKey: "active-key",
+      selectedModelId: "deepseek-chat",
+    });
+    expect(settings.current().presetId).toBe(activeId);
+  });
+
+  it("creates and activates a preset while notifying listeners once", () => {
+    const settings = createProviderSettings(makeDb(), {});
+    const originalActiveId = settings.current().presetId;
+    let notifications = 0;
+    settings.onChange(() => {
+      notifications += 1;
+    });
+
+    const created = settings.createPreset({
+      name: "Activated Copy",
+      activate: true,
+    });
+
+    expect(created.presetId).not.toBe(originalActiveId);
+    expect(settings.current().presetId).toBe(created.presetId);
+    expect(notifications).toBe(1);
+  });
+
+  it("activates a preset and notifies listeners once", () => {
+    const settings = createProviderSettings(makeDb(), {});
+    const created = settings.createPreset({ name: "Second Preset" });
+    let notifications = 0;
+    settings.onChange(() => {
+      notifications += 1;
+    });
+
+    const activated = settings.activatePreset(created.presetId);
+    const activatedAgain = settings.activatePreset(created.presetId);
+
+    expect(activated?.presetId).toBe(created.presetId);
+    expect(activatedAgain?.presetId).toBe(created.presetId);
+    expect(settings.current().presetId).toBe(created.presetId);
+    expect(notifications).toBe(1);
+  });
+
+  it("updates a non-active preset without notifying or changing current", () => {
+    const settings = createProviderSettings(makeDb(), {});
+    const activeId = settings.current().presetId;
+    const created = settings.createPreset({ name: "Inactive" });
+    let notifications = 0;
+    settings.onChange(() => {
+      notifications += 1;
+    });
+
+    const updated = settings.updatePreset(created.presetId, {
+      name: "  Inactive OpenAI  ",
+      profileId: "openai",
+      apiKey: "openai-key",
+      selectedModelId: "gpt-5.1",
+    });
+
+    expect(updated).toMatchObject({
+      presetId: created.presetId,
+      presetName: "Inactive OpenAI",
+      profileId: "openai",
+      apiKey: "openai-key",
+      selectedModelId: "gpt-5.1",
+    });
+    expect(settings.current().presetId).toBe(activeId);
+    expect(settings.current().profileId).toBe("anthropic");
+    expect(notifications).toBe(0);
+  });
+
+  it("persists non-active updatePreset changes after reloading settings", () => {
+    const db = makeDb();
+    const settings = createProviderSettings(db, {});
+    const activeId = settings.current().presetId;
+    const inactive = settings.createPreset({ name: "Inactive" });
+
+    settings.updatePreset(inactive.presetId, {
+      name: "Inactive DeepSeek",
+      profileId: "deepseek",
+      apiKey: "inactive-key",
+      selectedModelId: "deepseek-chat",
+    });
+
+    const reloaded = createProviderSettings(db, {});
+
+    expect(reloaded.current().presetId).toBe(activeId);
+    expect(reloaded.getPreset(inactive.presetId)).toMatchObject({
+      presetId: inactive.presetId,
+      presetName: "Inactive DeepSeek",
+      profileId: "deepseek",
+      apiKey: "inactive-key",
+      selectedModelId: "deepseek-chat",
+    });
+  });
+
+  it("updates an active preset, notifies, and persists name and provider fields", () => {
+    const db = makeDb();
+    const settings = createProviderSettings(db, {});
+    const activeId = settings.current().presetId;
+    let notifications = 0;
+    settings.onChange(() => {
+      notifications += 1;
+    });
+
+    const updated = settings.updatePreset(activeId, {
+      name: "  DeepSeek Main  ",
+      profileId: "deepseek",
+      apiKey: "deepseek-key",
+      baseUrl: "",
+    });
+    const invalidRename = settings.updatePreset(activeId, { name: "   " });
+
+    expect(updated).toMatchObject({
+      presetId: activeId,
+      presetName: "DeepSeek Main",
+      profileId: "deepseek",
+      apiKey: "deepseek-key",
+    });
+    expect(invalidRename?.presetName).toBe("DeepSeek Main");
+    expect(settings.current()).toMatchObject({
+      presetId: activeId,
+      presetName: "DeepSeek Main",
+      profileId: "deepseek",
+      apiKey: "deepseek-key",
+    });
+    expect(notifications).toBe(2);
+
+    const reloaded = createProviderSettings(db, {});
+    expect(reloaded.current()).toMatchObject({
+      presetId: activeId,
+      presetName: "DeepSeek Main",
+      profileId: "deepseek",
+      apiKey: "deepseek-key",
+    });
+  });
+
+  it("rejects deleting the final preset", () => {
+    const settings = createProviderSettings(makeDb(), {});
+
+    expect(settings.deletePreset(settings.current().presetId)).toEqual({
+      ok: false,
+      error: "cannot_delete_last_preset",
+    });
+    expect(settings.listPresets()).toHaveLength(1);
+  });
+
+  it("deletes an active preset by switching to a remaining preset and notifying", () => {
+    const settings = createProviderSettings(makeDb(), {});
+    const firstId = settings.current().presetId;
+    const second = settings.createPreset({ name: "Second Preset" });
+    settings.activatePreset(second.presetId);
+    let notifications = 0;
+    settings.onChange(() => {
+      notifications += 1;
+    });
+
+    expect(settings.deletePreset(second.presetId)).toEqual({ ok: true });
+
+    expect(settings.current().presetId).toBe(firstId);
+    expect(settings.listPresets().map((preset) => preset.id)).toEqual([firstId]);
+    expect(notifications).toBe(1);
+  });
+
+  it("deletes a non-active preset without notifying", () => {
+    const settings = createProviderSettings(makeDb(), {});
+    const activeId = settings.current().presetId;
+    const second = settings.createPreset({ name: "Second Preset" });
+    let notifications = 0;
+    settings.onChange(() => {
+      notifications += 1;
+    });
+
+    expect(settings.deletePreset(second.presetId)).toEqual({ ok: true });
+
+    expect(settings.current().presetId).toBe(activeId);
+    expect(settings.listPresets().map((preset) => preset.id)).toEqual([activeId]);
+    expect(notifications).toBe(0);
+  });
+
+  it("returns null or preset_not_found for missing preset mutations", () => {
+    const settings = createProviderSettings(makeDb(), {});
+
+    expect(settings.updatePreset("missing", { name: "Missing" })).toBeNull();
+    expect(settings.activatePreset("missing")).toBeNull();
+    expect(settings.deletePreset("missing")).toEqual({
+      ok: false,
+      error: "preset_not_found",
+    });
   });
 
   it("resolves SiliconFlow runtime through its OpenAI-compatible /v1 base URL", () => {

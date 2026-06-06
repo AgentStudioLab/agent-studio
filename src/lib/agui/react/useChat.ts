@@ -10,6 +10,7 @@ import {
   type ChatState,
   type MessageView,
   type PendingInterrupt,
+  type ProviderModelSelection,
 } from "../runtime";
 import { authedFetch } from "@/lib/sidecar-client";
 import i18n from "@/i18n";
@@ -103,6 +104,7 @@ export function useChat(opts: UseChatOptions) {
       text: string,
       sendOpts?: {
         permissionMode?: "ask" | "act-without-asking";
+        providerSelection?: ProviderModelSelection;
         model?: string;
       },
     ) => {
@@ -125,6 +127,7 @@ export function useChat(opts: UseChatOptions) {
       fromMessageId: string,
       regenOpts?: {
         permissionMode?: "ask" | "act-without-asking";
+        providerSelection?: ProviderModelSelection;
         model?: string;
       },
     ) => {

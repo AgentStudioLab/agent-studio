@@ -39,8 +39,8 @@ import { createConversation } from "@/lib/data/conversations";
 import { queryKeys } from "@/lib/data/queries";
 import { threadStatusKey } from "@/lib/agui/react/useChat";
 import { useQueryClient } from "@tanstack/react-query";
-import { useAvailableModels } from "@/lib/models";
-import { ModelPicker } from "@/features/task/ModelPicker";
+import { ProviderModelPicker } from "@/features/task/ProviderModelPicker";
+import type { ProviderModelSelection } from "@/lib/data/settings";
 
 /** Take just the last segment of a /-separated path for a compact button label. */
 function basename(p: string): string {
@@ -65,13 +65,9 @@ export function NewTaskView() {
   const [permissionMode, setPermissionMode] = useState<
     "ask" | "act-without-asking"
   >("ask");
+  const [providerSelection, setProviderSelection] =
+    useState<ProviderModelSelection | null>(null);
   const [confirmAct, setConfirmAct] = useState(false);
-  // Pre-thread model selection — same handoff pattern as permissionMode.
-  // Default null = "use the fetched list's first id"; TaskView resolves and
-  // persists into per-thread store once the thread is opened.
-  const [model, setModel] = useState<string | null>(null);
-  const { defaultModelId } = useAvailableModels();
-
   const handlePickFolder = async () => {
     setPopoverOpen(false);
     const picked = await openDialog({
@@ -110,7 +106,7 @@ export function NewTaskView() {
         conversationId: conv.id,
         text,
         permissionMode,
-        model: model ?? defaultModelId ?? undefined,
+        providerSelection,
       });
       navigate(`/task/${conv.id}`);
     } catch (e) {
@@ -244,7 +240,10 @@ export function NewTaskView() {
                     </DropdownMenu>
                   </PromptInputTools>
                   <PromptInputTools>
-                    <ModelPicker value={model} onChange={setModel} />
+                    <ProviderModelPicker
+                      value={providerSelection}
+                      onChange={setProviderSelection}
+                    />
                     <PromptInputSubmit />
                   </PromptInputTools>
                 </PromptInputFooter>

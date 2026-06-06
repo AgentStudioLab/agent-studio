@@ -179,12 +179,18 @@ app.use("*", async (c, next) => {
   await next();
 });
 
-// Build provider lazily — single instance per active runtime settings tuple.
-// Sessions live inside the provider, so we cache. When the user changes
-// provider config via /settings/provider, providerSettings.onChange fires
-// and we invalidate the cache so the next run picks up the new endpoint.
-function buildProvider() {
-  const current = providerSettings.current();
+// Build providers lazily — one instance per resolved provider/model settings tuple.
+// Sessions live inside the provider, so we cache. When provider settings change
+// we invalidate the cache so the next run picks up the new endpoint/selection.
+const providerInstances = new Map<string, AgentProvider>();
+function providerCacheKey(selection?: { providerId: string; modelId: string } | null) {
+  const resolved = providerSettings.resolveSelection(selection);
+  return `${resolved.providerId}:${resolved.modelId ?? ""}:${resolved.apiKey}:${resolved.baseUrl}`;
+}
+function buildProviderForSelection(
+  selection?: { providerId: string; modelId: string } | null,
+) {
+  const current = providerSettings.resolveSelection(selection);
   if (!current.apiKey) throw new Error("api_key_missing");
   const resolveAllowedTools = (threadId: string): string[] => {
     const override = threads.getAllowedTools(threadId);
@@ -193,7 +199,7 @@ function buildProvider() {
   return createAgentProviderForRuntime({
     runtime: current.agentRuntime,
     apiKey: current.apiKey,
-    defaultModel: current.selectedModelId ?? process.env.ANTHROPIC_MODEL,
+    defaultModel: current.modelId ?? process.env.ANTHROPIC_MODEL,
     common: {
       resolveAllowedTools,
       interruptBus,
@@ -238,17 +244,20 @@ function buildProvider() {
     },
   });
 }
-
-let providerInstance: AgentProvider | null = null;
-function getProvider() {
-  if (!providerInstance) providerInstance = buildProvider();
-  return providerInstance;
+function getProvider(selection?: { providerId: string; modelId: string } | null) {
+  const key = providerCacheKey(selection);
+  let provider = providerInstances.get(key);
+  if (!provider) {
+    provider = buildProviderForSelection(selection);
+    providerInstances.set(key, provider);
+  }
+  return provider;
 }
 // Drop the cache on any provider settings change. Next /runs builds a fresh
 // instance with the new baseUrl / apiKey. In-flight runs continue against
 // the old instance — that's intentional, we don't yank a running session.
 providerSettings.onChange(() => {
-  providerInstance = null;
+  providerInstances.clear();
 });
 // Lazy proxy so routes can wire it as a stable reference.
 const providerProxy: AgentProvider = {
@@ -349,6 +358,7 @@ app.route(
     agentLinks,
     agentMemoryStore,
     provider: providerProxy,
+    resolveProvider: (selection) => getProvider(selection),
     store,
     interruptBus,
     usage,

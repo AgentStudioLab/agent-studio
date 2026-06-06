@@ -9,6 +9,7 @@ import {
 } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import type { MockFile } from "@/lib/mock/types";
+import type { ProviderModelSelection } from "@/lib/data/settings";
 
 // Routes that render their own full-bleed layout — Sidebar should NOT show.
 // Kept as a Set for O(1) membership checks; pathname comparison handles
@@ -57,6 +58,7 @@ interface AppShellContextValue {
     conversationId: string;
     text: string;
     permissionMode?: "ask" | "act-without-asking";
+    providerSelection?: ProviderModelSelection | null;
     model?: string;
   } | null;
   setPendingFirstPrompt: (
@@ -64,6 +66,7 @@ interface AppShellContextValue {
       conversationId: string;
       text: string;
       permissionMode?: "ask" | "act-without-asking";
+      providerSelection?: ProviderModelSelection | null;
       model?: string;
     } | null,
   ) => void;
@@ -88,6 +91,7 @@ export function AppShellProvider({ children }: { children: ReactNode }) {
     conversationId: string;
     text: string;
     permissionMode?: "ask" | "act-without-asking";
+    providerSelection?: ProviderModelSelection | null;
     model?: string;
   } | null>(null);
 

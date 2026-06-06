@@ -21,6 +21,17 @@ import { createResumableRun } from "./sse";
 import { AGUIHttpClient, RunInProgressError, type AGUIApiOptions } from "./api";
 import { buildResumeRequest } from "./protocol";
 
+export interface ProviderModelSelection {
+  providerId: string;
+  modelId: string;
+}
+
+interface SendProviderOptions {
+  permissionMode?: "ask" | "act-without-asking";
+  providerSelection?: ProviderModelSelection;
+  model?: string;
+}
+
 // ============ 公开 API ============
 
 export interface ChatRuntimeOptions extends AGUIApiOptions {
@@ -41,10 +52,7 @@ export interface ChatRuntime {
   // —— 命令 ——
   send(
     text: string,
-    opts?: {
-      permissionMode?: "ask" | "act-without-asking";
-      model?: string;
-    },
+    opts?: SendProviderOptions,
   ): Promise<void>;
   /**
    * 重新生成：丢弃 fromMessageId（某条 user 消息）及其后所有轮次，回滚该轮
@@ -53,10 +61,7 @@ export interface ChatRuntime {
    */
   regenerate(
     fromMessageId: string,
-    opts?: {
-      permissionMode?: "ask" | "act-without-asking";
-      model?: string;
-    },
+    opts?: SendProviderOptions,
   ): Promise<void>;
   cancel(): Promise<void>;
   resume(payload: unknown): Promise<void>;
@@ -179,10 +184,7 @@ export function createChatRuntime(opts: ChatRuntimeOptions): ChatRuntime {
 
   async function send(
     text: string,
-    sendOpts?: {
-      permissionMode?: "ask" | "act-without-asking";
-      model?: string;
-    },
+    sendOpts?: SendProviderOptions,
   ): Promise<void> {
     if (state.isRunning) return;
     if (state.pendingInterrupts.some((it) => it.reason === "tool_approval")) return;
@@ -219,6 +221,9 @@ export function createChatRuntime(opts: ChatRuntimeOptions): ChatRuntime {
         ...(sendOpts?.permissionMode
           ? { permissionMode: sendOpts.permissionMode }
           : {}),
+        ...(sendOpts?.providerSelection
+          ? { providerSelection: sendOpts.providerSelection }
+          : {}),
         ...(sendOpts?.model ? { model: sendOpts.model } : {}),
       });
     } catch (err) {
@@ -249,10 +254,7 @@ export function createChatRuntime(opts: ChatRuntimeOptions): ChatRuntime {
 
   async function regenerate(
     fromMessageId: string,
-    regenOpts?: {
-      permissionMode?: "ask" | "act-without-asking";
-      model?: string;
-    },
+    regenOpts?: SendProviderOptions,
   ): Promise<void> {
     if (state.isRunning) return;
     if (state.pendingInterrupts.some((it) => it.reason === "tool_approval")) return;
@@ -285,6 +287,9 @@ export function createChatRuntime(opts: ChatRuntimeOptions): ChatRuntime {
         runId,
         ...(regenOpts?.permissionMode
           ? { permissionMode: regenOpts.permissionMode }
+          : {}),
+        ...(regenOpts?.providerSelection
+          ? { providerSelection: regenOpts.providerSelection }
           : {}),
         ...(regenOpts?.model ? { model: regenOpts.model } : {}),
       });

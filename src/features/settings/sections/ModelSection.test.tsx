@@ -15,42 +15,101 @@ import type { ReactNode } from "react";
 import i18n from "i18next";
 import { I18nextProvider, initReactI18next } from "react-i18next";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import type { ProviderState } from "@/lib/data/settings";
+import type {
+  ProviderConnectionConfig,
+  ProviderState,
+} from "@/lib/data/settings";
 
 notifyManager.setScheduler(queueMicrotask);
 
 const getProviderMock = mock(async () => providerState);
-const setProviderMock = mock(async (patch: unknown) => ({
-  ...providerState.current,
-  ...(patch as object),
+const getProviderConnectionMock = mock(async (id: string) => {
+  const connection = providerConnections[id];
+  if (!connection) throw new Error("provider_connection_not_found");
+  return connection;
+});
+const createProviderConnectionMock = mock(async () => ({
+  ...providerState,
+  connection: providerConnections["conn-openai"],
 }));
-const refreshModelsMock = mock(async () => modelsState);
+const updateProviderConnectionMock = mock(async (id: string) => ({
+  ...providerState,
+  connection: providerConnections[id],
+}));
+const deleteProviderConnectionMock = mock(async () => providerState);
+const refreshProviderConnectionModelsMock = mock(async (id: string) => ({
+  ...providerState,
+  connection: providerConnections[id],
+}));
+const setProviderConnectionEnabledModelsMock = mock(async (id: string) => ({
+  ...providerState,
+  connection: providerConnections[id],
+}));
 
 let providerState: ProviderState;
-let modelsState = {
-  data: [
-    {
-      id: "openrouter/auto",
-      displayName: "OpenRouter Auto",
-      description: "Auto-routed model",
-    },
-  ],
-  defaultModelId: "openrouter/auto",
-};
+let providerConnections: Record<string, ProviderConnectionConfig>;
 
 mock.module("@/lib/data/settings", () => ({
   getProvider: getProviderMock,
-  setProvider: setProviderMock,
+  getProviderConnection: getProviderConnectionMock,
+  createProviderConnection: createProviderConnectionMock,
+  updateProviderConnection: updateProviderConnectionMock,
+  deleteProviderConnection: deleteProviderConnectionMock,
+  refreshProviderConnectionModels: refreshProviderConnectionModelsMock,
+  setProviderConnectionEnabledModels: setProviderConnectionEnabledModelsMock,
 }));
 
-mock.module("@/lib/models", () => ({
-  refreshModels: refreshModelsMock,
-  useAvailableModels: () => ({
-    models: modelsState.data,
-    defaultModelId: modelsState.defaultModelId,
-    isLoading: false,
-    isError: false,
-  }),
+mock.module("@/components/ui/dialog", () => ({
+  Dialog: ({
+    open,
+    children,
+  }: {
+    open: boolean;
+    onOpenChange?: (open: boolean) => void;
+    children: ReactNode;
+  }) => (open ? <div>{children}</div> : null),
+  DialogContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  DialogDescription: ({ children }: { children: ReactNode }) => (
+    <p>{children}</p>
+  ),
+  DialogFooter: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  DialogHeader: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  DialogTitle: ({ children }: { children: ReactNode }) => <h3>{children}</h3>,
+}));
+
+mock.module("@/components/ui/checkbox", () => ({
+  Checkbox: ({
+    checked,
+    onCheckedChange,
+    "aria-label": ariaLabel,
+  }: {
+    checked?: boolean;
+    onCheckedChange?: (checked: boolean) => void;
+    "aria-label"?: string;
+  }) => (
+    <input
+      type="checkbox"
+      aria-label={ariaLabel}
+      checked={checked}
+      onChange={(event) => onCheckedChange?.(event.target.checked)}
+    />
+  ),
+}));
+
+mock.module("@/components/ui/switch", () => ({
+  Switch: ({
+    checked,
+    onCheckedChange,
+  }: {
+    checked?: boolean;
+    onCheckedChange?: (checked: boolean) => void;
+  }) => (
+    <input
+      type="checkbox"
+      checked={checked}
+      onChange={(event) => onCheckedChange?.(event.target.checked)}
+    />
+  ),
 }));
 
 mock.module("@/components/ui/select", () => ({
@@ -58,12 +117,14 @@ mock.module("@/components/ui/select", () => ({
     value,
     onValueChange,
     children,
+    disabled,
   }: {
     value?: string;
     onValueChange?: (value: string) => void;
     children: ReactNode;
+    disabled?: boolean;
   }) => (
-    <div data-select-value={value}>
+    <div data-select-value={value} data-disabled={String(disabled)}>
       <div>{children}</div>
       <div data-testid="select-actions">
         {onValueChange &&
@@ -147,43 +208,45 @@ void testI18n.use(initReactI18next).init({
     en: {
       translation: {
         settings: {
-          apiKey: {
-            placeholder: "sk-ant-...",
-          },
+          apiKey: { placeholder: "sk-ant-..." },
           provider: {
             title: "Model Provider",
-            description: "Pick an endpoint",
+            description: "Manage provider connections",
+            connectionsTitle: "Provider connections",
+            addModel: "Add model",
+            edit: "Edit",
+            delete: "Delete",
+            cancel: "Cancel",
+            defaultModelBadge: "Default",
+            enabledModels: "Enabled models",
+            disabled: "Disabled",
+            missingApiKey: "Missing key",
+            connectionAddTitle: "Add model provider",
+            connectionEditTitle: "Edit model provider",
+            connectionDialogDescription: "Configure endpoint",
+            connectionNameLabel: "Connection name",
             profileLabel: "Provider",
-            profile: {
-              custom: "Custom (OpenAI-compatible)",
-            },
+            profile: { custom: "Custom (OpenAI-compatible)" },
             baseUrlLabel: "Base URL",
             baseUrlPlaceholder: "https://api.example.com",
-            baseUrlHint: "Leave empty to use the selected provider's default.",
             apiKeyLabel: "API Key",
             showApiKey: "Show API key",
             hideApiKey: "Hide API key",
-            save: "Save",
-            saved: "Saved",
-            saveError: "Save failed",
-            modelLabel: "Model",
-            modelPlaceholder: "Select a model",
+            connectionEnabled: "Enabled for conversations",
             refreshModels: "Refresh models",
             refreshingModels: "Refreshing...",
             refreshSuccess: "Model list refreshed",
-            refreshUnsupported:
-              "This provider does not support remote model refresh",
-            refreshMissingKey: "Enter an API key first",
             refreshError: "Model refresh failed",
-            lastRefreshed: "Last refreshed: {{time}}",
-            compatibilityNote: "Compatibility note",
-            runtimeLabel: "Agent runtime",
-            runtimeAnthropic: "Anthropic-compatible",
-            runtimeOpenAI: "OpenAI-compatible",
-            runtimeTextOnly:
-              "Text streaming is available; tool calls and file rewind are not connected yet.",
-            runtimeUnsupported: "Agent runtime not implemented",
-            runtimeBaseUrl: "Runtime Base URL: {{baseUrl}}",
+            refreshMissingKey: "Enter an API key first",
+            refreshUnsupported: "Unsupported",
+            save: "Save",
+            saved: "Saved",
+            saveError: "Save failed",
+            connectionDeleteLastError: "Keep at least one connection",
+            modelsLabel: "Models",
+            modelSearch: "Search models",
+            modelEmpty: "No models found",
+            defaultModelLabel: "Default model",
           },
         },
       },
@@ -193,6 +256,12 @@ void testI18n.use(initReactI18next).init({
 
 function renderModelSection(provider: ProviderState) {
   providerState = provider;
+  providerConnections = Object.fromEntries(
+    (provider.connections ?? []).map((summary) => [
+      summary.id,
+      connectionFixture(summary.id),
+    ]),
+  );
   const qc = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
@@ -212,57 +281,125 @@ function renderModelSection(provider: ProviderState) {
   return { ...view, invalidateQueries };
 }
 
-function providerFixture(
-  overrides: Partial<ProviderState["current"]> = {},
-): ProviderState {
+function providerFixture(): ProviderState {
   return {
+    version: 3,
+    defaultSelection: { providerId: "conn-openai", modelId: "gpt-5.1" },
     current: {
-      profileId: "openrouter",
-      label: "OpenRouter Catalog",
-      baseUrl: "https://openrouter.ai/api/v1",
-      apiKey: "sk-test",
-      models: modelsState.data,
-      remoteModelsFetchedAt: "2026-05-29T08:00:00.000Z",
-      selectedModelId: "openrouter/auto",
+      presetId: "conn-openai",
+      presetName: "OpenAI",
+      profileId: "openai",
+      label: "OpenAI",
+      baseUrl: "https://api.openai.com/v1",
+      apiKey: "openai-key",
+      models: [],
+      remoteModelsFetchedAt: "",
+      selectedModelId: "gpt-5.1",
       supportsRemoteModels: true,
       agentRuntime: {
         protocol: "openai-compatible",
-        baseUrl: "https://openrouter.ai/api/v1",
+        baseUrl: "https://api.openai.com/v1",
         auth: "bearer",
         capabilities: { text: true, tools: false, fileCheckpoint: false },
       },
-      ...overrides,
     },
-    builtIn: [
+    activePresetId: "conn-openai",
+    presets: [],
+    connections: [
       {
-        id: "openrouter",
-        label: "OpenRouter Catalog",
-        baseUrl: "https://openrouter.ai/api/v1",
+        id: "conn-openai",
+        name: "OpenAI",
+        profileId: "openai",
+        providerLabel: "OpenAI",
+        baseUrl: "https://api.openai.com/v1",
+        enabled: true,
+        hasApiKey: true,
+        modelCount: 2,
+        enabledModelCount: 1,
+        defaultModelId: "gpt-5.1",
+        remoteModelsFetchedAt: "",
         supportsRemoteModels: true,
         agentRuntime: {
           protocol: "openai-compatible",
-          baseUrl: "https://openrouter.ai/api/v1",
+          baseUrl: "https://api.openai.com/v1",
           auth: "bearer",
           capabilities: { text: true, tools: false, fileCheckpoint: false },
         },
-        models: modelsState.data,
       },
       {
-        id: "gemini",
-        label: "Gemini Live",
-        baseUrl: "https://generativelanguage.googleapis.com/v1beta",
+        id: "conn-sf",
+        name: "SiliconFlow",
+        profileId: "siliconflow-cn",
+        providerLabel: "SiliconFlow China",
+        baseUrl: "https://api.siliconflow.cn/v1",
+        enabled: true,
+        hasApiKey: true,
+        modelCount: 1,
+        enabledModelCount: 0,
+        defaultModelId: null,
+        remoteModelsFetchedAt: "",
         supportsRemoteModels: true,
         agentRuntime: {
-          protocol: "unsupported",
-          reason: "Agent runtime is not implemented for this provider.",
-          capabilities: { text: false, tools: false, fileCheckpoint: false },
+          protocol: "openai-compatible",
+          baseUrl: "https://api.siliconflow.cn/v1",
+          auth: "bearer",
+          capabilities: { text: true, tools: false, fileCheckpoint: false },
         },
-        compatibilityNote: "Requires OpenAI-compatible mode.",
+      },
+    ],
+    enabledModels: [
+      {
+        providerId: "conn-openai",
+        providerName: "OpenAI",
+        providerLabel: "OpenAI",
+        modelId: "gpt-5.1",
+        modelLabel: "GPT-5.1",
+        modelDescription: "Flagship",
+        agentRuntime: {
+          protocol: "openai-compatible",
+          baseUrl: "https://api.openai.com/v1",
+          auth: "bearer",
+          capabilities: { text: true, tools: false, fileCheckpoint: false },
+        },
+      },
+    ],
+    builtIn: [
+      {
+        id: "openai",
+        label: "OpenAI",
+        baseUrl: "https://api.openai.com/v1",
+        supportsRemoteModels: true,
+        agentRuntime: {
+          protocol: "openai-compatible",
+          baseUrl: "https://api.openai.com/v1",
+          auth: "bearer",
+          capabilities: { text: true, tools: false, fileCheckpoint: false },
+        },
+        models: [
+          { id: "gpt-5.1", displayName: "GPT-5.1", description: "Flagship" },
+          {
+            id: "gpt-5.1-mini",
+            displayName: "GPT-5.1 Mini",
+            description: "Fast",
+          },
+        ],
+      },
+      {
+        id: "siliconflow-cn",
+        label: "SiliconFlow China",
+        baseUrl: "https://api.siliconflow.cn/v1",
+        supportsRemoteModels: true,
+        agentRuntime: {
+          protocol: "openai-compatible",
+          baseUrl: "https://api.siliconflow.cn/v1",
+          auth: "bearer",
+          capabilities: { text: true, tools: false, fileCheckpoint: false },
+        },
         models: [
           {
-            id: "gemini-2.5-flash",
-            displayName: "Gemini Flash",
-            description: "Gemini model",
+            id: "deepseek-ai/DeepSeek-V3.2",
+            displayName: "DeepSeek V3.2",
+            description: "Remote",
           },
         ],
       },
@@ -270,232 +407,153 @@ function providerFixture(
   };
 }
 
+function connectionFixture(id: string): ProviderConnectionConfig {
+  const provider = providerFixture();
+  const summary = provider.connections?.find((entry) => entry.id === id);
+  if (!summary) throw new Error("missing fixture");
+  const builtIn = provider.builtIn.find((entry) => entry.id === summary.profileId);
+  return {
+    presetId: summary.id,
+    presetName: summary.name,
+    providerId: summary.id,
+    providerName: summary.name,
+    profileId: summary.profileId,
+    label: summary.providerLabel,
+    baseUrl: summary.baseUrl,
+    apiKey: `${summary.id}-key`,
+    enabled: summary.enabled,
+    models: builtIn?.models ?? [],
+    remoteModelsFetchedAt: summary.remoteModelsFetchedAt,
+    selectedModelId: summary.defaultModelId,
+    enabledModelIds:
+      id === "conn-openai" ? ["gpt-5.1"] : [],
+    defaultModelId: summary.defaultModelId,
+    supportsRemoteModels: summary.supportsRemoteModels,
+    agentRuntime: summary.agentRuntime,
+  };
+}
+
 afterEach(() => {
   cleanup();
   getProviderMock.mockClear();
-  setProviderMock.mockClear();
-  refreshModelsMock.mockClear();
+  getProviderConnectionMock.mockClear();
+  createProviderConnectionMock.mockClear();
+  updateProviderConnectionMock.mockClear();
+  deleteProviderConnectionMock.mockClear();
+  refreshProviderConnectionModelsMock.mockClear();
+  setProviderConnectionEnabledModelsMock.mockClear();
 });
 
 import { ModelSection } from "./ModelSection";
 
 describe("ModelSection", () => {
-  it("renders provider options from the backend built-in catalog", async () => {
+  it("renders provider connection rows and no flat provider form", async () => {
     renderModelSection(providerFixture());
+
+    expect(await screen.findByText("Provider connections")).toBeDefined();
+    expect(screen.getAllByText("OpenAI").length).toBeGreaterThan(0);
+    expect(screen.getByText("SiliconFlow")).toBeDefined();
+    expect(screen.queryByLabelText("Provider")).toBeNull();
+  });
+
+  it("opens the add model dialog", async () => {
+    renderModelSection(providerFixture());
+
+    fireEvent.click(await screen.findByText("Add model"));
+
+    expect(screen.getByText("Add model provider")).toBeDefined();
+    expect(screen.getByLabelText("Connection name")).toBeDefined();
+  });
+
+  it("opens edit with provider details", async () => {
+    renderModelSection(providerFixture());
+
+    fireEvent.click(await screen.findByRole("button", { name: "Edit OpenAI" }));
 
     await waitFor(() =>
-      expect(screen.getAllByText("OpenRouter Catalog").length).toBeGreaterThan(
-        0,
-      ),
+      expect(getProviderConnectionMock).toHaveBeenCalledWith("conn-openai"),
     );
-    expect(screen.getAllByText("Gemini Live").length).toBeGreaterThan(0);
-    expect(screen.queryByText("DeepSeek")).toBeNull();
+    expect(screen.getByText("Edit model provider")).toBeDefined();
+    expect(screen.getByDisplayValue("OpenAI")).toBeDefined();
   });
 
-  it("opens the provider list from a fixed downward placement", async () => {
+  it("opens the provider dropdown below the trigger with a compact height", async () => {
     renderModelSection(providerFixture());
 
-    await screen.findByRole("button", { name: "Provider" });
-    const contents = screen.getAllByTestId("select-content");
+    fireEvent.click(await screen.findByText("Add model"));
 
-    expect(contents[0]?.getAttribute("data-position")).toBe("popper");
-    expect(contents[0]?.getAttribute("data-side")).toBe("bottom");
-    expect(contents[0]?.getAttribute("data-align")).toBe("start");
-    expect(contents[0]?.getAttribute("data-avoid-collisions")).toBe("false");
-    expect(contents[0]?.getAttribute("data-class-name")).toContain("!h-auto");
+    const providerContent = screen.getAllByTestId("select-content")[0]!;
+    expect(providerContent.getAttribute("data-position")).toBe("popper");
+    expect(providerContent.getAttribute("data-side")).toBe("bottom");
+    expect(providerContent.getAttribute("data-align")).toBe("start");
+    expect(providerContent.getAttribute("data-avoid-collisions")).toBe("false");
+    expect(providerContent.getAttribute("data-class-name")).toContain("max-h-56");
   });
 
-  it("switches to an unsaved provider model list and saves its fallback model", async () => {
-    renderModelSection(providerFixture());
-
-    await waitFor(() =>
-      expect(screen.getAllByText("Gemini Live").length).toBeGreaterThan(0),
-    );
-    const geminiAction = screen
-      .getAllByText("Gemini Live")
-      .find((el) => el.tagName === "BUTTON");
-    expect(geminiAction).toBeDefined();
-    fireEvent.click(geminiAction!);
-
-    await waitFor(() =>
-      expect(screen.getAllByText("Gemini Flash").length).toBeGreaterThan(0),
-    );
-    expect(screen.queryByText("OpenRouter Auto")).toBeNull();
-
-    fireEvent.click(screen.getByText("Save"));
-
-    await waitFor(() => expect(setProviderMock).toHaveBeenCalledTimes(1));
-    expect(setProviderMock.mock.calls[0]?.[0]).toMatchObject({
-      profileId: "gemini",
-      selectedModelId: "gemini-2.5-flash",
-    });
-  });
-
-  it("labels select triggers for assistive technology", async () => {
-    renderModelSection(
-      providerFixture({
-        profileId: "custom",
-        label: "Custom",
-        selectedModelId: null,
-      }),
-    );
-
-    expect(
-      await screen.findByRole("button", { name: "Provider" }),
-    ).toBeDefined();
-    expect(screen.getByRole("button", { name: "Model" })).toBeDefined();
-    expect(screen.queryByText("Model source")).toBeNull();
-  });
-
-  it("toggles API key visibility", async () => {
-    renderModelSection(providerFixture());
-
-    const input = await screen.findByPlaceholderText("sk-ant-...");
-    expect(input.getAttribute("type")).toBe("password");
-
-    fireEvent.click(screen.getByRole("button", { name: "Show API key" }));
-    expect(input.getAttribute("type")).toBe("text");
-
-    fireEvent.click(screen.getByRole("button", { name: "Hide API key" }));
-    expect(input.getAttribute("type")).toBe("password");
-  });
-
-  it("shows OpenAI-compatible runtime limitations for SiliconFlow", async () => {
-    renderModelSection(
-      providerFixture({
-        profileId: "siliconflow-cn",
-        label: "SiliconFlow China",
-        baseUrl: "https://api.siliconflow.cn/v1",
-        apiKey: "sf-key",
-        models: [
-          {
-            id: "deepseek-ai/DeepSeek-V3.2",
-            displayName: "DeepSeek V3.2",
-            description: "Remote model",
-          },
-        ],
-        remoteModelsFetchedAt: "2026-06-05T01:47:12.552Z",
-        selectedModelId: "deepseek-ai/DeepSeek-V3.2",
-        agentRuntime: {
-          protocol: "openai-compatible",
-          baseUrl: "https://api.siliconflow.cn/v1",
-          auth: "bearer",
-          capabilities: { text: true, tools: false, fileCheckpoint: false },
-        },
-      }),
-    );
-
-    expect(await screen.findByText("Agent runtime")).toBeDefined();
-    expect(screen.getByText("OpenAI-compatible")).toBeDefined();
-    expect(screen.getByText(/Text streaming is available/)).toBeDefined();
-  });
-
-  it("shows OpenAI-compatible runtime limitations", async () => {
-    renderModelSection(
-      providerFixture({
-        profileId: "openai",
-        label: "OpenAI",
-        baseUrl: "https://api.openai.com/v1",
-        apiKey: "openai-key",
-        models: [
-          {
-            id: "gpt-5.1",
-            displayName: "GPT-5.1",
-            description: "Remote model",
-          },
-        ],
-        remoteModelsFetchedAt: "",
-        selectedModelId: "gpt-5.1",
-        agentRuntime: {
-          protocol: "openai-compatible",
-          baseUrl: "https://api.openai.com/v1",
-          auth: "bearer",
-          capabilities: { text: true, tools: false, fileCheckpoint: false },
-        },
-      }),
-    );
-
-    expect(await screen.findByText("Agent runtime")).toBeDefined();
-    expect(screen.getByText("OpenAI-compatible")).toBeDefined();
-    expect(screen.getByText(/Text streaming is available/)).toBeDefined();
-  });
-
-  it("keeps the API key visibility toggle anchored while pressed", async () => {
-    renderModelSection(providerFixture());
-
-    const button = await screen.findByRole("button", {
-      name: "Show API key",
-    });
-
-    expect(button.getAttribute("class")).toContain(
-      "active:!-translate-y-1/2",
-    );
-  });
-
-  it("refreshes models and invalidates provider and models queries", async () => {
+  it("refreshes models for a non-default provider connection", async () => {
     const { invalidateQueries } = renderModelSection(providerFixture());
 
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Edit SiliconFlow" }),
+    );
     fireEvent.click(await screen.findByText("Refresh models"));
 
-    await waitFor(() => expect(setProviderMock).toHaveBeenCalledTimes(1));
-    expect(setProviderMock.mock.calls[0]?.[0]).toMatchObject({
-      profileId: "openrouter",
-      baseUrl: "https://openrouter.ai/api/v1",
-      apiKey: "sk-test",
-      selectedModelId: "openrouter/auto",
-    });
-    await waitFor(() => expect(refreshModelsMock).toHaveBeenCalledTimes(1));
     await waitFor(() =>
-      expect(screen.getByText("Model list refreshed")).toBeDefined(),
+      expect(refreshProviderConnectionModelsMock).toHaveBeenCalledWith(
+        "conn-sf",
+      ),
+    );
+    expect(updateProviderConnectionMock).toHaveBeenCalledWith(
+      "conn-sf",
+      expect.objectContaining({
+        providerName: "SiliconFlow",
+        profileId: "siliconflow-cn",
+      }),
     );
     expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ["provider"] });
     expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ["models"] });
   });
 
-  it("saves edited provider settings before refreshing models", async () => {
+  it("saves multiple enabled models", async () => {
     renderModelSection(providerFixture());
 
-    fireEvent.change(await screen.findByPlaceholderText("sk-ant-..."), {
-      target: { value: "new-key" },
-    });
-    fireEvent.change(screen.getByPlaceholderText("https://api.example.com"), {
-      target: { value: "https://edited.example/v1" },
-    });
-    fireEvent.click(screen.getByText("Refresh models"));
-
-    await waitFor(() => expect(refreshModelsMock).toHaveBeenCalledTimes(1));
-    expect(setProviderMock.mock.calls[0]?.[0]).toMatchObject({
-      profileId: "openrouter",
-      baseUrl: "https://edited.example/v1",
-      apiKey: "new-key",
-    });
-  });
-
-  it("shows missing API key feedback when refresh is rejected", async () => {
-    refreshModelsMock.mockImplementationOnce(async () => {
-      throw new Error("missing_api_key");
-    });
-    renderModelSection(providerFixture({ apiKey: "" }));
-
-    fireEvent.click(await screen.findByText("Refresh models"));
+    fireEvent.click(await screen.findByRole("button", { name: "Edit OpenAI" }));
+    fireEvent.click(await screen.findByLabelText("GPT-5.1 Mini"));
+    fireEvent.click(screen.getByText("Save"));
 
     await waitFor(() =>
-      expect(screen.getByText("Enter an API key first")).toBeDefined(),
+      expect(setProviderConnectionEnabledModelsMock).toHaveBeenCalledWith(
+        "conn-openai",
+        {
+          modelIds: ["gpt-5.1", "gpt-5.1-mini"],
+          defaultModelId: "gpt-5.1",
+        },
+      ),
     );
   });
 
-  it("does not render manual custom model JSON controls", async () => {
-    renderModelSection(
-      providerFixture({
-        profileId: "custom",
-        label: "Custom",
-        models: [],
-        selectedModelId: null,
-      }),
-    );
+  it("does not render a default model selector in the provider dialog", async () => {
+    renderModelSection(providerFixture());
 
-    await screen.findByRole("button", { name: "Provider" });
-    expect(screen.queryByText("Custom Model List (JSON)")).toBeNull();
-    expect(screen.queryByPlaceholderText("[]")).toBeNull();
+    fireEvent.click(await screen.findByRole("button", { name: "Edit OpenAI" }));
+
+    await waitFor(() =>
+      expect(getProviderConnectionMock).toHaveBeenCalledWith("conn-openai"),
+    );
+    expect(screen.queryByRole("button", { name: "Default model" })).toBeNull();
+    expect(screen.queryByText("Default model")).toBeNull();
+  });
+
+  it("keeps wheel scrolling inside the model list", async () => {
+    renderModelSection(providerFixture());
+
+    fireEvent.click(await screen.findByRole("button", { name: "Edit OpenAI" }));
+    const modelList = await screen.findByTestId("provider-model-list");
+    const EventCtor = modelList.ownerDocument.defaultView!.Event;
+    const event = new EventCtor("wheel", { bubbles: true, cancelable: true });
+    Object.defineProperty(event, "deltaY", { value: 80 });
+    modelList.dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(true);
   });
 });

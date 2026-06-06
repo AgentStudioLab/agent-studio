@@ -33,8 +33,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useThreadPermissionMode } from "@/lib/agui/react/useThreadPermissionMode";
-import { useThreadModel } from "@/lib/agui/react/useThreadModel";
-import { ModelPicker } from "@/features/task/ModelPicker";
+import { ProviderModelPicker } from "@/features/task/ProviderModelPicker";
+import type { ProviderModelSelection } from "@/lib/data/settings";
 
 interface TaskMessageInputProps {
   threadId: string;
@@ -50,9 +50,8 @@ interface TaskMessageInputProps {
   streaming?: boolean;
   /** Lock the model picker — the session has started, model is fixed. */
   modelLocked?: boolean;
-  /** Conversation-level default model (seeded for scheduled runs) shown when
-   *  the user hasn't picked a per-thread model. */
-  fallbackModel?: string | null;
+  providerSelection: ProviderModelSelection | null;
+  onProviderSelectionChange: (selection: ProviderModelSelection) => void;
 }
 
 export function TaskMessageInput({
@@ -63,11 +62,11 @@ export function TaskMessageInput({
   onStop,
   streaming = false,
   modelLocked = false,
-  fallbackModel = null,
+  providerSelection,
+  onProviderSelectionChange,
 }: TaskMessageInputProps) {
   const { t } = useTranslation();
   const { mode, setMode } = useThreadPermissionMode(threadId);
-  const { model, setModel } = useThreadModel(threadId);
   // Confirmation dialog is the safety gate between the dropdown click and the
   // mode flip. We do NOT change mode optimistically — only after the user
   // explicitly clicks "Yes, continue" in the dialog.
@@ -178,11 +177,11 @@ export function TaskMessageInput({
             </DropdownMenu>
           </PromptInputTools>
           <PromptInputTools>
-            <ModelPicker
-              value={model ?? fallbackModel}
-              onChange={setModel}
+            <ProviderModelPicker
               disabled={modelLocked}
               disabledReason={t("task.input.modelLocked")}
+              value={providerSelection}
+              onChange={onProviderSelectionChange}
             />
             {/*
               During streaming OR HITL-pause we render TWO buttons:

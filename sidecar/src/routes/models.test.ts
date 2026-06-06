@@ -112,6 +112,63 @@ describe("models routes", () => {
     expect(provider.current().remoteModelsFetchedAt).toBe(body.fetchedAt);
   });
 
+  it("POST /models/refresh updates only the active preset", async () => {
+    const { app, provider } = makeApp();
+    provider.update({
+      profileId: "openai",
+      apiKey: "active-openai-key",
+      selectedModelId: "active-before-refresh",
+    });
+    const activePresetId = provider.current().presetId;
+    const inactive = provider.createPreset({ name: "Inactive OpenAI" });
+    provider.updatePreset(inactive.presetId, {
+      profileId: "openai",
+      apiKey: "inactive-openai-key",
+      selectedModelId: "inactive-before-refresh",
+      baseUrl: "https://api.openai.com/v1",
+    });
+    const calls: Parameters<ModelFetchImpl>[] = [];
+    const fetchImpl: ModelFetchImpl = async (url, init) => {
+      calls.push([url, init]);
+      return new Response(JSON.stringify({ data: [{ id: "gpt-active" }] }));
+    };
+    app.route("/", buildModelsRoutes(provider, { fetchImpl }));
+
+    const res = await app.request("/models/refresh", { method: "POST" });
+    const body = (await res.json()) as {
+      data: { id: string }[];
+      defaultModelId: string | null;
+      fetchedAt: string;
+    };
+
+    expect(res.status).toBe(200);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.[1]?.headers).toEqual({
+      Authorization: "Bearer active-openai-key",
+    });
+    expect(body.data.map((model) => model.id)).toEqual(["gpt-active"]);
+    expect(body.defaultModelId).toBe("gpt-active");
+    expect(Date.parse(body.fetchedAt)).not.toBeNaN();
+
+    const active = provider.getPreset(activePresetId);
+    const nonActive = provider.getPreset(inactive.presetId);
+    expect(active).toMatchObject({
+      presetId: activePresetId,
+      selectedModelId: "active-before-refresh",
+      remoteModelsFetchedAt: body.fetchedAt,
+    });
+    expect(active?.models.map((model) => model.id)).toEqual(["gpt-active"]);
+    expect(nonActive).toMatchObject({
+      presetId: inactive.presetId,
+      selectedModelId: "inactive-before-refresh",
+      remoteModelsFetchedAt: "",
+    });
+    expect(nonActive?.models.map((model) => model.id)).not.toContain(
+      "gpt-active",
+    );
+    expect(provider.current().presetId).toBe(activePresetId);
+  });
+
   it("POST /models/refresh fetches custom remote OpenAI-compatible models", async () => {
     const { app, provider } = makeApp();
     provider.update({

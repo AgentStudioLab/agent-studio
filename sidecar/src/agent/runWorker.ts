@@ -14,6 +14,7 @@ import type { AgentLink, AgentLinkService } from "../services/agentLinks";
 import { MEMORY_INDEX_BUDGET, type AgentMemoryStore } from "../services/agentMemoryStore";
 import type { InterruptBus } from "../agui/provider-claude/interrupt-bus";
 import type { UsageService } from "../services/usage";
+import type { ProviderModelSelection } from "../services/providerSettings";
 
 /**
  * P2 sandbox roots from an agent's mounted folders: every folder is readable,
@@ -100,6 +101,8 @@ export interface RunWorkerInput {
    *  Omitted → no memory context. */
   agentMemoryStore?: AgentMemoryStore;
   provider: AgentProvider;
+  providerSelection?: ProviderModelSelection;
+  resolveProvider?: (selection?: ProviderModelSelection | null) => AgentProvider;
   interruptBus: InterruptBus;
   abortSignal: AbortSignal;
   usage: UsageService;
@@ -141,6 +144,8 @@ export async function runWorker(input: RunWorkerInput): Promise<void> {
     agentLinks,
     agentMemoryStore,
     provider,
+    providerSelection,
+    resolveProvider,
     interruptBus,
     abortSignal,
     usage,
@@ -315,7 +320,8 @@ export async function runWorker(input: RunWorkerInput): Promise<void> {
   }
 
   try {
-    const initialStream = provider.run({
+    const runProvider = resolveProvider?.(providerSelection) ?? provider;
+    const initialStream = runProvider.run({
       runId,
       threadId,
       userMessage,
@@ -338,7 +344,7 @@ export async function runWorker(input: RunWorkerInput): Promise<void> {
       runId,
       threadId,
       store,
-      provider,
+      provider: runProvider,
       initialStream,
       callbacks,
       abortSignal,
@@ -356,7 +362,7 @@ export async function runWorker(input: RunWorkerInput): Promise<void> {
         messages.cancelPendingToolCallsForThread(threadId);
         if (status === "cancelled") {
           messages.appendSystemNote(threadId, "已被用户中止");
-          await provider.notifyCancelled?.(threadId);
+        await runProvider.notifyCancelled?.(threadId);
         }
         threads.touch(threadId);
         await notifyTerminalResult(status, assistantText, errorMsg);

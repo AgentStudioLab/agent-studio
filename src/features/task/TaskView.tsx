@@ -22,13 +22,12 @@ import { useThreadUnread } from "@/lib/agui/react/useThreadUnread";
 import { useAllowedTools } from "@/lib/agui/react/useAllowedTools";
 import { useWorkspaceAllowedTools } from "@/lib/agui/react/useWorkspaceAllowedTools";
 import { useThreadPermissionMode } from "@/lib/agui/react/useThreadPermissionMode";
-import { useThreadModel } from "@/lib/agui/react/useThreadModel";
-import { useAvailableModels } from "@/lib/models";
 import {
   useArchiveConversationMutation,
   useConversation,
   useMessages,
 } from "@/lib/data/queries";
+import type { ProviderModelSelection } from "@/lib/data/settings";
 
 function touchedFileToPreview(f: TouchedFile): MockFile {
   const lower = f.relativePath.toLowerCase();
@@ -59,6 +58,8 @@ export function TaskView() {
   } = useAppShell();
   const archiveMutation = useArchiveConversationMutation();
   const [renameOpen, setRenameOpen] = useState(false);
+  const [providerSelection, setProviderSelection] =
+    useState<ProviderModelSelection | null>(null);
 
   // History GET — turn-grouped; reducer reads as initialMessages via
   // setHistorical. Don't default `data` to `[]` here: that allocates a fresh
@@ -106,18 +107,6 @@ export function TaskView() {
   // useThreadPermissionMode hook subscribes to.
   const { mode: permissionMode, setMode: setPermissionMode } =
     useThreadPermissionMode(activeTaskId);
-  const { model: threadModel, setModel: setThreadModel } =
-    useThreadModel(activeTaskId);
-  const { defaultModelId } = useAvailableModels();
-  // Per-thread store returns `null` until the user picks once. Fall back to
-  // the live default from /models (first id in the active profile's list).
-  // If /models hasn't resolved yet, leave undefined so send() omits the field
-  // and the sidecar falls back to its own default.
-  // Resolution order: explicit per-thread pick → conversation default (seeded
-  // for scheduled runs) → global default. So a scheduled run's conversation
-  // shows the task's model even before the user touches the picker.
-  const effectiveModel =
-    threadModel ?? conversationQuery.data?.model ?? defaultModelId ?? undefined;
 
   // Seed the per-thread permission mode from the conversation's stored mode
   // (scheduled runs persist their mode on the conversation). The mode store
@@ -183,23 +172,29 @@ export function TaskView() {
     firstPromptFired.current = activeTaskId;
     const text = pendingFirstPrompt.text;
     const firstMode = pendingFirstPrompt.permissionMode ?? permissionMode;
-    const firstModel = pendingFirstPrompt.model ?? effectiveModel;
+    const firstProviderSelection = pendingFirstPrompt.providerSelection ?? null;
+    // Normal new-task handoff now relies on the active provider preset.
+    // `pendingFirstPrompt.model` remains only for legacy seeded flows such as
+    // agent workspaces until those semantics are migrated separately.
+    const legacyFirstModel = pendingFirstPrompt.model;
     setPendingFirstPrompt(null);
+    setProviderSelection(firstProviderSelection);
     if (pendingFirstPrompt.permissionMode) {
       setPermissionMode(pendingFirstPrompt.permissionMode);
     }
-    if (pendingFirstPrompt.model) {
-      setThreadModel(pendingFirstPrompt.model);
-    }
-    void send(text, { permissionMode: firstMode, model: firstModel });
+    void send(text, {
+      permissionMode: firstMode,
+      ...(firstProviderSelection
+        ? { providerSelection: firstProviderSelection }
+        : {}),
+      ...(legacyFirstModel ? { model: legacyFirstModel } : {}),
+    });
   }, [
     activeTaskId,
     pendingFirstPrompt,
     setPendingFirstPrompt,
     permissionMode,
     setPermissionMode,
-    effectiveModel,
-    setThreadModel,
     send,
     activeRun,
   ]);
@@ -282,11 +277,14 @@ export function TaskView() {
   // only fires on races / multi-window.
   const sendOrQueue = useCallback(
     (text: string) => {
-      void send(text, { permissionMode, model: effectiveModel }).catch((e) => {
+      void send(text, {
+        permissionMode,
+        ...(providerSelection ? { providerSelection } : {}),
+      }).catch((e) => {
         if (e instanceof RunInProgressError) queue.add(text);
       });
     },
-    [send, permissionMode, effectiveModel, queue.add],
+    [send, permissionMode, providerSelection, queue.add],
   );
 
   // "Busy" = streaming OR HITL-paused OR a server-started run is in flight.
@@ -439,7 +437,7 @@ export function TaskView() {
               onRegenerate={(fromMessageId) =>
                 void regenerate(fromMessageId, {
                   permissionMode,
-                  model: effectiveModel,
+                  ...(providerSelection ? { providerSelection } : {}),
                 }).catch(() => {
                   // Only RunInProgressError propagates here (a run went live
                   // mid-regenerate — rare race). The runtime already restored
@@ -486,7 +484,8 @@ export function TaskView() {
               <TaskMessageInput
                 threadId={activeTaskId}
                 modelLocked={viewMessages.length > 0}
-                fallbackModel={conversationQuery.data?.model ?? null}
+                providerSelection={providerSelection}
+                onProviderSelectionChange={setProviderSelection}
                 onSend={(text) => {
                   queue.clearUserCancelled();
                   sendOrQueue(text);

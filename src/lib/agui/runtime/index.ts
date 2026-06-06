@@ -37,4 +37,5 @@ export {
   createChatRuntime,
   type ChatRuntime,
   type ChatRuntimeOptions,
+  type ProviderModelSelection,
 } from "./runtime";

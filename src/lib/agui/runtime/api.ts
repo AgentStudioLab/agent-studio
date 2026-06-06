@@ -21,6 +21,7 @@ export interface PostRunRequest {
   threadId: string;
   runId: string;
   message: { role: "user"; content: string };
+  providerSelection?: { providerId: string; modelId: string };
   /**
    * "ask" (default) — every mutation tool surfaces an HITL card.
    * "act-without-asking" — bypass approval for this run; provider's
@@ -43,6 +44,7 @@ export interface PostRegenerateRequest {
   fromMessageId: string;
   runId: string;
   permissionMode?: "ask" | "act-without-asking";
+  providerSelection?: { providerId: string; modelId: string };
   model?: string;
 }
 
@@ -121,6 +123,9 @@ export class AGUIHttpClient {
           fromMessageId: req.fromMessageId,
           runId: req.runId,
           ...(req.permissionMode ? { permissionMode: req.permissionMode } : {}),
+          ...(req.providerSelection
+            ? { providerSelection: req.providerSelection }
+            : {}),
           ...(req.model ? { model: req.model } : {}),
           ...(locale ? { locale } : {}),
         }),
