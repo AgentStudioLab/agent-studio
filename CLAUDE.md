@@ -1,193 +1,123 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+本文件是 Claude Code 在此仓库工作的基准说明。
 
-## Project layout
+## 项目结构
 
-Three independent subprojects in one repo, **no workspaces**:
+仓库包含三个独立子项目，**不要引入 package workspace**：
 
-- `src/` — React 19 + TypeScript + Tailwind v4 + shadcn frontend (Vite 8 / rolldown)
-- `src-tauri/` — Rust shell (Tauri v2), spawns sidecar + manages persistence
-- `sidecar/` — Bun + Hono HTTP/SSE server, compiled to a single native binary per platform
-- `scripts/build-sidecar.ts` — orchestrates `bun build --compile` across target triples
+- `src/`：React 19 + TypeScript + Tailwind v4 + shadcn 前端（Vite 8 / rolldown）
+- `src-tauri/`：Tauri v2 Rust 外壳，负责启动 sidecar 和持久化
+- `sidecar/`：Bun + Hono HTTP/SSE 服务，按平台编译为原生二进制
+- `scripts/build-sidecar.ts`：编排 `bun build --compile` 的 sidecar 构建
 
-Vite MUST live at the repo root because `tauri.conf.json` has `frontendDist: "../dist"` resolved relative to `src-tauri/`. Do not introduce a `package.json` workspace setup.
+Vite 必须保留在仓库根目录，因为 `src-tauri/tauri.conf.json` 的 `frontendDist: "../dist"` 按 `src-tauri/` 相对路径解析。
 
-## Frontend directory layout (`src/`)
+## 前端目录
 
-Feature-folder + co-location convention. Each feature owns its page composer + private subcomponents in the same directory. No `views/` folder. No `index.ts` barrels (breaks tree-shaking per `vercel-react-best-practices` `bundle-barrel-imports`).
+采用 feature-folder + co-location：页面组合器、私有组件、hooks/utils 放在同一 feature 内；没有 `views/`；不要新增 `index.ts` barrel。
 
 ```
 src/
-  app/                          # App-level chrome + routing
-    AppShell.tsx                # 3-pane layout (sidebar + main + optional aside)
-    AppShellContext.tsx         # currentView + setView + preview + hideSidebar
-    RouterView.tsx              # switch-on-currentView routing
-    MacTitlebar.tsx             # 36px overlay titlebar (Tauri)
-  features/                     # Each feature self-contained
-    new-task/                   # NewTaskView
-    task/                       # TaskView + TaskHeader/ChatStream/RightPanel/PreviewPane/tabs
-    projects/                   # ProjectsView + ProjectCard
-    project-detail/             # ProjectDetailView + InstructionsCard/ScheduledMiniCard/etc.
-    scheduled/                  # ScheduledListView + ScheduledDetailView + cards
-    customize/                  # CustomizeView + Nav/Home + skills/agents/plugins bodies
-    settings/                   # SettingsView + ProfileForm
-    sidebar/                    # Sidebar + NavItem/PinnedItem/RecentItem/UserBar
-  shared/
-    atoms/                      # BrandStar / InitialsAvatar / StatusDot / ThemeSegment
-  components/
-    ui/                         # shadcn primitives (do not modify by hand)
-    ai-elements/                # vercel/ai-elements (do not modify by hand)
+  app/                 # AppShell / RouterView / 全局布局状态
+  features/
+    agent-workspaces/  # AgentsView / AgentSpaceView / agent workspace 详情
+    auth/
+    billing/
+    composer/
+    customize/
+    new-task/
+    scheduled/
+    settings/
+    sidebar/
+    skills/
+    task/
+    tasks/
+  shared/              # 第二个 feature 复用时才提升到这里
+  components/ui/       # shadcn primitives，不要手动改
+  components/ai-elements/ # ai-elements primitives，不要手动改
   lib/
-    mock/                       # static fixtures (typed)
-    sidecar-client.ts
-    useThemeMode.ts
-    utils.ts
-  styles/                       # 3-tier design tokens (see convention #7)
+  styles/              # 三层 design tokens
 ```
 
-**Rules:**
-- View = thin composer (< 80 lines). Logic lives in feature-local hooks/utils; UI in private subcomponents.
-- Private subcomponents stay inside their feature. Promote to `shared/` only when a second feature needs them.
-- Import via direct path (`@/features/task/TaskView`), never via barrel.
-- New feature → new directory under `features/`. Don't add it to `app/` or `shared/`.
+规则：
 
-## Common commands
+- View 保持薄组合器，复杂逻辑放 feature-local hooks/utils。
+- 私有子组件留在所属 feature 内；跨 feature 复用才进 `shared/`。
+- 使用直接路径导入，例如 `@/features/task/TaskView`，不要通过 barrel。
+- 新功能优先新建 `src/features/<feature>/`，不要塞进 `app/` 或 `shared/`。
+
+## 常用命令
 
 ```bash
-bun run dev                          # Vite only, http://localhost:1420
-bun run build                        # tsc -b && vite build → dist/
-bun run build:sidecar -- --host-only # compile sidecar for current host only
-bun run build:sidecar                # compile sidecar for all 3 targets
-bun run tauri:dev                    # host sidecar + tauri dev (full app)
-bun run tauri:build                  # all sidecars + tauri release build
+bun run dev                          # Vite only，http://localhost:1420
+bun run build                        # tsc -b && vite build
+bun run build:sidecar -- --host-only # 仅当前 host sidecar
+bun run build:sidecar                # 全部 sidecar target
+bun run tauri:dev                    # 完整 Tauri dev
+bun run tauri:build                  # release build
 
-# Rust side
 cargo check --manifest-path src-tauri/Cargo.toml
 
-# Sidecar standalone (dev token, fixed port 4123)
-cd sidecar && bun run dev
-
-# Tests — Bun's runner everywhere (NOT vitest), even for frontend .tsx tests
-bun test                              # frontend (run from repo root)
-cd sidecar && bun test               # sidecar
-bun test path/to/file.test.ts        # single file
-bun test -t "name substring"         # single test by name
-
-# Typecheck (no emit)
-bunx tsc --noEmit -p tsconfig.app.json   # frontend
-cd sidecar && bunx tsc --noEmit          # sidecar
+bun test                              # 前端测试，Bun runner
+cd sidecar && bun test               # sidecar 测试
+bunx tsc --noEmit -p tsconfig.app.json
+cd sidecar && bunx tsc --noEmit
 ```
 
-Every `*.test.ts(x)` imports from `bun:test` — running them under vitest fails with `Cannot find package 'bun:test'`. There is no vitest in this repo.
+测试统一使用 Bun runner；所有 `*.test.ts(x)` 从 `bun:test` 导入。本仓库没有 vitest。
 
-Target triples handled by `scripts/build-sidecar.ts`:
+Sidecar target 仅支持：
 
-| Bun target | Tauri triple | Output |
-|---|---|---|
-| `bun-darwin-arm64` | `aarch64-apple-darwin` | `src-tauri/binaries/agent-studio-sidecar-aarch64-apple-darwin` |
-| `bun-darwin-x64` | `x86_64-apple-darwin` | `…-x86_64-apple-darwin` |
-| `bun-windows-x64` | `x86_64-pc-windows-msvc` | `…-x86_64-pc-windows-msvc.exe` |
+- `bun-darwin-arm64` → `aarch64-apple-darwin`
+- `bun-darwin-x64` → `x86_64-apple-darwin`
+- `bun-windows-x64` → `x86_64-pc-windows-msvc`
 
-No Linux support — explicit project decision.
+无 Linux 支持。
 
-## Architecture: how the three pieces talk
+## 架构速记
 
-```
-[ React UI ]
-   │
-   │  invoke('get_sidecar_info') → { port, token }   (one-time, cached)
-   │  fetch http://127.0.0.1:<port>/* + Bearer <token>
-   ▼
-[ Tauri Rust shell ]                [ Bun sidecar (HTTP/SSE) ]
-   │  setup():                          ▲
-   │    portpicker pick_unused_port     │ Hono bearer middleware
-   │    rand 32-char Alphanumeric token │ rejects bad/missing token → 401
-   │    shell.sidecar(...).spawn        │
-   │       --port=<n> --token=<t>  ─────┘
-   │  app.manage(SidecarInfo { port, token })
-   │  on RunEvent::Exit → child.kill()
-   ▼
-tauri-plugin-store (Rust-side JSON KV, persistence)
-```
+React 通过 Tauri `invoke('get_sidecar_info')` 获取 `{ port, token }`，再用 `fetch http://127.0.0.1:<port>/*` + Bearer token 调 sidecar。前端 client 在 `src/lib/sidecar-client.ts`。
 
-Frontend client lives in `src/lib/sidecar-client.ts`:
-- `getSidecarInfo()` — invokes Tauri command once, caches the promise
-- `fetchSidecar(path, init?)` — injects base URL + Authorization header
-- `subscribeSSE(path, onEvent, signal?)` — manual SSE parser over fetch+ReadableStream (not EventSource, because EventSource can't carry auth headers)
+Tauri 启动时选择空闲端口、生成 32 位 `rand::distr::Alphanumeric` token，并通过 `shell.sidecar(...).spawn` 启动 sidecar。退出时要 kill 子进程。
 
-## Architecture: inside the sidecar (the AGUI run engine)
+Sidecar 是 provider-agnostic 的 AGUI run engine：
 
-The sidecar is a single-threaded async event hub. Three layers, provider-agnostic core:
+- `routes/*` 接 HTTP/SSE。
+- `agent/runWorker.ts` 是唯一执行入口。
+- `agui/core/runLoop.ts` 消费 provider events 并 append 到 `run_events`。
+- `agui/provider-claude/` 是唯一 provider 实现，修改前必须查阅 `claude-agent-sdk-reference` skill。
 
-```
-routes/*  (Hono HTTP/SSE)                       services/*   (DB-backed + in-memory)
-   POST /runs ─┐                                  threads, messages, scheduledTasks,
-   regenerate ─┼──► agent/runWorker.ts ──► agui/core/runLoop.ts   usage, audit, scheduler,
-   scheduler ──┘        (single exec path)        │              titleGenerator, skillRegistry…
-                                                   │ consumes
-                                  agui/core/provider-types.ts  (AgentProvider interface)
-                                                   ▲ implemented by
-                                  agui/provider-claude/  (adapts @anthropic-ai/claude-agent-sdk)
-                                                   │ persists via
-                                  agui/core/store-types.ts ◄── agui/store-sqlite/  (event log)
-```
+前端 AGUI runtime 在 `src/lib/agui/`：
 
-**Run lifecycle is event-sourced.** A run is an append-only log in `run_events (run_id, seq, type, payload)` with the run row tracking `last_seq` + `status` (`running` → `completed`/`error`/`cancelled`/`awaiting_approval`). `runLoop.ts` drains the provider's `AsyncIterable<AGUIEvent>` (`RUN_STARTED` → `TEXT_MESSAGE_*`/`TOOL_CALL_*`/`REASONING_*` → `RUN_FINISHED`/`RUN_ERROR`), appending each event in a transaction that bumps `seq` and signals an EventEmitter so live SSE streamers wake immediately. `GET /runs/:id/events?after=<seq>` replays from any cursor — this is what makes runs resumable across reloads and cross-session attach.
+- `runtime/` 管 `ChatState`、SSE replay、send/regenerate/cancel/resume/attach。
+- `react/` 用 `useSyncExternalStore` 将 runtime 绑定到 React。
+- `MessageQueueContext.tsx` 负责 run 期间的 per-thread 消息排队。
 
-**`runWorker` is the one execution path.** POST /runs, POST /threads/:id/regenerate, and the scheduler tick all funnel through `agent/runWorker.ts` (fire-and-forget; the route returns 202 immediately). It buffers assistant/tool messages in memory and flushes them to the `messages`/`tool_calls` tables **only at run terminal** — never mid-run — so a cross-session resume that replays `run_events` can't create duplicate persisted turns.
+## 必守约定
 
-**`agui/core` is provider-agnostic.** It knows only the `AgentProvider` interface (`run`/`resume`/`getPendingInterrupts`/`rewindFiles`). `agui/provider-claude/` is the only implementation: `provider.ts` wraps the SDK `query()` generator and owns the `canUseTool` approval gates; `bridge.ts` translates `SDKMessage` → AGUI events. Satellites: `interrupt-bus` (HITL deferred-promise map keyed by runId), `sandbox` (path-based workspace guardrail), `destructive` (always-surface guardrail for `rm -rf`/`git reset --hard`/etc., even when allow-listed), `session-tag` (SDK session ↔ threadId), `audit-hook`+`redact` (tool audit log with secret masking), `error-map` (SDK errors → `RunErrorCode`), `file-rewind` (roll back Write/Edit on regenerate), `scheduled-tool` (in-process MCP server `mcp__agent_studio__create_scheduled_task`). **Before editing anything here, consult the `claude-agent-sdk-reference` skill** (per the Skills section).
-
-**HITL = the `awaiting_approval` status.** When `canUseTool` needs the user, the provider emits an interrupt; runLoop writes `RUN_FINISHED(outcome:"interrupt")` and parks the run at `awaiting_approval`. The client renders an approval/ask-user card and calls `POST /runs/:id/resume`, which resolves the interrupt-bus deferred and the worker continues. Stale resumes are a benign 202 (`alreadyResolved:true`), never a 409 — see `routes/runs.test.ts`.
-
-**`server.ts` wires DI at boot** (CLI: `--port`/`--token`/`--db`; bearer-auth middleware on all routes). It reconciles orphaned runs on startup (crashed `running` → `error`; orphaned `awaiting_approval` → `cancelled` + a system note), lazily caches the provider per (apiKey, baseUrl) and rebuilds it on `/settings/provider` change, and starts the poll-based `scheduler` (ticks only when an apiKey is configured).
-
-## Architecture: frontend AGUI runtime (`src/lib/agui/`)
-
-Mirrors the sidecar's event protocol on the client. Two layers:
-
-- **`runtime/`** — framework-agnostic chat state machine. `createChatRuntime()` (runtime.ts) owns immutable `ChatState` (`isRunning`, `activeRunId`, `historicalMessages`, `liveMessages`, `pendingInterrupts`, `error`, `lastCursor`) and exposes `send`/`regenerate`/`cancel`/`resume`/`attachToRun`/`restoreAwaiting` + pub-sub. `reducer.ts` is a pure `applyEvent(state, event)` that folds incoming AGUI SSE events into `ChatState` (accumulating `argsBuffer` for partial tool-call JSON, sweeping pending spinners on terminal). `sse.ts` is a resumable manual SSE parser (cursor-per-frame `?after=`, exponential backoff) — distinct from `sidecar-client`'s lower-level `subscribeSSE`. `api.ts` is the HTTP client and defines `RunInProgressError` (the 409 contract). `derivations.ts`/`thinking.ts`/`sweep.ts` derive progress phases, todos, touched files, and the "思考中" quiet-timer.
-- **`react/`** — `useChat.ts` binds one runtime per `threadId` to React via `useSyncExternalStore` (switching threadId tears down + recreates the runtime so SSE/argsBuffer can't leak). The other `use*` hooks are thin selectors/queries (permission mode, model, context, plan, progress phases, statuses, files, skills).
-
-**Run discovery / attach** (how the UI picks up a server-started run, e.g. a scheduled task): `GET /conversations/status` → `useThreadStatuses` (5 s poll, in Sidebar) → `useActiveRunForThread` → TaskView's attach effect calls `attachToRun(runId)`, which sets `isRunning=true` and connects the resumable SSE.
-
-**Message queue** (`src/features/task/MessageQueueContext.tsx`): an app-level, per-thread queue that survives navigation. While a run streams the composer is gated (`isBusy = isRunning || pendingInterrupts.length > 0 || activeRun !== null`) and Enter routes to `queue.add`; TaskView's auto-flush effect pops the head and sends on the `isRunning` true→false transition (skipped if the user hit Stop, via `userCancelled`). A `send()` that races a server-started run gets a 409 → `RunInProgressError` → re-queued instead of erroring.
-
-## Critical conventions
-
-1. **Tauri plugin versions are version-locked across Cargo and npm.** `tauri-plugin-shell` Rust crate version MUST equal `@tauri-apps/plugin-shell` npm major+minor. Same for `tauri-plugin-store`. When upgrading one side, upgrade the other in the same commit, or the plugin IPC will fail at runtime.
-
-2. **Capability uses `shell:allow-spawn`, NOT `shell:allow-execute`.** The sidecar is long-running. Allow-execute is for run-to-completion processes only. The arg validators in `src-tauri/capabilities/default.json` constrain `--port=` and `--token=` formats — the token generator MUST use `rand::distr::Alphanumeric` to match `[A-Za-z0-9]+`.
-
-3. **Vite `build.target = "esnext"`** — do NOT downgrade to `safari13`/`safari14`. esbuild can't downlevel shadcn/CVA's object rest destructuring, and Tauri v2's WebView baseline already supports modern JS.
-
-4. **`@tailwindcss/node` requires explicit `esbuild` devDep.** Already in `package.json`. If you ever remove it, Vite build will fail with `Cannot find package 'esbuild'`.
-
-5. **shadcn config:** `components.json` style is `radix-nova` (modern equivalent of the old `new-york` style). Alias `@/*` → `./src/*`. Add new components with `bunx shadcn@latest add <component>`.
-
-6. **Sidecar binaries are gitignored** (`src-tauri/binaries/agent-studio-sidecar*`). `tauri build` requires the host-triple binary to exist — `beforeBuildCommand` runs `build:sidecar` to ensure that. `tauri dev` does NOT; use `bun run tauri:dev` (which prefixes `build:sidecar -- --host-only`) rather than raw `tauri dev`.
-
-7. **Styling MUST go through the 3-tier design token system.** Whenever you write component CSS, apply a Tailwind class for color/spacing/radius, or pick any style value — first consult the `design-tokens` skill. The chain is `src/styles/primitives/` → `src/styles/semantic/` → `src/styles/components/` → `src/styles/shadcn-alias.css` → Tailwind utility via `@theme inline` in `src/index.css`. Theme is single-axis (`data-mode="light|dark"`, no `data-theme`). Hardcoding hex / raw HSL anywhere in `src/components/` or `src/features/` is forbidden — components reference **semantic** tokens (`var(--brand-100)`, `var(--bg-100)`, etc) which flow through to primitives. Direct primitive references (e.g., `var(--color-orange-500)`) are allowed ONLY in narrow "categorical palette picker" cases per the design-tokens skill exception clause.
-
-8. **反 AI slop（必守）：** ❌ 紫色渐变 / ❌ emoji 装饰 icon / ❌ 圆角左 border 色条。改用：单一 brand-100 橙色 / lucide-react inline SVG。code review 期间任一条违反 = block，不是 nit。Anthropic 视觉身份是克制。
-
-9. **Tests run on Bun's runner, not vitest** — every `*.test.ts(x)` (frontend AND sidecar) imports `bun:test`. Run with `bun test`. There is no vitest config; invoking these under vitest fails with `Cannot find package 'bun:test'`.
-
-10. **One live run per thread is an invariant.** `POST /runs` and `/threads/:id/regenerate` reject with **409 `{error:"run_in_progress", activeRunId}`** when the thread already has a `running`/`awaiting_approval` run (`store.getThreadActiveRun`). The frontend treats this 409 cooperatively (`RunInProgressError` → re-queue), never as an error banner. Don't add a code path that starts a second concurrent run — two runs resuming the same SDK session corrupts the conversation.
-
-11. **`run_events` is append-only and seq-ordered.** SSE resume/attach relies on `?after=<seq>` replay. Persist run output only through `store.appendEvent` (which bumps `seq`/`last_seq` atomically and signals streamers), and flush buffered messages **only at run terminal** — mid-run flushes duplicate turns after cross-session resume.
-
-12. **Commit messages must be written in English.** Follow the existing history's Conventional Commit style when possible, e.g. `fix(settings): resolve provider model type errors`, `docs(remote-im): design remote IM connection architecture`, or `refactor(provider): clarify settings state updates`.
+1. Tauri Rust crate 与 npm plugin 版本必须 major+minor 对齐：`tauri-plugin-shell` ↔ `@tauri-apps/plugin-shell`，`tauri-plugin-store` ↔ `@tauri-apps/plugin-store`。
+2. Capability 使用 `shell:allow-spawn`，不要换成 `shell:allow-execute`。
+3. Vite `build.target` 保持 `"esnext"`。
+4. `@tailwindcss/node` 依赖显式 `esbuild` devDep，不要移除。
+5. shadcn 配置是 `radix-nova`；新增组件用 `bunx shadcn@latest add <component>`。
+6. Sidecar binaries 已 gitignore；`tauri dev` 请用 `bun run tauri:dev`，不要裸跑。
+7. 样式必须走三层 design token：`primitives → semantic → components → shadcn-alias → Tailwind @theme inline`。改样式前先查 `design-tokens` skill；禁止在 `src/components/` 或 `src/features/` 硬编码 hex/raw HSL。
+8. 反 AI slop：不要紫色渐变、emoji 装饰 icon、圆角左 border 色条；优先单一 `brand-100` 橙色和 `lucide-react` inline SVG。
+9. 一个 thread 同时只能有一个 live run。`POST /runs` 和 regenerate 遇到 active run 必须返回 409 `{error:"run_in_progress", activeRunId}`，前端用 `RunInProgressError` 重新入队。
+10. `run_events` append-only 且 seq ordered；run output 只能通过 `store.appendEvent` 持久化；buffered messages 只在 run terminal flush。
+11. Commit message 必须写英文，优先 Conventional Commit 风格。
+12.  写实施计划文档输出一定要用中文。
+13. 代码需要有详细的中文注解。
 
 ## Skills
 
-Project skills live under `.claude/skills/`:
-- `design-tokens` — **always invoke before any styling change.** Enforces the 3-tier token discipline (primitives / semantic / components) and gates new token decisions.
-- `ai-elements` (vercel/ai-elements) — UI primitives for AI chat/agent UX. Required reading before installing or reconciling any ai-elements component.
-- `vercel-react-best-practices` (vercel-labs/agent-skills) — React performance rules.
-- `claude-agent-sdk-reference` — authoritative TypeScript reference for `@anthropic-ai/claude-agent-sdk` (query/startup/tool, sandbox, hooks, canUseTool, sessions, MCP, all message + tool schemas, plus usage recipes). Consult before writing or modifying code that touches the SDK — especially anything in `sidecar/src/agui/provider-claude/`.
-- `theme-creator` — how to author + register a new brand theme on the `data-brand` axis (required color tokens, contrast rules, adding a primitive hue, optional font swap). Use when adding a theme color / 主题色 / skin under `src/styles/themes/`. Pairs with `design-tokens` (which governs the underlying token tiers).
-- `skill-creator` (anthropics/skills) — meta-skill for authoring new skills.
+项目 skills 在 `.claude/skills/`：
 
-Consult these when relevant; they are part of the project's documented context.
+- `design-tokens`：任何样式改动前必须用。
+- `ai-elements`：安装或调整 AI chat/agent UI primitives 前使用。
+- `vercel-react-best-practices`：写 React/Next 性能相关代码时使用。
+- `claude-agent-sdk-reference`：修改 `@anthropic-ai/claude-agent-sdk` 相关代码前使用，尤其是 `sidecar/src/agui/provider-claude/`。
+- `theme-creator`：新增 brand theme / 主题色 / skin 时使用。
+- `skill-creator`：创建或修改 skills 时使用。
+

@@ -15,6 +15,7 @@ import type { Preview } from "@storybook/react-vite";
 import { withThemeByDataAttribute } from "@storybook/addon-themes";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import "../src/index.css";
+import { TooltipProvider } from "../src/components/ui/tooltip";
 import { defaultThemeId } from "../src/styles/themes/registry";
 
 // Brand themes live on the `data-brand` axis (the app ships it on <html> in
@@ -50,9 +51,11 @@ const preview: Preview = {
     }),
     (Story) => (
       <QueryClientProvider client={storyQueryClient}>
-        <div style={{ minHeight: "100vh", padding: "1rem" }}>
-          <Story />
-        </div>
+        <TooltipProvider delayDuration={200}>
+          <div style={{ minHeight: "100vh", padding: "1rem" }}>
+            <Story />
+          </div>
+        </TooltipProvider>
       </QueryClientProvider>
     ),
   ],

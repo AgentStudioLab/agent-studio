@@ -1,6 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "agent-studio",
+  "productName": "Agent Studio",
+  "mainBinaryName": "Agent Studio",
   "version": "0.1.0",
   "identifier": "com.agentstudiolab.agent-studio",
   "build": {

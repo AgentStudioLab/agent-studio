@@ -1,4 +1,4 @@
-import { Brain, Cable, ChevronLeft, Palette, ShieldCheck, User } from "lucide-react";
+import { BarChart3, Brain, Cable, ChevronLeft, Palette, ShieldCheck, User } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { to: "permissions", labelKey: "settings.nav.permissions", icon: ShieldCheck },
   { to: "remote-connections", labelKey: "settings.nav.remoteConnections", icon: Cable },
   { to: "appearance", labelKey: "settings.nav.appearance", icon: Palette },
+  { to: "usage", labelKey: "settings.nav.usage", icon: BarChart3 },
 ] as const;
 
 export function SettingsLayout() {

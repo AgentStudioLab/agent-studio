@@ -9,7 +9,7 @@ function makeApp() {
   const db = new Database(":memory:");
   migrate(db);
   db.exec(`INSERT INTO conversations (id, title, created_at, updated_at) VALUES ('t1', 'x', 1, 1)`);
-  db.exec(`INSERT INTO runs (id, thread_id, status, started_at) VALUES ('r1', 't1', 'running', 1)`);
+  db.exec(`INSERT INTO runs (id, thread_id, status, started_at) VALUES ('r1', 't1', 'completed', 1)`);
   const usage = new UsageService(db);
   usage.recordRun({ runId: "r1", threadId: "t1", inputTokens: 100, outputTokens: 200, cacheCreationTokens: 0, cacheReadTokens: 50, totalCostUsd: 0.01, permissionDenials: [], model: "m" });
   const app = new Hono();

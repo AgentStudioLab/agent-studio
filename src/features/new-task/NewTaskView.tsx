@@ -41,6 +41,7 @@ import { threadStatusKey } from "@/lib/agui/react/useChat";
 import { useQueryClient } from "@tanstack/react-query";
 import { ProviderModelPicker } from "@/features/task/ProviderModelPicker";
 import type { ProviderModelSelection } from "@/lib/data/settings";
+import { useTypewriterText } from "./useTypewriterText";
 
 /** Take just the last segment of a /-separated path for a compact button label. */
 function basename(p: string): string {
@@ -51,6 +52,8 @@ function basename(p: string): string {
 
 export function NewTaskView() {
   const { t } = useTranslation();
+  const welcomeHeading = t("newTask.welcome.heading");
+  const welcomeHeadingText = useTypewriterText(welcomeHeading);
   const navigate = useNavigate();
   const { setPendingFirstPrompt } = useAppShell();
   const qc = useQueryClient();
@@ -132,9 +135,24 @@ export function NewTaskView() {
                 className="mb-8 h-16 w-auto max-w-[238px] shrink-0 object-contain"
                 draggable={false}
               />
-              <h1 className="max-w-[780px] font-serif text-[44px] font-normal leading-[1.12] tracking-tight text-foreground">
-                {t("newTask.welcome.heading")}
+              <h1
+                aria-label={welcomeHeading}
+                className="grid max-w-[780px] font-serif text-[44px] font-normal leading-[1.12] text-foreground"
+              >
+                <span
+                  aria-hidden="true"
+                  className="invisible col-start-1 row-start-1"
+                >
+                  {welcomeHeading}
+                </span>
+                <span aria-hidden="true" className="col-start-1 row-start-1">
+                  {welcomeHeadingText}
+                  <span className="typewriter-caret" />
+                </span>
               </h1>
+              <p className="mt-4 max-w-[520px] text-[15px] leading-6 text-muted-foreground">
+                {t("newTask.welcome.subtitle")}
+              </p>
               <a
                 href="#"
                 className="mt-5 inline-flex items-center gap-1 text-sm text-muted-foreground underline-offset-4 hover:underline"

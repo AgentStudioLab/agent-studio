@@ -6,7 +6,8 @@
     "model": "Model",
     "permissions": "Permissions",
     "remoteConnections": "Remote Connections",
-    "appearance": "Appearance"
+    "appearance": "Appearance",
+    "usage": "Usage"
   },
   "saveButton": "Save",
   "profile": {
@@ -171,5 +172,22 @@
       "Task": "Subagent (Task)"
     }
   },
-  "back": "Back"
+  "back": "Back",
+  "usage": {
+    "title": "Usage",
+    "description": "Track completed model runs recorded on this device.",
+    "range7d": "7 days",
+    "range30d": "30 days",
+    "rangeAll": "All time",
+    "totalTokens": "Total tokens",
+    "inputTokens": "Input",
+    "outputTokens": "Output",
+    "cacheTokens": "Cache",
+    "runs": "Runs",
+    "empty": "No usage recorded for this range.",
+    "loading": "Loading usage...",
+    "error": "Usage failed to load.",
+    "refresh": "Refresh",
+    "retry": "Retry"
+  }
 }

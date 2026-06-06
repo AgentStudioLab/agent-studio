@@ -1,8 +1,22 @@
-import { afterEach, describe, expect, it, mock } from "bun:test";
-import { cleanup, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 globalThis.getComputedStyle = window.getComputedStyle.bind(window);
+
+const makeMatchMedia = (matches: boolean) =>
+  (query: string) =>
+    ({
+      matches,
+      media: query,
+      onchange: null,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+      addListener: () => undefined,
+      removeListener: () => undefined,
+      dispatchEvent: () => false,
+    }) as MediaQueryList;
 
 mock.module("react-i18next", () => ({
   I18nextProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
@@ -17,6 +31,8 @@ mock.module("react-i18next", () => ({
         "sidebar.user.settings": "Settings",
         "sidebar.user.signedIn": "Signed in",
         "sidebar.user.signedOut": "Not signed in",
+        "sidebar.user.switchToDark": "Switch to dark mode",
+        "sidebar.user.switchToLight": "Switch to light mode",
       };
       return translations[key] ?? key;
     },
@@ -32,13 +48,30 @@ mock.module("@/components/ui/popover", () => ({
 const { UserBar } = require("./UserBar") as typeof import("./UserBar");
 const { UserPopover } = require("./UserPopover") as typeof import("./UserPopover");
 
+const renderUserBar = (ui: ReactNode) =>
+  render(<TooltipProvider delayDuration={200}>{ui}</TooltipProvider>);
+
+beforeEach(() => {
+  Object.defineProperty(window, "matchMedia", {
+    configurable: true,
+    writable: true,
+    value: makeMatchMedia(false),
+  });
+  Object.defineProperty(globalThis, "localStorage", {
+    configurable: true,
+    value: window.localStorage,
+  });
+  window.localStorage.clear();
+  document.documentElement.setAttribute("data-mode", "light");
+});
+
 afterEach(() => {
   cleanup();
 });
 
 describe("UserBar", () => {
   it("shows only avatar and display name in the sidebar account bar", () => {
-    const { container } = render(
+    const { container } = renderUserBar(
       <UserBar
         signedIn
         userId="user-1234567890"
@@ -57,7 +90,7 @@ describe("UserBar", () => {
   });
 
   it("uses the signed-in fallback name in the sidebar account bar without showing account id or credits", () => {
-    const { container } = render(<UserBar signedIn userId="user-1234567890" credits={12} />);
+    const { container } = renderUserBar(<UserBar signedIn userId="user-1234567890" credits={12} />);
 
     const accountButton = container.querySelector("button");
     expect(accountButton?.textContent).toContain("Signed in");
@@ -66,7 +99,7 @@ describe("UserBar", () => {
   });
 
   it("shows the user's image in the sidebar account bar when an avatar URL is available", () => {
-    const { container } = render(
+    const { container } = renderUserBar(
       <UserBar
         signedIn
         userId="user-1"
@@ -78,6 +111,20 @@ describe("UserBar", () => {
     expect(container.querySelector("button img")?.getAttribute("src")).toBe(
       "https://example.test/uploads/avatar.png",
     );
+  });
+
+  it("keeps theme switching as a separate sidebar action from the account menu", () => {
+    renderUserBar(<UserBar signedIn={false} />);
+
+    const accountButton = screen.getByRole("button", { name: /Not signed in/i });
+    const themeButton = screen.getByRole("button", { name: "Switch to dark mode" });
+    expect(themeButton).not.toBe(accountButton);
+
+    fireEvent.click(themeButton);
+
+    expect(document.documentElement.getAttribute("data-mode")).toBe("dark");
+    expect(window.localStorage.getItem("preferred_theme_mode")).toBe("dark");
+    expect(screen.getByRole("button", { name: "Switch to light mode" })).toBeDefined();
   });
 
   it("keeps the signed-in user's account details in the account menu", () => {

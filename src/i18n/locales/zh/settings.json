@@ -6,7 +6,8 @@
     "model": "模型",
     "permissions": "权限",
     "remoteConnections": "远程连接",
-    "appearance": "外观"
+    "appearance": "外观",
+    "usage": "用量统计"
   },
   "saveButton": "保存",
   "profile": {
@@ -171,5 +172,22 @@
       "Task": "子任务（subagent）"
     }
   },
-  "back": "返回"
+  "back": "返回",
+  "usage": {
+    "title": "用量统计",
+    "description": "查看本机已完成模型运行的 token 和缓存用量汇总。",
+    "range7d": "近 7 天",
+    "range30d": "近 30 天",
+    "rangeAll": "全部时间",
+    "totalTokens": "总 token",
+    "inputTokens": "输入",
+    "outputTokens": "输出",
+    "cacheTokens": "缓存",
+    "runs": "运行次数",
+    "empty": "当前范围内暂无用量记录。",
+    "loading": "正在加载用量...",
+    "error": "用量加载失败。",
+    "refresh": "刷新",
+    "retry": "重试"
+  }
 }

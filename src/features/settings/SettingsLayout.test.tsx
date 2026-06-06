@@ -14,6 +14,7 @@ mock.module("react-i18next", () => ({
         "settings.nav.account": "Account",
         "settings.nav.model": "Model",
         "settings.nav.permissions": "Permissions",
+        "settings.nav.usage": "Usage",
         "settings.nav.appearance": "Appearance",
         "settings.nav.remoteConnections": "Remote Connections",
       };
@@ -34,6 +35,7 @@ function renderSettingsLayout(path = "/settings/account") {
           <Route path="permissions" element={<div>Permissions panel</div>} />
           <Route path="appearance" element={<div>Appearance panel</div>} />
           <Route path="remote-connections" element={<div>Remote Connections panel</div>} />
+          <Route path="usage" element={<div>Usage panel</div>} />
         </Route>
       </Routes>
     </MemoryRouter>,
@@ -51,5 +53,13 @@ describe("SettingsLayout", () => {
     expect(screen.getByRole("link", { name: "Permissions" }).querySelector("svg")).not.toBeNull();
     expect(screen.getByRole("link", { name: "Appearance" }).querySelector("svg")).not.toBeNull();
     expect(screen.getByRole("link", { name: "Remote Connections" }).querySelector("svg")).not.toBeNull();
+    expect(screen.getByRole("link", { name: "Usage" }).querySelector("svg")).not.toBeNull();
+  });
+
+  it("renders the usage panel from the usage navigation route", () => {
+    renderSettingsLayout("/settings/usage");
+
+    expect(screen.getByText("Usage panel")).toBeDefined();
+    expect(screen.getByRole("link", { name: "Usage" }).getAttribute("aria-current")).toBe("page");
   });
 });

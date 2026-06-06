@@ -46,6 +46,8 @@
     "logout": "退出登录",
     "signedIn": "已登录",
     "signedOut": "未登录",
+    "switchToDark": "切换到暗黑模式",
+    "switchToLight": "切换到明亮模式",
     "accountId": "账号 {{id}}",
     "credits": "{{count}} 积分",
     "loginWaitTitle": "正在等待浏览器授权",

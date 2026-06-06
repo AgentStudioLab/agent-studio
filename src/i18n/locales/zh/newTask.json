@@ -1,7 +1,8 @@
 {
   "defaultTitle": "新任务",
   "welcome": {
-    "heading": "来，把你清单上的事搞定一件",
+    "heading": "把任务交给我，今天推进到结果",
+    "subtitle": "说清目标、选定项目目录，我会拆解步骤、调用工具，把进展落到你的工作区。",
     "learnMore": "了解如何安全地使用 Agent Studio。"
   },
   "input": {

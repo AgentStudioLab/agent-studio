@@ -1,7 +1,8 @@
 {
   "defaultTitle": "New task",
   "welcome": {
-    "heading": "Let's knock something off your list",
+    "heading": "Hand me the task. We will move it forward today.",
+    "subtitle": "Describe the goal, choose a project folder, and I will break down the steps, use tools, and land the progress in your workspace.",
     "learnMore": "Learn how to use Agent Studio safely."
   },
   "input": {

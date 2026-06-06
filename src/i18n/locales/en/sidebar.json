@@ -46,6 +46,8 @@
     "logout": "Logout",
     "signedIn": "Signed in",
     "signedOut": "Not signed in",
+    "switchToDark": "Switch to dark mode",
+    "switchToLight": "Switch to light mode",
     "accountId": "ID {{id}}",
     "credits": "{{count}} credits",
     "loginWaitTitle": "Waiting for browser authorization",

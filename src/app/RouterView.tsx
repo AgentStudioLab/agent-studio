@@ -14,6 +14,7 @@ import { ModelSection } from "@/features/settings/sections/ModelSection";
 import { PermissionsSection } from "@/features/settings/sections/PermissionsSection";
 import { AppearanceSection } from "@/features/settings/sections/AppearanceSection";
 import { RemoteConnectionsSection } from "@/features/settings/sections/RemoteConnectionsSection";
+import { UsageSection } from "@/features/settings/sections/UsageSection";
 
 /**
  * Route ↔ view mapping. Entity ids (threadId, agentId, scheduledId) come
@@ -43,6 +44,7 @@ export function RouterView() {
         <Route path="permissions" element={<PermissionsSection />} />
         <Route path="remote-connections" element={<RemoteConnectionsSection />} />
         <Route path="appearance" element={<AppearanceSection />} />
+        <Route path="usage" element={<UsageSection />} />
       </Route>
       {/* Unknown URLs land on the New Task screen rather than a blank route. */}
       <Route path="*" element={<Navigate to="/" replace />} />

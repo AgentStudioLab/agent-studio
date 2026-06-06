@@ -42,23 +42,29 @@ export class UsageService {
     `);
     this.aggregate = db.prepare(`
       SELECT
-        COALESCE(SUM(input_tokens), 0)  AS inputTokens,
-        COALESCE(SUM(output_tokens), 0) AS outputTokens,
-        COALESCE(SUM(cache_creation_tokens), 0) AS cacheCreationTokens,
-        COALESCE(SUM(cache_read_tokens), 0)     AS cacheReadTokens,
-        COALESCE(SUM(cost_usd), 0)              AS totalCostUsd,
-        COUNT(DISTINCT run_id)                  AS runCount
-      FROM usage_ledger WHERE ts >= ? AND ts < ?
+        COALESCE(SUM(l.input_tokens), 0)  AS inputTokens,
+        COALESCE(SUM(l.output_tokens), 0) AS outputTokens,
+        COALESCE(SUM(l.cache_creation_tokens), 0) AS cacheCreationTokens,
+        COALESCE(SUM(l.cache_read_tokens), 0)     AS cacheReadTokens,
+        COALESCE(SUM(l.cost_usd), 0)              AS totalCostUsd,
+        COUNT(DISTINCT l.run_id)                  AS runCount
+      FROM usage_ledger l
+      -- 设置里的本机用量只展示真正跑完的记录，避免 running/error/cancelled 的中间态污染统计。
+      JOIN runs r ON r.id = l.run_id AND r.status = 'completed'
+      WHERE l.ts >= ? AND l.ts < ?
     `);
     this.aggregateByThread = db.prepare(`
       SELECT
-        COALESCE(SUM(input_tokens), 0)  AS inputTokens,
-        COALESCE(SUM(output_tokens), 0) AS outputTokens,
-        COALESCE(SUM(cache_creation_tokens), 0) AS cacheCreationTokens,
-        COALESCE(SUM(cache_read_tokens), 0)     AS cacheReadTokens,
-        COALESCE(SUM(cost_usd), 0)              AS totalCostUsd,
-        COUNT(DISTINCT run_id)                  AS runCount
-      FROM usage_ledger WHERE ts >= ? AND ts < ? AND thread_id = ?
+        COALESCE(SUM(l.input_tokens), 0)  AS inputTokens,
+        COALESCE(SUM(l.output_tokens), 0) AS outputTokens,
+        COALESCE(SUM(l.cache_creation_tokens), 0) AS cacheCreationTokens,
+        COALESCE(SUM(l.cache_read_tokens), 0)     AS cacheReadTokens,
+        COALESCE(SUM(l.cost_usd), 0)              AS totalCostUsd,
+        COUNT(DISTINCT l.run_id)                  AS runCount
+      FROM usage_ledger l
+      -- thread 过滤仍保留给既有 API，但首版 Settings 页面不会暴露该过滤入口。
+      JOIN runs r ON r.id = l.run_id AND r.status = 'completed'
+      WHERE l.ts >= ? AND l.ts < ? AND l.thread_id = ?
     `);
   }
 
