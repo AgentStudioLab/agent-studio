@@ -9,10 +9,18 @@ import type {
 import { toUnifiedIncomingMessage } from "./WeixinAdapter";
 import { createWeixinMonitor, sendWeixinOutgoing } from "./WeixinMonitor";
 
+type WeixinPluginDeps = {
+  createMonitor?: typeof createWeixinMonitor;
+  sendOutgoing?: typeof sendWeixinOutgoing;
+  dataDir?: string;
+};
+
 export class WeixinPlugin implements ChannelPlugin {
   readonly type = "weixin" as const;
   private handler: ((message: UnifiedIncomingMessage) => Promise<void>) | null = null;
   private aborters = new Map<string, AbortController>();
+
+  constructor(private deps: WeixinPluginDeps = {}) {}
 
   async start(connection: ChannelConnection): Promise<void> {
     const credentials = connection.credentials ?? {};
@@ -23,13 +31,15 @@ export class WeixinPlugin implements ChannelPlugin {
         ? credentials.baseUrl
         : "https://ilinkai.weixin.qq.com";
     if (!accountId || !botToken) throw new Error("WeChat accountId and botToken are required");
+    this.aborters.get(connection.id)?.abort();
     const abort = new AbortController();
     this.aborters.set(connection.id, abort);
-    const monitor = createWeixinMonitor({
+    const monitor = (this.deps.createMonitor ?? createWeixinMonitor)({
       baseUrl,
       token: botToken,
       accountId,
-      dataDir: join(homedir(), ".agent-studio"),
+      dataDir: this.deps.dataDir ?? join(homedir(), ".agent-studio"),
+      abortSignal: abort.signal,
       onMessage: async (incoming) => {
         await this.handler?.(
           toUnifiedIncomingMessage({
@@ -74,7 +84,7 @@ export class WeixinPlugin implements ChannelPlugin {
       typeof credentials.baseUrl === "string"
         ? credentials.baseUrl
         : "https://ilinkai.weixin.qq.com";
-    await sendWeixinOutgoing({
+    await (this.deps.sendOutgoing ?? sendWeixinOutgoing)({
       baseUrl,
       token: botToken,
       accountId,

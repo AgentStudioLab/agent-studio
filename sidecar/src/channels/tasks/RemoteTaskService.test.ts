@@ -57,7 +57,7 @@ afterEach(() => {
 
 describe("RemoteTaskService", () => {
   it("creates task dirs, conversation, run row and starts a remote run", async () => {
-    const { root, connections, db, started, service } = makeDeps();
+    const { root, connections, db, messages, started, service } = makeDeps();
     const inputFile = join(root, "incoming.txt");
     writeFileSync(inputFile, "hello");
     const connection = connections.create({
@@ -90,6 +90,12 @@ describe("RemoteTaskService", () => {
       threadId: task.conversationId,
       permissionMode: "act-without-asking",
     });
+    const turns = messages.listByThreadGrouped(task.conversationId);
+    expect(turns[0]).toMatchObject({
+      role: "user",
+      content: "summarize\n\nAttachments:\n- incoming.txt",
+    });
+    expect((started[0] as { userMessageId: string }).userMessageId).toBe(turns[0]!.id);
     expect((started[0] as { prompt: string }).prompt).toContain("summarize");
     expect((started[0] as { appendContextExtra: string }).appendContextExtra).toContain(
       task.outputDir,
@@ -97,6 +103,104 @@ describe("RemoteTaskService", () => {
     expect(
       db.prepare("SELECT status, reply_state FROM remote_tasks WHERE id = ?").get(task.id),
     ).toEqual({ status: "running", reply_state: "pending" });
+  });
+
+  it("starts a remote run for text-only IM requests", async () => {
+    const { root, connections, messages, started, service } = makeDeps();
+    const connection = connections.create({
+      type: "weixin",
+      name: "WeChat",
+      config: {
+        permissionStrategy: "auto_execute",
+        defaultWorkspace: root,
+      },
+    });
+
+    const task = await service.createReadyTask({
+      connectionId: connection.id,
+      channelType: "weixin",
+      chatId: "chat_1",
+      senderId: "sender_1",
+      displayName: "Alice",
+      instructionText: "帮我解释一下 TypeScript 的泛型",
+      attachments: [],
+      contextToken: "ctx_1",
+    });
+
+    expect(existsSync(task.inputDir)).toBe(true);
+    expect(existsSync(task.outputDir)).toBe(true);
+    expect(messages.listByThreadGrouped(task.conversationId)[0]).toMatchObject({
+      role: "user",
+      content: "帮我解释一下 TypeScript 的泛型",
+    });
+    expect(started).toHaveLength(1);
+    expect((started[0] as { prompt: string }).prompt).toContain(
+      "帮我解释一下 TypeScript 的泛型",
+    );
+    expect((started[0] as { prompt: string }).prompt).toContain(
+      "This request came from a remote IM channel.",
+    );
+    expect((started[0] as { prompt: string }).prompt).not.toContain("Input files are in:");
+    expect((started[0] as { appendContextExtra: string }).appendContextExtra).toContain(
+      "[AGENT_WORKS_REMOTE_SEND]",
+    );
+  });
+
+  it("shows attachment-only IM requests as a normal user turn with attachments", async () => {
+    const { root, connections, messages, started, service } = makeDeps();
+    const inputFile = join(root, "incoming.txt");
+    writeFileSync(inputFile, "hello");
+    const connection = connections.create({
+      type: "weixin",
+      name: "WeChat",
+      config: { permissionStrategy: "auto_execute", defaultWorkspace: root },
+    });
+
+    const task = await service.createReadyTask({
+      connectionId: connection.id,
+      channelType: "weixin",
+      chatId: "chat_1",
+      senderId: "sender_1",
+      instructionText: "Received remote attachments.",
+      attachments: [{ type: "file", path: inputFile, name: "incoming.txt" }],
+    });
+
+    expect(messages.listByThreadGrouped(task.conversationId)[0]).toMatchObject({
+      role: "user",
+      content: "Attachments:\n- incoming.txt",
+    });
+    expect((started[0] as { prompt: string }).prompt).toContain(
+      "The remote user sent attachments without additional text.",
+    );
+  });
+
+  it("reuses the channel session conversation for later messages in the same chat", async () => {
+    const { root, connections, started, service } = makeDeps();
+    const connection = connections.create({
+      type: "weixin",
+      name: "WeChat",
+      config: { permissionStrategy: "auto_execute", defaultWorkspace: root },
+    });
+
+    const first = await service.createReadyTask({
+      connectionId: connection.id,
+      channelType: "weixin",
+      chatId: "chat_1",
+      senderId: "sender_1",
+      instructionText: "first question",
+      attachments: [],
+    });
+    const second = await service.createReadyTask({
+      connectionId: connection.id,
+      channelType: "weixin",
+      chatId: "chat_1",
+      senderId: "sender_1",
+      instructionText: "follow up",
+      attachments: [],
+    });
+
+    expect(second.conversationId).toBe(first.conversationId);
+    expect((started[1] as { threadId: string }).threadId).toBe(first.conversationId);
   });
 
   it("marks completed, strips protocol blocks, sends summary and output files", async () => {

@@ -38,104 +38,91 @@ function message(input: Partial<UnifiedIncomingMessage>): UnifiedIncomingMessage
 }
 
 describe("RemoteTaskAggregator", () => {
-  it("is ready immediately for text then file", async () => {
+  it("is ready immediately for text-only messages", async () => {
     const sessions = new FakeSessions();
     const aggregator = new RemoteTaskAggregator({
       sessions: sessions as unknown as ChannelSessionService,
       waitMs: 30_000,
     });
 
-    expect(await aggregator.ingest(message({ text: "summarize", contextToken: "ctx_1" }))).toEqual({
-      type: "wait_for_file",
-    });
-    const result = await aggregator.ingest(
-      message({
-        attachments: [{ type: "file", path: "/tmp/a.txt", name: "a.txt" }],
-        contextToken: "ctx_2",
-      }),
-    );
+    const result = await aggregator.ingest(message({ text: "summarize", contextToken: "ctx_1" }));
 
     expect(result).toEqual({
       type: "ready",
       instructionText: "summarize",
-      attachments: [{ type: "file", path: "/tmp/a.txt", name: "a.txt" }],
-      contextToken: "ctx_2",
+      attachments: [],
+      contextToken: "ctx_1",
     });
   });
 
-  it("is ready immediately for file then text", async () => {
+  it("is ready immediately for file-only messages", async () => {
     const aggregator = new RemoteTaskAggregator({
       sessions: new FakeSessions() as unknown as ChannelSessionService,
       waitMs: 30_000,
+    });
+
+    const result = await aggregator.ingest(
+      message({
+        attachments: [{ type: "image", path: "/tmp/a.png", name: "a.png" }],
+        contextToken: "ctx_file",
+      }),
+    );
+
+    expect(result).toMatchObject({
+      type: "ready",
+      instructionText: "Received remote attachments.",
+      attachments: [{ type: "image", path: "/tmp/a.png", name: "a.png" }],
+      contextToken: "ctx_file",
+    });
+  });
+
+  it("does not keep text-only messages pending for file follow-up", async () => {
+    let now = 1_000;
+    const aggregator = new RemoteTaskAggregator({
+      sessions: new FakeSessions() as unknown as ChannelSessionService,
+      waitMs: 30_000,
+      now: () => now,
+    });
+
+    expect(await aggregator.ingest(message({ text: "please process", timestamp: now }))).toEqual({
+      type: "ready",
+      instructionText: "please process",
+      attachments: [],
+      contextToken: undefined,
+    });
+    now += 30_001;
+
+    expect(aggregator.flushExpired()).toEqual([]);
+  });
+
+  it("does not ask for instruction after file-only timeout", async () => {
+    let now = 1_000;
+    const aggregator = new RemoteTaskAggregator({
+      sessions: new FakeSessions() as unknown as ChannelSessionService,
+      waitMs: 30_000,
+      now: () => now,
     });
 
     expect(
       await aggregator.ingest(
         message({
-          attachments: [{ type: "image", path: "/tmp/a.png", name: "a.png" }],
-          contextToken: "ctx_file",
+          attachments: [{ type: "file", path: "/tmp/a.txt", name: "a.txt" }],
+          timestamp: now,
         }),
       ),
-    ).toEqual({ type: "wait_for_instruction" });
-
-    const result = await aggregator.ingest(message({ text: "describe it" }));
-
-    expect(result).toMatchObject({
+    ).toMatchObject({
       type: "ready",
-      instructionText: "describe it",
-      contextToken: "ctx_file",
+      instructionText: "Received remote attachments.",
     });
-  });
-
-  it("asks for file after text-only timeout", async () => {
-    let now = 1_000;
-    const aggregator = new RemoteTaskAggregator({
-      sessions: new FakeSessions() as unknown as ChannelSessionService,
-      waitMs: 30_000,
-      now: () => now,
-    });
-
-    await aggregator.ingest(message({ text: "please process", timestamp: now }));
-    now += 30_001;
-
-    expect(aggregator.flushExpired()).toEqual([
-      {
-        type: "ask_for_file",
-        connectionId: "conn_1",
-        chatId: "chat_1",
-        senderId: "sender_1",
-        text: "请继续发送要处理的文件。",
-        contextToken: undefined,
-      },
-    ]);
-  });
-
-  it("asks for instruction after file-only timeout", async () => {
-    let now = 1_000;
-    const aggregator = new RemoteTaskAggregator({
-      sessions: new FakeSessions() as unknown as ChannelSessionService,
-      waitMs: 30_000,
-      now: () => now,
-    });
-
     await aggregator.ingest(
       message({
-        attachments: [{ type: "file", path: "/tmp/a.txt", name: "a.txt" }],
+        attachments: [],
         timestamp: now,
       }),
     );
     now += 30_001;
 
-    expect(aggregator.flushExpired()).toEqual([
-      {
-        type: "ask_for_instruction",
-        connectionId: "conn_1",
-        chatId: "chat_1",
-        senderId: "sender_1",
-        text: "请继续发送任务说明。",
-        contextToken: undefined,
-      },
-    ]);
+    expect(aggregator.flushExpired()).toEqual([]);
   });
 
   it("returns busy when the session has an active task", async () => {
@@ -148,7 +135,6 @@ describe("RemoteTaskAggregator", () => {
 
     expect(await aggregator.ingest(message({ text: "new task" }))).toEqual({
       type: "busy",
-      text: "当前会话已有远程任务在执行，请等待完成后再发送新任务。",
       session: expect.objectContaining({ activeTaskId: "rt_running" }),
     });
   });

@@ -18,12 +18,15 @@ import type {
 import type { UnifiedIncomingAttachment } from "../core/PluginRegistry";
 import { resolveRemoteSendProtocol } from "./RemoteSendProtocol";
 
+const ATTACHMENT_ONLY_INSTRUCTION = "Received remote attachments.";
+
 export interface RemoteTaskRunInput {
   runId: string;
   threadId: string;
   prompt: string;
   appendContextExtra: string;
   permissionMode: "act-without-asking";
+  userMessageId: string;
   onTerminalResult: RunWorkerInput["onTerminalResult"];
 }
 
@@ -127,30 +130,39 @@ export class RemoteTaskService {
     const connection = this.deps.connections.getInternal(input.connectionId);
     if (!connection) throw new Error(`channel connection ${input.connectionId} not found`);
 
-    const conversationId = `rmt_conv_${nanoid(12)}`;
     const workingDir =
       typeof connection.config.defaultWorkspace === "string" &&
       connection.config.defaultWorkspace.length > 0
         ? connection.config.defaultWorkspace
         : this.deps.dataDir ?? defaultDataDir();
-    this.deps.threads.create({
-      id: conversationId,
-      title: `Remote ${input.channelType} task`,
-      agentWorkspaceId:
-        typeof connection.config.defaultAgentId === "string"
-          ? connection.config.defaultAgentId
-          : null,
-      workingDir,
-      permissionMode: "act-without-asking",
-    });
-    const session = this.deps.sessions.getOrCreate({
-      connectionId: input.connectionId,
-      channelType: input.channelType,
-      chatId: input.chatId,
-      senderId: input.senderId,
-      displayName: input.displayName,
-      conversationId,
-    });
+    const existingSession = this.deps.sessions.find(
+      input.connectionId,
+      input.chatId,
+      input.senderId,
+    );
+    const conversationId = existingSession?.conversationId ?? `rmt_conv_${nanoid(12)}`;
+    if (!existingSession) {
+      this.deps.threads.create({
+        id: conversationId,
+        title: `Remote ${input.channelType} task`,
+        agentWorkspaceId:
+          typeof connection.config.defaultAgentId === "string"
+            ? connection.config.defaultAgentId
+            : null,
+        workingDir,
+        permissionMode: "act-without-asking",
+      });
+    }
+    const session =
+      existingSession ??
+      this.deps.sessions.getOrCreate({
+        connectionId: input.connectionId,
+        channelType: input.channelType,
+        chatId: input.chatId,
+        senderId: input.senderId,
+        displayName: input.displayName,
+        conversationId,
+      });
 
     const taskId = `rmt_${nanoid(12)}`;
     const runId = `run_${nanoid(12)}`;
@@ -192,12 +204,17 @@ export class RemoteTaskService {
     await this.deps.store.createRun(runId, conversationId);
 
     const task = this.get(taskId)!;
+    const userMessage = this.deps.messages.appendUser(
+      conversationId,
+      this.buildVisibleUserMessage(input.instructionText, input.attachments),
+    );
     await this.deps.startRun({
       runId,
       threadId: conversationId,
-      prompt: this.buildPrompt(input.instructionText, inputDir, outputDir),
-      appendContextExtra: this.buildAppendContextExtra(inputDir, outputDir),
+      prompt: this.buildPrompt(input.instructionText, input.attachments, inputDir, outputDir),
+      appendContextExtra: this.buildAppendContextExtra(input.attachments, inputDir, outputDir),
       permissionMode: "act-without-asking",
+      userMessageId: userMessage.id,
       onTerminalResult: task.onTerminalResult,
     });
 
@@ -366,22 +383,81 @@ export class RemoteTaskService {
       );
   }
 
-  private buildPrompt(instructionText: string, inputDir: string, outputDir: string): string {
+  private buildPrompt(
+    instructionText: string,
+    attachments: UnifiedIncomingAttachment[],
+    inputDir: string,
+    outputDir: string,
+  ): string {
+    const lines = [
+      "This request came from a remote IM channel.",
+      "",
+      "User request:",
+      instructionText === ATTACHMENT_ONLY_INSTRUCTION && attachments.length > 0
+        ? "The remote user sent attachments without additional text. Inspect the attachments and respond appropriately. If you need more details, ask the user in their language."
+        : instructionText,
+    ];
+
+    if (attachments.length > 0) {
+      lines.push(
+        "",
+        "Input files:",
+        ...attachments.map((attachment) => `- ${attachment.name || basename(attachment.path)}`),
+        "",
+        `Input files are in: ${inputDir}`,
+        `Write files for remote reply only under: ${outputDir}`,
+      );
+    }
+
+    return lines.join("\n");
+  }
+
+  private buildVisibleUserMessage(
+    instructionText: string,
+    attachments: UnifiedIncomingAttachment[],
+  ): string {
+    if (attachments.length === 0) return instructionText;
+    if (instructionText === ATTACHMENT_ONLY_INSTRUCTION) {
+      return [
+        "Attachments:",
+        ...attachments.map((attachment) => `- ${attachment.name || basename(attachment.path)}`),
+      ].join("\n");
+    }
     return [
       instructionText,
       "",
-      `Input files are in: ${inputDir}`,
-      `Write files for remote reply only under: ${outputDir}`,
+      "Attachments:",
+      ...attachments.map((attachment) => `- ${attachment.name || basename(attachment.path)}`),
     ].join("\n");
   }
 
-  private buildAppendContextExtra(inputDir: string, outputDir: string): string {
-    return [
-      "Remote IM task context:",
-      `- Input directory: ${inputDir}`,
-      `- Output directory: ${outputDir}`,
-      "- Only files in the output directory can be sent back with [AGENT_WORKS_REMOTE_SEND].",
-    ].join("\n");
+  private buildAppendContextExtra(
+    attachments: UnifiedIncomingAttachment[],
+    inputDir: string,
+    outputDir: string,
+  ): string {
+    const lines = [
+      "Remote IM channel context:",
+      "- Answer the remote user directly. Generate all user-visible text through the model response; do not rely on fixed channel-side text.",
+      "- Match the user's language when possible.",
+    ];
+
+    if (attachments.length > 0) {
+      lines.push(
+        `- Input directory: ${inputDir}`,
+        `- Output directory: ${outputDir}`,
+        "- If files or images should be sent back, save final deliverables under the output directory and append one protocol block per file:",
+        '  [AGENT_WORKS_REMOTE_SEND]{"type":"file","path":"<output-file-path>","fileName":"<optional-name>"}[/AGENT_WORKS_REMOTE_SEND]',
+        "- Only files in the output directory can be sent back with [AGENT_WORKS_REMOTE_SEND].",
+      );
+    } else {
+      lines.push(
+        "- This message may be a normal question with no attachment. Reply normally; do not ask for a file unless the user's request specifically requires one.",
+        "- If a later answer needs to send a generated file or image, use [AGENT_WORKS_REMOTE_SEND] only after creating that file under the task output directory.",
+      );
+    }
+
+    return lines.join("\n");
   }
 
   private assistantTextFromRunEvents(runId: string): string {

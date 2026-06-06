@@ -7,6 +7,8 @@ import type {
   RemoteTaskService,
 } from "../tasks/RemoteTaskService";
 
+const BUSY_TEXT = "当前会话已有远程任务在执行，请等待完成后再发送新任务。";
+
 export class ChannelManager {
   private handlersAttached = false;
 
@@ -103,7 +105,7 @@ export class ChannelManager {
       return;
     }
     if (result.type === "busy") {
-      await this.sendText(message.channelType, message.connectionId, message.chatId, result.text, message.contextToken);
+      await this.sendText(message.channelType, message.connectionId, message.chatId, BUSY_TEXT, message.contextToken);
     }
   }
 
@@ -115,12 +117,24 @@ export class ChannelManager {
     contextToken?: string,
   ): Promise<void> {
     const plugin = this.deps.registry.require(channelType);
-    await plugin.send(connectionId, {
+    const message = {
       chatId,
       ...(contextToken ? { contextToken } : {}),
       type: "text",
       text,
-    });
+    } as const;
+    const withConnection = plugin as typeof plugin & {
+      sendWithConnection?: (
+        connection: NonNullable<ReturnType<ChannelConnectionService["getInternal"]>>,
+        message: Parameters<typeof plugin.send>[1],
+      ) => Promise<void>;
+    };
+    const connection = this.deps.connections.getInternal(connectionId);
+    if (connection && withConnection.sendWithConnection) {
+      await withConnection.sendWithConnection(connection, message);
+      return;
+    }
+    await plugin.send(connectionId, message);
   }
 }
 

@@ -108,6 +108,23 @@ describe("WeixinMonitor", () => {
     });
   });
 
+  it("treats long-poll timeout as an empty poll", async () => {
+    const root = makeRoot();
+    const fetchImpl = mock(async () => {
+      throw new DOMException("The operation timed out.", "TimeoutError");
+    });
+    const monitor = createWeixinMonitor({
+      baseUrl: "https://ilink.example",
+      token: "token_1",
+      accountId: "bot_1",
+      dataDir: root,
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+    });
+
+    await expect(monitor.pollOnce()).resolves.toBeUndefined();
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
   it("sends outgoing text and files through sendmessage/getuploadurl/CDN upload", async () => {
     const root = makeRoot();
     const file = join(root, "out.txt");

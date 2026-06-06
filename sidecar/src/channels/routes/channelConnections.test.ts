@@ -16,8 +16,17 @@ import { RemoteTaskAggregator } from "../tasks/RemoteTaskAggregator";
 import { RemoteTaskService } from "../tasks/RemoteTaskService";
 import type { RemoteTaskSendInput } from "../tasks/RemoteTaskService";
 import { FakeChannelPlugin } from "../plugins/fake/FakeChannelPlugin";
-import { buildChannelConnectionRoutes } from "./channelConnections";
+import type { ChannelConnection } from "../core/ChannelTypes";
+import type { LoginCallbacks } from "../plugins/weixin/WeixinLogin";
 import { buildRemoteTaskRoutes } from "./remoteTasks";
+
+import { buildChannelConnectionRoutes } from "./channelConnections";
+
+let runLoginFlow: LoginCallbacks | null = null;
+
+function tick(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
 
 function makeApp() {
   const root = mkdtempSync(join(tmpdir(), "channel-routes-"));
@@ -30,7 +39,16 @@ function makeApp() {
   const store = createBunSqliteRunStore(db);
   const registry = new PluginRegistry();
   const fake = new FakeChannelPlugin();
+  const started: ChannelConnection[] = [];
   registry.register(fake);
+  registry.register({
+    type: "weixin",
+    start: async (connection) => {
+      started.push(connection);
+    },
+    stop: async () => {},
+    send: async () => {},
+  });
   let manager!: ChannelManager;
   const tasks: RemoteTaskService = new RemoteTaskService({
     db,
@@ -51,9 +69,20 @@ function makeApp() {
     tasks,
   });
   const app = new Hono();
-  app.route("/", buildChannelConnectionRoutes({ connections, manager, fake }));
+  app.route(
+    "/",
+    buildChannelConnectionRoutes({
+      connections,
+      manager,
+      fake,
+      startWeixinLogin: (callbacks) => {
+        runLoginFlow = callbacks;
+        return { abort: () => {} };
+      },
+    }),
+  );
   app.route("/", buildRemoteTaskRoutes({ tasks }));
-  return { app, connections, fake };
+  return { app, connections, fake, started };
 }
 
 describe("channel connection routes", () => {
@@ -122,5 +151,66 @@ describe("channel connection routes", () => {
     expect((await recent.json()) as unknown).toMatchObject({
       tasks: [expect.objectContaining({ status: "running" })],
     });
+  });
+
+  it("persists confirmed weixin login as an enabled running connection", async () => {
+    const { app, started } = makeApp();
+
+    const login = await app.request("/channels/weixin/login/start", { method: "POST" });
+    expect(login.status).toBe(200);
+    expect(runLoginFlow).toBeTruthy();
+    runLoginFlow!.onDone({
+      accountId: "bot_1",
+      botToken: "token_1",
+      baseUrl: "https://ilink.example",
+    });
+    await tick();
+
+    const listed = await app.request("/channels/connections");
+    expect((await listed.json()) as unknown).toMatchObject({
+      connections: [
+        expect.objectContaining({
+          type: "weixin",
+          enabled: true,
+          status: "running",
+        }),
+      ],
+    });
+    expect(started).toHaveLength(1);
+  });
+
+  it("reuses the existing weixin connection after a second confirmed login", async () => {
+    const { app, connections, started } = makeApp();
+    connections.create({
+      type: "weixin",
+      name: "WeChat",
+      enabled: true,
+      status: "running",
+      credentials: {
+        accountId: "old_bot",
+        botToken: "old_token",
+        baseUrl: "https://old.example",
+      },
+      config: { permissionStrategy: "auto_execute" },
+    });
+
+    const login = await app.request("/channels/weixin/login/start", { method: "POST" });
+    expect(login.status).toBe(200);
+    runLoginFlow!.onDone({
+      accountId: "new_bot",
+      botToken: "new_token",
+      baseUrl: "https://new.example",
+    });
+    await tick();
+
+    const listed = await app.request("/channels/connections");
+    const json = (await listed.json()) as { connections: Array<{ type: string; id: string }> };
+    expect(json.connections.filter((connection) => connection.type === "weixin")).toHaveLength(1);
+    expect(connections.getInternal(json.connections[0]!.id)?.credentials).toMatchObject({
+      accountId: "new_bot",
+      botToken: "new_token",
+      baseUrl: "https://new.example",
+    });
+    expect(started).toHaveLength(1);
   });
 });

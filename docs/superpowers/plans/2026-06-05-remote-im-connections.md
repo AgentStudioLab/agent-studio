@@ -310,10 +310,10 @@ git commit -m "feat(remote-im): add remote send protocol"
 
 覆盖：
 
-- 先文本后文件，立即 ready。
-- 先文件后文本，立即 ready。
-- 只有文本 30 秒后产出 `ask_for_file`。
-- 只有文件 30 秒后产出 `ask_for_instruction`。
+- 纯文本，立即 ready。
+- 纯文件，立即 ready。
+- 只有文本不会等待文件，也不会产出 `ask_for_file`。
+- 只有文件不会等待说明，也不会产出 `ask_for_instruction`。
 - session 有 active task 时返回 busy。
 - ready 结果必须携带 `contextToken`。
 
@@ -350,8 +350,6 @@ export interface UnifiedIncomingMessage {
 ```ts
 type AggregatorResult =
   | { type: "ignored" }
-  | { type: "wait_for_file" }
-  | { type: "wait_for_instruction" }
   | { type: "busy"; text: string }
   | {
       type: "ready";

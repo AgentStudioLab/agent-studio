@@ -4,6 +4,7 @@ import type { ChannelManager } from "../core/ChannelManager";
 import type { ChannelConnectionConfig } from "../core/ChannelTypes";
 import type { FakeChannelPlugin } from "../plugins/fake/FakeChannelPlugin";
 import { startLogin } from "../plugins/weixin/WeixinLogin";
+import type { LoginCallbacks, LoginHandle } from "../plugins/weixin/WeixinLogin";
 
 type WeixinLoginState =
   | { status: "waiting"; qrUrl?: string; qrData?: string }
@@ -12,13 +13,16 @@ type WeixinLoginState =
   | { status: "error"; error: string };
 
 const weixinLoginStates = new Map<string, WeixinLoginState>();
+type StartWeixinLogin = (callbacks: LoginCallbacks) => LoginHandle;
 
 export function buildChannelConnectionRoutes(deps: {
   connections: ChannelConnectionService;
   manager: ChannelManager;
   fake?: FakeChannelPlugin;
+  startWeixinLogin?: StartWeixinLogin;
 }): Hono {
   const app = new Hono();
+  const startWeixinLogin = deps.startWeixinLogin ?? startLogin;
 
   app.get("/channels/connections", (c) => {
     return c.json({ connections: deps.connections.list() });
@@ -119,7 +123,7 @@ export function buildChannelConnectionRoutes(deps: {
   app.post("/channels/weixin/login/start", (c) => {
     const id = `wxl_${Date.now()}`;
     weixinLoginStates.set(id, { status: "waiting" });
-    startLogin({
+    startWeixinLogin({
       onQR: (qrUrl, qrData) => {
         weixinLoginStates.set(id, { status: "waiting", qrUrl, qrData });
       },
@@ -131,19 +135,39 @@ export function buildChannelConnectionRoutes(deps: {
         });
       },
       onDone: (result) => {
-        const connection = deps.connections.create({
-          type: "weixin",
-          name: "WeChat",
-          enabled: false,
-          status: "stopped",
-          credentials: {
-            accountId: result.accountId,
-            botToken: result.botToken,
-            baseUrl: result.baseUrl,
-          },
-          config: { permissionStrategy: "auto_execute" },
-        });
-        weixinLoginStates.set(id, { status: "confirmed", connectionId: connection.id });
+        const credentials = {
+          accountId: result.accountId,
+          botToken: result.botToken,
+          baseUrl: result.baseUrl,
+        };
+        const existing = deps.connections.list().find((connection) => connection.type === "weixin");
+        const connection = existing
+          ? deps.connections.update(existing.id, {
+              enabled: false,
+              credentials,
+              config: {
+                ...existing.config,
+                permissionStrategy: "auto_execute",
+              },
+            })!
+          : deps.connections.create({
+              type: "weixin",
+              name: "WeChat",
+              credentials,
+              config: { permissionStrategy: "auto_execute" },
+            });
+        void deps.manager
+          .start(connection.id)
+          .then(() => {
+            weixinLoginStates.set(id, { status: "confirmed", connectionId: connection.id });
+          })
+          .catch((error) => {
+            deps.connections.update(connection.id, { enabled: false });
+            weixinLoginStates.set(id, {
+              status: "error",
+              error: error instanceof Error ? error.message : String(error),
+            });
+          });
       },
       onError: (error) => {
         weixinLoginStates.set(id, { status: "error", error: error.message });

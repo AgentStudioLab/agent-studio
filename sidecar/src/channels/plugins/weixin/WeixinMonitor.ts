@@ -9,6 +9,7 @@ const VOICE_ITEM_TYPE = 3;
 const FILE_ITEM_TYPE = 4;
 const CDN_BASE_URL = "https://novac2c.cdn.weixin.qq.com/c2c";
 const API_TIMEOUT_MS = 15_000;
+const LONG_POLL_TIMEOUT_MS = 35_000;
 
 export interface WeixinMonitorIncoming {
   chatId: string;
@@ -46,6 +47,7 @@ interface MonitorOptions {
   accountId: string;
   dataDir: string;
   fetchImpl?: typeof fetch;
+  abortSignal?: AbortSignal;
   onMessage?: (message: WeixinMonitorIncoming) => Promise<void>;
   log?: (message: string) => void;
 }
@@ -110,9 +112,13 @@ async function apiPost<T>(
     token: string;
     wechatUin: string;
     fetchImpl: typeof fetch;
+    timeoutMs?: number;
+    signal?: AbortSignal;
   },
 ): Promise<T> {
   const body = JSON.stringify(opts.body);
+  const timeoutSignal = AbortSignal.timeout(opts.timeoutMs ?? API_TIMEOUT_MS);
+  const signal = opts.signal ? AbortSignal.any([opts.signal, timeoutSignal]) : timeoutSignal;
   const res = await opts.fetchImpl(`${trimBase(opts.baseUrl)}/${opts.endpoint}`, {
     method: "POST",
     headers: {
@@ -123,10 +129,17 @@ async function apiPost<T>(
       "X-WECHAT-UIN": opts.wechatUin,
     },
     body,
-    signal: AbortSignal.timeout(API_TIMEOUT_MS),
+    signal,
   });
   if (!res.ok) throw new Error(`${opts.endpoint} HTTP ${res.status}`);
   return (await res.json()) as T;
+}
+
+function isTimeoutError(err: unknown): boolean {
+  return (
+    err instanceof DOMException &&
+    (err.name === "TimeoutError" || err.name === "AbortError")
+  );
 }
 
 export function createWeixinMonitor(options: MonitorOptions): {
@@ -137,17 +150,28 @@ export function createWeixinMonitor(options: MonitorOptions): {
   return {
     async pollOnce(): Promise<void> {
       const buf = loadBuf(options.dataDir, options.accountId);
-      const resp = await apiPost<{
+      let resp: {
         get_updates_buf?: string;
         msgs?: WeixinRawMessage[];
-      }>({
-        baseUrl: options.baseUrl,
-        endpoint: "ilink/bot/getupdates",
-        body: { get_updates_buf: buf, base_info: {} },
-        token: options.token,
-        wechatUin,
-        fetchImpl,
-      });
+      };
+      try {
+        resp = await apiPost<{
+          get_updates_buf?: string;
+          msgs?: WeixinRawMessage[];
+        }>({
+          baseUrl: options.baseUrl,
+          endpoint: "ilink/bot/getupdates",
+          body: { get_updates_buf: buf, base_info: {} },
+          token: options.token,
+          wechatUin,
+          fetchImpl,
+          timeoutMs: LONG_POLL_TIMEOUT_MS,
+          signal: options.abortSignal,
+        });
+      } catch (err) {
+        if (isTimeoutError(err)) return;
+        throw err;
+      }
       if (resp.get_updates_buf) saveBuf(options.dataDir, options.accountId, resp.get_updates_buf);
       for (const raw of resp.msgs ?? []) {
         const incoming = await rawToIncoming(raw, options.dataDir, fetchImpl);

@@ -106,7 +106,10 @@
     "enable": "Enable",
     "disable": "Disable",
     "fakeTrigger": "Send fake incoming",
+    "addWeixin": "Add WeChat connection",
     "startWeixin": "Start WeChat login",
+    "reconnectWeixin": "Reconnect WeChat",
+    "weixinQrAlt": "WeChat login QR code",
     "experimental": "Experimental",
     "status": {
       "waiting": "Waiting for scan",

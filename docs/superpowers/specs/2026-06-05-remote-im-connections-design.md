@@ -207,11 +207,11 @@ connectionId + chatId + senderId
 
 ```text
 收到文本
-  -> 没有 pending 文件：awaiting_file，30 秒后追问“请继续发送要处理的文件”
+  -> 没有 pending 文件：ready -> running（普通远程 IM 请求）
   -> 已有 pending 文件：ready -> running
 
 收到文件/图片
-  -> 没有 pending 文本：awaiting_instruction，30 秒后追问“已收到文件，请发送修改要求”
+  -> 没有 pending 文本：ready -> running（附件远程 IM 请求）
   -> 已有 pending 文本：ready -> running
 ```
 

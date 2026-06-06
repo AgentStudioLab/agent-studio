@@ -292,6 +292,7 @@ const remoteTaskService = new RemoteTaskService({
       usage,
       permissionMode: input.permissionMode,
       appendContextExtra: input.appendContextExtra,
+      userMessageId: input.userMessageId,
       onTerminalResult: input.onTerminalResult,
     });
   },

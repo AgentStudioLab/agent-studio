@@ -106,7 +106,10 @@
     "enable": "启用",
     "disable": "停用",
     "fakeTrigger": "发送 fake 入站",
+    "addWeixin": "添加微信连接",
     "startWeixin": "开始微信登录",
+    "reconnectWeixin": "重新连接微信",
+    "weixinQrAlt": "微信登录二维码",
     "experimental": "实验性",
     "status": {
       "waiting": "等待扫码",

@@ -11,7 +11,7 @@
 
 - [ ] 扫码登录返回 confirmed，生成 connection。
 - [ ] 手动 enable connection 后状态变为 running。
-- [ ] 微信发送纯文本，sidecar 日志出现 getupdates 入站消息。
+- [ ] 微信发送纯文本问题，sidecar 日志出现 getupdates 入站消息，并且微信收到 AI 生成的文本回复。
 - [ ] 微信发送文件或图片，sidecar 下载到数据目录，日志显示 attachment path。
 - [ ] fake channel 自动化 E2E 已通过。
 - [ ] 微信发送文件和说明后，如果 run 成功，微信收到摘要。

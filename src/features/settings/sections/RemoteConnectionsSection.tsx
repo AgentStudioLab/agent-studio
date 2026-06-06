@@ -1,4 +1,5 @@
 import { Cable, FlaskConical } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import {
@@ -6,13 +7,15 @@ import {
   useChannelConnections,
   useWeixinLogin,
 } from "@/lib/data/channel-connections-queries";
-import type { ChannelConnection } from "@/lib/data/channel-connections";
+import type { ChannelConnection, WeixinLoginStatus } from "@/lib/data/channel-connections";
 
 export function RemoteConnectionsSection() {
   const { t } = useTranslation();
   const { data: connections = [], isLoading } = useChannelConnections();
   const actions = useChannelConnectionActions();
   const weixinLogin = useWeixinLogin();
+  const visibleConnections = normalizeRemoteConnections(connections);
+  const hasWeixinConnection = visibleConnections.some((connection) => connection.type === "weixin");
 
   return (
     <section className="space-y-5">
@@ -25,42 +28,45 @@ export function RemoteConnectionsSection() {
         </p>
       </div>
 
-      <div className="rounded-lg border border-border bg-card p-4">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-            <FlaskConical className="size-4" />
-            <span>WeChat</span>
+      {!hasWeixinConnection ? (
+        <div className="rounded-lg border border-border bg-card p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+              <FlaskConical className="size-4" />
+              <span>{t("settings.remoteConnections.addWeixin")}</span>
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              onClick={() => weixinLogin.start.mutate()}
+            >
+              {t("settings.remoteConnections.startWeixin")}
+            </Button>
           </div>
-          <Button
-            type="button"
-            size="sm"
-            variant="secondary"
-            onClick={() => weixinLogin.start.mutate()}
-          >
-            {t("settings.remoteConnections.startWeixin")}
-          </Button>
+          {weixinLogin.status ? <WeixinLoginStatusPanel status={weixinLogin.status} /> : null}
         </div>
-        {weixinLogin.status ? (
-          <p className="mt-3 text-sm text-muted-foreground">
-            {t(`settings.remoteConnections.status.${weixinLogin.status.status}`)}
-          </p>
-        ) : null}
-      </div>
+      ) : null}
+
+      {hasWeixinConnection && weixinLogin.status ? (
+        <WeixinLoginStatusPanel status={weixinLogin.status} />
+      ) : null}
 
       <div className="space-y-3">
         {isLoading ? (
           <p className="text-sm text-muted-foreground">...</p>
-        ) : connections.length === 0 ? (
+        ) : visibleConnections.length === 0 ? (
           <p className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">
             {t("settings.remoteConnections.empty")}
           </p>
         ) : (
-          connections.map((connection) => (
+          visibleConnections.map((connection) => (
             <ConnectionRow
               key={connection.id}
               connection={connection}
               onEnable={() => actions.enable.mutate(connection.id)}
               onDisable={() => actions.disable.mutate(connection.id)}
+              onReconnectWeixin={() => weixinLogin.start.mutate()}
               onFakeIncoming={() =>
                 actions.fakeIncoming.mutate([
                   connection.id,
@@ -79,14 +85,58 @@ export function RemoteConnectionsSection() {
   );
 }
 
+function normalizeRemoteConnections(connections: ChannelConnection[]): ChannelConnection[] {
+  const weixin = connections.find((connection) => connection.type === "weixin" && connection.status === "running")
+    ?? connections.find((connection) => connection.type === "weixin");
+  return connections.filter((connection) => connection.type !== "weixin" || connection.id === weixin?.id);
+}
+
+function WeixinLoginStatusPanel({ status }: { status: WeixinLoginStatus }) {
+  const { t } = useTranslation();
+  const rawQr = "qrData" in status ? status.qrData : null;
+  const qrValue = "qrUrl" in status && status.qrUrl ? status.qrUrl : rawQr;
+
+  return (
+    <div className="mt-3 space-y-3">
+      <p className="text-sm text-muted-foreground">
+        {t(`settings.remoteConnections.status.${status.status}`)}
+      </p>
+      {qrValue ? (
+        <div className="inline-flex rounded-lg border border-border bg-background p-3">
+          <QRCodeSVG
+            value={qrValue}
+            size={160}
+            role="img"
+            aria-label={t("settings.remoteConnections.weixinQrAlt")}
+          />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function ConnectionRow(props: {
   connection: ChannelConnection;
   onEnable: () => void;
   onDisable: () => void;
+  onReconnectWeixin: () => void;
   onFakeIncoming: () => void;
 }) {
   const { t } = useTranslation();
   const { connection } = props;
+  const shouldReconnectWeixin =
+    connection.type === "weixin" &&
+    (!connection.enabled || connection.status === "stopped" || connection.status === "error");
+  const actionLabel = shouldReconnectWeixin
+    ? t("settings.remoteConnections.reconnectWeixin")
+    : connection.enabled
+      ? t("settings.remoteConnections.disable")
+      : t("settings.remoteConnections.enable");
+  const actionHandler = shouldReconnectWeixin
+    ? props.onReconnectWeixin
+    : connection.enabled
+      ? props.onDisable
+      : props.onEnable;
   return (
     <div className="rounded-lg border border-border bg-card p-4">
       <div className="flex items-start justify-between gap-3">
@@ -118,11 +168,9 @@ function ConnectionRow(props: {
             type="button"
             size="sm"
             variant={connection.enabled ? "secondary" : "default"}
-            onClick={connection.enabled ? props.onDisable : props.onEnable}
+            onClick={actionHandler}
           >
-            {connection.enabled
-              ? t("settings.remoteConnections.disable")
-              : t("settings.remoteConnections.enable")}
+            {actionLabel}
           </Button>
         </div>
       </div>
