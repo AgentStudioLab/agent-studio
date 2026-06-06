@@ -186,6 +186,63 @@ CREATE TABLE IF NOT EXISTS agent_links (
 );
 CREATE INDEX IF NOT EXISTS idx_agent_links_agent ON agent_links (agent_workspace_id);
 
+CREATE TABLE IF NOT EXISTS channel_connections (
+  id                TEXT PRIMARY KEY,
+  type              TEXT NOT NULL,
+  name              TEXT NOT NULL,
+  enabled           INTEGER NOT NULL DEFAULT 0,
+  status            TEXT NOT NULL,
+  credentials_json  TEXT,
+  config_json       TEXT NOT NULL,
+  last_connected_at INTEGER,
+  error_msg         TEXT,
+  created_at        INTEGER NOT NULL,
+  updated_at        INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_channel_connections_type ON channel_connections (type);
+CREATE INDEX IF NOT EXISTS idx_channel_connections_enabled ON channel_connections (enabled);
+
+CREATE TABLE IF NOT EXISTS channel_sessions (
+  id              TEXT PRIMARY KEY,
+  connection_id   TEXT NOT NULL REFERENCES channel_connections(id) ON DELETE CASCADE,
+  channel_type    TEXT NOT NULL,
+  chat_id         TEXT NOT NULL,
+  sender_id       TEXT NOT NULL,
+  display_name    TEXT,
+  conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+  active_task_id  TEXT,
+  created_at      INTEGER NOT NULL,
+  updated_at      INTEGER NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_channel_sessions_identity
+  ON channel_sessions (connection_id, chat_id, sender_id);
+
+CREATE TABLE IF NOT EXISTS remote_tasks (
+  id                TEXT PRIMARY KEY,
+  session_id        TEXT NOT NULL REFERENCES channel_sessions(id) ON DELETE CASCADE,
+  connection_id     TEXT NOT NULL REFERENCES channel_connections(id) ON DELETE CASCADE,
+  conversation_id   TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+  run_id            TEXT,
+  channel_type      TEXT NOT NULL,
+  chat_id           TEXT NOT NULL,
+  sender_id         TEXT NOT NULL,
+  context_token     TEXT,
+  status            TEXT NOT NULL,
+  reply_state       TEXT NOT NULL DEFAULT 'pending',
+  instruction_text  TEXT,
+  input_dir         TEXT NOT NULL,
+  output_dir        TEXT NOT NULL,
+  result_summary    TEXT,
+  result_files_json TEXT,
+  error_msg         TEXT,
+  created_at        INTEGER NOT NULL,
+  updated_at        INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_remote_tasks_session ON remote_tasks (session_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_remote_tasks_run ON remote_tasks (run_id);
+CREATE INDEX IF NOT EXISTS idx_remote_tasks_status ON remote_tasks (status);
+CREATE INDEX IF NOT EXISTS idx_remote_tasks_reply_state ON remote_tasks (reply_state);
+
 `;
 
 interface ColumnInfo {
@@ -232,6 +289,43 @@ export function migrate(db: Database): void {
   ensureColumn(db, "conversations", "agent_workspace_id", "TEXT");
   ensureColumn(db, "scheduled_tasks", "agent_workspace_id", "TEXT");
   ensureColumn(db, "agent_workspaces", "pinned", "INTEGER NOT NULL DEFAULT 0");
+  ensureColumn(db, "channel_connections", "type", "TEXT NOT NULL DEFAULT 'fake'");
+  ensureColumn(db, "channel_connections", "name", "TEXT NOT NULL DEFAULT ''");
+  ensureColumn(db, "channel_connections", "enabled", "INTEGER NOT NULL DEFAULT 0");
+  ensureColumn(db, "channel_connections", "status", "TEXT NOT NULL DEFAULT 'stopped'");
+  ensureColumn(db, "channel_connections", "credentials_json", "TEXT");
+  ensureColumn(db, "channel_connections", "config_json", "TEXT NOT NULL DEFAULT '{}'");
+  ensureColumn(db, "channel_connections", "last_connected_at", "INTEGER");
+  ensureColumn(db, "channel_connections", "error_msg", "TEXT");
+  ensureColumn(db, "channel_connections", "created_at", "INTEGER NOT NULL DEFAULT 0");
+  ensureColumn(db, "channel_connections", "updated_at", "INTEGER NOT NULL DEFAULT 0");
+  ensureColumn(db, "channel_sessions", "connection_id", "TEXT");
+  ensureColumn(db, "channel_sessions", "channel_type", "TEXT NOT NULL DEFAULT 'fake'");
+  ensureColumn(db, "channel_sessions", "chat_id", "TEXT NOT NULL DEFAULT ''");
+  ensureColumn(db, "channel_sessions", "sender_id", "TEXT NOT NULL DEFAULT ''");
+  ensureColumn(db, "channel_sessions", "display_name", "TEXT");
+  ensureColumn(db, "channel_sessions", "conversation_id", "TEXT");
+  ensureColumn(db, "channel_sessions", "active_task_id", "TEXT");
+  ensureColumn(db, "channel_sessions", "created_at", "INTEGER NOT NULL DEFAULT 0");
+  ensureColumn(db, "channel_sessions", "updated_at", "INTEGER NOT NULL DEFAULT 0");
+  ensureColumn(db, "remote_tasks", "session_id", "TEXT");
+  ensureColumn(db, "remote_tasks", "connection_id", "TEXT");
+  ensureColumn(db, "remote_tasks", "conversation_id", "TEXT");
+  ensureColumn(db, "remote_tasks", "run_id", "TEXT");
+  ensureColumn(db, "remote_tasks", "channel_type", "TEXT NOT NULL DEFAULT 'fake'");
+  ensureColumn(db, "remote_tasks", "chat_id", "TEXT NOT NULL DEFAULT ''");
+  ensureColumn(db, "remote_tasks", "sender_id", "TEXT NOT NULL DEFAULT ''");
+  ensureColumn(db, "remote_tasks", "context_token", "TEXT");
+  ensureColumn(db, "remote_tasks", "status", "TEXT NOT NULL DEFAULT 'failed'");
+  ensureColumn(db, "remote_tasks", "reply_state", "TEXT NOT NULL DEFAULT 'pending'");
+  ensureColumn(db, "remote_tasks", "instruction_text", "TEXT");
+  ensureColumn(db, "remote_tasks", "input_dir", "TEXT NOT NULL DEFAULT ''");
+  ensureColumn(db, "remote_tasks", "output_dir", "TEXT NOT NULL DEFAULT ''");
+  ensureColumn(db, "remote_tasks", "result_summary", "TEXT");
+  ensureColumn(db, "remote_tasks", "result_files_json", "TEXT");
+  ensureColumn(db, "remote_tasks", "error_msg", "TEXT");
+  ensureColumn(db, "remote_tasks", "created_at", "INTEGER NOT NULL DEFAULT 0");
+  ensureColumn(db, "remote_tasks", "updated_at", "INTEGER NOT NULL DEFAULT 0");
 }
 
 export function openDb(path: string): Database {

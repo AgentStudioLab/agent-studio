@@ -45,6 +45,17 @@ import { SkillRegistry } from "./services/skillRegistry";
 import { buildSkillsRoutes } from "./routes/skills";
 import { buildSkillFilesRoutes } from "./routes/skillFiles";
 import { SkillInvocationStore } from "./agui/provider-claude/skill-invocations";
+import { ChannelConnectionService } from "./channels/core/ChannelConnectionService";
+import { ChannelSessionService } from "./channels/core/ChannelSessionService";
+import { PluginRegistry } from "./channels/core/PluginRegistry";
+import { ChannelManager } from "./channels/core/ChannelManager";
+import { RemoteTaskAggregator } from "./channels/tasks/RemoteTaskAggregator";
+import { RemoteTaskService } from "./channels/tasks/RemoteTaskService";
+import { FakeChannelPlugin } from "./channels/plugins/fake/FakeChannelPlugin";
+import { WeixinPlugin } from "./channels/plugins/weixin/WeixinPlugin";
+import { buildChannelConnectionRoutes } from "./channels/routes/channelConnections";
+import { buildRemoteTaskRoutes } from "./channels/routes/remoteTasks";
+import { runWorker } from "./agent/runWorker";
 
 type Args = { port: number; token: string; db: string };
 
@@ -107,6 +118,8 @@ const usage = new UsageService(db);
 const settingsTools = new SettingsToolsService(db);
 const sessionMetadata = new SessionMetadataStore();
 const skillRegistry = new SkillRegistry(db);
+const channelConnections = new ChannelConnectionService(db);
+const channelSessions = new ChannelSessionService(db);
 // Tracks which skills the agent invoked at runtime via the built-in `Skill`
 // tool, keyed by threadId. Populated by a PreToolUse hook installed inside
 // runTurn; read back by GET /threads/:id/context. In-memory — cleared on
@@ -249,6 +262,55 @@ const providerProxy: AgentProvider = {
     Promise.resolve({ canRewind: false, error: "unsupported" })),
 };
 
+const channelRegistry = new PluginRegistry();
+const fakeChannelPlugin = new FakeChannelPlugin();
+channelRegistry.register(fakeChannelPlugin);
+channelRegistry.register(new WeixinPlugin());
+const remoteTaskAggregator = new RemoteTaskAggregator({ sessions: channelSessions });
+let channelManager: ChannelManager;
+const remoteTaskService = new RemoteTaskService({
+  db,
+  connections: channelConnections,
+  sessions: channelSessions,
+  threads,
+  messages,
+  store,
+  startRun: async (input) => {
+    void runWorker({
+      runId: input.runId,
+      threadId: input.threadId,
+      userMessage: { role: "user", content: input.prompt },
+      store,
+      messages,
+      threads,
+      agentFolders,
+      agentLinks,
+      agentMemoryStore,
+      provider: providerProxy,
+      interruptBus,
+      abortSignal: new AbortController().signal,
+      usage,
+      permissionMode: input.permissionMode,
+      appendContextExtra: input.appendContextExtra,
+      userMessageId: input.userMessageId,
+      onTerminalResult: input.onTerminalResult,
+    });
+  },
+  sendResult: async (input) => channelManager.sendRemoteTaskResult(input),
+});
+channelManager = new ChannelManager({
+  connections: channelConnections,
+  registry: channelRegistry,
+  aggregator: remoteTaskAggregator,
+  tasks: remoteTaskService,
+});
+void channelManager.recoverRemoteTasksOnBoot().catch((err) => {
+  console.warn("[channels] recover remote tasks failed:", err);
+});
+void channelManager.startEnabled().catch((err) => {
+  console.warn("[channels] start enabled connections failed:", err);
+});
+
 // Scheduled-task engine. Polls scheduled_tasks.next_run_at every minute and
 // fires due tasks as fresh headless runs through the same runWorker path as
 // POST /runs. Only ticks while this process is alive (desktop app open).
@@ -324,6 +386,15 @@ app.route("/", buildSettingsToolsRoutes(settingsTools));
 app.route("/", buildModelsRoutes(providerSettings));
 app.route("/", buildThreadContextRoutes(sessionMetadata, skillInvocations, skillRegistry));
 app.route("/", buildFileContentRoutes());
+app.route(
+  "/",
+  buildChannelConnectionRoutes({
+    connections: channelConnections,
+    manager: channelManager,
+    fake: fakeChannelPlugin,
+  }),
+);
+app.route("/", buildRemoteTaskRoutes({ tasks: remoteTaskService }));
 app.route("/", buildSkillsRoutes(skillRegistry));
 app.route("/", buildSkillFilesRoutes(skillRegistry));
 

@@ -1,4 +1,4 @@
-import { Brain, ChevronLeft, Palette, ShieldCheck, User } from "lucide-react";
+import { Brain, Cable, ChevronLeft, Palette, ShieldCheck, User } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { to: "account", labelKey: "settings.nav.account", icon: User },
   { to: "model", labelKey: "settings.nav.model", icon: Brain },
   { to: "permissions", labelKey: "settings.nav.permissions", icon: ShieldCheck },
+  { to: "remote-connections", labelKey: "settings.nav.remoteConnections", icon: Cable },
   { to: "appearance", labelKey: "settings.nav.appearance", icon: Palette },
 ] as const;
 

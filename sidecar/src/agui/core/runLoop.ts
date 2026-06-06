@@ -16,7 +16,8 @@ export interface RunLoopInput {
   abortSignal: AbortSignal;
   onCompleted?: () => void;
   onTerminal?: (
-    status: "completed" | "error" | "cancelled",
+    status: "completed" | "error" | "cancelled" | "awaiting_approval",
+    errorMsg?: string,
   ) => void | Promise<void>;
 }
 
@@ -63,7 +64,7 @@ export async function executeRunLoop(input: RunLoopInput): Promise<void> {
       status,
       result.cancelled ? "cancelled by user" : result.message,
     );
-    await onTerminal?.(status);
+    await onTerminal?.(status, result.cancelled ? "cancelled by user" : result.message);
     return;
   }
 
@@ -74,4 +75,5 @@ export async function executeRunLoop(input: RunLoopInput): Promise<void> {
     interrupts: result.interrupts,
   } as never);
   await store.finishRun(runId, "awaiting_approval");
+  await onTerminal?.("awaiting_approval");
 }

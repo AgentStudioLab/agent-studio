@@ -39,8 +39,8 @@ Agent Works 需要在设置页增加远程连接能力，先支持微信，后�
   - 先发文字说明，再发文件。
 - 聚合 key 使用同一连接、同一微信会话、同一发送方的组合。
 - 聚合等待时间为 30 秒。
-- 如果只收到文件，30 秒内没有说明，通过微信追问“已收到文件，请发送修改要求”。
-- 如果只收到说明，30 秒内没有文件，通过微信追问“请继续发送要处理的文件”。
+- 如果只收到文件，立即作为附件远程 IM 请求启动 Agent run，由模型判断是否需要追问说明。
+- 如果只收到文字说明，立即作为普通远程 IM 请求启动 Agent run；不得默认追问文件。
 - 追问后继续保留 pending 状态，等待同一 session 的后续消息。
 - 聚合成功后在该 session 对应的 Agent Works conversation 中启动 run。
 
@@ -238,11 +238,11 @@ remote_tasks
 
 ```text
 收到文本
-  -> 没有 pending 文件：awaiting_file，30 秒后追问“请继续发送要处理的文件”
+  -> 没有 pending 文件：ready -> running（普通远程 IM 请求）
   -> 已有 pending 文件：ready -> running
 
 收到文件/图片
-  -> 没有 pending 文本：awaiting_instruction，30 秒后追问“已收到文件，请发送修改要求”
+  -> 没有 pending 文本：ready -> running（附件远程 IM 请求）
   -> 已有 pending 文本：ready -> running
 
 running
