@@ -69,6 +69,17 @@ type PollResult =
   | "aborted"
   | { accountId: string; botToken: string; baseUrl: string };
 
+function redactConfirmedLoginResponse(
+  result: Record<string, unknown>,
+): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(result).map(([key, value]) => [
+      key,
+      key.toLowerCase().includes("token") ? "[redacted]" : value,
+    ]),
+  );
+}
+
 async function pollQRStatus(
   qrcode: string,
   callbacks: LoginCallbacks,
@@ -102,6 +113,10 @@ async function pollQRStatus(
     if (!result.bot_token || !result.ilink_bot_id) {
       throw new Error("Missing bot_token or ilink_bot_id in confirmed response");
     }
+    console.log(
+      "[channels:weixin] confirmed login response",
+      redactConfirmedLoginResponse(result as Record<string, unknown>),
+    );
     return {
       accountId: result.ilink_bot_id,
       botToken: result.bot_token,

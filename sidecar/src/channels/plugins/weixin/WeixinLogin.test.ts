@@ -9,7 +9,70 @@ function json(data: unknown): Response {
 }
 
 describe("WeixinLogin", () => {
+  it("logs the redacted confirmed login response for identity inspection", async () => {
+    const originalLog = console.log;
+    const logs: unknown[][] = [];
+    console.log = (...args: unknown[]) => {
+      logs.push(args);
+    };
+    try {
+      let requestCount = 0;
+      const fetchImpl = async () => {
+        requestCount++;
+        if (requestCount === 1) {
+          return json({ qrcode: "qr_1", qrcode_img_content: "https://qr.example/1" });
+        }
+        return json({
+          status: "confirmed",
+          ilink_bot_id: "bot_1",
+          ilink_user_id: "user_1",
+          nickname: "Alice",
+          avatar_url: "https://avatar.example/alice.png",
+          bot_token: "token_1",
+          baseurl: "https://ilink.example",
+        });
+      };
+
+      const done = new Promise((resolve, reject) => {
+        startLogin(
+          {
+            onQR: () => {},
+            onScanned: () => {},
+            onDone: resolve,
+            onError: reject,
+          },
+          { fetchImpl: fetchImpl as unknown as typeof fetch, pollDelayMs: 0 },
+        );
+      });
+
+      await expect(done).resolves.toEqual({
+        accountId: "bot_1",
+        botToken: "token_1",
+        baseUrl: "https://ilink.example",
+      });
+    } finally {
+      console.log = originalLog;
+    }
+
+    expect(logs).toEqual([
+      [
+        "[channels:weixin] confirmed login response",
+        {
+          status: "confirmed",
+          ilink_bot_id: "bot_1",
+          ilink_user_id: "user_1",
+          nickname: "Alice",
+          avatar_url: "https://avatar.example/alice.png",
+          bot_token: "[redacted]",
+          baseurl: "https://ilink.example",
+        },
+      ],
+    ]);
+  });
+
   it("continues polling on wait, emits scanned, then returns confirmed credentials", async () => {
+    const originalLog = console.log;
+    console.log = () => {};
     const urls: string[] = [];
     const fetchImpl = async (url: string | URL | Request) => {
       urls.push(String(url));
@@ -38,11 +101,15 @@ describe("WeixinLogin", () => {
       );
     });
 
-    await expect(done).resolves.toEqual({
-      accountId: "bot_1",
-      botToken: "token_1",
-      baseUrl: "https://ilink.example",
-    });
+    try {
+      await expect(done).resolves.toEqual({
+        accountId: "bot_1",
+        botToken: "token_1",
+        baseUrl: "https://ilink.example",
+      });
+    } finally {
+      console.log = originalLog;
+    }
     expect(events).toEqual(["qr:https://qr.example/1:qr_1", "scanned"]);
     expect(urls.some((url) => url.includes("ilink/bot/get_bot_qrcode"))).toBe(true);
     expect(urls.some((url) => url.includes("ilink/bot/get_qrcode_status"))).toBe(true);
