@@ -183,6 +183,45 @@ describe("providerSettings", () => {
     expect(current.remoteModelsFetchedAt).toBe("");
   });
 
+  it("binds remote cache writes to the built-in provider effective base URL", () => {
+    const settings = createProviderSettings(makeDb(), {});
+
+    settings.update({
+      profileId: "openai",
+      remoteModels: [
+        {
+          id: "gpt-5.1",
+          displayName: "GPT-5.1",
+          description: "Remote model",
+        },
+      ],
+      remoteModelsProviderId: "openai",
+      remoteModelsFetchedAt: "2026-05-29T00:00:00.000Z",
+    });
+
+    const current = settings.current();
+    expect(current.baseUrl).toBe("https://api.openai.com/v1");
+    expect(current.remoteModelsFetchedAt).toBe("2026-05-29T00:00:00.000Z");
+    expect(current.models.map((model) => model.id)).toEqual(["gpt-5.1"]);
+  });
+
+  it("preserves selected model when base URL or API key changes", () => {
+    const settings = createProviderSettings(makeDb(), {});
+
+    settings.update({
+      profileId: "openai",
+      baseUrl: "https://api.openai.com/v1",
+      apiKey: "key-a",
+      selectedModelId: "gpt-5.1",
+    });
+
+    settings.update({ baseUrl: "https://gateway.example/v1" });
+    expect(settings.current().selectedModelId).toBe("gpt-5.1");
+
+    settings.update({ apiKey: "key-b" });
+    expect(settings.current().selectedModelId).toBe("gpt-5.1");
+  });
+
   it("resolves SiliconFlow runtime through its OpenAI-compatible /v1 base URL", () => {
     const settings = createProviderSettings(makeDb(), {});
 

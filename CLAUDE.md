@@ -178,6 +178,8 @@ Mirrors the sidecar's event protocol on the client. Two layers:
 
 11. **`run_events` is append-only and seq-ordered.** SSE resume/attach relies on `?after=<seq>` replay. Persist run output only through `store.appendEvent` (which bumps `seq`/`last_seq` atomically and signals streamers), and flush buffered messages **only at run terminal** — mid-run flushes duplicate turns after cross-session resume.
 
+12. **Commit messages must be written in English.** Follow the existing history's Conventional Commit style when possible, e.g. `fix(settings): resolve provider model type errors`, `docs(remote-im): design remote IM connection architecture`, or `refactor(provider): clarify settings state updates`.
+
 ## Skills
 
 Project skills live under `.claude/skills/`:

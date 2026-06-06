@@ -261,6 +261,119 @@ function resolve(persisted: PersistedProvider): ResolvedProvider {
   };
 }
 
+function effectiveBaseUrl(
+  profileId: ProviderProfileId,
+  baseUrl: string,
+): string {
+  if (profileId === "custom") return baseUrl;
+  return baseUrl || getBuiltInProfile(profileId)?.baseUrl || "";
+}
+
+function resolveNextConfig(
+  cache: PersistedProvider,
+  patch: Partial<PersistedProvider>,
+): {
+  profileId: ProviderProfileId;
+  baseUrl: string;
+  apiKey: string;
+  profileChanged: boolean;
+  configChanged: boolean;
+} {
+  const profileId =
+    patch.profileId !== undefined
+      ? sanitizeProviderProfileId(patch.profileId) ?? cache.profileId
+      : cache.profileId;
+  const baseUrl =
+    typeof patch.baseUrl === "string" ? patch.baseUrl : cache.baseUrl;
+  const apiKey =
+    typeof patch.apiKey === "string" ? patch.apiKey : cache.apiKey;
+  const profileChanged = profileId !== cache.profileId;
+
+  return {
+    profileId,
+    baseUrl,
+    apiKey,
+    profileChanged,
+    configChanged:
+      profileChanged || baseUrl !== cache.baseUrl || apiKey !== cache.apiKey,
+  };
+}
+
+function resolveNextRemoteCache(
+  cache: PersistedProvider,
+  patch: Partial<PersistedProvider>,
+  nextConfig: ReturnType<typeof resolveNextConfig>,
+): Pick<
+  PersistedProvider,
+  | "remoteModels"
+  | "remoteModelsProviderId"
+  | "remoteModelsBaseUrl"
+  | "remoteModelsFetchedAt"
+> {
+  if (patch.remoteModels !== undefined) {
+    return {
+      remoteModels: sanitizeModels(patch.remoteModels),
+      remoteModelsProviderId:
+        patch.remoteModelsProviderId !== undefined
+          ? sanitizeRemoteModelsProviderId(patch.remoteModelsProviderId)
+          : cache.remoteModelsProviderId,
+      remoteModelsBaseUrl:
+        typeof patch.remoteModelsBaseUrl === "string"
+          ? patch.remoteModelsBaseUrl
+          : effectiveBaseUrl(nextConfig.profileId, nextConfig.baseUrl),
+      remoteModelsFetchedAt:
+        typeof patch.remoteModelsFetchedAt === "string"
+          ? patch.remoteModelsFetchedAt
+          : cache.remoteModelsFetchedAt,
+    };
+  }
+
+  if (nextConfig.configChanged) {
+    return {
+      remoteModels: [],
+      remoteModelsProviderId: "",
+      remoteModelsBaseUrl: "",
+      remoteModelsFetchedAt: "",
+    };
+  }
+
+  return {
+    remoteModels: cache.remoteModels,
+    remoteModelsProviderId: cache.remoteModelsProviderId,
+    remoteModelsBaseUrl: cache.remoteModelsBaseUrl,
+    remoteModelsFetchedAt: cache.remoteModelsFetchedAt,
+  };
+}
+
+function resolveNextSelectedModelId(
+  cache: PersistedProvider,
+  patch: Partial<PersistedProvider>,
+  profileChanged: boolean,
+): string | null {
+  if (patch.selectedModelId === null || typeof patch.selectedModelId === "string") {
+    return patch.selectedModelId;
+  }
+  return profileChanged ? null : cache.selectedModelId;
+}
+
+function buildNextProvider(
+  cache: PersistedProvider,
+  patch: Partial<PersistedProvider>,
+): PersistedProvider {
+  const nextConfig = resolveNextConfig(cache, patch);
+  return {
+    profileId: nextConfig.profileId,
+    baseUrl: nextConfig.baseUrl,
+    apiKey: nextConfig.apiKey,
+    ...resolveNextRemoteCache(cache, patch, nextConfig),
+    selectedModelId: resolveNextSelectedModelId(
+      cache,
+      patch,
+      nextConfig.profileChanged,
+    ),
+  };
+}
+
 export function createProviderSettings(
   db: Database,
   envFallback: { apiKey?: string; baseUrl?: string },
@@ -281,60 +394,7 @@ export function createProviderSettings(
       return cache.apiKey;
     },
     update(patch): ResolvedProvider {
-      const nextProfileId =
-        patch.profileId !== undefined
-          ? sanitizeProviderProfileId(patch.profileId) ?? cache.profileId
-          : cache.profileId;
-      const profileChanged = nextProfileId !== cache.profileId;
-      const nextBaseUrl =
-        typeof patch.baseUrl === "string" ? patch.baseUrl : cache.baseUrl;
-      const nextApiKey =
-        typeof patch.apiKey === "string" ? patch.apiKey : cache.apiKey;
-      const configChanged =
-        profileChanged || nextBaseUrl !== cache.baseUrl || nextApiKey !== cache.apiKey;
-      const writesRemoteCache = patch.remoteModels !== undefined;
-      const nextEffectiveBaseUrl =
-        nextProfileId === "custom"
-          ? nextBaseUrl
-          : nextBaseUrl || getBuiltInProfile(nextProfileId)?.baseUrl || "";
-      cache = {
-        profileId: nextProfileId,
-        baseUrl: nextBaseUrl,
-        apiKey: nextApiKey,
-        remoteModels:
-          patch.remoteModels !== undefined
-            ? sanitizeModels(patch.remoteModels)
-            : configChanged
-              ? []
-              : cache.remoteModels,
-        remoteModelsProviderId:
-          patch.remoteModelsProviderId !== undefined
-            ? sanitizeRemoteModelsProviderId(patch.remoteModelsProviderId)
-            : configChanged
-              ? ""
-              : cache.remoteModelsProviderId,
-        remoteModelsBaseUrl:
-          typeof patch.remoteModelsBaseUrl === "string"
-            ? patch.remoteModelsBaseUrl
-            : writesRemoteCache
-              ? nextEffectiveBaseUrl
-              : configChanged
-                ? ""
-                : cache.remoteModelsBaseUrl,
-        remoteModelsFetchedAt:
-          typeof patch.remoteModelsFetchedAt === "string"
-            ? patch.remoteModelsFetchedAt
-            : configChanged
-              ? ""
-              : cache.remoteModelsFetchedAt,
-        selectedModelId:
-          patch.selectedModelId === null ||
-          typeof patch.selectedModelId === "string"
-            ? patch.selectedModelId
-            : profileChanged
-              ? null
-              : cache.selectedModelId,
-      };
+      cache = buildNextProvider(cache, patch);
       writeRow(db, cache);
       notify();
       return resolve(cache);
