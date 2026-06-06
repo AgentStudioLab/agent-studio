@@ -11,7 +11,7 @@
       <stop offset="0" stop-color="#FFF6E8"/>
       <stop offset="1" stop-color="#FFFFFF"/>
     </linearGradient>
-    <filter id="agent-studio-soft-shadow" x="44" y="46" width="424" height="424" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+    <filter id="agent-studio-soft-shadow" x="0" y="0" width="512" height="512" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
       <feFlood flood-opacity="0" result="BackgroundImageFix"/>
       <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
       <feOffset dy="14"/>
@@ -22,7 +22,7 @@
     </filter>
   </defs>
 
-  <g filter="url(#agent-studio-soft-shadow)">
+  <g filter="url(#agent-studio-soft-shadow)" transform="translate(-38.4 -38.4) scale(1.15)">
     <rect x="72" y="64" width="368" height="368" rx="92" fill="url(#agent-studio-bg)"/>
     <path d="M132 257.5C132 205.3 174.3 163 226.5 163H322" stroke="white" stroke-opacity="0.22" stroke-width="20" stroke-linecap="round"/>
     <path d="M382 254.5C382 306.7 339.7 349 287.5 349H192" stroke="white" stroke-opacity="0.18" stroke-width="20" stroke-linecap="round"/>
