@@ -1,4 +1,4 @@
-import { Cable, FlaskConical } from "lucide-react";
+import { Cable } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
@@ -23,16 +23,13 @@ export function RemoteConnectionsSection() {
         <h2 className="font-serif text-[32px] font-normal leading-none text-foreground">
           {t("settings.remoteConnections.title")}
         </h2>
-        <p className="text-sm text-muted-foreground">
-          {t("settings.remoteConnections.description")}
-        </p>
       </div>
 
       {!hasWeixinConnection ? (
         <div className="rounded-lg border border-border bg-card p-4">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-              <FlaskConical className="size-4" />
+              <Cable className="size-4" />
               <span>{t("settings.remoteConnections.addWeixin")}</span>
             </div>
             <Button
@@ -124,6 +121,10 @@ function ConnectionRow(props: {
 }) {
   const { t } = useTranslation();
   const { connection } = props;
+  const connectionName =
+    connection.type === "weixin"
+      ? t("settings.remoteConnections.weixinName")
+      : connection.name;
   const shouldReconnectWeixin =
     connection.type === "weixin" &&
     (!connection.enabled || connection.status === "stopped" || connection.status === "error");
@@ -144,13 +145,8 @@ function ConnectionRow(props: {
           <div className="flex items-center gap-2">
             <Cable className="size-4 shrink-0 text-muted-foreground" />
             <h3 className="truncate text-sm font-medium text-foreground">
-              {connection.name}
+              {connectionName}
             </h3>
-            {connection.type === "weixin" ? (
-              <span className="rounded-md bg-secondary px-2 py-0.5 text-xs text-secondary-foreground">
-                {t("settings.remoteConnections.experimental")}
-              </span>
-            ) : null}
           </div>
           <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             <span>{connection.type}</span>

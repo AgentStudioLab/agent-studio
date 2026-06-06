@@ -98,7 +98,6 @@
   },
   "remoteConnections": {
     "title": "远程连接",
-    "description": "微信适配器为实验性能力，需要手工 smoke；自动化端到端使用 Fake Channel。",
     "empty": "暂无远程连接。",
     "permissionStrategy": "权限策略",
     "autoExecute": "自动执行",
@@ -109,8 +108,8 @@
     "addWeixin": "添加微信连接",
     "startWeixin": "开始微信登录",
     "reconnectWeixin": "重新连接微信",
+    "weixinName": "微信",
     "weixinQrAlt": "微信登录二维码",
-    "experimental": "实验性",
     "status": {
       "waiting": "等待扫码",
       "scanned": "已扫码",

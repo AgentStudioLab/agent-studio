@@ -35,8 +35,6 @@ mock.module("react-i18next", () => ({
     t: (key: string) => {
       const translations: Record<string, string> = {
         "settings.remoteConnections.title": "Remote Connections",
-        "settings.remoteConnections.description":
-          "Experimental WeChat adapter requires manual smoke testing. Automated E2E uses Fake Channel.",
         "settings.remoteConnections.empty": "No remote connections yet.",
         "settings.remoteConnections.permissionStrategy": "Permission strategy",
         "settings.remoteConnections.autoExecute": "Auto execute",
@@ -48,8 +46,8 @@ mock.module("react-i18next", () => ({
         "settings.remoteConnections.startWeixin": "Start WeChat login",
         "settings.remoteConnections.reconnectWeixin": "Reconnect WeChat",
         "settings.remoteConnections.addWeixin": "Add WeChat connection",
+        "settings.remoteConnections.weixinName": "WeChat",
         "settings.remoteConnections.weixinQrAlt": "WeChat login QR code",
-        "settings.remoteConnections.experimental": "Experimental",
         "settings.remoteConnections.status.waiting": "Waiting for scan",
         "settings.remoteConnections.status.scanned": "Scanned",
         "settings.remoteConnections.status.confirmed": "Confirmed",
@@ -95,7 +93,7 @@ afterEach(() => {
 });
 
 describe("RemoteConnectionsSection", () => {
-  it("shows the empty state and experimental warning copy", () => {
+  it("shows the empty state without the removed remote connection warning", () => {
     connectionsState = [];
     loginState = null;
 
@@ -103,14 +101,15 @@ describe("RemoteConnectionsSection", () => {
 
     expect(screen.getByText("Remote Connections")).toBeTruthy();
     expect(
-      screen.getByText(
+      screen.queryByText(
         "Experimental WeChat adapter requires manual smoke testing. Automated E2E uses Fake Channel.",
       ),
-    ).toBeTruthy();
+    ).toBeNull();
+    expect(screen.queryByText("settings.remoteConnections.description")).toBeNull();
     expect(screen.getByText("No remote connections yet.")).toBeTruthy();
   });
 
-  it("shows fake running and weixin experimental rows", () => {
+  it("shows fake running and localized weixin rows without experimental badges", () => {
     connectionsState = [
       {
         id: "fake_1",
@@ -123,7 +122,7 @@ describe("RemoteConnectionsSection", () => {
       {
         id: "wx_1",
         type: "weixin",
-        name: "WeChat",
+        name: "Raw Backend Weixin",
         enabled: false,
         status: "stopped",
         config: { permissionStrategy: "auto_execute" },
@@ -134,8 +133,10 @@ describe("RemoteConnectionsSection", () => {
 
     expect(screen.getByText("Fake Channel")).toBeTruthy();
     expect(screen.getByText("running")).toBeTruthy();
-    expect(screen.getAllByText("WeChat").length).toBeGreaterThan(0);
-    expect(screen.getByText("Experimental")).toBeTruthy();
+    expect(screen.getByText("WeChat")).toBeTruthy();
+    expect(screen.queryByText("Raw Backend Weixin")).toBeNull();
+    expect(screen.queryByText("Experimental")).toBeNull();
+    expect(screen.queryByText("settings.remoteConnections.experimental")).toBeNull();
     expect(screen.getAllByText("Auto execute")).toHaveLength(2);
     expect(screen.getByText("Interactive approval is not supported")).toBeTruthy();
   });

@@ -4,7 +4,7 @@
 
 - 已有可扫码的微信账号。
 - Agent Works sidecar 已启动。
-- Settings > Remote Connections 能看到 WeChat experimental adapter。
+- Settings > Remote Connections 能看到微信连接入口或微信连接行。
 - 本 smoke 不作为 CI 阻断条件。
 
 ## 检查项

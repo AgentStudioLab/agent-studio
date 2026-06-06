@@ -98,7 +98,6 @@
   },
   "remoteConnections": {
     "title": "Remote Connections",
-    "description": "Experimental WeChat adapter requires manual smoke testing. Automated E2E uses Fake Channel.",
     "empty": "No remote connections yet.",
     "permissionStrategy": "Permission strategy",
     "autoExecute": "Auto execute",
@@ -109,8 +108,8 @@
     "addWeixin": "Add WeChat connection",
     "startWeixin": "Start WeChat login",
     "reconnectWeixin": "Reconnect WeChat",
+    "weixinName": "WeChat",
     "weixinQrAlt": "WeChat login QR code",
-    "experimental": "Experimental",
     "status": {
       "waiting": "Waiting for scan",
       "scanned": "Scanned",
