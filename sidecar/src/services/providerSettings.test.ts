@@ -376,6 +376,69 @@ describe("providerSettings", () => {
     expect(current.remoteModelsFetchedAt).toBe("");
   });
 
+  it("resolves custom Anthropic-compatible providers to the full Claude runtime", () => {
+    const settings = createProviderSettings(makeDb(), {});
+    const connection = settings.createConnection({
+      name: "Custom Anthropic Gateway",
+      profileId: "custom",
+      baseUrl: "https://anthropic-gateway.example",
+      apiKey: "gateway-key",
+      customProtocol: "anthropic",
+    });
+
+    expect(connection.profileId).toBe("custom");
+    expect(connection.agentRuntime).toEqual({
+      protocol: "anthropic",
+      baseUrl: "https://anthropic-gateway.example",
+      auth: "x-api-key",
+      capabilities: {
+        text: true,
+        tools: true,
+        fileCheckpoint: true,
+      },
+    });
+    expect(connection.customProtocol).toBe("anthropic");
+
+    const resolved = settings.resolveSelection({
+      providerId: connection.providerId,
+      modelId: connection.defaultModelId ?? "",
+    });
+    expect(resolved.agentRuntime.protocol).toBe("anthropic");
+  });
+
+  it("clears custom model cache when custom protocol changes", () => {
+    const settings = createProviderSettings(makeDb(), {});
+    const connection = settings.createConnection({
+      profileId: "custom",
+      baseUrl: "https://gateway.example",
+      apiKey: "gateway-key",
+      customProtocol: "openai-compatible",
+    });
+    const refreshed = settings.updateConnection(connection.providerId, {
+      remoteModels: [
+        {
+          id: "openai-model",
+          displayName: "OpenAI Model",
+          description: "Remote model",
+        },
+      ],
+      remoteModelsProviderId: "custom",
+      remoteModelsBaseUrl: "https://gateway.example",
+      remoteModelsFetchedAt: "2026-06-06T00:00:00.000Z",
+    });
+    expect(refreshed?.models.map((model) => model.id)).toEqual([
+      "openai-model",
+    ]);
+
+    const updated = settings.updateConnection(connection.providerId, {
+      customProtocol: "anthropic",
+    });
+
+    expect(updated?.customProtocol).toBe("anthropic");
+    expect(updated?.models).toEqual([]);
+    expect(updated?.remoteModelsFetchedAt).toBe("");
+  });
+
   it("does not expose remote cache after changing API key", () => {
     const settings = createProviderSettings(makeDb(), {});
     settings.update({

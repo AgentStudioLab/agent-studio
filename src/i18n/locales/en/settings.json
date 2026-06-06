@@ -65,8 +65,11 @@
     "profile": {
       "anthropic": "Anthropic",
       "deepseek": "DeepSeek",
-      "custom": "Custom (OpenAI-compatible)"
+      "custom": "Custom"
     },
+    "customProtocolLabel": "Protocol",
+    "customProtocolOpenAI": "OpenAI-compatible",
+    "customProtocolAnthropic": "Anthropic Messages-compatible",
     "baseUrlLabel": "Base URL",
     "baseUrlPlaceholder": "https://api.example.com",
     "baseUrlHint": "Leave empty to use the selected provider's default.",
@@ -104,6 +107,8 @@
     "delete": "Delete",
     "cancel": "Cancel",
     "defaultModelBadge": "Default",
+    "setDefault": "Set default",
+    "defaultProviderError": "Default provider update failed",
     "enabledModels": "Enabled models",
     "disabled": "Disabled",
     "missingApiKey": "Missing key",

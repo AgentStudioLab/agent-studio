@@ -43,8 +43,15 @@ const refreshProviderConnectionModelsMock = mock(async (id: string) => ({
 }));
 const setProviderConnectionEnabledModelsMock = mock(async (id: string) => ({
   ...providerState,
-  connection: providerConnections[id],
+  connection: {
+    ...providerConnections[id],
+    enabledModelIds:
+      id === "conn-sf" ? ["deepseek-ai/DeepSeek-V3.2"] : providerConnections[id]?.enabledModelIds,
+    defaultModelId:
+      id === "conn-sf" ? "deepseek-ai/DeepSeek-V3.2" : providerConnections[id]?.defaultModelId,
+  },
 }));
+const setDefaultProviderSelectionMock = mock(async () => providerState);
 
 let providerState: ProviderState;
 let providerConnections: Record<string, ProviderConnectionConfig>;
@@ -57,6 +64,7 @@ mock.module("@/lib/data/settings", () => ({
   deleteProviderConnection: deleteProviderConnectionMock,
   refreshProviderConnectionModels: refreshProviderConnectionModelsMock,
   setProviderConnectionEnabledModels: setProviderConnectionEnabledModelsMock,
+  setDefaultProviderSelection: setDefaultProviderSelectionMock,
 }));
 
 mock.module("@/components/ui/dialog", () => ({
@@ -218,6 +226,8 @@ void testI18n.use(initReactI18next).init({
             delete: "Delete",
             cancel: "Cancel",
             defaultModelBadge: "Default",
+            setDefault: "Set default",
+            defaultProviderError: "Default provider failed",
             enabledModels: "Enabled models",
             disabled: "Disabled",
             missingApiKey: "Missing key",
@@ -226,7 +236,10 @@ void testI18n.use(initReactI18next).init({
             connectionDialogDescription: "Configure endpoint",
             connectionNameLabel: "Connection name",
             profileLabel: "Provider",
-            profile: { custom: "Custom (OpenAI-compatible)" },
+            profile: { custom: "Custom" },
+            customProtocolLabel: "Protocol",
+            customProtocolOpenAI: "OpenAI-compatible",
+            customProtocolAnthropic: "Anthropic Messages-compatible",
             baseUrlLabel: "Base URL",
             baseUrlPlaceholder: "https://api.example.com",
             apiKeyLabel: "API Key",
@@ -407,11 +420,43 @@ function providerFixture(): ProviderState {
   };
 }
 
+function providerFixtureWithAnthropicFirst(): ProviderState {
+  const provider = providerFixture();
+  const anthropicRuntime = {
+    protocol: "anthropic" as const,
+    baseUrl: "https://api.anthropic.com",
+    auth: "x-api-key" as const,
+    capabilities: { text: true, tools: true, fileCheckpoint: true },
+  };
+  return {
+    ...provider,
+    builtIn: [
+      {
+        id: "anthropic",
+        label: "Anthropic",
+        baseUrl: "https://api.anthropic.com",
+        supportsRemoteModels: true,
+        agentRuntime: anthropicRuntime,
+        models: [
+          {
+            id: "claude-sonnet-4-6",
+            displayName: "Sonnet 4.6",
+            description: "Responsive everyday work",
+          },
+        ],
+      },
+      ...provider.builtIn,
+    ],
+  };
+}
+
 function connectionFixture(id: string): ProviderConnectionConfig {
   const provider = providerFixture();
   const summary = provider.connections?.find((entry) => entry.id === id);
   if (!summary) throw new Error("missing fixture");
-  const builtIn = provider.builtIn.find((entry) => entry.id === summary.profileId);
+  const builtIn =
+    provider.builtIn.find((entry) => entry.id === summary.profileId) ??
+    provider.builtIn.find((entry) => entry.id === "siliconflow-cn");
   return {
     presetId: summary.id,
     presetName: summary.name,
@@ -442,6 +487,7 @@ afterEach(() => {
   deleteProviderConnectionMock.mockClear();
   refreshProviderConnectionModelsMock.mockClear();
   setProviderConnectionEnabledModelsMock.mockClear();
+  setDefaultProviderSelectionMock.mockClear();
 });
 
 import { ModelSection } from "./ModelSection";
@@ -514,6 +560,96 @@ describe("ModelSection", () => {
     expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ["models"] });
   });
 
+  it("sets a provider connection as the default provider", async () => {
+    const { invalidateQueries } = renderModelSection(providerFixture());
+
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: "Set default SiliconFlow",
+      }),
+    );
+
+    await waitFor(() =>
+      expect(setDefaultProviderSelectionMock).toHaveBeenCalledWith({
+        providerId: "conn-sf",
+        modelId: "deepseek-ai/DeepSeek-V3.2",
+      }),
+    );
+    expect(setProviderConnectionEnabledModelsMock).toHaveBeenCalledWith(
+      "conn-sf",
+      {
+        modelIds: ["deepseek-ai/DeepSeek-V3.2"],
+        defaultModelId: "deepseek-ai/DeepSeek-V3.2",
+      },
+    );
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ["provider"] });
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ["models"] });
+  });
+
+  it("creates then refreshes models from the add provider dialog", async () => {
+    renderModelSection(providerFixture());
+
+    fireEvent.click(await screen.findByText("Add model"));
+    fireEvent.change(screen.getByLabelText("Connection name"), {
+      target: { value: "Anthropic Fresh" },
+    });
+    fireEvent.click(screen.getByText("Refresh models"));
+
+    await waitFor(() =>
+      expect(createProviderConnectionMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "Anthropic Fresh",
+          profileId: "openai",
+        }),
+      ),
+    );
+    expect(refreshProviderConnectionModelsMock).toHaveBeenCalledWith(
+      "conn-openai",
+    );
+  });
+
+  it("allows refreshing models when adding an Anthropic connection", async () => {
+    renderModelSection(providerFixtureWithAnthropicFirst());
+
+    fireEvent.click(await screen.findByText("Add model"));
+
+    expect((screen.getByText("Refresh models") as HTMLButtonElement).disabled).toBe(
+      false,
+    );
+  });
+
+  it("saves a custom Anthropic-compatible provider connection", async () => {
+    renderModelSection(providerFixture());
+
+    fireEvent.click(await screen.findByText("Add model"));
+    fireEvent.change(screen.getByLabelText("Connection name"), {
+      target: { value: "Custom Anthropic" },
+    });
+    const providerActions = screen.getAllByTestId("select-actions")[0]!;
+    fireEvent.click(providerActions.querySelectorAll("button")[2]!);
+    const protocolActions = screen.getAllByTestId("select-actions")[1]!;
+    fireEvent.click(protocolActions.querySelectorAll("button")[1]!);
+    fireEvent.change(screen.getByPlaceholderText("https://api.example.com"), {
+      target: { value: "https://gateway.example" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("sk-ant-..."), {
+      target: { value: "gateway-key" },
+    });
+    fireEvent.click(screen.getByText("Save"));
+
+    await waitFor(() =>
+      expect(createProviderConnectionMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "Custom Anthropic",
+          profileId: "custom",
+          customProtocol: "anthropic",
+          baseUrl: "https://gateway.example",
+          apiKey: "gateway-key",
+        }),
+      ),
+    );
+  });
+
   it("saves multiple enabled models", async () => {
     renderModelSection(providerFixture());
 
@@ -532,16 +668,27 @@ describe("ModelSection", () => {
     );
   });
 
-  it("does not render a default model selector in the provider dialog", async () => {
+  it("saves an explicit default model inside the provider dialog", async () => {
     renderModelSection(providerFixture());
 
     fireEvent.click(await screen.findByRole("button", { name: "Edit OpenAI" }));
+    fireEvent.click(await screen.findByLabelText("GPT-5.1 Mini"));
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: "Set default GPT-5.1 Mini",
+      }),
+    );
+    fireEvent.click(screen.getByText("Save"));
 
     await waitFor(() =>
-      expect(getProviderConnectionMock).toHaveBeenCalledWith("conn-openai"),
+      expect(setProviderConnectionEnabledModelsMock).toHaveBeenCalledWith(
+        "conn-openai",
+        {
+          modelIds: ["gpt-5.1", "gpt-5.1-mini"],
+          defaultModelId: "gpt-5.1-mini",
+        },
+      ),
     );
-    expect(screen.queryByRole("button", { name: "Default model" })).toBeNull();
-    expect(screen.queryByText("Default model")).toBeNull();
   });
 
   it("keeps wheel scrolling inside the model list", async () => {

@@ -29,6 +29,7 @@ import {
   setProviderConnectionEnabledModels,
   updateProviderConnection,
   type BuiltInProfile,
+  type CustomProviderProtocol,
   type ProfileId,
   type ProviderConnectionConfig,
 } from "@/lib/data/settings";
@@ -48,6 +49,9 @@ interface ProviderConnectionDialogProps {
     name: string;
     provider: string;
     custom: string;
+    protocol: string;
+    protocolOpenAI: string;
+    protocolAnthropic: string;
     baseUrl: string;
     baseUrlPlaceholder: string;
     apiKey: string;
@@ -68,12 +72,15 @@ interface ProviderConnectionDialogProps {
     models: string;
     modelSearch: string;
     modelEmpty: string;
+    defaultModel: string;
+    setDefaultModel: string;
   };
 }
 
 interface FormState {
   name: string;
   profileId: ProfileId;
+  customProtocol: CustomProviderProtocol;
   baseUrl: string;
   apiKey: string;
   enabled: boolean;
@@ -86,6 +93,7 @@ function defaultForm(builtIn: BuiltInProfile[]): FormState {
   return {
     name: profile?.label ?? "Anthropic",
     profileId: profile?.id ?? "anthropic",
+    customProtocol: "openai-compatible",
     baseUrl: profile?.baseUrl ?? "",
     apiKey: "",
     enabled: true,
@@ -98,6 +106,7 @@ function formFromConnection(connection: ProviderConnectionConfig): FormState {
   return {
     name: connection.providerName,
     profileId: connection.profileId,
+    customProtocol: connection.customProtocol ?? "openai-compatible",
     baseUrl: connection.baseUrl,
     apiKey: connection.apiKey,
     enabled: connection.enabled,
@@ -119,6 +128,8 @@ export function ProviderConnectionDialog({
   const [showApiKey, setShowApiKey] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [workingConnection, setWorkingConnection] =
+    useState<ProviderConnectionConfig | null>(connection);
   const [refreshMsg, setRefreshMsg] = useState<
     "success" | "missing" | "unsupported" | "error" | null
   >(null);
@@ -129,14 +140,17 @@ export function ProviderConnectionDialog({
     setRefreshMsg(null);
     setSaveMsg(null);
     setShowApiKey(false);
+    setWorkingConnection(connection);
     setForm(connection ? formFromConnection(connection) : defaultForm(builtIn));
   }, [open, connection, builtIn]);
 
   const selectedBuiltIn = builtIn.find((profile) => profile.id === form.profileId);
   const models = useMemo(() => {
-    if (connection?.profileId === form.profileId) return connection.models;
+    if (workingConnection?.profileId === form.profileId) {
+      return workingConnection.models;
+    }
     return selectedBuiltIn?.models ?? [];
-  }, [connection, form.profileId, selectedBuiltIn]);
+  }, [workingConnection, form.profileId, selectedBuiltIn]);
 
   const handleProfileChange = (value: string) => {
     const profileId = value as ProfileId;
@@ -146,6 +160,8 @@ export function ProviderConnectionDialog({
       profileId,
       name: current.name || profile?.label || "Custom",
       baseUrl: profile?.baseUrl ?? current.baseUrl,
+      customProtocol:
+        profileId === "custom" ? current.customProtocol : "openai-compatible",
       enabledModelIds: [],
       defaultModelId: null,
     }));
@@ -155,31 +171,38 @@ export function ProviderConnectionDialog({
     setSaving(true);
     setSaveMsg(null);
     try {
-      let saved = connection;
-      if (mode === "create" || !connection) {
+      let saved = workingConnection;
+      if (!saved) {
         const state = await createProviderConnection({
           name: form.name,
           profileId: form.profileId,
           baseUrl: form.baseUrl,
           apiKey: form.apiKey,
+          customProtocol: form.customProtocol,
           enabled: form.enabled,
         });
         saved = state.connection;
+        setWorkingConnection(saved);
       } else {
-        const state = await updateProviderConnection(connection.providerId, {
+        const state = await updateProviderConnection(saved.providerId, {
           providerName: form.name,
           profileId: form.profileId,
           baseUrl: form.baseUrl,
           apiKey: form.apiKey,
+          customProtocol: form.customProtocol,
           enabled: form.enabled,
           defaultModelId: form.defaultModelId,
         });
         saved = state.connection;
+        setWorkingConnection(saved);
       }
       if (saved) {
         await setProviderConnectionEnabledModels(saved.providerId, {
           modelIds: form.enabledModelIds,
-          defaultModelId: form.enabledModelIds[0] ?? null,
+          defaultModelId:
+            form.defaultModelId && form.enabledModelIds.includes(form.defaultModelId)
+              ? form.defaultModelId
+              : (form.enabledModelIds[0] ?? null),
         });
       }
       setSaveMsg("saved");
@@ -193,18 +216,34 @@ export function ProviderConnectionDialog({
   };
 
   const refreshModels = async () => {
-    if (!connection) return;
     setRefreshing(true);
     setRefreshMsg(null);
     try {
-      await updateProviderConnection(connection.providerId, {
-        providerName: form.name,
-        profileId: form.profileId,
-        baseUrl: form.baseUrl,
-        apiKey: form.apiKey,
-        enabled: form.enabled,
-      });
-      const state = await refreshProviderConnectionModels(connection.providerId);
+      let target = workingConnection;
+      if (!target) {
+        const created = await createProviderConnection({
+          name: form.name,
+          profileId: form.profileId,
+          baseUrl: form.baseUrl,
+          apiKey: form.apiKey,
+          customProtocol: form.customProtocol,
+          enabled: form.enabled,
+        });
+        target = created.connection;
+      } else {
+        const updated = await updateProviderConnection(target.providerId, {
+          providerName: form.name,
+          profileId: form.profileId,
+          baseUrl: form.baseUrl,
+          apiKey: form.apiKey,
+          customProtocol: form.customProtocol,
+          enabled: form.enabled,
+        });
+        target = updated.connection;
+      }
+      setWorkingConnection(target);
+      const state = await refreshProviderConnectionModels(target.providerId);
+      setWorkingConnection(state.connection);
       setForm(formFromConnection(state.connection));
       setRefreshMsg("success");
       onSaved();
@@ -258,6 +297,33 @@ export function ProviderConnectionDialog({
               </SelectContent>
             </Select>
           </Field>
+          {form.profileId === "custom" && (
+            <Field label={labels.protocol}>
+              <Select
+                value={form.customProtocol}
+                onValueChange={(value) =>
+                  setForm((current) => ({
+                    ...current,
+                    customProtocol: value as CustomProviderProtocol,
+                    enabledModelIds: [],
+                    defaultModelId: null,
+                  }))
+                }
+              >
+                <SelectTrigger aria-label={labels.protocol} className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent align="start" side="bottom" position="popper">
+                  <SelectItem value="openai-compatible">
+                    {labels.protocolOpenAI}
+                  </SelectItem>
+                  <SelectItem value="anthropic">
+                    {labels.protocolAnthropic}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+          )}
           <Field label={labels.baseUrl}>
             <Input
               value={form.baseUrl}
@@ -325,7 +391,7 @@ export function ProviderConnectionDialog({
                 type="button"
                 variant="outline"
                 onClick={() => void refreshModels()}
-                disabled={!connection || refreshing}
+                disabled={refreshing || saving}
               >
                 {refreshing ? labels.refreshing : labels.refresh}
               </Button>
@@ -333,6 +399,7 @@ export function ProviderConnectionDialog({
             <ProviderModelSelector
               models={models}
               enabledModelIds={form.enabledModelIds}
+              defaultModelId={form.defaultModelId}
               onChange={(modelIds) =>
                 setForm((current) => ({
                   ...current,
@@ -343,9 +410,20 @@ export function ProviderConnectionDialog({
                       : (modelIds[0] ?? null),
                 }))
               }
+              onDefaultChange={(modelId) =>
+                setForm((current) => ({
+                  ...current,
+                  enabledModelIds: current.enabledModelIds.includes(modelId)
+                    ? current.enabledModelIds
+                    : [...current.enabledModelIds, modelId],
+                  defaultModelId: modelId,
+                }))
+              }
               labels={{
                 search: labels.modelSearch,
                 empty: labels.modelEmpty,
+                default: labels.defaultModel,
+                setDefault: labels.setDefaultModel,
               }}
             />
             {refreshMsg === "success" && (

@@ -10,25 +10,47 @@ import {
   type ProfileModel,
   type ProviderProfile,
 } from "../lib/providerProfiles";
+import type { CustomProviderProtocol } from "../services/providerSettings";
 
 interface ModelsRouteDeps {
   fetchImpl?: ModelFetchImpl;
 }
 
-const CUSTOM_OPENAI_COMPATIBLE_PROFILE: ProviderProfile = {
-  id: "openai",
-  label: "Custom",
-  baseUrl: "",
-  modelList: { strategy: "openai-compatible", path: "/models" },
-  agentRuntime: {
-    protocol: "openai-compatible",
-    baseUrl: "",
-    auth: "bearer",
-    capabilities: { text: true, tools: false, fileCheckpoint: false },
-  },
-  supportsRemoteModels: true,
-  models: [],
-};
+function customProfile(
+  baseUrl: string,
+  customProtocol: CustomProviderProtocol = "openai-compatible",
+): ProviderProfile {
+  if (customProtocol === "anthropic") {
+    return {
+      id: "anthropic",
+      label: "Custom",
+      baseUrl,
+      modelList: { strategy: "anthropic", path: "/v1/models" },
+      agentRuntime: {
+        protocol: "anthropic",
+        baseUrl,
+        auth: "x-api-key",
+        capabilities: { text: true, tools: true, fileCheckpoint: true },
+      },
+      supportsRemoteModels: true,
+      models: [],
+    };
+  }
+  return {
+    id: "openai",
+    label: "Custom",
+    baseUrl,
+    modelList: { strategy: "openai-compatible", path: "/models" },
+    agentRuntime: {
+      protocol: "openai-compatible",
+      baseUrl,
+      auth: "bearer",
+      capabilities: { text: true, tools: false, fileCheckpoint: false },
+    },
+    supportsRemoteModels: true,
+    models: [],
+  };
+}
 
 function defaultModelId(
   models: ProfileModel[],
@@ -70,7 +92,7 @@ export function buildModelsRoutes(
     const current = provider.current();
     const profile =
       current.profileId === "custom"
-        ? CUSTOM_OPENAI_COMPATIBLE_PROFILE
+        ? customProfile(current.baseUrl, current.customProtocol)
         : getBuiltInProfile(current.profileId);
 
     if (!profile) {

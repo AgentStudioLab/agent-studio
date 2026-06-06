@@ -71,6 +71,28 @@ function normalizeOpenAICompatible(value: unknown): ProfileModel[] {
     .filter((model): model is ProfileModel => model !== null);
 }
 
+function normalizeAnthropic(value: unknown): ProfileModel[] {
+  if (!value || typeof value !== "object") return [];
+  const data = (value as { data?: unknown }).data;
+  if (!Array.isArray(data)) return [];
+  return data
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const record = item as { id?: unknown; display_name?: unknown };
+      const model = remoteModel(record.id);
+      if (!model) return null;
+      return {
+        ...model,
+        displayName:
+          typeof record.display_name === "string" &&
+          record.display_name.trim()
+            ? record.display_name.trim()
+            : model.displayName,
+      };
+    })
+    .filter((model): model is ProfileModel => model !== null);
+}
+
 function normalizeGemini(value: unknown): ProfileModel[] {
   if (!value || typeof value !== "object") return [];
   const models = (value as { models?: unknown }).models;
@@ -141,6 +163,21 @@ export async function listModelsForProvider(
     );
     if (!response.ok) return response;
     return success(normalizeGemini(response.value));
+  }
+
+  if (strategy === "anthropic") {
+    const response = await fetchJson(
+      fetchImpl,
+      joinUrl(input.baseUrl, input.profile.modelList.path?.trim() || "/v1/models"),
+      {
+        headers: {
+          "anthropic-version": "2023-06-01",
+          "x-api-key": apiKey,
+        },
+      },
+    );
+    if (!response.ok) return response;
+    return success(normalizeAnthropic(response.value));
   }
 
   const response = await fetchJson(

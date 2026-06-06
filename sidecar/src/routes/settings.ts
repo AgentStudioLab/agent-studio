@@ -11,7 +11,6 @@ import type { UserProfileSettingsState } from "../services/userProfileSettings";
 import {
   BUILT_IN_PROFILES,
   isBuiltInProfileId,
-  type ProfileModel,
   type ProviderProfileId,
 } from "../lib/providerProfiles";
 import {
@@ -19,6 +18,7 @@ import {
   type ModelFetchError,
   type ModelFetchImpl,
 } from "../services/modelCatalog";
+import type { CustomProviderProtocol } from "../services/providerSettings";
 
 interface SettingsRouteDeps {
   fetchImpl?: ModelFetchImpl;
@@ -98,6 +98,15 @@ function validateConnectionPatch(
     }
     patch.defaultModelId = body.defaultModelId;
   }
+  if (body.customProtocol !== undefined) {
+    if (
+      body.customProtocol !== "openai-compatible" &&
+      body.customProtocol !== "anthropic"
+    ) {
+      return { ok: false, error: "invalid_custom_protocol" };
+    }
+    patch.customProtocol = body.customProtocol;
+  }
   return { ok: true, patch };
 }
 
@@ -109,7 +118,30 @@ function validateSelection(value: unknown): ProviderModelSelection | null {
   return { providerId: value.providerId, modelId: value.modelId };
 }
 
-function customOpenAIProfile(baseUrl: string) {
+function sanitizeCustomProtocol(value: unknown): CustomProviderProtocol {
+  return value === "anthropic" ? "anthropic" : "openai-compatible";
+}
+
+function customProfile(
+  baseUrl: string,
+  customProtocol: CustomProviderProtocol = "openai-compatible",
+) {
+  if (customProtocol === "anthropic") {
+    return {
+      id: "anthropic" as const,
+      label: "Custom",
+      baseUrl,
+      modelList: { strategy: "anthropic" as const, path: "/v1/models" },
+      agentRuntime: {
+        protocol: "anthropic" as const,
+        baseUrl,
+        auth: "x-api-key" as const,
+        capabilities: { text: true, tools: true, fileCheckpoint: true },
+      },
+      supportsRemoteModels: true,
+      models: [],
+    };
+  }
   return {
     id: "openai" as const,
     label: "Custom",
@@ -165,55 +197,6 @@ function validateProviderPresetPatch(
     patch.selectedModelId = body.selectedModelId;
   }
   return { ok: true, patch };
-}
-
-function modelListUrl(baseUrl: string): string | null {
-  const trimmed = baseUrl.trim();
-  if (!trimmed) return null;
-  try {
-    const url = new URL(trimmed);
-    const pathname = url.pathname.replace(/\/+$/, "");
-    url.pathname = pathname.endsWith("/v1")
-      ? `${pathname}/models`
-      : `${pathname}/v1/models`;
-    url.search = "";
-    url.hash = "";
-    return url.toString();
-  } catch {
-    return null;
-  }
-}
-
-function normalizeFetchedModels(raw: unknown): ProfileModel[] {
-  const data =
-    raw && typeof raw === "object" && Array.isArray((raw as { data?: unknown }).data)
-      ? (raw as { data: unknown[] }).data
-      : Array.isArray(raw)
-        ? raw
-        : [];
-
-  const seen = new Set<string>();
-  const models: ProfileModel[] = [];
-  for (const item of data) {
-    if (!item || typeof item !== "object") continue;
-    const record = item as Record<string, unknown>;
-    if (typeof record.id !== "string" || !record.id.trim()) continue;
-    const id = record.id.trim();
-    if (seen.has(id)) continue;
-    seen.add(id);
-    const displayName =
-      typeof record.displayName === "string" && record.displayName.trim()
-        ? record.displayName.trim()
-        : typeof record.display_name === "string" && record.display_name.trim()
-          ? record.display_name.trim()
-          : id;
-    const description =
-      typeof record.description === "string" && record.description.trim()
-        ? record.description.trim()
-        : "Fetched from provider";
-    models.push({ id, displayName, description });
-  }
-  return models;
 }
 
 export function buildSettingsRoutes(
@@ -333,6 +316,15 @@ export function buildSettingsRoutes(
       }
       input.apiKey = body.apiKey;
     }
+    if (body.customProtocol !== undefined) {
+      if (
+        body.customProtocol !== "openai-compatible" &&
+        body.customProtocol !== "anthropic"
+      ) {
+        return c.json({ error: "invalid_custom_protocol" }, 400);
+      }
+      input.customProtocol = body.customProtocol;
+    }
     if (body.enabled !== undefined) {
       if (typeof body.enabled !== "boolean") {
         return c.json({ error: "invalid_enabled" }, 400);
@@ -380,7 +372,10 @@ export function buildSettingsRoutes(
     }
     const profile =
       connection.profileId === "custom"
-        ? customOpenAIProfile(connection.baseUrl)
+        ? customProfile(
+            connection.baseUrl,
+            sanitizeCustomProtocol(connection.customProtocol),
+          )
         : BUILT_IN_PROFILES.find((item) => item.id === connection.profileId);
     if (!profile) {
       return c.json({ error: "unsupported_remote_models" }, 400);
@@ -539,6 +534,13 @@ export function buildSettingsRoutes(
     if (body.apiKey !== undefined && typeof body.apiKey !== "string") {
       return c.json({ error: "invalid_api_key" }, 400);
     }
+    if (
+      body.customProtocol !== undefined &&
+      body.customProtocol !== "openai-compatible" &&
+      body.customProtocol !== "anthropic"
+    ) {
+      return c.json({ error: "invalid_custom_protocol" }, 400);
+    }
 
     const current = provider.current();
     const profileId =
@@ -547,36 +549,37 @@ export function buildSettingsRoutes(
       typeof body.baseUrl === "string" ? body.baseUrl : current.baseUrl;
     const apiKey =
       typeof body.apiKey === "string" ? body.apiKey : current.apiKey;
-    const url = modelListUrl(baseUrl);
-    if (!url) return c.json({ error: "invalid_base_url" }, 400);
-
-    let upstream: Response;
-    try {
-      upstream = await fetch(url, {
-        headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : undefined,
-      });
-    } catch {
-      return c.json({ error: "fetch_failed" }, 502);
+    const customProtocol =
+      body.customProtocol !== undefined
+        ? sanitizeCustomProtocol(body.customProtocol)
+        : sanitizeCustomProtocol(current.customProtocol);
+    const profile =
+      profileId === "custom"
+        ? customProfile(baseUrl, customProtocol)
+        : BUILT_IN_PROFILES.find((item) => item.id === profileId);
+    if (!profile) {
+      return c.json({ error: "unsupported_remote_models" }, 400);
     }
-    if (!upstream.ok) {
-      return c.json({ error: "provider_error", status: upstream.status }, 502);
-    }
-
-    const json = (await upstream.json().catch(() => null)) as unknown;
-    const models = normalizeFetchedModels(json);
-    if (models.length === 0) {
-      return c.json({ error: "empty_models" }, 422);
+    const result = await listModelsForProvider({
+      profile,
+      baseUrl,
+      apiKey,
+      fetchImpl: deps.fetchImpl,
+    });
+    if (!result.ok) {
+      return c.json({ error: result.error }, statusForRefreshError(result.error));
     }
 
     const next = provider.update({
       profileId,
       baseUrl,
       apiKey,
-      remoteModels: models,
+      customProtocol,
+      remoteModels: result.models,
       remoteModelsProviderId: profileId,
       remoteModelsBaseUrl: baseUrl,
-      remoteModelsFetchedAt: new Date().toISOString(),
-      selectedModelId: models[0]?.id ?? null,
+      remoteModelsFetchedAt: result.fetchedAt,
+      selectedModelId: result.models[0]?.id ?? null,
     });
     return c.json({ current: next });
   });

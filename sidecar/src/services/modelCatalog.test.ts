@@ -22,6 +22,53 @@ function openAIProfile(): ProviderProfile {
 }
 
 describe("modelCatalog", () => {
+  it("fetches Anthropic model catalogs with Anthropic headers", async () => {
+    const calls: Parameters<ModelFetchImpl>[] = [];
+    const fetchImpl: ModelFetchImpl = async (url, init) => {
+      calls.push([url, init]);
+      return new Response(
+        JSON.stringify({
+          data: [
+            { id: "claude-sonnet-4-6", display_name: "Claude Sonnet 4.6" },
+            { id: "claude-haiku-4-5" },
+          ],
+        }),
+      );
+    };
+    const profile = getBuiltInProfile("anthropic");
+    expect(profile).toBeDefined();
+    if (!profile) throw new Error("missing Anthropic profile");
+
+    const result = await listModelsForProvider({
+      profile,
+      baseUrl: "https://api.anthropic.test",
+      apiKey: "anthropic-key",
+      fetchImpl,
+    });
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.[0]).toBe("https://api.anthropic.test/v1/models");
+    expect(calls[0]?.[1]?.headers).toEqual({
+      "anthropic-version": "2023-06-01",
+      "x-api-key": "anthropic-key",
+    });
+    expect(result).toMatchObject({
+      ok: true,
+      models: [
+        {
+          id: "claude-sonnet-4-6",
+          displayName: "Claude Sonnet 4.6",
+          description: "Remote model",
+        },
+        {
+          id: "claude-haiku-4-5",
+          displayName: "claude-haiku-4-5",
+          description: "Remote model",
+        },
+      ],
+    });
+  });
+
   it("normalizes OpenAI-compatible model responses", async () => {
     const calls: Parameters<ModelFetchImpl>[] = [];
     const fetchImpl: ModelFetchImpl = async (url, init) => {

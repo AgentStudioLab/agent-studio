@@ -32,6 +32,7 @@ export interface ProfileModel {
 
 export type ModelListStrategy =
   | { strategy: "static" }
+  | { strategy: "anthropic"; path?: string }
   | { strategy: "openai-compatible"; path?: string }
   | { strategy: "gemini" }
   | { strategy: "bedrock" };
@@ -151,7 +152,7 @@ export const ANTHROPIC_PROFILE: ProviderProfile = defineProfile({
   label: "Anthropic",
   region: "Global",
   baseUrl: "https://api.anthropic.com",
-  modelList: { strategy: "static" },
+  modelList: { strategy: "anthropic", path: "/v1/models" },
   agentRuntime: anthropicRuntime("https://api.anthropic.com", "x-api-key"),
   models: [
     {

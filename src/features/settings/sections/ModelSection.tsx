@@ -5,7 +5,10 @@ import {
   deleteProviderConnection,
   getProvider,
   getProviderConnection,
+  setDefaultProviderSelection,
+  setProviderConnectionEnabledModels,
   type ProviderConnectionConfig,
+  type ProviderConnectionSummary,
 } from "@/lib/data/settings";
 import { ProviderConnectionDialog } from "./ProviderConnectionDialog";
 import { ProviderConnectionList } from "./ProviderConnectionList";
@@ -59,6 +62,31 @@ export function ModelSection() {
     }
   };
 
+  const handleSetDefault = async (connection: ProviderConnectionSummary) => {
+    try {
+      const detail = await getProviderConnection(connection.id);
+      const modelId =
+        detail.defaultModelId ??
+        detail.enabledModelIds[0] ??
+        detail.models[0]?.id ??
+        null;
+      if (!modelId) return;
+      if (!detail.enabledModelIds.includes(modelId)) {
+        await setProviderConnectionEnabledModels(detail.providerId, {
+          modelIds: [modelId],
+          defaultModelId: modelId,
+        });
+      }
+      await setDefaultProviderSelection({
+        providerId: connection.id,
+        modelId,
+      });
+      invalidateProviderAndModels();
+    } catch {
+      setDeleteMsg(t("settings.provider.defaultProviderError"));
+    }
+  };
+
   if (isLoading || !data) {
     return (
       <section>
@@ -87,12 +115,14 @@ export function ModelSection() {
         onAdd={openCreate}
         onEdit={(id) => void openEdit(id)}
         onDelete={(id) => void handleDelete(id)}
+        onSetDefault={(connection) => void handleSetDefault(connection)}
         labels={{
           title: t("settings.provider.connectionsTitle"),
           add: t("settings.provider.addModel"),
           edit: t("settings.provider.edit"),
           delete: t("settings.provider.delete"),
           default: t("settings.provider.defaultModelBadge"),
+          setDefault: t("settings.provider.setDefault"),
           enabledModels: t("settings.provider.enabledModels"),
           disabled: t("settings.provider.disabled"),
           missingKey: t("settings.provider.missingApiKey"),
@@ -115,6 +145,9 @@ export function ModelSection() {
           name: t("settings.provider.connectionNameLabel"),
           provider: t("settings.provider.profileLabel"),
           custom: t("settings.provider.profile.custom"),
+          protocol: t("settings.provider.customProtocolLabel"),
+          protocolOpenAI: t("settings.provider.customProtocolOpenAI"),
+          protocolAnthropic: t("settings.provider.customProtocolAnthropic"),
           baseUrl: t("settings.provider.baseUrlLabel"),
           baseUrlPlaceholder: t("settings.provider.baseUrlPlaceholder"),
           apiKey: t("settings.provider.apiKeyLabel"),
@@ -135,6 +168,8 @@ export function ModelSection() {
           models: t("settings.provider.modelsLabel"),
           modelSearch: t("settings.provider.modelSearch"),
           modelEmpty: t("settings.provider.modelEmpty"),
+          defaultModel: t("settings.provider.defaultModelBadge"),
+          setDefaultModel: t("settings.provider.setDefault"),
         }}
       />
     </section>

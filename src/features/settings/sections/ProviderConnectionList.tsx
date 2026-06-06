@@ -12,12 +12,14 @@ interface ProviderConnectionListProps {
   onAdd: () => void;
   onEdit: (id: string) => void;
   onDelete: (id: string) => void;
+  onSetDefault: (connection: ProviderConnectionSummary) => void;
   labels: {
     title: string;
     add: string;
     edit: string;
     delete: string;
     default: string;
+    setDefault: string;
     enabledModels: string;
     disabled: string;
     missingKey: string;
@@ -30,6 +32,7 @@ export function ProviderConnectionList({
   onAdd,
   onEdit,
   onDelete,
+  onSetDefault,
   labels,
 }: ProviderConnectionListProps) {
   return (
@@ -72,6 +75,17 @@ export function ProviderConnectionList({
                 </div>
               </div>
               <div className="flex shrink-0 items-center gap-1">
+                {!isDefault && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    aria-label={`${labels.setDefault} ${connection.name}`}
+                    onClick={() => onSetDefault(connection)}
+                  >
+                    {labels.setDefault}
+                  </Button>
+                )}
                 <Button
                   type="button"
                   variant="ghost"

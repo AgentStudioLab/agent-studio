@@ -44,6 +44,8 @@ export type ProfileId =
   | "hunyuan"
   | "custom";
 
+export type CustomProviderProtocol = "openai-compatible" | "anthropic";
+
 export interface ProfileModel {
   id: string;
   displayName: string;
@@ -84,6 +86,7 @@ export interface ProviderConfig {
   label: string;
   baseUrl: string;
   apiKey: string;
+  customProtocol?: CustomProviderProtocol;
   models: ProfileModel[];
   remoteModelsFetchedAt: string;
   selectedModelId: string | null;
@@ -119,6 +122,7 @@ export interface ProviderPresetSummary {
   baseUrl: string;
   selectedModelId: string | null;
   selectedModelLabel: string | null;
+  customProtocol?: CustomProviderProtocol;
   agentRuntime: AgentRuntime;
   supportsRemoteModels: boolean;
   remoteModelsFetchedAt: string;
@@ -142,6 +146,7 @@ export interface ProviderConnectionSummary {
   enabledModelCount: number;
   defaultModelId: string | null;
   remoteModelsFetchedAt: string;
+  customProtocol?: CustomProviderProtocol;
   agentRuntime: AgentRuntime;
   supportsRemoteModels: boolean;
   compatibilityNote?: string;
@@ -154,6 +159,7 @@ export interface EnabledModelOption {
   modelId: string;
   modelLabel: string;
   modelDescription: string;
+  customProtocol?: CustomProviderProtocol;
   agentRuntime: AgentRuntime;
   compatibilityNote?: string;
 }
@@ -197,13 +203,20 @@ export interface CreateProviderConnectionInput {
   profileId?: ProfileId;
   baseUrl?: string;
   apiKey?: string;
+  customProtocol?: CustomProviderProtocol;
   enabled?: boolean;
 }
 
 export type ProviderConnectionPatch = Partial<
   Pick<
     ProviderConnectionConfig,
-    "providerName" | "profileId" | "baseUrl" | "apiKey" | "enabled" | "defaultModelId"
+    | "providerName"
+    | "profileId"
+    | "baseUrl"
+    | "apiKey"
+    | "customProtocol"
+    | "enabled"
+    | "defaultModelId"
   >
 > & {
   name?: string;

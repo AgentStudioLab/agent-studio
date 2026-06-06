@@ -68,13 +68,13 @@ describe("settings provider routes", () => {
     expect(body.current.models).toEqual([
       {
         id: "alpha-model",
-        displayName: "Alpha Model",
-        description: "Fetched from provider",
+        displayName: "alpha-model",
+        description: "Remote model",
       },
       {
         id: "beta-model",
         displayName: "beta-model",
-        description: "Fetched from provider",
+        description: "Remote model",
       },
     ]);
 
@@ -124,8 +124,8 @@ describe("settings provider routes", () => {
     expect(body.current.models).toEqual([
       {
         id: "gpt-5.1",
-        displayName: "GPT-5.1",
-        description: "Fetched from provider",
+        displayName: "gpt-5.1",
+        description: "Remote model",
       },
     ]);
 
@@ -144,8 +144,76 @@ describe("settings provider routes", () => {
     expect(providerBody.presets[0]).toMatchObject({
       profileId: "openai",
       selectedModelId: "gpt-5.1",
-      selectedModelLabel: "GPT-5.1",
+      selectedModelLabel: "gpt-5.1",
     });
     expect(providerBody.presets[0]?.remoteModelsFetchedAt).not.toBe("");
+  });
+
+  it("refreshes custom Anthropic-compatible connection models through the Anthropic catalog", async () => {
+    const app = makeApp();
+    const createRes = await app.request("/settings/provider/connections", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: "Anthropic Gateway",
+        profileId: "custom",
+        baseUrl: "https://gateway.example",
+        apiKey: "gateway-key",
+        customProtocol: "anthropic",
+      }),
+    });
+    expect(createRes.status).toBe(200);
+    const created = (await createRes.json()) as {
+      connection: { providerId: string; customProtocol: string };
+    };
+    expect(created.connection.customProtocol).toBe("anthropic");
+
+    const fetchMock = mock(
+      async (url: string | URL | Request, init?: RequestInit) => {
+        expect(String(url)).toBe("https://gateway.example/v1/models");
+        expect(init?.headers).toEqual({
+          "anthropic-version": "2023-06-01",
+          "x-api-key": "gateway-key",
+        });
+        return new Response(
+          JSON.stringify({
+            data: [
+              {
+                id: "claude-sonnet-4-6",
+                display_name: "Claude Sonnet 4.6",
+              },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      },
+    );
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    const refreshRes = await app.request(
+      `/settings/provider/connections/${created.connection.providerId}/models/refresh`,
+      { method: "POST" },
+    );
+
+    expect(refreshRes.status).toBe(200);
+    const refreshed = (await refreshRes.json()) as {
+      connection: {
+        customProtocol: string;
+        agentRuntime: { protocol: string; capabilities: { tools: boolean } };
+        models: unknown[];
+      };
+    };
+    expect(refreshed.connection.customProtocol).toBe("anthropic");
+    expect(refreshed.connection.agentRuntime).toMatchObject({
+      protocol: "anthropic",
+      capabilities: { tools: true },
+    });
+    expect(refreshed.connection.models).toEqual([
+      {
+        id: "claude-sonnet-4-6",
+        displayName: "Claude Sonnet 4.6",
+        description: "Remote model",
+      },
+    ]);
   });
 });

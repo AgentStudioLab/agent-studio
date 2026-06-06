@@ -7,6 +7,8 @@ import {
   type ProviderProfileId,
 } from "../lib/providerProfiles";
 
+export type CustomProviderProtocol = "openai-compatible" | "anthropic";
+
 // Persisted shape — JSON-encoded into settings.value under key "provider".
 // `apiKey` lives here too so all provider-related state is one row. The
 // existing settings.value column is TEXT NOT NULL so we always write JSON.
@@ -18,6 +20,7 @@ export interface PersistedProvider {
   profileId: ProviderProfileId;
   baseUrl: string;
   apiKey: string;
+  customProtocol: CustomProviderProtocol;
   remoteModels: ProfileModel[];
   remoteModelsProviderId: ProviderProfileId | "";
   remoteModelsBaseUrl: string;
@@ -71,6 +74,7 @@ export interface ProviderConnectionSummary {
   enabledModelCount: number;
   defaultModelId: string | null;
   remoteModelsFetchedAt: string;
+  customProtocol?: CustomProviderProtocol;
   agentRuntime: AgentRuntime;
   supportsRemoteModels: boolean;
   compatibilityNote?: string;
@@ -84,6 +88,7 @@ export interface ProviderPresetSummary {
   baseUrl: string;
   selectedModelId: string | null;
   selectedModelLabel: string | null;
+  customProtocol?: CustomProviderProtocol;
   agentRuntime: AgentRuntime;
   supportsRemoteModels: boolean;
   remoteModelsFetchedAt: string;
@@ -97,6 +102,7 @@ export interface EnabledModelOption {
   modelId: string;
   modelLabel: string;
   modelDescription: string;
+  customProtocol?: CustomProviderProtocol;
   agentRuntime: AgentRuntime;
   compatibilityNote?: string;
 }
@@ -121,6 +127,7 @@ export type ProviderConnectionPatch = Partial<
     | "profileId"
     | "baseUrl"
     | "apiKey"
+    | "customProtocol"
     | "remoteModels"
     | "remoteModelsProviderId"
     | "remoteModelsBaseUrl"
@@ -135,6 +142,7 @@ export interface CreateProviderConnectionInput {
   profileId?: ProviderProfileId;
   baseUrl?: string;
   apiKey?: string;
+  customProtocol?: CustomProviderProtocol;
   enabled?: boolean;
 }
 
@@ -216,6 +224,7 @@ export interface ResolvedProvider {
   label: string;
   baseUrl: string;
   apiKey: string;
+  customProtocol?: CustomProviderProtocol;
   models: ProfileModel[];
   remoteModelsFetchedAt: string;
   selectedModelId: string | null;
@@ -228,6 +237,12 @@ const OPENAI_TEXT_CAPABILITIES = {
   text: true,
   tools: false,
   fileCheckpoint: false,
+} satisfies AgentRuntime["capabilities"];
+
+const ANTHROPIC_FULL_CAPABILITIES = {
+  text: true,
+  tools: true,
+  fileCheckpoint: true,
 } satisfies AgentRuntime["capabilities"];
 
 const KEY = "provider";
@@ -285,6 +300,10 @@ function sanitizeRemoteModelsProviderId(
   return sanitizeProviderProfileId(value) ?? "";
 }
 
+function sanitizeCustomProviderProtocol(value: unknown): CustomProviderProtocol {
+  return value === "anthropic" ? "anthropic" : "openai-compatible";
+}
+
 function sanitizeModels(value: unknown): ProfileModel[] {
   if (!Array.isArray(value)) return [];
   const out: ProfileModel[] = [];
@@ -316,6 +335,7 @@ function defaultPersistedProvider(envFallback: {
     profileId: DEFAULT_PROFILE_ID,
     baseUrl: envFallback.baseUrl ?? "",
     apiKey: envFallback.apiKey ?? "",
+    customProtocol: "openai-compatible",
     remoteModels: [],
     remoteModelsProviderId: "",
     remoteModelsBaseUrl: "",
@@ -433,6 +453,7 @@ function normalizePersistedProvider(value: unknown): PersistedProvider | null {
     profileId,
     baseUrl: raw.baseUrl,
     apiKey: raw.apiKey,
+    customProtocol: sanitizeCustomProviderProtocol(raw.customProtocol),
     remoteModels: sanitizeModels(raw.remoteModels),
     remoteModelsProviderId: sanitizeRemoteModelsProviderId(
       raw.remoteModelsProviderId,
@@ -633,6 +654,20 @@ function resolve(persisted: ProviderPreset): ResolvedProvider {
     const remoteModelsFetchedAt = remoteCacheMatches
       ? persisted.remoteModelsFetchedAt
       : "";
+    const agentRuntime: AgentRuntime =
+      persisted.customProtocol === "anthropic"
+        ? {
+            protocol: "anthropic",
+            baseUrl: persisted.baseUrl.trim().replace(/\/+$/, ""),
+            auth: "x-api-key",
+            capabilities: ANTHROPIC_FULL_CAPABILITIES,
+          }
+        : {
+            protocol: "openai-compatible",
+            baseUrl: normalizeOpenAICompatibleBaseUrl(persisted.baseUrl),
+            auth: "bearer",
+            capabilities: OPENAI_TEXT_CAPABILITIES,
+          };
     return {
       presetId: persisted.id,
       presetName: persisted.name,
@@ -640,15 +675,11 @@ function resolve(persisted: ProviderPreset): ResolvedProvider {
       label: "Custom",
       baseUrl: persisted.baseUrl,
       apiKey: persisted.apiKey,
+      customProtocol: persisted.customProtocol,
       models: activeRemoteModels,
       remoteModelsFetchedAt,
       selectedModelId: persisted.selectedModelId,
-      agentRuntime: {
-        protocol: "openai-compatible",
-        baseUrl: normalizeOpenAICompatibleBaseUrl(persisted.baseUrl),
-        auth: "bearer",
-        capabilities: OPENAI_TEXT_CAPABILITIES,
-      },
+      agentRuntime,
       supportsRemoteModels: true,
     };
   }
@@ -817,6 +848,7 @@ function toPersistedProvider(preset: ProviderPreset): PersistedProvider {
     profileId: preset.profileId,
     baseUrl: preset.baseUrl,
     apiKey: preset.apiKey,
+    customProtocol: preset.customProtocol,
     remoteModels: preset.remoteModels,
     remoteModelsProviderId: preset.remoteModelsProviderId,
     remoteModelsBaseUrl: preset.remoteModelsBaseUrl,
@@ -846,6 +878,7 @@ function summarizePreset(preset: ProviderPreset): ProviderPresetSummary {
     baseUrl: resolved.baseUrl,
     selectedModelId: resolved.selectedModelId,
     selectedModelLabel: selectedModelLabel(resolved),
+    customProtocol: resolved.customProtocol,
     agentRuntime: resolved.agentRuntime,
     supportsRemoteModels: resolved.supportsRemoteModels,
     remoteModelsFetchedAt: resolved.remoteModelsFetchedAt,
@@ -869,6 +902,7 @@ function summarizeConnection(
     enabledModelCount: connection.enabledModelIds.length,
     defaultModelId: connection.defaultModelId,
     remoteModelsFetchedAt: resolved.remoteModelsFetchedAt,
+    customProtocol: resolved.customProtocol,
     agentRuntime: resolved.agentRuntime,
     supportsRemoteModels: resolved.supportsRemoteModels,
     compatibilityNote: resolved.compatibilityNote,
@@ -892,6 +926,7 @@ function enabledModelOptions(
         modelId,
         modelLabel: model.displayName,
         modelDescription: model.description,
+        customProtocol: resolved.customProtocol,
         agentRuntime: resolved.agentRuntime,
         compatibilityNote: resolved.compatibilityNote,
       });
@@ -943,6 +978,7 @@ function resolveNextConfig(
   profileId: ProviderProfileId;
   baseUrl: string;
   apiKey: string;
+  customProtocol: CustomProviderProtocol;
   profileChanged: boolean;
   configChanged: boolean;
 } {
@@ -954,15 +990,23 @@ function resolveNextConfig(
     typeof patch.baseUrl === "string" ? patch.baseUrl : cache.baseUrl;
   const apiKey =
     typeof patch.apiKey === "string" ? patch.apiKey : cache.apiKey;
+  const customProtocol =
+    patch.customProtocol !== undefined
+      ? sanitizeCustomProviderProtocol(patch.customProtocol)
+      : cache.customProtocol;
   const profileChanged = profileId !== cache.profileId;
 
   return {
     profileId,
     baseUrl,
     apiKey,
+    customProtocol,
     profileChanged,
     configChanged:
-      profileChanged || baseUrl !== cache.baseUrl || apiKey !== cache.apiKey,
+      profileChanged ||
+      baseUrl !== cache.baseUrl ||
+      apiKey !== cache.apiKey ||
+      customProtocol !== cache.customProtocol,
   };
 }
 
@@ -1032,6 +1076,7 @@ function buildNextProvider(
     profileId: nextConfig.profileId,
     baseUrl: nextConfig.baseUrl,
     apiKey: nextConfig.apiKey,
+    customProtocol: nextConfig.customProtocol,
     ...resolveNextRemoteCache(cache, patch, nextConfig),
     selectedModelId: resolveNextSelectedModelId(
       cache,
@@ -1117,6 +1162,7 @@ export function createProviderSettings(
           profileId,
           baseUrl: input?.baseUrl ?? getBuiltInProfile(profileId)?.baseUrl ?? "",
           apiKey: input?.apiKey ?? "",
+          customProtocol: sanitizeCustomProviderProtocol(input?.customProtocol),
         },
         {
           name: sanitizePresetName(input?.name) ?? defaultPresetName(profileId),
