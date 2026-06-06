@@ -6,7 +6,7 @@ use std::{
 
 use rand::distr::{Alphanumeric, SampleString};
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter, Manager, RunEvent, State};
+use tauri::{AppHandle, Emitter, Manager, RunEvent, State, WindowEvent};
 use tauri_plugin_deep_link::DeepLinkExt;
 use tauri_plugin_shell::{
     process::{CommandChild, CommandEvent},
@@ -16,6 +16,9 @@ use tauri_plugin_store::StoreExt;
 
 const DESKTOP_AUTH_CALLBACK_PREFIX: &str = "agent-studio://auth/callback";
 const LOOPBACK_AUTH_CALLBACK_PATH: &str = "/auth/callback";
+const WINDOW_STATE_STORE_KEY: &str = "main_window_state";
+const MIN_WINDOW_WIDTH: u32 = 1100;
+const MIN_WINDOW_HEIGHT: u32 = 720;
 
 #[derive(Clone, Serialize)]
 pub struct SidecarInfo {
@@ -38,6 +41,15 @@ pub struct DesktopAuthTokens {
     access_token_expires_at: i64,
     refresh_token: String,
     refresh_token_expires_at: i64,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+struct MainWindowState {
+    width: u32,
+    height: u32,
+    x: i32,
+    y: i32,
+    maximized: bool,
 }
 
 #[tauri::command]
@@ -431,6 +443,73 @@ fn desktop_auth_redirect_uri(app: AppHandle) -> Result<DesktopAuthRedirectUri, S
     }
 }
 
+fn save_main_window_state(app: &AppHandle) -> Result<(), String> {
+    let Some(window) = app.get_webview_window("main") else {
+        return Ok(());
+    };
+
+    let size = window.outer_size().map_err(|e| e.to_string())?;
+    let position = window.outer_position().map_err(|e| e.to_string())?;
+    let state = MainWindowState {
+        width: size.width.max(MIN_WINDOW_WIDTH),
+        height: size.height.max(MIN_WINDOW_HEIGHT),
+        x: position.x,
+        y: position.y,
+        maximized: window.is_maximized().map_err(|e| e.to_string())?,
+    };
+
+    let store = app.store("settings.json").map_err(|e| e.to_string())?;
+    store.set(
+        WINDOW_STATE_STORE_KEY,
+        serde_json::to_value(state).map_err(|e| e.to_string())?,
+    );
+    store.save().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+fn restore_main_window_state(app: &AppHandle) -> Result<(), String> {
+    let Some(window) = app.get_webview_window("main") else {
+        return Ok(());
+    };
+
+    let store = app.store("settings.json").map_err(|e| e.to_string())?;
+    let Some(value) = store.get(WINDOW_STATE_STORE_KEY) else {
+        return Ok(());
+    };
+    let state: MainWindowState = serde_json::from_value(value).map_err(|e| e.to_string())?;
+
+    window
+        .set_size(tauri::PhysicalSize::new(
+            state.width.max(MIN_WINDOW_WIDTH),
+            state.height.max(MIN_WINDOW_HEIGHT),
+        ))
+        .map_err(|e| e.to_string())?;
+    window
+        .set_position(tauri::PhysicalPosition::new(state.x, state.y))
+        .map_err(|e| e.to_string())?;
+
+    if state.maximized {
+        window.maximize().map_err(|e| e.to_string())?;
+    }
+
+    Ok(())
+}
+
+fn watch_main_window_state(app: &AppHandle) {
+    let Some(window) = app.get_webview_window("main") else {
+        return;
+    };
+    let app_handle = app.clone();
+    window.on_window_event(move |event| match event {
+        WindowEvent::Resized(_) | WindowEvent::Moved(_) | WindowEvent::Destroyed => {
+            if let Err(err) = save_main_window_state(&app_handle) {
+                log::warn!("[window] failed to save main window state: {err}");
+            }
+        }
+        _ => {}
+    });
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // 从 repo 根的 .env 加载环境变量（dotenvy 从 CWD 向上搜索）。
@@ -472,6 +551,11 @@ pub fn run() {
             let redirect_uri = desktop_auth_redirect_uri(app.handle().clone())?;
             log::info!("[auth] desktop redirect uri {}", redirect_uri.0);
             app.manage(redirect_uri);
+
+            if let Err(err) = restore_main_window_state(app.handle()) {
+                log::warn!("[window] failed to restore main window state: {err}");
+            }
+            watch_main_window_state(app.handle());
 
             let app_handle = app.handle().clone();
             app.deep_link().on_open_url(move |event| {

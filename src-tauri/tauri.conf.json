@@ -13,8 +13,8 @@
     "windows": [
       {
         "title": "Agent Studio",
-        "width": 1480,
-        "height": 880,
+        "width": 1280,
+        "height": 800,
         "minWidth": 1100,
         "minHeight": 720,
         "resizable": true,
