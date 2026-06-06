@@ -40,4 +40,47 @@ describe("WeixinPlugin", () => {
     expect(monitorOptions[0]!.abortSignal?.aborted).toBe(true);
     expect(monitorOptions[1]!.abortSignal?.aborted).toBe(false);
   });
+
+  it("passes files to the WeChat outgoing sender", async () => {
+    const sent: unknown[] = [];
+    const plugin = new WeixinPlugin({
+      sendOutgoing: async (input) => {
+        sent.push(input);
+      },
+    });
+
+    await plugin.sendWithConnection(connection("wx_1"), {
+      type: "files",
+      chatId: "chat_1",
+      contextToken: "ctx_1",
+      text: "Done",
+      files: [
+        {
+          type: "file",
+          path: "/tmp/report.pdf",
+          fileName: "report.pdf",
+          caption: "Report",
+        },
+      ],
+    });
+
+    expect(sent).toEqual([
+      {
+        baseUrl: "https://ilink.example",
+        token: "token_1",
+        accountId: "bot_1",
+        chatId: "chat_1",
+        contextToken: "ctx_1",
+        text: "Done",
+        files: [
+          {
+            type: "file",
+            path: "/tmp/report.pdf",
+            fileName: "report.pdf",
+            caption: "Report",
+          },
+        ],
+      },
+    ]);
+  });
 });

@@ -140,9 +140,17 @@ describe("RemoteTaskService", () => {
     expect((started[0] as { prompt: string }).prompt).toContain(
       "This request came from a remote IM channel.",
     );
-    expect((started[0] as { prompt: string }).prompt).not.toContain("Input files are in:");
+    expect((started[0] as { prompt: string }).prompt).toContain(
+      `Write files for remote reply only under: ${task.outputDir}`,
+    );
+    expect((started[0] as { appendContextExtra: string }).appendContextExtra).toContain(
+      `Output directory: ${task.outputDir}`,
+    );
     expect((started[0] as { appendContextExtra: string }).appendContextExtra).toContain(
       "[AGENT_WORKS_REMOTE_SEND]",
+    );
+    expect((started[0] as { appendContextExtra: string }).appendContextExtra).toContain(
+      "Without the protocol block, the app will not actually send the file.",
     );
   });
 

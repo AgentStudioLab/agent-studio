@@ -166,7 +166,7 @@ export class RemoteTaskService {
 
     const taskId = `rmt_${nanoid(12)}`;
     const runId = `run_${nanoid(12)}`;
-    const taskRoot = join(this.deps.dataDir ?? defaultDataDir(), "remote-tasks", taskId);
+    const taskRoot = join(workingDir, "remote-tasks", taskId);
     const inputDir = join(taskRoot, "input");
     const outputDir = join(taskRoot, "output");
     mkdirSync(inputDir, { recursive: true });
@@ -405,9 +405,9 @@ export class RemoteTaskService {
         ...attachments.map((attachment) => `- ${attachment.name || basename(attachment.path)}`),
         "",
         `Input files are in: ${inputDir}`,
-        `Write files for remote reply only under: ${outputDir}`,
       );
     }
+    lines.push("", `Write files for remote reply only under: ${outputDir}`);
 
     return lines.join("\n");
   }
@@ -442,18 +442,23 @@ export class RemoteTaskService {
       "- Match the user's language when possible.",
     ];
 
+    lines.push(
+      `- Output directory: ${outputDir}`,
+      "- If files or images should be sent back, save final deliverables under the output directory and append one protocol block per file.",
+      "- Without the protocol block, the app will not actually send the file.",
+      '  [AGENT_WORKS_REMOTE_SEND]{"type":"file","path":"<output-file-path>","fileName":"<optional-name>"}[/AGENT_WORKS_REMOTE_SEND]',
+      "- Only files in the output directory can be sent back with [AGENT_WORKS_REMOTE_SEND].",
+    );
+
     if (attachments.length > 0) {
       lines.push(
         `- Input directory: ${inputDir}`,
-        `- Output directory: ${outputDir}`,
-        "- If files or images should be sent back, save final deliverables under the output directory and append one protocol block per file:",
-        '  [AGENT_WORKS_REMOTE_SEND]{"type":"file","path":"<output-file-path>","fileName":"<optional-name>"}[/AGENT_WORKS_REMOTE_SEND]',
-        "- Only files in the output directory can be sent back with [AGENT_WORKS_REMOTE_SEND].",
+        "- Inspect the input directory when the request depends on received attachments.",
       );
     } else {
       lines.push(
         "- This message may be a normal question with no attachment. Reply normally; do not ask for a file unless the user's request specifically requires one.",
-        "- If a later answer needs to send a generated file or image, use [AGENT_WORKS_REMOTE_SEND] only after creating that file under the task output directory.",
+        "- If the user asks you to generate or send back a file, create it under the output directory and include the protocol block in the final answer.",
       );
     }
 
