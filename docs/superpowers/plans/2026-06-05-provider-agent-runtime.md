@@ -1582,7 +1582,7 @@ Expected: PASS。
 Run:
 
 ```bash
-cd sidecar && bun -e 'import { Database } from "bun:sqlite"; const db=new Database("/Users/wisen/Library/Application Support/com.ugreen.agent-studio/agent-studio.db", {readonly:true}); console.log(db.query("select run_id, seq, type, payload from run_events order by created_at desc, seq desc limit 10").all());'
+cd sidecar && bun -e 'import { Database } from "bun:sqlite"; const db=new Database("/Users/wisen/Library/Application Support/com.agentstudiolab.agent-studio/agent-studio.db", {readonly:true}); console.log(db.query("select run_id, seq, type, payload from run_events order by created_at desc, seq desc limit 10").all());'
 ```
 
 Expected: 如果失败，`RUN_ERROR.payload` 应包含比 `stream error` 更具体的信息。根据 payload 再回到 provider bridge、error-map 或 SDK env 配置定位。

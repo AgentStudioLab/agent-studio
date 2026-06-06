@@ -231,7 +231,7 @@ describe("interrupt-bus", () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd /Users/yangjie.ugreen/ugreen/ugreen-ai/agent-studio/sidecar && bun test src/agui/provider-claude/interrupt-bus.test.ts`
+Run: `cd /path/to/agent-studio/sidecar && bun test src/agui/provider-claude/interrupt-bus.test.ts`
 Expected: FAIL with `Cannot find module './interrupt-bus'` or similar.
 
 - [ ] **Step 3: Write minimal implementation**
@@ -342,7 +342,7 @@ export function createInterruptBus(opts: CreateInterruptBusOptions): InterruptBu
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `cd /Users/yangjie.ugreen/ugreen/ugreen-ai/agent-studio/sidecar && bun test src/agui/provider-claude/interrupt-bus.test.ts`
+Run: `cd /path/to/agent-studio/sidecar && bun test src/agui/provider-claude/interrupt-bus.test.ts`
 Expected: PASS — `5 pass`.
 
 - [ ] **Step 5: Commit**
@@ -475,7 +475,7 @@ In `sidecar/src/agui/provider-claude/provider.ts`, replace the `runTurn` functio
 
 - [ ] **Step 4: Typecheck**
 
-Run: `cd /Users/yangjie.ugreen/ugreen/ugreen-ai/agent-studio && bunx tsc -b`
+Run: `cd /path/to/agent-studio && bunx tsc -b`
 Expected: exit 0, no errors.
 
 - [ ] **Step 5: Commit**
@@ -554,7 +554,7 @@ Inside `buildRunRoutes`, add this block right BEFORE the `return app;` at the en
 
 - [ ] **Step 3: Typecheck**
 
-Run: `cd /Users/yangjie.ugreen/ugreen/ugreen-ai/agent-studio && bunx tsc -b`
+Run: `cd /path/to/agent-studio && bunx tsc -b`
 Expected: exit 0, no errors.
 
 - [ ] **Step 4: Commit**
@@ -634,7 +634,7 @@ Also in the `catch (err)` block (currently lines 87-102), add a `cancelAll` BEFO
 
 - [ ] **Step 3: Typecheck**
 
-Run: `cd /Users/yangjie.ugreen/ugreen/ugreen-ai/agent-studio && bunx tsc -b`
+Run: `cd /path/to/agent-studio && bunx tsc -b`
 Expected: errors about `runWorker` callers missing `interruptBus`. Continue — Task 5 fixes the call site.
 
 - [ ] **Step 4: Commit**
@@ -723,10 +723,10 @@ The `POST /runs` handler in `sidecar/src/routes/runs.ts` (lines 33-67) spawns `r
 
 - [ ] **Step 5: Typecheck + smoke test**
 
-Run: `cd /Users/yangjie.ugreen/ugreen/ugreen-ai/agent-studio && bunx tsc -b`
+Run: `cd /path/to/agent-studio && bunx tsc -b`
 Expected: exit 0.
 
-Run: `cd /Users/yangjie.ugreen/ugreen/ugreen-ai/agent-studio && bun run build:sidecar -- --host-only`
+Run: `cd /path/to/agent-studio && bun run build:sidecar -- --host-only`
 Expected: `[build-sidecar] done (1 target)` — sidecar bundle compiles.
 
 - [ ] **Step 6: Commit**
@@ -781,7 +781,7 @@ In the same file, edit the `<ChatStream … />` JSX (currently lines 101-108). R
 
 - [ ] **Step 3: Typecheck**
 
-Run: `cd /Users/yangjie.ugreen/ugreen/ugreen-ai/agent-studio && bunx tsc -b`
+Run: `cd /path/to/agent-studio && bunx tsc -b`
 Expected: errors about `ChatStream` not accepting `pendingInterrupts` / `onResume`. Continue — Task 7 fixes ChatStream's prop signature.
 
 - [ ] **Step 4: Commit**
@@ -920,7 +920,7 @@ Inside the same `ChatStream` function, in the JSX `<ConversationContent classNam
 
 - [ ] **Step 4: Typecheck**
 
-Run: `cd /Users/yangjie.ugreen/ugreen/ugreen-ai/agent-studio && bunx tsc -b`
+Run: `cd /path/to/agent-studio && bunx tsc -b`
 Expected: exit 0, no errors.
 
 - [ ] **Step 5: Commit**
@@ -938,12 +938,12 @@ git commit -m "feat(task): render <Confirmation> card for pending tool approvals
 
 - [ ] **Step 1: Wipe local dev DB so the new schema runs cleanly**
 
-Run: `rm -f "$HOME/Library/Application Support/com.ugreen.agent-studio/agent-studio.db"*`
+Run: `rm -f "$HOME/Library/Application Support/com.agentstudiolab.agent-studio/agent-studio.db"*`
 Expected: prints nothing (success).
 
 - [ ] **Step 2: Launch full stack**
 
-Run: `cd /Users/yangjie.ugreen/ugreen/ugreen-ai/agent-studio && bun run tauri:dev`
+Run: `cd /path/to/agent-studio && bun run tauri:dev`
 Expected: Tauri window opens, sidecar boots, no error log entries.
 
 - [ ] **Step 3: Trigger a tool**

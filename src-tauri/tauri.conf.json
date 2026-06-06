@@ -2,7 +2,7 @@
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "agent-studio",
   "version": "0.1.0",
-  "identifier": "com.ugreen.agent-studio",
+  "identifier": "com.agentstudiolab.agent-studio",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:1420",

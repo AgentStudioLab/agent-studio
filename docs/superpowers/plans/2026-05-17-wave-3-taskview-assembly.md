@@ -42,7 +42,7 @@ Wave 3 开局，先把所有 mock 类型 + 数据备齐，让后续 component ta
 
 - [ ] **Step 1: Wave 2 sanity**
    ```bash
-   cd /Users/yangjie.ugreen/ugreen/ugreen-ai/agent-studio
+   cd /path/to/agent-studio
    git log --oneline -3
    git status --short
    bun run build 2>&1 | tail -3

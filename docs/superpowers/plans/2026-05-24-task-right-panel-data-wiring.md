@@ -530,7 +530,7 @@ git commit -m "feat(sidecar): GET /threads/:id/context route + wire store into p
 
 - [ ] **Step 1: Check if reducer.test.ts exists**
 
-Run: `ls /Users/yangjie.ugreen/ugreen/ugreen-ai/agent-studio/src/lib/agui/runtime/reducer.test.ts 2>&1 || echo "missing"`
+Run: `ls /path/to/agent-studio/src/lib/agui/runtime/reducer.test.ts 2>&1 || echo "missing"`
 Expected: either path printed or "missing"
 
 If missing, the test will be added to a new file. If exists, append to it.
@@ -2095,7 +2095,7 @@ Note: `MockFile` will STILL be used after this refactor — `AppShellContext.ope
 Run for each candidate:
 
 ```bash
-grep -rn "MockTask\b\|PlanStep\b\|StepStatus\b\|MockSkill\b\|MockMcpServer\b" /Users/yangjie.ugreen/ugreen/ugreen-ai/agent-studio/src --include="*.ts" --include="*.tsx"
+grep -rn "MockTask\b\|PlanStep\b\|StepStatus\b\|MockSkill\b\|MockMcpServer\b" /path/to/agent-studio/src --include="*.ts" --include="*.tsx"
 ```
 
 Expected: outputs may show:

@@ -3316,8 +3316,8 @@ git commit -m "chore: remove src/lib/mock/task.ts — TaskView fully driven by D
 
 ```bash
 # 备份并清空当前 DB
-mv ~/Library/Application\ Support/com.ugreen.agent-studio/agent-studio.db{,.bak} 2>/dev/null
-mv ~/Library/Application\ Support/com.ugreen.agent-studio/settings.json{,.bak} 2>/dev/null
+mv ~/Library/Application\ Support/com.agentstudiolab.agent-studio/agent-studio.db{,.bak} 2>/dev/null
+mv ~/Library/Application\ Support/com.agentstudiolab.agent-studio/settings.json{,.bak} 2>/dev/null
 ```
 
 - [ ] **Step 2: 启动应用**

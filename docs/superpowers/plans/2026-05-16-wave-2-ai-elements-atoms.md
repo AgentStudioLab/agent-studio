@@ -122,7 +122,7 @@
 
 - [ ] **Step 1: 检查 git 状态**
    ```bash
-   cd /Users/yangjie.ugreen/ugreen/ugreen-ai/agent-studio
+   cd /path/to/agent-studio
    git status --short
    git log --oneline -5
    ```
@@ -162,7 +162,7 @@ shadcn 安装是 1:1 拷贝，每个组件 < 50 行 TSX。批量装一次。
 - [ ] **Step 1: 一次性装 11 个**
 
 ```bash
-cd /Users/yangjie.ugreen/ugreen/ugreen-ai/agent-studio
+cd /path/to/agent-studio
 bunx shadcn@latest add input textarea select avatar tooltip dropdown-menu dialog popover scroll-area separator badge --yes 2>&1 | tail -10
 ```
 

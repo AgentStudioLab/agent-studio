@@ -314,7 +314,7 @@ Expected: PASS（7 tests）。
 - [ ] **Step 5: 提交**
 
 ```bash
-cd /Users/yangjie.ugreen/ugreen/ugreen-ai/agent-works
+cd /path/to/agent-works
 git add sidecar/src/services/agentMemoryStore.ts sidecar/src/services/agentMemoryStore.test.ts
 git commit -m "feat(memory): file-based AgentMemoryStore (MEMORY.md index + scenario files)"
 ```
