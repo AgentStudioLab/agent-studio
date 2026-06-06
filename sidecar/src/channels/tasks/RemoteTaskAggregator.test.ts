@@ -23,6 +23,14 @@ class FakeSessions {
   }
 }
 
+class FakeTasks {
+  statuses = new Map<string, "running" | "completed" | "failed" | null>();
+  get(taskId: string): { status: "running" | "completed" | "failed" } | null {
+    const status = this.statuses.get(taskId);
+    return status ? { status } : null;
+  }
+}
+
 function message(input: Partial<UnifiedIncomingMessage>): UnifiedIncomingMessage {
   return {
     id: input.id ?? `msg_${Math.random()}`,
@@ -136,6 +144,44 @@ describe("RemoteTaskAggregator", () => {
     expect(await aggregator.ingest(message({ text: "new task" }))).toEqual({
       type: "busy",
       session: expect.objectContaining({ activeTaskId: "rt_running" }),
+    });
+  });
+
+  it("is ready when the session active task is already completed", async () => {
+    const sessions = new FakeSessions();
+    sessions.activeTaskId = "rt_done";
+    const tasks = new FakeTasks();
+    tasks.statuses.set("rt_done", "completed");
+    const aggregator = new RemoteTaskAggregator({
+      sessions: sessions as unknown as ChannelSessionService,
+      tasks,
+      waitMs: 30_000,
+    });
+
+    expect(await aggregator.ingest(message({ text: "next task" }))).toEqual({
+      type: "ready",
+      instructionText: "next task",
+      attachments: [],
+      contextToken: undefined,
+      session: expect.objectContaining({ activeTaskId: "rt_done" }),
+    });
+  });
+
+  it("is ready when the session active task no longer exists", async () => {
+    const sessions = new FakeSessions();
+    sessions.activeTaskId = "rt_missing";
+    const aggregator = new RemoteTaskAggregator({
+      sessions: sessions as unknown as ChannelSessionService,
+      tasks: new FakeTasks(),
+      waitMs: 30_000,
+    });
+
+    expect(await aggregator.ingest(message({ text: "next task" }))).toEqual({
+      type: "ready",
+      instructionText: "next task",
+      attachments: [],
+      contextToken: undefined,
+      session: expect.objectContaining({ activeTaskId: "rt_missing" }),
     });
   });
 });

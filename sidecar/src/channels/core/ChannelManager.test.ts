@@ -57,10 +57,10 @@ function makeManager() {
   manager = new ChannelManager({
     connections,
     registry,
-    aggregator: new RemoteTaskAggregator({ sessions, waitMs: 30_000 }),
+    aggregator: new RemoteTaskAggregator({ sessions, tasks, waitMs: 30_000 }),
     tasks,
   });
-  return { manager, connections, fake, tasks };
+  return { manager, connections, fake, sessions, tasks };
 }
 
 function makeManagerWithClock() {
@@ -267,6 +267,49 @@ describe("ChannelManager", () => {
       type: "text",
       text: "当前会话已有远程任务在执行，请等待完成后再发送新任务。",
     });
+  });
+
+  it("starts a new task when a stale active task is already completed", async () => {
+    const { manager, connections, fake, sessions, tasks } = makeManager();
+    const connection = connections.create({
+      type: "fake",
+      name: "Fake",
+      enabled: true,
+      config: { permissionStrategy: "auto_execute", defaultWorkspace: "/tmp" },
+    });
+    await manager.startEnabled();
+    await fake.emitIncoming({
+      id: "msg_1",
+      connectionId: connection.id,
+      channelType: "fake",
+      chatId: "chat_1",
+      senderId: "sender_1",
+      text: "first",
+      attachments: [],
+      timestamp: 1,
+    });
+    const stale = tasks.listRecent()[0]!;
+    const session = sessions.find(connection.id, "chat_1", "sender_1")!;
+    await stale.onTerminalResult({
+      status: "completed",
+      assistantText: "done",
+    });
+    sessions.setActiveTask(session.id, stale.id);
+    fake.sentMessages.length = 0;
+
+    await fake.emitIncoming({
+      id: "msg_2",
+      connectionId: connection.id,
+      channelType: "fake",
+      chatId: "chat_1",
+      senderId: "sender_1",
+      text: "second",
+      attachments: [],
+      timestamp: 2,
+    });
+
+    expect(tasks.listRecent()).toHaveLength(2);
+    expect(fake.sentMessages).toEqual([]);
   });
 
   it("routes text-only inbound messages into RemoteTaskService", async () => {

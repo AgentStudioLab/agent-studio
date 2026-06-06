@@ -275,7 +275,6 @@ const channelRegistry = new PluginRegistry();
 const fakeChannelPlugin = new FakeChannelPlugin();
 channelRegistry.register(fakeChannelPlugin);
 channelRegistry.register(new WeixinPlugin());
-const remoteTaskAggregator = new RemoteTaskAggregator({ sessions: channelSessions });
 let channelManager: ChannelManager;
 const remoteTaskService = new RemoteTaskService({
   db,
@@ -306,6 +305,10 @@ const remoteTaskService = new RemoteTaskService({
     });
   },
   sendResult: async (input) => channelManager.sendRemoteTaskResult(input),
+});
+const remoteTaskAggregator = new RemoteTaskAggregator({
+  sessions: channelSessions,
+  tasks: remoteTaskService,
 });
 channelManager = new ChannelManager({
   connections: channelConnections,

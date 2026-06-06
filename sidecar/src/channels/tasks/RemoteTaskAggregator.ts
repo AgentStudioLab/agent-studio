@@ -4,6 +4,10 @@ import type { UnifiedIncomingMessage } from "../core/PluginRegistry";
 
 const ATTACHMENT_ONLY_INSTRUCTION = "Received remote attachments.";
 
+interface RemoteTaskStatusReader {
+  get(taskId: string): { status: string } | null;
+}
+
 type AggregatorResult =
   | { type: "ignored" }
   | { type: "busy"; session: ChannelSession }
@@ -20,6 +24,7 @@ type ExpiredAggregate = never;
 export class RemoteTaskAggregator {
   constructor(private deps: {
     sessions: ChannelSessionService;
+    tasks?: RemoteTaskStatusReader;
     waitMs?: number;
     now?: () => number;
   }) {}
@@ -34,7 +39,7 @@ export class RemoteTaskAggregator {
       message.chatId,
       message.senderId,
     );
-    if (session?.activeTaskId) {
+    if (session?.activeTaskId && this.isActiveTaskStillRunning(session.activeTaskId)) {
       return {
         type: "busy",
         session,
@@ -52,6 +57,12 @@ export class RemoteTaskAggregator {
 
   flushExpired(): ExpiredAggregate[] {
     return [];
+  }
+
+  private isActiveTaskStillRunning(taskId: string): boolean {
+    if (!this.deps.tasks) return true;
+    const task = this.deps.tasks?.get(taskId);
+    return task?.status === "running";
   }
 }
 
