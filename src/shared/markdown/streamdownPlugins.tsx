@@ -1,7 +1,7 @@
 import { cjk } from "@streamdown/cjk";
 import { code } from "@streamdown/code";
 import { math } from "@streamdown/math";
-import { mermaid } from "@streamdown/mermaid";
+import { createMermaidPlugin } from "@streamdown/mermaid";
 import { cloneElement, isValidElement, type ReactNode } from "react";
 import type { PluginConfig } from "streamdown";
 import {
@@ -24,13 +24,24 @@ function MarkdownPreBlock({ children }: { children?: ReactNode }): ReactNode {
   return <MarkdownCodeBlock>{children}</MarkdownCodeBlock>;
 }
 
-STREAMDOWN_COMPONENTS.pre = MarkdownPreBlock;
+export const STREAMDOWN_MARKDOWN_COMPONENTS = {
+  ...STREAMDOWN_COMPONENTS,
+  pre: MarkdownPreBlock,
+};
+
+export const STREAMDOWN_MERMAID_PLUGIN = createMermaidPlugin({
+  config: {
+    securityLevel: "strict",
+    startOnLoad: false,
+    suppressErrorRendering: true,
+  },
+});
 
 export const STREAMDOWN_PLUGINS: PluginConfig = {
   cjk,
   code,
   math,
-  mermaid,
+  mermaid: STREAMDOWN_MERMAID_PLUGIN,
   renderers: [
     {
       component: MarkdownMermaidBlock,

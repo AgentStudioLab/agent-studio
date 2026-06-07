@@ -7,12 +7,30 @@ import {
   waitFor,
 } from "@testing-library/react";
 
+const mermaidRenderCalls: string[] = [];
+
 mock.module("@streamdown/mermaid", () => ({
+  createMermaidPlugin: () => ({
+    language: "mermaid",
+    name: "mermaid",
+    type: "diagram",
+    getMermaid: () => ({
+      render: async (_id: string, source: string) => {
+        mermaidRenderCalls.push(source);
+        return {
+          svg: `<svg role="img" data-testid="mock-mermaid-svg"><text>${source}</text></svg>`,
+        };
+      },
+    }),
+  }),
   mermaid: {
     getMermaid: () => ({
-      render: async (_id: string, source: string) => ({
-        svg: `<svg role="img" data-testid="mock-mermaid-svg"><text>${source}</text></svg>`,
-      }),
+      render: async (_id: string, source: string) => {
+        mermaidRenderCalls.push(source);
+        return {
+          svg: `<svg role="img" data-testid="mock-mermaid-svg"><text>${source}</text></svg>`,
+        };
+      },
     }),
   },
 }));
@@ -20,11 +38,20 @@ mock.module("@streamdown/mermaid", () => ({
 const { Streamdown } = await import("streamdown");
 const { STREAMDOWN_COMPONENTS } = await import("./MarkdownCodeBlock");
 const { MarkdownMermaidBlock } = await import("./MarkdownMermaidBlock");
-const { STREAMDOWN_PLUGINS } = await import("./streamdownPlugins");
+const { STREAMDOWN_MARKDOWN_COMPONENTS, STREAMDOWN_PLUGINS } = await import("./streamdownPlugins");
 
-afterEach(() => cleanup());
+afterEach(() => {
+  mermaidRenderCalls.length = 0;
+  cleanup();
+});
 
 describe("MarkdownMermaidBlock", () => {
+  it("exports composed markdown components without mutating the base code components", () => {
+    expect(STREAMDOWN_MARKDOWN_COMPONENTS).toBeDefined();
+    expect(STREAMDOWN_MARKDOWN_COMPONENTS).not.toBe(STREAMDOWN_COMPONENTS);
+    expect(STREAMDOWN_MARKDOWN_COMPONENTS.pre).not.toBe(STREAMDOWN_COMPONENTS.pre);
+  });
+
   it("renders diagram view by default", async () => {
     render(
       <MarkdownMermaidBlock
@@ -71,7 +98,7 @@ describe("MarkdownMermaidBlock", () => {
   it("routes Mermaid fences through the shared Streamdown renderer", async () => {
     render(
       <Streamdown
-        components={STREAMDOWN_COMPONENTS}
+        components={STREAMDOWN_MARKDOWN_COMPONENTS}
         plugins={STREAMDOWN_PLUGINS}
       >
         {"```mermaid\nflowchart LR\n  A --> B\n```"}
@@ -82,10 +109,27 @@ describe("MarkdownMermaidBlock", () => {
     await waitFor(() => expect(screen.getByTestId("mock-mermaid-svg")).toBeDefined());
   });
 
+  it("does not render an incomplete streaming Mermaid fence through Streamdown", () => {
+    render(
+      <Streamdown
+        mode="streaming"
+        parseIncompleteMarkdown
+        isAnimating
+        components={STREAMDOWN_MARKDOWN_COMPONENTS}
+        plugins={STREAMDOWN_PLUGINS}
+      >
+        {"```mermaid\nflowchart LR\n  A -->"}
+      </Streamdown>
+    );
+
+    expect(mermaidRenderCalls).toHaveLength(0);
+    expect(screen.getByText("Mermaid 正在生成，源码可先查看。")).toBeDefined();
+  });
+
   it("keeps non-Mermaid code fences on the normal code block renderer", () => {
     render(
       <Streamdown
-        components={STREAMDOWN_COMPONENTS}
+        components={STREAMDOWN_MARKDOWN_COMPONENTS}
         plugins={STREAMDOWN_PLUGINS}
       >
         {"```typescript\nconst ok = true;\n```"}

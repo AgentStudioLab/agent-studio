@@ -21,8 +21,10 @@ import {
   type ProcessStep,
 } from "@/features/task/ProcessGroup";
 import { ThinkingSpinner } from "@/shared/atoms/ThinkingSpinner";
-import { STREAMDOWN_COMPONENTS } from "@/shared/markdown/MarkdownCodeBlock";
-import { STREAMDOWN_PLUGINS } from "@/shared/markdown/streamdownPlugins";
+import {
+  STREAMDOWN_MARKDOWN_COMPONENTS,
+  STREAMDOWN_PLUGINS,
+} from "@/shared/markdown/streamdownPlugins";
 import {
   Conversation,
   ConversationContent,
@@ -524,7 +526,8 @@ function MessageRow({
               <Streamdown
                 mode="streaming"
                 parseIncompleteMarkdown
-                components={STREAMDOWN_COMPONENTS}
+                isAnimating={streaming || parkedForApproval}
+                components={STREAMDOWN_MARKDOWN_COMPONENTS}
                 plugins={STREAMDOWN_PLUGINS}
               >
                 {b.content}

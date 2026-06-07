@@ -1,5 +1,5 @@
 import { useEffect, useId, useState } from "react";
-import { mermaid } from "@streamdown/mermaid";
+import type { CustomRendererProps } from "streamdown";
 import type { BundledLanguage } from "shiki";
 import {
   CodeBlock,
@@ -9,19 +9,14 @@ import {
   CodeBlockHeader,
   CodeBlockTitle,
 } from "@/components/ai-elements/code-block";
-
-interface MarkdownMermaidBlockProps {
-  code: string;
-  isIncomplete: boolean;
-  language: string;
-}
+import { STREAMDOWN_MERMAID_PLUGIN } from "./streamdownPlugins";
 
 type ViewMode = "diagram" | "source";
 
 export function MarkdownMermaidBlock({
   code,
   isIncomplete,
-}: MarkdownMermaidBlockProps) {
+}: CustomRendererProps) {
   const reactId = useId();
   const renderId = `mermaid-${reactId.replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const [mode, setMode] = useState<ViewMode>("diagram");
@@ -41,7 +36,7 @@ export function MarkdownMermaidBlock({
       };
     }
 
-    mermaid
+    STREAMDOWN_MERMAID_PLUGIN
       .getMermaid()
       .render(renderId, code)
       .then(({ svg: nextSvg }) => {
@@ -111,7 +106,7 @@ export function MarkdownMermaidBlock({
           ) : svg ? (
             <div
               className="[&_svg]:h-auto [&_svg]:max-w-full"
-              // Mermaid 返回的是受控渲染结果，dangerouslySetInnerHTML 只隔离在图表 SVG 容器。
+              // SVG 由共享的 strict Mermaid 插件渲染，HTML 注入范围只保留在图表容器内。
               dangerouslySetInnerHTML={{ __html: svg }}
             />
           ) : (

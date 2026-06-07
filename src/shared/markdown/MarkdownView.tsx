@@ -15,8 +15,10 @@
 // each callsite can theme the body to its own surface.
 
 import { Streamdown } from "streamdown";
-import { STREAMDOWN_COMPONENTS } from "./MarkdownCodeBlock";
-import { STREAMDOWN_PLUGINS } from "./streamdownPlugins";
+import {
+  STREAMDOWN_MARKDOWN_COMPONENTS,
+  STREAMDOWN_PLUGINS,
+} from "./streamdownPlugins";
 import { splitFrontmatter } from "./frontmatter";
 import { FrontmatterPanel } from "./FrontmatterPanel";
 
@@ -33,7 +35,10 @@ export function MarkdownView({ content, className }: MarkdownViewProps) {
   return (
     <div className={className}>
       {frontmatter !== null && <FrontmatterPanel raw={frontmatter} />}
-      <Streamdown plugins={STREAMDOWN_PLUGINS} components={STREAMDOWN_COMPONENTS}>
+      <Streamdown
+        plugins={STREAMDOWN_PLUGINS}
+        components={STREAMDOWN_MARKDOWN_COMPONENTS}
+      >
         {body}
       </Streamdown>
     </div>
