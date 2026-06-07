@@ -15,15 +15,10 @@
 // each callsite can theme the body to its own surface.
 
 import { Streamdown } from "streamdown";
-import { cjk } from "@streamdown/cjk";
-import { code } from "@streamdown/code";
-import { math } from "@streamdown/math";
-import { mermaid } from "@streamdown/mermaid";
 import { STREAMDOWN_COMPONENTS } from "./MarkdownCodeBlock";
+import { STREAMDOWN_PLUGINS } from "./streamdownPlugins";
 import { splitFrontmatter } from "./frontmatter";
 import { FrontmatterPanel } from "./FrontmatterPanel";
-
-const STREAMDOWN_PLUGINS = { cjk, code, math, mermaid };
 
 export interface MarkdownViewProps {
   content: string;
