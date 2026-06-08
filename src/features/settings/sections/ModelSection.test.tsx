@@ -76,7 +76,17 @@ mock.module("@/components/ui/dialog", () => ({
     onOpenChange?: (open: boolean) => void;
     children: ReactNode;
   }) => (open ? <div>{children}</div> : null),
-  DialogContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  DialogContent: ({
+    children,
+    className,
+  }: {
+    children: ReactNode;
+    className?: string;
+  }) => (
+    <div data-testid="dialog-content" data-class-name={className ?? ""}>
+      {children}
+    </div>
+  ),
   DialogDescription: ({ children }: { children: ReactNode }) => (
     <p>{children}</p>
   ),
@@ -509,6 +519,21 @@ describe("ModelSection", () => {
 
     expect(screen.getByText("Add model provider")).toBeDefined();
     expect(screen.getByLabelText("Connection name")).toBeDefined();
+  });
+
+  it("keeps the provider dialog within the viewport and scrolls the form body", async () => {
+    renderModelSection(providerFixture());
+
+    fireEvent.click(await screen.findByText("Add model"));
+
+    const dialog = screen.getByTestId("dialog-content");
+    expect(dialog.getAttribute("data-class-name")).toContain(
+      "max-h-[calc(100dvh-2rem)]",
+    );
+    expect(dialog.getAttribute("data-class-name")).toContain("overflow-hidden");
+    expect(screen.getByTestId("provider-dialog-body").className).toContain(
+      "overflow-y-auto",
+    );
   });
 
   it("opens edit with provider details", async () => {

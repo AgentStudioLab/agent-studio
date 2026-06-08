@@ -259,190 +259,196 @@ export function ProviderConnectionDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[620px]">
-        <DialogHeader>
+      <DialogContent className="flex max-h-[calc(100dvh-2rem)] flex-col gap-0 overflow-hidden sm:max-w-[620px]">
+        <DialogHeader className="shrink-0 pb-4">
           <DialogTitle>
             {mode === "create" ? labels.addTitle : labels.editTitle}
           </DialogTitle>
           <DialogDescription>{labels.description}</DialogDescription>
         </DialogHeader>
-        <div className="grid gap-4">
-          <Field label={labels.name}>
-            <Input
-              value={form.name}
-              onChange={(event) =>
-                setForm((current) => ({ ...current, name: event.target.value }))
-              }
-              aria-label={labels.name}
-            />
-          </Field>
-          <Field label={labels.provider}>
-            <Select value={form.profileId} onValueChange={handleProfileChange}>
-              <SelectTrigger aria-label={labels.provider} className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent
-                align="start"
-                side="bottom"
-                position="popper"
-                avoidCollisions={false}
-                className="max-h-56"
-              >
-                {builtIn.map((profile) => (
-                  <SelectItem key={profile.id} value={profile.id}>
-                    {profile.label}
-                  </SelectItem>
-                ))}
-                <SelectItem value="custom">{labels.custom}</SelectItem>
-              </SelectContent>
-            </Select>
-          </Field>
-          {form.profileId === "custom" && (
-            <Field label={labels.protocol}>
-              <Select
-                value={form.customProtocol}
-                onValueChange={(value) =>
-                  setForm((current) => ({
-                    ...current,
-                    customProtocol: value as CustomProviderProtocol,
-                    enabledModelIds: [],
-                    defaultModelId: null,
-                  }))
+        <div
+          data-testid="provider-dialog-body"
+          className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1 pb-4"
+        >
+          <div className="grid gap-4">
+            <Field label={labels.name}>
+              <Input
+                value={form.name}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, name: event.target.value }))
                 }
-              >
-                <SelectTrigger aria-label={labels.protocol} className="w-full">
+                aria-label={labels.name}
+              />
+            </Field>
+            <Field label={labels.provider}>
+              <Select value={form.profileId} onValueChange={handleProfileChange}>
+                <SelectTrigger aria-label={labels.provider} className="w-full">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent align="start" side="bottom" position="popper">
-                  <SelectItem value="openai-compatible">
-                    {labels.protocolOpenAI}
-                  </SelectItem>
-                  <SelectItem value="anthropic">
-                    {labels.protocolAnthropic}
-                  </SelectItem>
+                <SelectContent
+                  align="start"
+                  side="bottom"
+                  position="popper"
+                  avoidCollisions={false}
+                  className="max-h-56"
+                >
+                  {builtIn.map((profile) => (
+                    <SelectItem key={profile.id} value={profile.id}>
+                      {profile.label}
+                    </SelectItem>
+                  ))}
+                  <SelectItem value="custom">{labels.custom}</SelectItem>
                 </SelectContent>
               </Select>
             </Field>
-          )}
-          <Field label={labels.baseUrl}>
-            <Input
-              value={form.baseUrl}
-              onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  baseUrl: event.target.value,
-                }))
-              }
-              placeholder={labels.baseUrlPlaceholder}
-            />
-          </Field>
-          <Field label={labels.apiKey}>
-            <div className="relative">
+            {form.profileId === "custom" && (
+              <Field label={labels.protocol}>
+                <Select
+                  value={form.customProtocol}
+                  onValueChange={(value) =>
+                    setForm((current) => ({
+                      ...current,
+                      customProtocol: value as CustomProviderProtocol,
+                      enabledModelIds: [],
+                      defaultModelId: null,
+                    }))
+                  }
+                >
+                  <SelectTrigger aria-label={labels.protocol} className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent align="start" side="bottom" position="popper">
+                    <SelectItem value="openai-compatible">
+                      {labels.protocolOpenAI}
+                    </SelectItem>
+                    <SelectItem value="anthropic">
+                      {labels.protocolAnthropic}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+            )}
+            <Field label={labels.baseUrl}>
               <Input
-                type={showApiKey ? "text" : "password"}
-                value={form.apiKey}
+                value={form.baseUrl}
                 onChange={(event) =>
                   setForm((current) => ({
                     ...current,
-                    apiKey: event.target.value,
+                    baseUrl: event.target.value,
                   }))
                 }
-                placeholder={labels.apiKeyPlaceholder}
-                className="pr-10"
+                placeholder={labels.baseUrlPlaceholder}
               />
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label={
-                      showApiKey ? labels.hideApiKey : labels.showApiKey
-                    }
-                    className="absolute top-1/2 right-1 -translate-y-1/2 active:!-translate-y-1/2"
-                    onClick={() => setShowApiKey((value) => !value)}
-                  >
-                    {showApiKey ? <EyeOffIcon /> : <EyeIcon />}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  {showApiKey ? labels.hideApiKey : labels.showApiKey}
-                </TooltipContent>
-              </Tooltip>
-            </div>
-          </Field>
-          <label className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2">
-            <span className="text-sm font-medium text-foreground">
-              {labels.enabled}
-            </span>
-            <Switch
-              checked={form.enabled}
-              onCheckedChange={(enabled) =>
-                setForm((current) => ({ ...current, enabled }))
-              }
-            />
-          </label>
-          <div className="space-y-2">
-            <div className="flex items-center justify-between gap-3">
+            </Field>
+            <Field label={labels.apiKey}>
+              <div className="relative">
+                <Input
+                  type={showApiKey ? "text" : "password"}
+                  value={form.apiKey}
+                  onChange={(event) =>
+                    setForm((current) => ({
+                      ...current,
+                      apiKey: event.target.value,
+                    }))
+                  }
+                  placeholder={labels.apiKeyPlaceholder}
+                  className="pr-10"
+                />
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label={
+                        showApiKey ? labels.hideApiKey : labels.showApiKey
+                      }
+                      className="absolute top-1/2 right-1 -translate-y-1/2 active:!-translate-y-1/2"
+                      onClick={() => setShowApiKey((value) => !value)}
+                    >
+                      {showApiKey ? <EyeOffIcon /> : <EyeIcon />}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {showApiKey ? labels.hideApiKey : labels.showApiKey}
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+            </Field>
+            <label className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2">
               <span className="text-sm font-medium text-foreground">
-                {labels.models}
+                {labels.enabled}
               </span>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => void refreshModels()}
-                disabled={refreshing || saving}
-              >
-                {refreshing ? labels.refreshing : labels.refresh}
-              </Button>
+              <Switch
+                checked={form.enabled}
+                onCheckedChange={(enabled) =>
+                  setForm((current) => ({ ...current, enabled }))
+                }
+              />
+            </label>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm font-medium text-foreground">
+                  {labels.models}
+                </span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => void refreshModels()}
+                  disabled={refreshing || saving}
+                >
+                  {refreshing ? labels.refreshing : labels.refresh}
+                </Button>
+              </div>
+              <ProviderModelSelector
+                models={models}
+                enabledModelIds={form.enabledModelIds}
+                defaultModelId={form.defaultModelId}
+                onChange={(modelIds) =>
+                  setForm((current) => ({
+                    ...current,
+                    enabledModelIds: modelIds,
+                    defaultModelId:
+                      current.defaultModelId &&
+                      modelIds.includes(current.defaultModelId)
+                        ? current.defaultModelId
+                        : (modelIds[0] ?? null),
+                  }))
+                }
+                onDefaultChange={(modelId) =>
+                  setForm((current) => ({
+                    ...current,
+                    enabledModelIds: current.enabledModelIds.includes(modelId)
+                      ? current.enabledModelIds
+                      : [...current.enabledModelIds, modelId],
+                    defaultModelId: modelId,
+                  }))
+                }
+                labels={{
+                  search: labels.modelSearch,
+                  empty: labels.modelEmpty,
+                  default: labels.defaultModel,
+                  setDefault: labels.setDefaultModel,
+                }}
+              />
+              {refreshMsg === "success" && (
+                <p className="text-sm text-muted-foreground">
+                  {labels.refreshSuccess}
+                </p>
+              )}
+              {refreshMsg === "missing" && (
+                <p className="text-sm text-destructive">{labels.missingKey}</p>
+              )}
+              {refreshMsg === "unsupported" && (
+                <p className="text-sm text-destructive">{labels.unsupported}</p>
+              )}
+              {refreshMsg === "error" && (
+                <p className="text-sm text-destructive">{labels.refreshError}</p>
+              )}
             </div>
-            <ProviderModelSelector
-              models={models}
-              enabledModelIds={form.enabledModelIds}
-              defaultModelId={form.defaultModelId}
-              onChange={(modelIds) =>
-                setForm((current) => ({
-                  ...current,
-                  enabledModelIds: modelIds,
-                  defaultModelId:
-                    current.defaultModelId && modelIds.includes(current.defaultModelId)
-                      ? current.defaultModelId
-                      : (modelIds[0] ?? null),
-                }))
-              }
-              onDefaultChange={(modelId) =>
-                setForm((current) => ({
-                  ...current,
-                  enabledModelIds: current.enabledModelIds.includes(modelId)
-                    ? current.enabledModelIds
-                    : [...current.enabledModelIds, modelId],
-                  defaultModelId: modelId,
-                }))
-              }
-              labels={{
-                search: labels.modelSearch,
-                empty: labels.modelEmpty,
-                default: labels.defaultModel,
-                setDefault: labels.setDefaultModel,
-              }}
-            />
-            {refreshMsg === "success" && (
-              <p className="text-sm text-muted-foreground">
-                {labels.refreshSuccess}
-              </p>
-            )}
-            {refreshMsg === "missing" && (
-              <p className="text-sm text-destructive">{labels.missingKey}</p>
-            )}
-            {refreshMsg === "unsupported" && (
-              <p className="text-sm text-destructive">{labels.unsupported}</p>
-            )}
-            {refreshMsg === "error" && (
-              <p className="text-sm text-destructive">{labels.refreshError}</p>
-            )}
           </div>
         </div>
-        <DialogFooter>
+        <DialogFooter className="shrink-0">
           {saveMsg === "saved" && (
             <span className="self-center text-sm text-muted-foreground">
               {labels.saved}
