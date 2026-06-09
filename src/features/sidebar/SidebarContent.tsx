@@ -33,15 +33,6 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { RenameDialog } from "@/shared/RenameDialog";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import { useAppShell } from "@/app/AppShellContext";
 import type { MockPinnedItem, MockRecentItem } from "@/lib/mock/types";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
@@ -133,16 +124,11 @@ export function SidebarContent() {
   // (bg-000) — only counts when the task view is the one in focus.
   const selectedTaskId = routeThreadId ?? null;
   const { t } = useTranslation();
-  // searchOpen is shared with MacTitlebar (which renders the search trigger),
-  // so it lives in AppShellContext rather than local state here. Section
-  // collapse state lives there too — see AppShellContext: SidebarContent
-  // renders in two places + remounts on nav, so local state can't persist.
-  const {
-    searchOpen,
-    setSearchOpen,
-    sidebarCollapsedSections,
-    toggleSidebarSection,
-  } = useAppShell();
+  // Section collapse state lives in AppShellContext — see the note there:
+  // SidebarContent renders in two places + remounts on nav, so local state
+  // can't persist. (The global search dialog is mounted at the App level and
+  // driven by searchOpen in the same context.)
+  const { sidebarCollapsedSections, toggleSidebarSection } = useAppShell();
 
   const { data: recentsData = [] } = useRecentConversations();
   const { data: pinnedData = [] } = usePinnedConversations();
@@ -470,23 +456,6 @@ export function SidebarContent() {
           onLogout={() => void auth.logout()}
         />
       </div>
-
-      {/* ⌘K placeholder dialog */}
-      <Dialog open={searchOpen} onOpenChange={setSearchOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t("sidebar.search.dialogTitle")}</DialogTitle>
-            <DialogDescription>
-              {t("sidebar.search.dialogDescription")}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button onClick={() => setSearchOpen(false)}>
-              {t("sidebar.search.ok")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <RenameDialog
         open={pendingRename !== null}

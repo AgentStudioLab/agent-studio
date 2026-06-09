@@ -37,8 +37,25 @@
   "search": {
     "ariaLabel": "Search (Cmd+K)",
     "dialogTitle": "Search ⌘K",
-    "dialogDescription": "Search across tasks, projects, and recents (coming soon).",
-    "ok": "OK"
+    "dialogDescription": "Search across chats, scheduled tasks, agents, and skills.",
+    "placeholder": "Search tasks, agents, skills…",
+    "empty": "No results found",
+    "recent": "Recent",
+    "groups": {
+      "conversation": "Chats",
+      "scheduled": "Scheduled",
+      "agent": "Agents",
+      "skill": "Skills"
+    },
+    "time": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "thisWeek": "This week"
+    },
+    "skillSource": {
+      "builtin": "Built-in",
+      "personal": "Personal"
+    }
   },
   "user": {
     "settings": "Settings",

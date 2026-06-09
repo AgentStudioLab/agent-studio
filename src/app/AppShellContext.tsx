@@ -129,10 +129,19 @@ export function AppShellProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (!(event.metaKey || event.ctrlKey)) return;
-      if (event.key !== "," && event.code !== "Comma") return;
 
-      event.preventDefault();
-      navigate("/settings");
+      // ⌘, → 设置
+      if (event.key === "," || event.code === "Comma") {
+        event.preventDefault();
+        navigate("/settings");
+        return;
+      }
+
+      // ⌘K → 切换全局搜索面板（再次按下可关闭）。
+      if (event.key === "k" || event.key === "K" || event.code === "KeyK") {
+        event.preventDefault();
+        setSearchOpen((v) => !v);
+      }
     };
 
     document.addEventListener("keydown", onKeyDown);

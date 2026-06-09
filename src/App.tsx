@@ -7,6 +7,7 @@ import { RouterView } from "@/app/RouterView";
 import { ScheduledRunWatcher } from "@/features/scheduled/ScheduledRunWatcher";
 import { AuthProvider } from "@/features/auth/AuthProvider";
 import { LoginWaitDialog } from "@/features/auth/LoginWaitDialog";
+import { GlobalSearchDialog } from "@/features/search/GlobalSearchDialog";
 
 function App() {
   return (
@@ -44,6 +45,8 @@ function App() {
                 <MacTitlebar />
                 <ScheduledRunWatcher />
                 <LoginWaitDialog />
+                {/* 全局搜索命令面板（⌘K）。在此挂载一次，覆盖所有路由。 */}
+                <GlobalSearchDialog />
               </div>
             </TooltipProvider>
           </MessageQueueProvider>

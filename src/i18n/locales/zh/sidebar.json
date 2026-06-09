@@ -37,8 +37,25 @@
   "search": {
     "ariaLabel": "搜索 (Cmd+K)",
     "dialogTitle": "搜索 ⌘K",
-    "dialogDescription": "跨任务、项目、最近条目搜索（即将上线）。",
-    "ok": "好的"
+    "dialogDescription": "跨对话任务、定时任务、智能体与技能搜索。",
+    "placeholder": "搜索任务、智能体、技能…",
+    "empty": "没有找到结果",
+    "recent": "最近",
+    "groups": {
+      "conversation": "对话任务",
+      "scheduled": "定时任务",
+      "agent": "智能体",
+      "skill": "技能"
+    },
+    "time": {
+      "today": "今天",
+      "yesterday": "昨天",
+      "thisWeek": "本周内"
+    },
+    "skillSource": {
+      "builtin": "内置",
+      "personal": "个人"
+    }
   },
   "user": {
     "settings": "设置",
