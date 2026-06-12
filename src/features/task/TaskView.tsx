@@ -83,7 +83,6 @@ export function TaskView() {
     attachToRun,
     setHistoricalMessages,
     pendingInterrupts,
-    activeRunId,
     resumeRun,
   } = useChat({ threadId: activeTaskId ?? "" });
 
@@ -102,6 +101,9 @@ export function TaskView() {
     for (const t of workspaceAllowed) merged.add(t);
     return merged;
   }, [globalAllowed, workspaceAllowed]);
+  // 下发给 sidecar 的「始终允许」规则数组（全局 + 当前 cwd 的并集，CC Tool(pattern)
+  // 语法）。sidecar 在 canUseTool 内匹配，命中即放行 —— 匹配已从前端闸口移到服务端。
+  const approvalRules = useMemo(() => [...allowedTools], [allowedTools]);
   // Permission mode (per-thread). Read here so every send/first-prompt path
   // converges on a single source — the dropdown writes to the same store the
   // useThreadPermissionMode hook subscribes to.
@@ -188,6 +190,7 @@ export function TaskView() {
         ? { providerSelection: firstProviderSelection }
         : {}),
       ...(legacyFirstModel ? { model: legacyFirstModel } : {}),
+      ...(approvalRules.length ? { approvalRules } : {}),
     });
   }, [
     activeTaskId,
@@ -197,35 +200,13 @@ export function TaskView() {
     setPermissionMode,
     send,
     activeRun,
+    approvalRules,
   ]);
 
-  // Auto-allow interrupts whose toolName is on the allowlist. The dedup set
-  // is **scoped by runId** — different runs use independent fired sets, so
-  // even if the SDK reuses a tool_use ID across resumed sessions we never
-  // confuse one run's "already fired" with another's "fresh".
-  const autoAllowFiredByRun = useRef<Map<string, Set<string>>>(new Map());
-  useEffect(() => {
-    if (!activeRunId) return;
-    let fired = autoAllowFiredByRun.current.get(activeRunId);
-    if (!fired) {
-      fired = new Set();
-      autoAllowFiredByRun.current.set(activeRunId, fired);
-    }
-    for (const it of pendingInterrupts) {
-      if (fired.has(it.id)) continue;
-      const toolName = (it.payload as { toolName?: string }).toolName;
-      if (toolName && allowedTools.has(toolName)) {
-        fired.add(it.id);
-        void resumeRun({ decisions: [{ type: "allow" }] });
-      }
-    }
-  }, [pendingInterrupts, allowedTools, resumeRun, activeRunId]);
-
-  // Drop the entire run→fired map on thread switch — keeps memory bounded
-  // and means returning to a thread starts fresh (no stale per-run sets).
-  useEffect(() => {
-    autoAllowFiredByRun.current.clear();
-  }, [activeTaskId]);
+  // 「始终允许」的自动放行已从这里（客户端闸口）移到 sidecar 的 canUseTool：
+  // 命中规则的工具调用在服务端直接放行、不再产生 interrupt，所以无需前端
+  // resumeRun 闸口。规则经 approvalRules 在 run 启动时下发、经 /resume 的
+  // persistRule 在 run 内追加。
 
   // Mark the open thread as read whenever its last run reaches a terminal
   // state (completed/error/cancelled). Sidebar's onClick handler covers the
@@ -280,11 +261,12 @@ export function TaskView() {
       void send(text, {
         permissionMode,
         ...(providerSelection ? { providerSelection } : {}),
+        ...(approvalRules.length ? { approvalRules } : {}),
       }).catch((e) => {
         if (e instanceof RunInProgressError) queue.add(text);
       });
     },
-    [send, permissionMode, providerSelection, queue.add],
+    [send, permissionMode, providerSelection, queue.add, approvalRules],
   );
 
   // "Busy" = streaming OR HITL-paused OR a server-started run is in flight.
@@ -417,7 +399,6 @@ export function TaskView() {
               loading={messagesQuery.isLoading}
               pendingInterrupts={pendingInterrupts}
               onResume={resumeRun}
-              allowedTools={allowedTools}
               onAllowAlways={addWorkspaceTool}
               workingDir={cwd}
               onOpenFile={({ absolutePath }) => {
@@ -438,6 +419,7 @@ export function TaskView() {
                 void regenerate(fromMessageId, {
                   permissionMode,
                   ...(providerSelection ? { providerSelection } : {}),
+                  ...(approvalRules.length ? { approvalRules } : {}),
                 }).catch(() => {
                   // Only RunInProgressError propagates here (a run went live
                   // mid-regenerate — rare race). The runtime already restored

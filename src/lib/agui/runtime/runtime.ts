@@ -30,6 +30,9 @@ interface SendProviderOptions {
   permissionMode?: "ask" | "act-without-asking";
   providerSelection?: ProviderModelSelection;
   model?: string;
+  /** 「始终允许」命令规则（CC Tool(pattern) 语法）：cwd + 全局 allowlist 的并集。
+   *  sidecar 在 canUseTool 内匹配，命中即放行（见 features/task/bash-rule.ts）。 */
+  approvalRules?: string[];
 }
 
 // ============ 公开 API ============
@@ -225,6 +228,9 @@ export function createChatRuntime(opts: ChatRuntimeOptions): ChatRuntime {
           ? { providerSelection: sendOpts.providerSelection }
           : {}),
         ...(sendOpts?.model ? { model: sendOpts.model } : {}),
+        ...(sendOpts?.approvalRules?.length
+          ? { approvalRules: sendOpts.approvalRules }
+          : {}),
       });
     } catch (err) {
       if (err instanceof RunInProgressError) {
@@ -292,6 +298,9 @@ export function createChatRuntime(opts: ChatRuntimeOptions): ChatRuntime {
           ? { providerSelection: regenOpts.providerSelection }
           : {}),
         ...(regenOpts?.model ? { model: regenOpts.model } : {}),
+        ...(regenOpts?.approvalRules?.length
+          ? { approvalRules: regenOpts.approvalRules }
+          : {}),
       });
     } catch (err) {
       if (err instanceof RunInProgressError) {

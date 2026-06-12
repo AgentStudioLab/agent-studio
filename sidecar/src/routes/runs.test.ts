@@ -22,6 +22,9 @@ function makeApp(opts: {
     resolve: () => opts.resolveReturns,
     resolveAskUser: () => opts.resolveReturns,
     cancelAll: () => {},
+    seedRules: () => {},
+    addRule: () => {},
+    getRules: () => new Set<string>(),
   };
   // Minimal stubs for unused deps in the /resume path. Cast to never to
   // avoid sprouting unrelated infrastructure in this targeted test.
@@ -29,6 +32,9 @@ function makeApp(opts: {
   // The allow / ask-user resume path flips the run back to running on a
   // successful resolve, so the store needs a markRunning spy.
   const markRunning = mock(async () => {});
+  // 「始终允许」沉淀规则走 bus.addRule —— spy 验证它被正确调用。
+  const addRule = mock((_runId: string, _rule: string) => {});
+  bus.addRule = addRule;
   const app = new Hono();
   app.route(
     "/",
@@ -44,7 +50,7 @@ function makeApp(opts: {
       usage: stub() as never,
     }),
   );
-  return { app, markRunning };
+  return { app, markRunning, addRule };
 }
 
 const allowBody = JSON.stringify({
@@ -123,6 +129,50 @@ describe("POST /runs/:runId/resume — idempotent semantics", () => {
       body: denyBody,
     });
     expect(deny.markRunning).not.toHaveBeenCalled();
+  });
+
+  it("persists a rule via bus.addRule when allow carries persistRule", async () => {
+    const { app, addRule } = makeApp({ resolveReturns: true });
+    await app.request("/runs/r1/resume", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        resumes: [
+          {
+            interruptId: "tu_1",
+            payload: { decisions: [{ type: "allow", persistRule: "Bash(git status:*)" }] },
+          },
+        ],
+      }),
+    });
+    expect(addRule).toHaveBeenCalledTimes(1);
+    expect(addRule).toHaveBeenCalledWith("r1", "Bash(git status:*)");
+  });
+
+  it("does NOT call addRule for a plain allow or a deny", async () => {
+    const allow = makeApp({ resolveReturns: true });
+    await allow.app.request("/runs/r1/resume", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: allowBody,
+    });
+    expect(allow.addRule).not.toHaveBeenCalled();
+
+    const deny = makeApp({ resolveReturns: true });
+    await deny.app.request("/runs/r1/resume", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        resumes: [
+          {
+            interruptId: "tu_1",
+            // persistRule on a deny must be ignored.
+            payload: { decisions: [{ type: "deny", persistRule: "Bash(x)" }] },
+          },
+        ],
+      }),
+    });
+    expect(deny.addRule).not.toHaveBeenCalled();
   });
 });
 

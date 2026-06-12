@@ -17,6 +17,7 @@ import { getResumeSessionId, tagThreadSession } from "./session-tag";
 import { rewindSessionFiles } from "./file-rewind";
 import { checkWorkspaceSandbox } from "./sandbox";
 import { isDestructiveToolCall } from "./destructive";
+import { anyRuleMatches } from "./approval-rules";
 import { createAuditHooks } from "./audit-hook";
 import { BashSideEffectsTracker, createBashSideEffectsHooks } from "./bash-side-effects";
 import {
@@ -224,6 +225,10 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
     const writeRoots = [ctx.cwd, ...additionalWriteDirs];
 
     const bus = opts.interruptBus;
+    // 把本 run 的「始终允许」命令规则种入 bus（按 runId）。seedRules 为加性合并，
+    // 不会清空 run 内经 /resume 的 persistRule 追加的规则；canUseTool 命中即放行。
+    // ResumeContext 无 approvalRules（跨会话重连）→ 种空集，即 no-op（保留已有规则）。
+    if (bus) bus.seedRules(ctx.runId, ctxRun.approvalRules ?? []);
     // canUseTool runs for every tool call. Two gates layered:
     //   1. Workspace sandbox (sync, policy) — paths outside ctx.cwd are
     //      auto-denied so the user isn't asked to approve filesystem reads
@@ -289,15 +294,15 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
       if (!bus) {
         return { behavior: "allow" as const, updatedInput: input };
       }
-      // Per-task allow-list (scheduled/background runs): auto-approve a
-      // pre-authorized, non-destructive tool so unattended runs don't stall on
-      // every step. Runs AFTER the sandbox (an allow-listed Write still can't
-      // escape cwd) and AFTER the destructive guardrail (irreversible actions
-      // always fall through to the bus, even when allow-listed).
-      if (
-        ctx.autoApproveTools?.includes(toolName) &&
-        !isDestructiveToolCall(toolName, input)
-      ) {
+      // 「始终允许」命中检查（统一匹配器）。来源两类，都用 CC `Tool(pattern)` 语法：
+      //   · bus.getRules(runId)  —— 交互式 run 沉淀的命令规则（含本 run 内 /resume 追加）
+      //   · ctx.autoApproveTools —— 定时/后台 run 预授权的裸工具名
+      // 命中且非不可逆操作 → 放行（不进 bus）。仍在 sandbox 之后（allow-listed Write
+      // 仍逃不出 cwd），且不可逆操作始终回退到 bus，与原 autoApproveTools 语义一致。
+      const matched =
+        anyRuleMatches(bus.getRules(ctx.runId), toolName, input) ||
+        anyRuleMatches(ctx.autoApproveTools ?? [], toolName, input);
+      if (matched && !isDestructiveToolCall(toolName, input)) {
         return { behavior: "allow" as const, updatedInput: input };
       }
       const result = await bus.requestApproval({

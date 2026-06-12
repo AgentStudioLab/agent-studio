@@ -106,6 +106,7 @@ export function useChat(opts: UseChatOptions) {
         permissionMode?: "ask" | "act-without-asking";
         providerSelection?: ProviderModelSelection;
         model?: string;
+        approvalRules?: string[];
       },
     ) => {
       // finally (not a trailing statement) so the status query also refreshes
@@ -129,6 +130,7 @@ export function useChat(opts: UseChatOptions) {
         permissionMode?: "ask" | "act-without-asking";
         providerSelection?: ProviderModelSelection;
         model?: string;
+        approvalRules?: string[];
       },
     ) => {
       try {

@@ -112,6 +112,8 @@ export interface RunWorkerInput {
   model?: string;
   /** Per-task allow-list for scheduled/background runs (see RunContext). */
   autoApproveTools?: string[];
+  /** 交互式 run 的「始终允许」命令规则（CC Tool(pattern) 语法，见 RunContext）。 */
+  approvalRules?: string[];
   /** DB id of the user message this run answers. When set, the captured SDK
    *  prompt uuid is persisted onto it (for future regenerate). */
   userMessageId?: string;
@@ -152,6 +154,7 @@ export async function runWorker(input: RunWorkerInput): Promise<void> {
     permissionMode = "ask",
     model,
     autoApproveTools,
+    approvalRules,
     userMessageId,
     resumeSessionAt,
     freshSession,
@@ -331,6 +334,7 @@ export async function runWorker(input: RunWorkerInput): Promise<void> {
       permissionMode,
       model,
       autoApproveTools,
+      approvalRules,
       resumeSessionAt,
       freshSession,
       additionalReadDirs: agentDirs?.additionalReadDirs,

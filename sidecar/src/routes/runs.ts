@@ -45,6 +45,12 @@ function parseProviderSelection(value: unknown): ProviderModelSelection | undefi
   return { providerId: raw.providerId, modelId: raw.modelId };
 }
 
+/** 防御式解析 string[]：非数组 → undefined；过滤掉非字符串项。 */
+function parseStringArray(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  return value.filter((x): x is string => typeof x === "string");
+}
+
 /**
  * Run lifecycle + SSE event stream. Wire events are AG-UI-shaped
  * (RUN_STARTED / TEXT_MESSAGE_* / RUN_FINISHED ...); the URL surface is
@@ -73,6 +79,7 @@ export function buildRunRoutes(deps: MountRunsDeps): Hono {
           model?: string;
           providerSelection?: unknown;
           locale?: string;
+          approvalRules?: unknown;
         }
       | null;
     if (
@@ -96,6 +103,8 @@ export function buildRunRoutes(deps: MountRunsDeps): Hono {
         ? body.model
         : undefined;
     const providerSelection = parseProviderSelection(body.providerSelection);
+    // 「始终允许」命令规则（CC 语法）。前端传 cwd + 全局 allowlist 的并集。
+    const approvalRules = parseStringArray(body.approvalRules);
 
     // Refuse to start a second run on a thread that already has one in flight
     // (a scheduled run, or a send from another window). Two runs resuming the
@@ -150,6 +159,7 @@ export function buildRunRoutes(deps: MountRunsDeps): Hono {
       permissionMode,
       model,
       locale,
+      approvalRules,
       userMessageId: userMsg.id,
     }).finally(() => aborters.delete(body.runId!));
 
@@ -171,6 +181,7 @@ export function buildRunRoutes(deps: MountRunsDeps): Hono {
           model?: string;
           providerSelection?: unknown;
           locale?: string;
+          approvalRules?: unknown;
         }
       | null;
     if (!body?.fromMessageId || !body?.runId) {
@@ -204,6 +215,7 @@ export function buildRunRoutes(deps: MountRunsDeps): Hono {
         : undefined;
     const providerSelection = parseProviderSelection(body.providerSelection);
     const locale = typeof body.locale === "string" ? body.locale : undefined;
+    const approvalRules = parseStringArray(body.approvalRules);
 
     const cwd = thread.workingDir;
     const userContent = target.content;
@@ -274,6 +286,7 @@ export function buildRunRoutes(deps: MountRunsDeps): Hono {
           permissionMode,
           model,
           locale,
+          approvalRules,
           userMessageId: newUser.id,
           resumeSessionAt,
           freshSession: resumeSessionAt == null,
@@ -350,7 +363,7 @@ export function buildRunRoutes(deps: MountRunsDeps): Hono {
             interruptId?: string;
             payload?: {
               decisions?: Array<
-                | { type?: "allow" }
+                | { type?: "allow"; persistRule?: string }
                 | { type?: "deny"; message?: string }
                 | {
                     type?: "ask_user_answers";
@@ -409,6 +422,16 @@ export function buildRunRoutes(deps: MountRunsDeps): Hono {
       // run that already terminated.
       if (ok) await deps.store.markRunning(runId);
       return c.json({ ok: true, alreadyResolved: !ok }, 202);
+    }
+
+    // 「始终允许此前缀/此命令/整个 Bash」：allow 决策可带一条要沉淀的规则，
+    // 追加进本 run 的规则集，使后续同模式工具调用立即放行（不再发卡）。在 resolve
+    // 之前追加 —— SDK 要等本次 promise resolve 才会发起下一个工具调用。
+    if (decision.type === "allow") {
+      const persistRule = decision.persistRule;
+      if (typeof persistRule === "string" && persistRule.trim()) {
+        deps.interruptBus.addRule(runId, persistRule.trim());
+      }
     }
 
     const result =

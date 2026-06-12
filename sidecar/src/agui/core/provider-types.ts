@@ -91,6 +91,15 @@ export interface RunContext {
    */
   autoApproveTools?: string[];
   /**
+   * 交互式 run 的「始终允许」命令规则（CC `Tool(pattern)` 语法，见
+   * provider-claude/approval-rules.ts）。前端把 cwd + 全局 allowlist 的并集经
+   * POST /runs 传入；provider 在 run 启动时种入 interruptBus（按 runId），
+   * canUseTool 命中即放行。run 内经 /resume 的 persistRule 追加。
+   * autoApproveTools（裸名）与本字段在 canUseTool 内走同一匹配器。
+   * 背景 run（scheduler/remote）无前端 → undefined。
+   */
+  approvalRules?: string[];
+  /**
    * Regenerate: SDK message uuid to resume the session AT (transcript is
    * restored up to and including this message, then `userMessage` re-runs).
    * Maps to the SDK `resumeSessionAt` option. Omit for a normal turn.

@@ -35,6 +35,8 @@ export interface PostRunRequest {
    * ANTHROPIC_MODEL env (and ultimately the SDK's own default).
    */
   model?: string;
+  /** 「始终允许」命令规则（CC Tool(pattern) 语法）。sidecar 在 canUseTool 内匹配。 */
+  approvalRules?: string[];
 }
 
 export interface PostRegenerateRequest {
@@ -46,6 +48,8 @@ export interface PostRegenerateRequest {
   permissionMode?: "ask" | "act-without-asking";
   providerSelection?: { providerId: string; modelId: string };
   model?: string;
+  /** 「始终允许」命令规则（CC Tool(pattern) 语法）。sidecar 在 canUseTool 内匹配。 */
+  approvalRules?: string[];
 }
 
 export interface ResumeRequest {
@@ -128,6 +132,7 @@ export class AGUIHttpClient {
             : {}),
           ...(req.model ? { model: req.model } : {}),
           ...(locale ? { locale } : {}),
+          ...(req.approvalRules?.length ? { approvalRules: req.approvalRules } : {}),
         }),
       },
     );

@@ -166,13 +166,15 @@ interface ChatStreamProps {
   pendingInterrupts: PendingInterrupt[];
   onResume: (payload: {
     decisions: Array<
-      | { type: "allow" }
+      | { type: "allow"; persistRule?: string }
       | { type: "deny"; message?: string }
       | AskUserAnswersDecision
     >;
   }) => Promise<void>;
-  allowedTools: ReadonlySet<string>;
-  onAllowAlways: (toolName: string) => void;
+  /** 「始终允许」本地持久化（按 cwd）。参数是 CC 规则串（见 ToolApprovalCard）。
+   *  命中规则的工具调用由 sidecar 在 canUseTool 内放行，不再产生 interrupt，
+   *  所以前端不再需要 allowlist 过滤闸口。 */
+  onAllowAlways: (rule: string) => void;
   /**
    * Called when the user clicks "继续上次任务" on a process_restart notice.
    * Sends a follow-up prompt that resumes the previously interrupted turn —
@@ -214,7 +216,6 @@ export function ChatStream({
   loading = false,
   pendingInterrupts,
   onResume,
-  allowedTools,
   onAllowAlways,
   onContinueAfterRestart,
   workingDir,
@@ -228,22 +229,14 @@ export function ChatStream({
   // cast: ChatRuntime.subscribe takes (state) => void; RuntimeLike expects () => void.
   // The wrapper in useRunStatus discards the state arg, so this is safe at runtime.
   const status = useRunStatus(runtime as never);
+  // 命中「始终允许」规则的工具调用由 sidecar 在 canUseTool 内直接放行，根本不会
+  // 产生 interrupt，因此前端不再按 allowlist 过滤 —— 凡是到达这里的 interrupt 都
+  // 需要用户决策，全部渲染卡片。
   const interruptsByToolId = useMemo(() => {
     const m = new Map<string, PendingInterrupt>();
-    for (const it of pendingInterrupts) {
-      // AskUserQuestion is a form, not an approval — the allowed-tools
-      // auto-skip filter doesn't apply (the user still needs to answer
-      // even if AskUserQuestion is on their always-allow list).
-      if (it.reason === "ask_user") {
-        m.set(it.id, it);
-        continue;
-      }
-      const tn = (it.payload as { toolName?: string }).toolName;
-      if (tn && allowedTools.has(tn)) continue;
-      m.set(it.id, it);
-    }
+    for (const it of pendingInterrupts) m.set(it.id, it);
     return m;
-  }, [pendingInterrupts, allowedTools]);
+  }, [pendingInterrupts]);
 
   const renderApprovalCard = useCallback(
     (it: PendingInterrupt) => {
@@ -265,7 +258,12 @@ export function ChatStream({
           interrupt={it}
           onAllow={() => void onResume({ decisions: [{ type: "allow" }] })}
           onDeny={(reason) => void onResume({ decisions: [{ type: "deny", message: reason }] })}
-          onAllowAlways={onAllowAlways}
+          onAllowAlways={(rule) => {
+            // 1) 本地按 cwd 持久化（下次 run 经 approvalRules 注入 sidecar）。
+            onAllowAlways(rule);
+            // 2) 当前 run 立即生效：allow 续跑并把规则带给 sidecar 的 per-run registry。
+            void onResume({ decisions: [{ type: "allow", persistRule: rule }] });
+          }}
         />
       );
     },

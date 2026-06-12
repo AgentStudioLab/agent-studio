@@ -71,9 +71,22 @@ export interface InterruptBus {
   /**
    * Called from runWorker on terminal status: rejects every pending deferred
    * for the run as `deny` (approval) / empty-answers (ask_user) so the SDK
-   * side unblocks and tears down cleanly.
+   * side unblocks and tears down cleanly. Also drops this run's approval-rule
+   * set (in-memory hygiene; runId is never reused).
    */
   cancelAll(runId: string): void;
+
+  // ─── 命令级「始终允许」规则（按 runId，仅内存） ───────────────────────────
+  // canUseTool 命中即放行（B2 方案）。run 启动时 seed 一次（前端经 POST /runs 传
+  // approvalRules）；run 内点「始终允许」经 /resume 的 persistRule 追加，立即对
+  // 后续工具调用生效。run 终止由 cancelAll 清理。
+  /** run 启动时种入初始规则。加性合并：多次 seed（含 resume 重连时种空集）都不会
+   *  清空 run 内经 addRule 累积的规则。 */
+  seedRules(runId: string, rules: string[]): void;
+  /** run 内追加一条规则（如卡片「始终允许此前缀」）。 */
+  addRule(runId: string, rule: string): void;
+  /** 读取本 run 当前生效的规则集（canUseTool 用）。 */
+  getRules(runId: string): ReadonlySet<string>;
 }
 
 export interface CreateInterruptBusOptions {
@@ -88,6 +101,9 @@ export function createInterruptBus(opts: CreateInterruptBusOptions): InterruptBu
   // (returns false) instead of forcing the wrong shape onto a deferred.
   const permissionDeferreds = new Map<string, (r: PermissionResult) => void>();
   const askUserDeferreds = new Map<string, (r: AskUserAnswers) => void>();
+  // 命令级「始终允许」规则，按 runId。值为 CC 规则串集合（见 approval-rules.ts）。
+  const runRules = new Map<string, Set<string>>();
+  const EMPTY_RULES: ReadonlySet<string> = new Set();
 
   return {
     async requestApproval(req) {
@@ -191,6 +207,28 @@ export function createInterruptBus(opts: CreateInterruptBusOptions): InterruptBu
         // sends partial" spec when the partial is "nothing answered."
         fn({ answers: {} });
       }
+      runRules.delete(runId);
+    },
+
+    seedRules(runId, rules) {
+      // 加性合并：若该 run 已有规则集（含 addRule 追加的），只补充不清空。这样即便
+      // 未来 runTurn 在一个 run 内被多次调用（如 resume 重连），也不会丢失已批准的规则。
+      const existing = runRules.get(runId);
+      if (existing) {
+        for (const r of rules) existing.add(r);
+      } else {
+        runRules.set(runId, new Set(rules));
+      }
+    },
+
+    addRule(runId, rule) {
+      const existing = runRules.get(runId);
+      if (existing) existing.add(rule);
+      else runRules.set(runId, new Set([rule]));
+    },
+
+    getRules(runId) {
+      return runRules.get(runId) ?? EMPTY_RULES;
     },
   };
 }

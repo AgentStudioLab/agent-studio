@@ -55,6 +55,9 @@ describe("provider sandbox config", () => {
       resolve: () => true,
       resolveAskUser: () => true,
       cancelAll: () => {},
+      seedRules: () => {},
+      addRule: () => {},
+      getRules: () => new Set<string>(),
     };
     const provider = createClaudeProvider({ apiKey: "k", interruptBus: fakeBus });
     const ac = new AbortController();
@@ -99,6 +102,9 @@ describe("provider sandbox config", () => {
       resolve: () => true,
       resolveAskUser: () => true,
       cancelAll: () => {},
+      seedRules: () => {},
+      addRule: () => {},
+      getRules: () => new Set<string>(),
     };
     const provider = createClaudeProvider({ apiKey: "k", interruptBus: fakeBus });
     const ac = new AbortController();
