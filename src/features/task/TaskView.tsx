@@ -36,6 +36,9 @@ function touchedFileToPreview(f: TouchedFile): MockFile {
   else if (lower.endsWith(".html") || lower.endsWith(".htm")) type = "html";
   else if (lower.endsWith(".xlsx") || lower.endsWith(".csv")) type = "spreadsheet";
   else if (lower.endsWith(".pptx") || lower.endsWith(".key")) type = "presentation";
+  // rich 文档：docx/pdf 在预览面板内由 @js-preview/* 渲染（见 preview/richDoc.ts）
+  else if (lower.endsWith(".docx")) type = "document";
+  else if (lower.endsWith(".pdf")) type = "pdf";
   else if (/\.(png|jpe?g|gif|svg|webp)$/.test(lower)) type = "image";
   else if (/\.(ts|tsx|js|jsx|py|rs|go|java|c|cpp|h|hpp)$/.test(lower)) type = "code";
   return {

@@ -30,6 +30,12 @@ function metaForPath(path: string): IconMeta {
   if (lower.endsWith(".pptx") || lower.endsWith(".key")) {
     return { Icon: Presentation, color: "hsl(15 75% 55%)" };
   }
+  if (lower.endsWith(".docx")) {
+    return { Icon: FileText, color: "hsl(210 60% 50%)" };
+  }
+  if (lower.endsWith(".pdf")) {
+    return { Icon: FileText, color: "hsl(0 60% 55%)" };
+  }
   if (lower.endsWith(".png") || lower.endsWith(".jpg") || lower.endsWith(".jpeg") || lower.endsWith(".gif") || lower.endsWith(".svg") || lower.endsWith(".webp")) {
     return { Icon: ImageIcon, color: "hsl(var(--text-400))" };
   }

@@ -19,6 +19,8 @@ import { SpreadsheetRenderer } from "./renderers/SpreadsheetRenderer";
 import { ImageRenderer } from "./renderers/ImageRenderer";
 import { GenericTextRenderer } from "./renderers/GenericTextRenderer";
 import { BinaryFallbackRenderer } from "./renderers/BinaryFallbackRenderer";
+import { OfficeDocRenderer } from "./renderers/OfficeDocRenderer";
+import { richDocKind } from "./richDoc";
 import type { MarkdownViewMode } from "./MarkdownViewToggle";
 
 interface PreviewBodyProps {
@@ -32,6 +34,10 @@ interface PreviewBodyProps {
    * (markdown + html — identical semantics). Other renderers ignore it.
    */
   viewMode: MarkdownViewMode;
+  /** rich 文档（pdf/docx/xlsx）渲染器自取 /files/raw 所需的 cwd。 */
+  workingDir: string | null;
+  /** 刷新按钮自增 nonce —— rich 文档不走 useFileContent 的 refetch。 */
+  reloadNonce: number;
 }
 
 export function PreviewBody({
@@ -41,8 +47,27 @@ export function PreviewBody({
   isLoading,
   onOpenExternal,
   viewMode,
+  workingDir,
+  reloadNonce,
 }: PreviewBodyProps) {
   const { t } = useTranslation();
+
+  // rich 文档（pdf/docx/xlsx）最先分流：它们不经 useFileContent（PreviewPane
+  // 对其禁用了该 hook，data/error 恒为 null），由 OfficeDocRenderer 内部
+  // 走 /files/raw 流式自取 + @js-preview 渲染。必须放在 loading/error/data
+  // 判断之前，否则会被 `if (!data) return null` 短路。
+  const kind = richDocKind(file);
+  if (kind) {
+    return (
+      <OfficeDocRenderer
+        file={file}
+        workingDir={workingDir}
+        kind={kind}
+        reloadNonce={reloadNonce}
+        onOpenExternal={onOpenExternal}
+      />
+    );
+  }
 
   if (isLoading) {
     return (
@@ -89,9 +114,9 @@ export function PreviewBody({
   const props = { file, data, onOpenExternal };
 
   // Binary → base64. Images get an inline renderer; everything else
-  // (presentation, generic binary, future pptx/xlsx) hits the fallback
-  // CTA for now. When dedicated pptx/xlsx renderers land they'll branch
-  // here.
+  // (presentation/pptx, legacy .doc/.xls, generic binary) hits the
+  // fallback CTA. pdf/docx/xlsx never reach here — they branch to
+  // OfficeDocRenderer above before the data checks.
   if (data.encoding === "base64") {
     if (file.type === "image") return <ImageRenderer {...props} />;
     return <BinaryFallbackRenderer {...props} />;

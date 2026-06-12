@@ -17,6 +17,9 @@
   },
   "dependencies": {
     "@fontsource-variable/geist": "^5.2.8",
+    "@js-preview/docx": "^1.6.4",
+    "@js-preview/excel": "^1.7.14",
+    "@js-preview/pdf": "^2.0.10",
     "@radix-ui/react-use-controllable-state": "^1.2.2",
     "@rive-app/react-webgl2": "^4.28.5",
     "@streamdown/cjk": "^1.0.3",

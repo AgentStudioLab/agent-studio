@@ -88,7 +88,7 @@ export interface ChatMessage {
 export interface MockFile {
   name: string;
   path: string;
-  type: "markdown" | "html" | "spreadsheet" | "presentation" | "code" | "image" | "generic";
+  type: "markdown" | "html" | "spreadsheet" | "presentation" | "document" | "pdf" | "code" | "image" | "generic";
   isNew?: boolean;
   content?: string; // populated for preview
 }

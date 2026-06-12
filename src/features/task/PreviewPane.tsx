@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { useFileContent } from "@/lib/agui/react/useFileContent";
 import type { MockFile } from "@/lib/mock/types";
 import { PreviewBody } from "@/features/task/preview/PreviewBody";
+import { richDocKind } from "@/features/task/preview/richDoc";
 import { OpenerMenu } from "@/features/task/preview/OpenerMenu";
 import {
   MarkdownViewToggle,
@@ -56,9 +57,15 @@ export function PreviewPane({ file, workingDir, onClose }: PreviewPaneProps) {
   // control. Shared by markdown + html (identical semantics).
   const [viewMode, setViewMode] = useState<MarkdownViewMode>("preview");
   const [copied, setCopied] = useState(false);
+  // rich 文档（pdf/docx/xlsx）的刷新 nonce：自增触发 OfficeDocRenderer
+  // 重新走 /files/raw 下载 + 重渲染（它们不经 useFileContent 的 refetch）。
+  const [reloadNonce, setReloadNonce] = useState(0);
 
+  // rich 文档禁用 useFileContent（传 path=null）：它们走 /files/raw 流式
+  // 自取。不禁用会对大文件先发一次注定 413（>2MiB）的 base64 请求。
+  const docKind = richDocKind(file);
   const { data, error, isLoading, isFetching, refetch } = useFileContent(
-    file.path,
+    docKind ? null : file.path,
     workingDir,
   );
 
@@ -98,6 +105,9 @@ export function PreviewPane({ file, workingDir, onClose }: PreviewPaneProps) {
   //   - Everything else: width-proportional zoom wrapper.
   const isHtmlPreview = file.type === "html" && viewMode === "preview";
   const isCodeView = viewMode === "source" || file.type === "code";
+  // rich 文档：OfficeDocRenderer 自管内部滚动与布局，给 full-bleed 槽位
+  // （不套 zoom —— 库渲染的分页/表格按真实尺寸展示，缩放交给库自身）。
+  const isRichDoc = docKind !== null;
 
   const canCopy = data?.encoding === "utf8";
   const handleCopy = () => {
@@ -121,8 +131,16 @@ export function PreviewPane({ file, workingDir, onClose }: PreviewPaneProps) {
       isLoading={isLoading}
       onOpenExternal={handleOpenExternal}
       viewMode={viewMode}
+      workingDir={workingDir}
+      reloadNonce={reloadNonce}
     />
   );
+
+  // 刷新：rich 文档自增 nonce 重新流式下载；其余走 useFileContent.refetch。
+  const handleRefresh = () => {
+    if (isRichDoc) setReloadNonce((n) => n + 1);
+    else refetch();
+  };
 
   return (
     <aside
@@ -186,7 +204,7 @@ export function PreviewPane({ file, workingDir, onClose }: PreviewPaneProps) {
         <button
           type="button"
           aria-label={t("task.preview.refresh")}
-          onClick={refetch}
+          onClick={handleRefresh}
           disabled={isFetching}
           className="rounded-md p-1.5 transition hover:bg-state-hover hover:text-foreground disabled:opacity-50"
           style={{ color: "hsl(var(--text-300))" }}
@@ -208,7 +226,9 @@ export function PreviewPane({ file, workingDir, onClose }: PreviewPaneProps) {
           The zoom wrapper uses `zoom` (not `transform: scale`) so it affects
           layout — scrollbar bounds + flex height adapt — around a constant
           480px design width. */}
-      {isHtmlPreview ? (
+      {isRichDoc ? (
+        <div className="min-h-0 flex-1">{body}</div>
+      ) : isHtmlPreview ? (
         <div className="min-h-0 flex-1 overflow-auto">{body}</div>
       ) : isCodeView ? (
         <div className="min-h-0 flex-1">{body}</div>

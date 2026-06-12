@@ -1,0 +1,36 @@
+/* OfficeDocRenderer 对 @js-preview/docx（内嵌 docx-preview）默认样式的覆盖。
+ *
+ * 背景：docx-preview 注入的默认样式是
+ *   .docx-wrapper { background: gray; padding: 30px; display: flex;
+ *                   flex-flow: column; align-items: center; }
+ *   .docx-wrapper > section.docx { background: white; box-shadow: 0 0 10px …; }
+ * 其中 align-items: center 让「没有内联宽度」的 section 收缩成内容宽 ——
+ * 生成器（如 html→docx 转换）不写 sectPr/pgSz 时，各页宽窄不一、灰底白块，
+ * 观感破碎。这里统一成「默认 A4 纸容器」：
+ *   - 宽度/页边距用 *非 !important* 兜底：文档自带 pgSz/页边距（内联样式）
+ *     永远优先，只有缺失时才落到 A4 默认值；
+ *   - 画布去掉死灰色，透出面板背景；纸张阴影减淡并走 border token。
+ * 颜色一律语义 token；纸张白底由 docx-preview 注入样式保留（文档墨色假定
+ * 白纸，暗色模式下纸张保持白色属预期，等同 PDF 阅读器）。 */
+
+/* 画布：库默认灰色 → 透明（透出面板 bg-100） */
+.office-doc .docx-wrapper {
+  background: transparent;
+  padding: 20px 16px;
+}
+
+/* 纸张：A4 兜底尺寸 + 统一间距与轻阴影 */
+.office-doc .docx-wrapper > section.docx {
+  /* A4 @96dpi ≈ 794×1123px；非 !important，内联 pgSz 宽高优先 */
+  width: 794px;
+  min-height: 1123px;
+  /* Word 默认页边距（上下 2.54cm / 左右约 1.9cm）兜底，内联页边距优先 */
+  padding: 96px 72px;
+  box-sizing: border-box;
+  /* !important：库包 CSS（.vue-office-docx … { margin-bottom: 5px }）与本规则
+     同特异性且随懒加载 chunk 后插入，源顺序会赢；页间距无内联值，important 安全 */
+  margin-bottom: 20px !important;
+  box-shadow:
+    0 0 0 1px hsl(var(--border-300) / 0.12),
+    0 2px 8px hsl(var(--border-300) / 0.25);
+}
