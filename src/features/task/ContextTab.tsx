@@ -1,9 +1,17 @@
+import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { Clock, ExternalLink, ScrollText } from "lucide-react";
 import { open as shellOpen } from "@tauri-apps/plugin-shell";
 import { cn } from "@/lib/utils";
-import { useThreadContext, type ContextMcpServer } from "@/lib/agui/react/useThreadContext";
+import {
+  useThreadContext,
+  type ContextMcpServer,
+  type ContextSkill,
+} from "@/lib/agui/react/useThreadContext";
+import { useSkills } from "@/lib/agui/react/useSkills";
+import { deriveInvokedSkills } from "@/lib/agui/runtime/derivations";
+import type { ChatState } from "@/lib/agui/runtime/types";
 import { useAgentLinks } from "@/lib/data/agent-link-queries";
 import { useAgentFolders } from "@/lib/data/agent-folder-queries";
 import { useAgentMemoryTree } from "@/lib/data/agent-memory-tree-queries";
@@ -13,6 +21,12 @@ import { MemoryFilesCard } from "@/shared/agent-context/MemoryFilesCard";
 
 interface ContextTabProps {
   threadId: string | null;
+  /**
+   * thread 的会话状态（与 useChat 同一对象）。skill 列表从其 tool_call
+   * 事件推导 —— sidecar 的内存 SkillInvocationStore 重启即清空，历史
+   * 会话只能靠事件回填。可不传（如 Storybook），仅展示服务端实时列表。
+   */
+  state?: ChatState | null;
   /** Bound agent → surface its folders / links / memory + the agent_studio MCP. */
   agentWorkspaceId?: string | null;
   /** When set, the conversation is a scheduled run — show a link back to the task. */
@@ -105,6 +119,7 @@ function collectMemoryFiles(nodes: MemoryTreeNode[]): string[] {
 
 export function ContextTab({
   threadId,
+  state = null,
   agentWorkspaceId,
   scheduledTaskId,
   scheduledTaskName,
@@ -112,7 +127,43 @@ export function ContextTab({
 }: ContextTabProps) {
   const { t } = useTranslation();
   const { context, isLoading } = useThreadContext(threadId);
-  const { skills } = context;
+  // skill 注册表（staleTime: Infinity，启动后不变）——给「事件推导出来、
+  // 但服务端内存列表里没有」的 skill 补全显示名/描述。
+  const { skills: registrySkills } = useSkills();
+
+  // 服务端实时列表 ∪ 事件推导列表。推导覆盖「sidecar 重启 / 重开历史会话」
+  // 后内存清空的场景；live run 期间两边都有、按 id 去重。顺序以首次调用
+  // 时间为准（推导序），服务端独有的（理论不会发生）追加在尾部。
+  const derivedIds = useMemo(
+    () => (state ? deriveInvokedSkills(state) : []),
+    [state],
+  );
+  const skills = useMemo<ContextSkill[]>(() => {
+    const serverById = new Map(context.skills.map((s) => [s.id, s] as const));
+    const registryById = new Map(registrySkills.map((s) => [s.id, s] as const));
+    const merged: ContextSkill[] = [];
+    const taken = new Set<string>();
+    for (const id of derivedIds) {
+      taken.add(id);
+      const server = serverById.get(id);
+      if (server) {
+        merged.push(server);
+        continue;
+      }
+      const known = registryById.get(id);
+      // 注册表也查不到（skill 被删/停用）→ 退化为用 id 当名称，与服务端
+      // 路由的兜底行为一致
+      merged.push(
+        known
+          ? { id, name: known.name, description: known.description }
+          : { id, name: id, description: "" },
+      );
+    }
+    for (const s of context.skills) {
+      if (!taken.has(s.id)) merged.push(s);
+    }
+    return merged;
+  }, [derivedIds, context.skills, registrySkills]);
 
   const isAgentBound = Boolean(agentWorkspaceId);
   const { data: folders } = useAgentFolders(agentWorkspaceId ?? null);
@@ -142,7 +193,8 @@ export function ContextTab({
   // gate on isLoading alone — TanStack Query v5 reports isLoading=false when
   // the query is disabled (threadId null), so the null path would otherwise
   // fall through to "noCapabilities" instead of the correct "notStarted".
-  if (!threadId || isLoading) {
+  // 事件推导出的 skill 已在本地（skills 非空）时不等服务端，直接渲染。
+  if (!threadId || (isLoading && skills.length === 0)) {
     return (
       <div className="px-6 py-12 text-center text-sm" style={{ color: "hsl(var(--text-300))" }}>
         {t("task.contextTab.empty.notStarted")}

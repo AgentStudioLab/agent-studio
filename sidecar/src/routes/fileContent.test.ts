@@ -209,3 +209,55 @@ describe("GET /files/raw", () => {
     expect(r2.status).toBe(400);
   });
 });
+
+describe("POST /files/exists", () => {
+  function postExists(app: Hono, body: unknown) {
+    return app.request("/files/exists", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  }
+
+  it("echoes back only paths that exist as regular files inside cwd", async () => {
+    const app = makeApp();
+    const res = await postExists(app, {
+      cwd: tmpRoot,
+      paths: [
+        join(tmpRoot, "hello.txt"), // 存在 → 保留
+        join(tmpRoot, "deleted.txt"), // 不存在 → 剔除
+        join(tmpRoot, "sub"), // 目录 → 剔除
+        "/etc/passwd", // 沙箱外 → 剔除
+      ],
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { existing: string[] };
+    expect(body.existing).toEqual([join(tmpRoot, "hello.txt")]);
+  });
+
+  it("returns empty list for empty paths", async () => {
+    const app = makeApp();
+    const res = await postExists(app, { cwd: tmpRoot, paths: [] });
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { existing: string[] }).existing).toEqual([]);
+  });
+
+  it("rejects .. escape attempts (treated as outside cwd)", async () => {
+    const app = makeApp();
+    const res = await postExists(app, {
+      cwd: tmpRoot,
+      paths: [`${tmpRoot}/sub/../../../etc/passwd`],
+    });
+    expect(((await res.json()) as { existing: string[] }).existing).toEqual([]);
+  });
+
+  it("returns 400 on missing cwd / non-array paths / oversized list", async () => {
+    const app = makeApp();
+    expect((await postExists(app, { paths: [] })).status).toBe(400);
+    expect((await postExists(app, { cwd: tmpRoot, paths: "x" })).status).toBe(400);
+    expect((await postExists(app, { cwd: tmpRoot, paths: [123] })).status).toBe(400);
+    expect(
+      (await postExists(app, { cwd: tmpRoot, paths: Array(501).fill("/x") })).status,
+    ).toBe(400);
+  });
+});

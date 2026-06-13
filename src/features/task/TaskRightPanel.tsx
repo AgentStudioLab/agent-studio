@@ -13,9 +13,9 @@ import type { OpenFolderFile } from "@/shared/agent-context/AgentFoldersCard";
 export type TaskRightTabId = "runs" | "process" | "files" | "context";
 
 interface TaskRightPanelProps {
-  /** ChatState from TaskView's useChat — drives Process/Files derivations. */
+  /** ChatState from TaskView's useChat — drives Process/Files/Context derivations. */
   state: ChatState | null;
-  /** threadId for ContextTab (TanStack Query-backed, doesn't need state). */
+  /** threadId for ContextTab's server-side context query. */
   threadId: string | null;
   /** Bound agent (when this conversation runs in an agent space) → Context tab
    *  surfaces the agent's folders / links / memory + the agent_studio MCP. */
@@ -152,6 +152,7 @@ export function TaskRightPanel({
         {activeTab === "context" && (
           <ContextTab
             threadId={threadId}
+            state={state}
             agentWorkspaceId={agentWorkspaceId}
             scheduledTaskId={scheduledTaskId}
             scheduledTaskName={scheduledTaskName}

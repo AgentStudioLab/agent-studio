@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import {
+  deriveInvokedSkills,
   deriveProgressPhases,
   deriveTodos,
   deriveTouchedFiles,
@@ -530,5 +531,75 @@ describe("deriveProgressPhases", () => {
     expect(
       deriveProgressPhases(state).find((p) => p.id === "context")!.lastToolLabel,
     ).toBe("Read file.md");
+  });
+});
+
+describe("deriveInvokedSkills", () => {
+  function skillCall(id: string, skill: unknown): MessageView {
+    return {
+      id: `msg_${id}`,
+      role: "assistant",
+      blocks: [
+        {
+          kind: "tool_call",
+          toolCall: {
+            id,
+            toolName: "Skill",
+            args: typeof skill === "object" && skill !== null ? skill : { skill },
+            result: null,
+            status: "pending",
+          },
+        },
+      ],
+    };
+  }
+
+  it("returns empty for state without Skill calls", () => {
+    expect(deriveInvokedSkills(createInitialState())).toEqual([]);
+  });
+
+  it("extracts skill ids in first-invocation order, deduped", () => {
+    const state = withMessages([
+      skillCall("t1", "agent-studio:docx"),
+      skillCall("t2", "agent-studio:xlsx"),
+      skillCall("t3", "agent-studio:docx"), // 重复调用 → 去重
+    ]);
+    expect(deriveInvokedSkills(state)).toEqual([
+      "agent-studio:docx",
+      "agent-studio:xlsx",
+    ]);
+  });
+
+  it("walks historical messages before live messages", () => {
+    const state: ChatState = {
+      ...createInitialState(),
+      historicalMessages: [skillCall("h1", "skill-a")],
+      liveMessages: [skillCall("l1", "skill-b")],
+    };
+    expect(deriveInvokedSkills(state)).toEqual(["skill-a", "skill-b"]);
+  });
+
+  it("ignores malformed args and other tools", () => {
+    const state = withMessages([
+      skillCall("t1", { notSkill: true }), // 无 skill 字段
+      skillCall("t2", { skill: 42 }), // 非字符串
+      {
+        id: "m3",
+        role: "assistant",
+        blocks: [
+          {
+            kind: "tool_call",
+            toolCall: {
+              id: "t3",
+              toolName: "Read",
+              args: { skill: "not-a-skill-call" },
+              result: null,
+              status: "pending",
+            },
+          },
+        ],
+      },
+    ]);
+    expect(deriveInvokedSkills(state)).toEqual([]);
   });
 });

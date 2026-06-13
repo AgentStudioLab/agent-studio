@@ -447,3 +447,38 @@ export function deriveProgressPhases(state: ChatState): PhaseEntry[] {
   });
 }
 
+
+/**
+ * 跨 Run 聚合本 thread 实际调用过的 skill（内置 `Skill` tool 的调用）。
+ *
+ * Context Tab 原本只读 sidecar 内存里的 SkillInvocationStore（run 期间由
+ * PreToolUse hook 实时记录），sidecar 重启即清空 —— 历史会话重新打开时
+ * 面板显示「未加载任何 skill」，与对话内容矛盾。而 Skill 调用本身就持久
+ * 化在 run_events 的 tool_call block 里，这里直接从消息推导：历史会话
+ * 回填 + live run 实时更新两者都覆盖（与 deriveTouchedFiles 同模式）。
+ *
+ * 返回 skill id 数组，按首次调用顺序去重。
+ */
+export function deriveInvokedSkills(state: ChatState): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const messages of [state.historicalMessages, state.liveMessages]) {
+    for (const m of messages) {
+      if (m.role !== "assistant") continue;
+      for (const block of m.blocks) {
+        if (block.kind !== "tool_call") continue;
+        if (block.toolCall.toolName !== "Skill") continue;
+        // 入参形状与 sidecar PreToolUse hook 一致：{ skill: "<id>" }
+        const args = block.toolCall.args;
+        if (typeof args !== "object" || args === null) continue;
+        const skill = (args as Record<string, unknown>).skill;
+        if (typeof skill !== "string" || !skill) continue;
+        if (!seen.has(skill)) {
+          seen.add(skill);
+          out.push(skill);
+        }
+      }
+    }
+  }
+  return out;
+}

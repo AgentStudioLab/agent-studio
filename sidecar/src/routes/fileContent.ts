@@ -106,6 +106,49 @@ export function buildFileContentRoutes(): Hono {
     });
   });
 
+  // POST /files/exists — 批量存在性校验，供 Files Tab 过滤已被用户在磁盘
+  // 删除的文件（事件推导出的 touched files 不感知磁盘状态）。
+  //
+  // 入参 { cwd, paths: string[] }，返回 { existing: string[] }（原样回显
+  // 仍存在的 path，前端按 absolutePath 精确匹配过滤）。判定规则：
+  //   - cwd 沙箱外的 path 一律视为不存在（与 content/raw 同边界）；
+  //   - stat 失败（已删除）或非常规文件（目录等）→ 不存在。
+  // paths 上限 500：Files Tab 单 thread 的 touched files 远小于此，超出
+  // 视为异常请求直接 400。
+  app.post("/files/exists", async (c) => {
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: "invalid json" }, 400);
+    }
+    const { cwd, paths } = (body ?? {}) as { cwd?: unknown; paths?: unknown };
+    if (typeof cwd !== "string" || !cwd) {
+      return c.json({ error: "missing cwd" }, 400);
+    }
+    if (!Array.isArray(paths) || paths.some((p) => typeof p !== "string")) {
+      return c.json({ error: "paths must be string[]" }, 400);
+    }
+    if (paths.length > 500) {
+      return c.json({ error: "too many paths" }, 400);
+    }
+
+    const absCwd = resolve(normalize(cwd));
+    const cwdPrefix = absCwd.endsWith("/") ? absCwd : absCwd + "/";
+    const existing: string[] = [];
+    for (const p of paths as string[]) {
+      const absPath = resolve(normalize(p));
+      if (absPath !== absCwd && !absPath.startsWith(cwdPrefix)) continue;
+      try {
+        const stats = await stat(absPath);
+        if (stats.isFile()) existing.push(p);
+      } catch {
+        // ENOENT 等 → 不存在，跳过
+      }
+    }
+    return c.json({ existing });
+  });
+
   // GET /files/raw — 原始字节流，供 rich 文档预览（pdf/docx/xlsx）使用。
   //
   // 与 /files/content 的区别：
