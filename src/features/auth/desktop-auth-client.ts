@@ -46,6 +46,28 @@ function buildLocalizedWebsitePath(path: string, locale?: string): string {
     : `/${normalizedLocale}${path}`;
 }
 
+function resolveTokenRedirectUri(redirectUri?: string): string {
+  const resolvedRedirectUri = redirectUri || REDIRECT_URI;
+
+  try {
+    const url = new URL(resolvedRedirectUri);
+    // 网站授权码当前保存 localhost，token 兑换也必须使用同一形式。
+    if (
+      (url.protocol === "http:" || url.protocol === "https:") &&
+      url.hostname === "127.0.0.1" &&
+      url.pathname === "/auth/callback" &&
+      Boolean(url.port)
+    ) {
+      url.hostname = "localhost";
+      return url.toString();
+    }
+  } catch {
+    return resolvedRedirectUri;
+  }
+
+  return resolvedRedirectUri;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
@@ -172,7 +194,7 @@ export async function exchangeAuthCode(input: {
     body: JSON.stringify({
       grant_type: "authorization_code",
       client_id: CLIENT_ID,
-      redirect_uri: input.redirectUri || REDIRECT_URI,
+      redirect_uri: resolveTokenRedirectUri(input.redirectUri),
       code: input.code,
       code_verifier: input.codeVerifier,
       device_id: input.deviceId,

@@ -286,7 +286,7 @@ describe("AuthProvider", () => {
     expect(authorizeUrl.searchParams.get("redirect_uri")).toBe(
       "http://127.0.0.1:49152/auth/callback",
     );
-    expect(tokenBody.redirect_uri).toBe("http://127.0.0.1:49152/auth/callback");
+    expect(tokenBody.redirect_uri).toBe("http://localhost:49152/auth/callback");
   });
 
   it("reopens the current browser authorization without creating a new login request", async () => {

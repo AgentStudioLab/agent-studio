@@ -90,7 +90,7 @@ describe("desktop auth client", () => {
     expect(url.pathname).toBe("/desktop/authorize");
   });
 
-  it("uses a caller-provided redirect URI for loopback development callbacks", async () => {
+  it("keeps authorize redirect URI but uses localhost for token loopback redirects", async () => {
     const fetchSpy = mock(async () =>
       jsonResponse({
         code: 0,
@@ -124,7 +124,7 @@ describe("desktop auth client", () => {
 
     const tokenBody = JSON.parse((fetchSpy.mock.calls[0]?.[1] as RequestInit).body as string);
     expect(new URL(authorizeUrl).searchParams.get("redirect_uri")).toBe(redirectUri);
-    expect(tokenBody.redirect_uri).toBe(redirectUri);
+    expect(tokenBody.redirect_uri).toBe("http://localhost:49152/auth/callback");
   });
 
   it("resolves relative user avatar URLs against the configured website origin", async () => {
