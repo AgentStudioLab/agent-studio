@@ -39,7 +39,15 @@ export function InstructionsCard({ agentId }: { agentId: string }) {
     <>
       <RailSection title={t("agentSpace.instructions.title")} action={pencil}>
         {content ? (
-          <p className="whitespace-pre-wrap text-sm text-foreground">{content}</p>
+          <div
+            role="region"
+            aria-label={t("agentSpace.instructions.title")}
+            tabIndex={0}
+            className="max-h-56 overflow-x-hidden overflow-y-auto overscroll-contain rounded-md pr-1 outline-hidden focus-visible:ring-2 focus-visible:ring-ring/50"
+          >
+            {/* 说明可能很长，预览区保留内部滚动，避免拖高整个右侧栏。 */}
+            <p className="whitespace-pre-wrap break-words text-sm text-foreground">{content}</p>
+          </div>
         ) : (
           <p className="text-sm italic text-muted-foreground">
             {t("agentSpace.instructions.description")}
