@@ -353,7 +353,7 @@ function providerFixture(): ProviderState {
         id: "conn-sf",
         name: "SiliconFlow",
         profileId: "siliconflow-cn",
-        providerLabel: "SiliconFlow China",
+        providerLabel: "硅基流动（中国）",
         baseUrl: "https://api.siliconflow.cn/v1",
         enabled: true,
         hasApiKey: true,
@@ -409,7 +409,7 @@ function providerFixture(): ProviderState {
       },
       {
         id: "siliconflow-cn",
-        label: "SiliconFlow China",
+        label: "硅基流动（中国）",
         baseUrl: "https://api.siliconflow.cn/v1",
         supportsRemoteModels: true,
         agentRuntime: {
@@ -519,6 +519,9 @@ describe("ModelSection", () => {
 
     expect(screen.getByText("Add model provider")).toBeDefined();
     expect(screen.getByLabelText("Connection name")).toBeDefined();
+    expect((screen.getByLabelText("Connection name") as HTMLInputElement).value).toBe(
+      "",
+    );
   });
 
   it("keeps the provider dialog within the viewport and scrolls the form body", async () => {
@@ -559,6 +562,35 @@ describe("ModelSection", () => {
     expect(providerContent.getAttribute("data-align")).toBe("start");
     expect(providerContent.getAttribute("data-avoid-collisions")).toBe("false");
     expect(providerContent.getAttribute("data-class-name")).toContain("max-h-56");
+  });
+
+  it("renders built-in providers as a flat list with Chinese provider names", async () => {
+    renderModelSection(providerFixture());
+
+    fireEvent.click(await screen.findByText("Add model"));
+
+    const providerContent = screen.getAllByTestId("select-content")[0]!;
+    expect(providerContent.textContent).toContain("OpenAI");
+    expect(providerContent.textContent).toContain("硅基流动（中国）");
+    expect(providerContent.textContent).not.toContain("国内模型");
+    expect(providerContent.textContent).not.toContain("国外模型");
+  });
+
+  it("fills the connection name from the selected provider", async () => {
+    renderModelSection(providerFixture());
+
+    fireEvent.click(await screen.findByText("Add model"));
+    const connectionName = screen.getByLabelText("Connection name");
+    const providerActions = screen.getAllByTestId("select-actions")[0]!;
+    const providerButtons = providerActions.querySelectorAll("button");
+
+    expect((connectionName as HTMLInputElement).value).toBe("");
+
+    fireEvent.click(providerButtons[0]!);
+    expect((connectionName as HTMLInputElement).value).toBe("OpenAI");
+
+    fireEvent.click(providerButtons[1]!);
+    expect((connectionName as HTMLInputElement).value).toBe("硅基流动（中国）");
   });
 
   it("refreshes models for a non-default provider connection", async () => {
@@ -647,11 +679,11 @@ describe("ModelSection", () => {
     renderModelSection(providerFixture());
 
     fireEvent.click(await screen.findByText("Add model"));
+    const providerActions = screen.getAllByTestId("select-actions")[0]!;
+    fireEvent.click(providerActions.querySelectorAll("button")[2]!);
     fireEvent.change(screen.getByLabelText("Connection name"), {
       target: { value: "Custom Anthropic" },
     });
-    const providerActions = screen.getAllByTestId("select-actions")[0]!;
-    fireEvent.click(providerActions.querySelectorAll("button")[2]!);
     const protocolActions = screen.getAllByTestId("select-actions")[1]!;
     fireEvent.click(protocolActions.querySelectorAll("button")[1]!);
     fireEvent.change(screen.getByPlaceholderText("https://api.example.com"), {

@@ -33,6 +33,42 @@ describe("providerProfiles", () => {
     expect(ids).not.toContain("custom");
   });
 
+  it("keeps the built-in provider order and localizes Chinese provider labels", () => {
+    expect(BUILT_IN_PROFILES.map((profile) => profile.id)).toEqual([
+      "anthropic",
+      "deepseek",
+      "gemini",
+      "openai",
+      "minimax",
+      "openrouter",
+      "novita",
+      "bedrock",
+      "dashscope",
+      "siliconflow-cn",
+      "siliconflow",
+      "zhipu",
+      "moonshot-cn",
+      "moonshot-global",
+      "doubao",
+      "volcengine-ark",
+      "bailian",
+      "qianfan",
+      "hunyuan",
+    ]);
+    expect(getBuiltInProfile("minimax")?.label).toBe("稀宇科技 MiniMax");
+    expect(getBuiltInProfile("dashscope")?.label).toBe("阿里云灵积");
+    expect(getBuiltInProfile("siliconflow-cn")?.label).toBe("硅基流动（中国）");
+    expect(getBuiltInProfile("siliconflow")?.label).toBe("硅基流动（全球）");
+    expect(getBuiltInProfile("zhipu")?.label).toBe("智谱 AI");
+    expect(getBuiltInProfile("moonshot-cn")?.label).toBe("月之暗面（中国）");
+    expect(getBuiltInProfile("moonshot-global")?.label).toBe("月之暗面（全球）");
+    expect(getBuiltInProfile("doubao")?.label).toBe("豆包");
+    expect(getBuiltInProfile("volcengine-ark")?.label).toBe("火山方舟");
+    expect(getBuiltInProfile("bailian")?.label).toBe("阿里云百炼");
+    expect(getBuiltInProfile("qianfan")?.label).toBe("百度千帆");
+    expect(getBuiltInProfile("hunyuan")?.label).toBe("腾讯混元");
+  });
+
   it("marks providers with remote model capability from modelList strategy", () => {
     for (const profile of BUILT_IN_PROFILES) {
       expect(profile.supportsRemoteModels).toBe(

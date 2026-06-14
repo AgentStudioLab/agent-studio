@@ -175,7 +175,7 @@ export const ANTHROPIC_PROFILE: ProviderProfile = defineProfile({
 
 export const DEEPSEEK_PROFILE: ProviderProfile = defineProfile({
   id: "deepseek",
-  label: "DeepSeek",
+  label: "深度求索",
   region: "Global",
   baseUrl: "https://api.deepseek.com/anthropic",
   modelList: { strategy: "static" },
@@ -220,7 +220,7 @@ const PROFILE_INPUTS: ProviderProfileInput[] = [
   },
   {
     id: "minimax",
-    label: "MiniMax",
+    label: "稀宇科技 MiniMax",
     region: "Global",
     baseUrl: "https://api.minimax.io/v1",
     modelList: { strategy: "openai-compatible", path: "/models" },
@@ -255,7 +255,7 @@ const PROFILE_INPUTS: ProviderProfileInput[] = [
   },
   {
     id: "dashscope",
-    label: "DashScope",
+    label: "阿里云灵积",
     region: "China",
     baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
     modelList: { strategy: "openai-compatible", path: "/models" },
@@ -266,7 +266,7 @@ const PROFILE_INPUTS: ProviderProfileInput[] = [
   },
   {
     id: "siliconflow-cn",
-    label: "SiliconFlow China",
+    label: "硅基流动（中国）",
     region: "China",
     baseUrl: "https://api.siliconflow.cn/v1",
     modelList: { strategy: "openai-compatible", path: "/models" },
@@ -275,7 +275,7 @@ const PROFILE_INPUTS: ProviderProfileInput[] = [
   },
   {
     id: "siliconflow",
-    label: "SiliconFlow Global",
+    label: "硅基流动（全球）",
     region: "Global",
     baseUrl: "https://api.siliconflow.com/v1",
     modelList: { strategy: "openai-compatible", path: "/models" },
@@ -284,7 +284,7 @@ const PROFILE_INPUTS: ProviderProfileInput[] = [
   },
   {
     id: "zhipu",
-    label: "Zhipu AI",
+    label: "智谱 AI",
     region: "China",
     baseUrl: "https://open.bigmodel.cn/api/paas/v4",
     modelList: { strategy: "openai-compatible", path: "/models" },
@@ -293,7 +293,7 @@ const PROFILE_INPUTS: ProviderProfileInput[] = [
   },
   {
     id: "moonshot-cn",
-    label: "Moonshot China",
+    label: "月之暗面（中国）",
     region: "China",
     baseUrl: "https://api.moonshot.cn/v1",
     modelList: { strategy: "openai-compatible", path: "/models" },
@@ -302,7 +302,7 @@ const PROFILE_INPUTS: ProviderProfileInput[] = [
   },
   {
     id: "moonshot-global",
-    label: "Moonshot Global",
+    label: "月之暗面（全球）",
     region: "Global",
     baseUrl: "https://api.moonshot.ai/v1",
     modelList: { strategy: "openai-compatible", path: "/models" },
@@ -311,7 +311,7 @@ const PROFILE_INPUTS: ProviderProfileInput[] = [
   },
   {
     id: "doubao",
-    label: "Doubao",
+    label: "豆包",
     region: "China",
     baseUrl: "https://ark.cn-beijing.volces.com/api/v3",
     modelList: { strategy: "openai-compatible", path: "/models" },
@@ -322,7 +322,7 @@ const PROFILE_INPUTS: ProviderProfileInput[] = [
   },
   {
     id: "volcengine-ark",
-    label: "Volcengine Ark",
+    label: "火山方舟",
     region: "Cloud",
     baseUrl: "https://ark.cn-beijing.volces.com/api/v3",
     modelList: { strategy: "openai-compatible", path: "/models" },
@@ -333,7 +333,7 @@ const PROFILE_INPUTS: ProviderProfileInput[] = [
   },
   {
     id: "bailian",
-    label: "Alibaba Cloud Bailian",
+    label: "阿里云百炼",
     region: "Cloud",
     baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
     modelList: { strategy: "openai-compatible", path: "/models" },
@@ -344,7 +344,7 @@ const PROFILE_INPUTS: ProviderProfileInput[] = [
   },
   {
     id: "qianfan",
-    label: "Baidu Qianfan",
+    label: "百度千帆",
     region: "Cloud",
     baseUrl: "https://qianfan.baidubce.com/v2",
     modelList: { strategy: "openai-compatible", path: "/models" },
@@ -353,7 +353,7 @@ const PROFILE_INPUTS: ProviderProfileInput[] = [
   },
   {
     id: "hunyuan",
-    label: "Tencent Hunyuan",
+    label: "腾讯混元",
     region: "Cloud",
     baseUrl: "https://api.hunyuan.cloud.tencent.com/v1",
     modelList: { strategy: "openai-compatible", path: "/models" },

@@ -91,7 +91,7 @@ interface FormState {
 function defaultForm(builtIn: BuiltInProfile[]): FormState {
   const profile = builtIn[0];
   return {
-    name: profile?.label ?? "Anthropic",
+    name: "",
     profileId: profile?.id ?? "anthropic",
     customProtocol: "openai-compatible",
     baseUrl: profile?.baseUrl ?? "",
@@ -158,7 +158,7 @@ export function ProviderConnectionDialog({
     setForm((current) => ({
       ...current,
       profileId,
-      name: current.name || profile?.label || "Custom",
+      name: profile?.label || "Custom",
       baseUrl: profile?.baseUrl ?? current.baseUrl,
       customProtocol:
         profileId === "custom" ? current.customProtocol : "openai-compatible",

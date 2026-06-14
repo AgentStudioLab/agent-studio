@@ -39,6 +39,10 @@ describe("settings provider routes", () => {
     });
     expect(body.builtIn.map((p) => p.id)).toContain("openai");
     expect(body.builtIn.map((p) => p.id)).toContain("gemini");
+    expect(body.builtIn.slice(0, 2).map((p) => p.id)).toEqual([
+      "anthropic",
+      "deepseek",
+    ]);
   });
 
   it("GET /settings/provider returns v3 connections and enabled models", async () => {
