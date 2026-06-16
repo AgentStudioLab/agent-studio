@@ -50,6 +50,14 @@ export function buildAgentWorkspaceRoutes(deps: MountAgentWorkspaceDeps): Hono {
     if (body.name !== undefined && (typeof body.name !== "string" || body.name.trim().length === 0)) {
       return c.json({ error: "invalid_name" }, 400);
     }
+    // mountedSkills 三态：null=继承全部；字符串数组=显式子集（含空数组）；其余=不改。
+    const rawSkills = body.mountedSkills;
+    const mountedSkills =
+      rawSkills === null
+        ? null
+        : Array.isArray(rawSkills) && rawSkills.every((s) => typeof s === "string")
+          ? (rawSkills as string[])
+          : undefined;
     const updated = agentWorkspaces.update(id, {
       name: typeof body.name === "string" ? body.name : undefined,
       avatar:
@@ -58,6 +66,7 @@ export function buildAgentWorkspaceRoutes(deps: MountAgentWorkspaceDeps): Hono {
           : undefined,
       archived: typeof body.archived === "boolean" ? body.archived : undefined,
       pinned: typeof body.pinned === "boolean" ? body.pinned : undefined,
+      mountedSkills,
     });
     return c.json(updated);
   });

@@ -78,6 +78,9 @@ export interface AgentWorkspace {
   archived: boolean;
   /** Pinned → surfaced in the sidebar Pinned section. */
   pinned: boolean;
+  /** 挂载的技能 id 列表（三态）：null=继承全部启用技能；[]=显式不挂；非空数组=显式子集。
+   *  运行时与全局启用集取交集。 */
+  mountedSkills: string[] | null;
   createdAt: number;
   updatedAt: number;
 }

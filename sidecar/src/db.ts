@@ -289,6 +289,10 @@ export function migrate(db: Database): void {
   ensureColumn(db, "conversations", "agent_workspace_id", "TEXT");
   ensureColumn(db, "scheduled_tasks", "agent_workspace_id", "TEXT");
   ensureColumn(db, "agent_workspaces", "pinned", "INTEGER NOT NULL DEFAULT 0");
+  // 每个 agent 的技能挂载选择（三态）：NULL=继承全部启用技能；'[]'=显式不挂；
+  // '["id1","id2"]'=显式子集。运行时与全局启用集取交集。详见
+  // docs/superpowers/specs/2026-06-16-per-agent-skill-mounting-design.md。
+  ensureColumn(db, "agent_workspaces", "mounted_skills_json", "TEXT");
   ensureColumn(db, "channel_connections", "type", "TEXT NOT NULL DEFAULT 'fake'");
   ensureColumn(db, "channel_connections", "name", "TEXT NOT NULL DEFAULT ''");
   ensureColumn(db, "channel_connections", "enabled", "INTEGER NOT NULL DEFAULT 0");

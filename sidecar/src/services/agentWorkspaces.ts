@@ -15,6 +15,9 @@ export interface AgentWorkspace {
   archived: boolean;
   /** Pinned → surfaced in the sidebar Pinned section. */
   pinned: boolean;
+  /** 该 agent 挂载的技能 id 列表（三态）：null=继承全部启用技能；[]=显式不挂任何技能；
+   *  非空数组=显式子集。运行时与全局启用集取交集（见 server.ts resolveSkillsConfig）。 */
+  mountedSkills: string[] | null;
   createdAt: number;
   updatedAt: number;
 }
@@ -26,8 +29,22 @@ interface AgentWorkspaceRow {
   home_dir: string;
   archived: number;
   pinned: number;
+  mounted_skills_json: string | null;
   created_at: number;
   updated_at: number;
+}
+
+/** 安全解析挂载技能 JSON：NULL/损坏/非字符串数组都回退为 null（继承全部），
+ *  不让坏数据炸掉 run。 */
+function parseMountedSkills(raw: string | null): string[] | null {
+  if (raw == null) return null;
+  try {
+    const v = JSON.parse(raw);
+    if (Array.isArray(v) && v.every((x) => typeof x === "string")) return v;
+  } catch {
+    // 损坏数据 → 回退继承
+  }
+  return null;
 }
 
 function rowToAgent(r: AgentWorkspaceRow): AgentWorkspace {
@@ -38,6 +55,7 @@ function rowToAgent(r: AgentWorkspaceRow): AgentWorkspace {
     homeDir: r.home_dir,
     archived: r.archived === 1,
     pinned: r.pinned === 1,
+    mountedSkills: parseMountedSkills(r.mounted_skills_json),
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -54,6 +72,8 @@ export interface UpdateAgentWorkspaceInput {
   avatar?: string | null;
   archived?: boolean;
   pinned?: boolean;
+  /** undefined=不改；null=改回"继承全部"；数组=改为显式子集（含空数组=显式不挂）。 */
+  mountedSkills?: string[] | null;
 }
 
 /** Default root for per-agent home dirs: ~/.agent-studio/agent-workspaces/<id>/ */
@@ -126,6 +146,11 @@ export class AgentWorkspaceService {
     if (patch.pinned !== undefined) {
       sets.push("pinned = ?");
       vals.push(patch.pinned ? 1 : 0);
+    }
+    if (patch.mountedSkills !== undefined) {
+      // null → 写 NULL（继承全部）；数组 → 序列化（空数组=显式不挂）。
+      sets.push("mounted_skills_json = ?");
+      vals.push(patch.mountedSkills === null ? null : JSON.stringify(patch.mountedSkills));
     }
     sets.push("updated_at = ?");
     vals.push(Date.now());

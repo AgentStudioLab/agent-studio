@@ -18,6 +18,8 @@ export interface CreateAgentWorkspaceArgs {
 export type UpdateAgentWorkspaceArgs = Partial<CreateAgentWorkspaceArgs> & {
   archived?: boolean;
   pinned?: boolean;
+  /** null=继承全部；数组=显式子集（含空数组=显式不挂）；省略=不改。 */
+  mountedSkills?: string[] | null;
 };
 
 export async function listAgentWorkspaces(): Promise<AgentWorkspace[]> {

@@ -518,7 +518,7 @@ function MessageRow({
           return (
             <div
               key={`${b.id}-${i}`}
-              className="prose-stream text-[14px] leading-[1.75]"
+              className="prose-stream prose-chat text-[14px] leading-[1.75]"
               style={{ color: "hsl(var(--text-100))" }}
             >
               <Streamdown

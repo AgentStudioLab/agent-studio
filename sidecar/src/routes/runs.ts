@@ -5,6 +5,7 @@ import { runWorker } from "../agent/runWorker";
 import type { RunEventStore, AgentProvider } from "../agui/core";
 import type { ThreadService } from "../services/threads";
 import type { MessageService } from "../services/messages";
+import type { AgentWorkspaceService } from "../services/agentWorkspaces";
 import type { AgentFolderService } from "../services/agentFolders";
 import type { AgentLinkService } from "../services/agentLinks";
 import type { AgentMemoryStore } from "../services/agentMemoryStore";
@@ -15,6 +16,7 @@ import type { ProviderModelSelection } from "../services/providerSettings";
 export interface MountRunsDeps {
   threads: ThreadService;
   messages: MessageService;
+  agentWorkspaces: AgentWorkspaceService;
   agentFolders: AgentFolderService;
   agentLinks: AgentLinkService;
   agentMemoryStore: AgentMemoryStore;
@@ -147,6 +149,7 @@ export function buildRunRoutes(deps: MountRunsDeps): Hono {
       store: deps.store,
       messages: deps.messages,
       threads: deps.threads,
+      agentWorkspaces: deps.agentWorkspaces,
       agentFolders: deps.agentFolders,
       agentLinks: deps.agentLinks,
       agentMemoryStore: deps.agentMemoryStore,
@@ -274,6 +277,7 @@ export function buildRunRoutes(deps: MountRunsDeps): Hono {
           store: deps.store,
           messages: deps.messages,
           threads: deps.threads,
+          agentWorkspaces: deps.agentWorkspaces,
           agentFolders: deps.agentFolders,
           agentLinks: deps.agentLinks,
           agentMemoryStore: deps.agentMemoryStore,

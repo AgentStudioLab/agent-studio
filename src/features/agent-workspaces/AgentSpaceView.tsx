@@ -24,6 +24,7 @@ import { AgentSpaceHeader } from "@/features/agent-workspaces/AgentSpaceHeader";
 import { AgentRecents } from "@/features/agent-workspaces/AgentRecents";
 import { InstructionsCard } from "@/features/agent-workspaces/InstructionsCard";
 import { ScheduledRailCard } from "@/features/agent-workspaces/ScheduledRailCard";
+import { SkillsRailCard } from "@/features/agent-workspaces/SkillsRailCard";
 import { ContextCard } from "@/features/agent-workspaces/ContextCard";
 import { PreviewPane } from "@/features/task/PreviewPane";
 import type { MockFile } from "@/lib/mock/types";
@@ -127,6 +128,7 @@ export function AgentSpaceView() {
             <aside className="flex w-[340px] shrink-0 flex-col gap-4 overflow-y-auto border-l border-border p-4 pt-12">
               <InstructionsCard agentId={agentId} />
               <ScheduledRailCard agentId={agentId} />
+              <SkillsRailCard agentId={agentId} />
               <ContextCard
                 agentId={agentId}
                 onOpenFile={(file, workingDir) => setPreview({ file, workingDir })}

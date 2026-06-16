@@ -4,6 +4,7 @@ import type { InterruptBus } from "../agui/provider-claude/interrupt-bus";
 import type { ScheduledTask, ScheduledTaskService } from "./scheduledTasks";
 import type { ThreadService } from "./threads";
 import type { MessageService } from "./messages";
+import type { AgentWorkspaceService } from "./agentWorkspaces";
 import type { AgentFolderService } from "./agentFolders";
 import type { AgentLinkService } from "./agentLinks";
 import type { AgentMemoryStore } from "./agentMemoryStore";
@@ -17,6 +18,8 @@ export interface SchedulerDeps {
   provider: AgentProvider;
   interruptBus: InterruptBus;
   usage: UsageService;
+  /** Resolves an agent-bound run's name → identity block injected into append. */
+  agentWorkspaces?: AgentWorkspaceService;
   /** Resolves an agent-bound run's external folders → sandbox roots (P2). */
   agentFolders?: AgentFolderService;
   /** Resolves an agent-bound run's reference links → systemPrompt.append (P3). */
@@ -130,6 +133,7 @@ export class Scheduler {
       store: this.deps.store,
       messages: this.deps.messages,
       threads: this.deps.threads,
+      agentWorkspaces: this.deps.agentWorkspaces,
       agentFolders: this.deps.agentFolders,
       agentLinks: this.deps.agentLinks,
       agentMemoryStore: this.deps.agentMemoryStore,

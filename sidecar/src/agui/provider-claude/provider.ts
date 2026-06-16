@@ -104,8 +104,11 @@ export interface ClaudeProviderOptions {
    * built-in) and the absolute path of the built-in plugin directory (or
    * null when unavailable, e.g. dev mode without built-in/ committed). When
    * omitted, no skill/plugin config is passed and the SDK uses its defaults.
+   *
+   * agentWorkspaceId（绑定 agent 的 run 才有）让 host 端按该 agent 的挂载选择与全局启用集
+   * 取交集，实现「智能体级技能挂载」。不绑 agent 时为 undefined → 返回全局启用集。
    */
-  resolveSkillsConfig?: () => {
+  resolveSkillsConfig?: (agentWorkspaceId?: string) => {
     enabledSkills: string[];
     pluginPath: string | null;
   };
@@ -354,8 +357,10 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
     // Skill/plugin config — resolved per turn so a toggle from Customize >
     // Skills takes effect on the very next /runs without provider rebuild.
     // Always passes an explicit array (never 'all') so we don't get surprised
-    // by future SDK default-discovery changes.
-    const skillsConfig = opts.resolveSkillsConfig?.() ?? null;
+    // by future SDK default-discovery changes. 传入本 run 绑定的 agentWorkspaceId，
+    // host 端据此与该 agent 的挂载选择取交集（绑 agent 时才会收窄）。
+    const skillsConfig =
+      opts.resolveSkillsConfig?.(ctxRun.agentWorkspaceId) ?? null;
 
     // In-process `agent_studio` MCP server. Built per-run with whichever tools
     // apply: `create_scheduled_task` (always, for the /schedule skill) and

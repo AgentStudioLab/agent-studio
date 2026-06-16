@@ -207,10 +207,20 @@ function buildProviderForSelection(
       resolveAppendPrompt: () =>
         composeAppendPrompt(userProfileSettings.current()),
       onInitMetadata: (threadId, meta) => sessionMetadata.upsert(threadId, meta),
-      resolveSkillsConfig: () => ({
-        enabledSkills: skillRegistry.listEnabledIds(),
-        pluginPath: skillRegistry.builtinPluginPath(),
-      }),
+      // 全局启用集 ∩ 该 agent 的挂载选择。绑 agent 且其 mountedSkills 为数组时收窄；
+      // 为 null（继承）或不绑 agent 时直接用全局启用集。全局禁用/卸载的技能因交集自然掉出。
+      resolveSkillsConfig: (agentWorkspaceId) => {
+        const enabled = skillRegistry.listEnabledIds();
+        const mounted = agentWorkspaceId
+          ? (agentWorkspaces.get(agentWorkspaceId)?.mountedSkills ?? null)
+          : null;
+        const effective =
+          mounted == null ? enabled : enabled.filter((id) => mounted.includes(id));
+        return {
+          enabledSkills: effective,
+          pluginPath: skillRegistry.builtinPluginPath(),
+        };
+      },
       skillInvocationsStore: skillInvocations,
       // `/schedule` skill → in-process MCP tool persists through the same service
       // the scheduler reads. Working dir + model are injected by the provider
@@ -291,6 +301,7 @@ const remoteTaskService = new RemoteTaskService({
       store,
       messages,
       threads,
+      agentWorkspaces,
       agentFolders,
       agentLinks,
       agentMemoryStore,
@@ -334,6 +345,7 @@ const scheduler = new Scheduler({
   provider: providerProxy,
   interruptBus,
   usage,
+  agentWorkspaces,
   agentFolders,
   agentLinks,
   agentMemoryStore,
@@ -357,6 +369,7 @@ app.route(
   buildRunRoutes({
     threads,
     messages,
+    agentWorkspaces,
     agentFolders,
     agentLinks,
     agentMemoryStore,

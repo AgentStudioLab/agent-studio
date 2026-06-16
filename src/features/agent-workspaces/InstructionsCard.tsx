@@ -99,7 +99,10 @@ function EditInstructionsModal({
           onChange={(e) => setDraft(e.target.value)}
           placeholder={t("agentSpace.instructions.editPlaceholder")}
           rows={12}
-          className="resize-y text-sm"
+          // shadcn Textarea 基类带 field-sizing-content（按内容高度，忽略 rows 属性），
+          // 且 min-h-16 只有约 4 行。用 min-h 覆盖出 ≥6 行的起始高度（≈8 行）；
+          // resize-y + field-sizing 仍允许内容增长与手动拖高。
+          className="min-h-[180px] resize-y text-sm"
           autoFocus
         />
         <DialogFooter>

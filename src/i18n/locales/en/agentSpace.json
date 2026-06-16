@@ -39,6 +39,21 @@
     "createNew": "Create new task",
     "add": "Add scheduled task"
   },
+  "skills": {
+    "title": "Skills",
+    "manage": "Manage skills",
+    "allMounted": "All skills mounted (including future additions).",
+    "noneMounted": "No skills mounted.",
+    "manageTitle": "Manage skills",
+    "manageDescription": "Choose which skills this agent can use. Fewer skills keep it focused and trim context. Intersected with globally-enabled skills at runtime.",
+    "selectAll": "Select all",
+    "deselectAll": "Deselect all",
+    "globallyOff": "Globally off",
+    "loading": "Loading…",
+    "empty": "No skills available.",
+    "cancel": "Cancel",
+    "save": "Save"
+  },
   "folders": {
     "title": "Folders",
     "description": "Mount external folders as context for this agent. Read-only by default; grant write per folder.",
@@ -51,11 +66,11 @@
   },
   "instructions": {
     "title": "Instructions",
-    "description": "Acts as this agent's CLAUDE.md — auto-loaded on every run.",
+    "description": "Acts as this agent's instructions file — auto-loaded on every run.",
     "placeholder": "Write instructions this agent should follow…",
     "edit": "Edit",
     "editTitle": "Edit instructions",
-    "editPlaceholder": "Tell Claude how to work in this project (optional)",
+    "editPlaceholder": "Tell this agent how to work (optional)",
     "cancel": "Cancel",
     "save": "Save",
     "saved": "Saved"

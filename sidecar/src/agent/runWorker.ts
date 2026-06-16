@@ -9,6 +9,7 @@ import {
 } from "../agui/core";
 import type { MessageService } from "../services/messages";
 import type { ThreadService } from "../services/threads";
+import type { AgentWorkspaceService } from "../services/agentWorkspaces";
 import type { AgentFolderService } from "../services/agentFolders";
 import type { AgentLink, AgentLinkService } from "../services/agentLinks";
 import { MEMORY_INDEX_BUDGET, type AgentMemoryStore } from "../services/agentMemoryStore";
@@ -84,6 +85,22 @@ export function buildAgentAppendContext(
   return parts.length > 0 ? parts.join("\n\n") : null;
 }
 
+/**
+ * Agent 身份信息块，注入到 systemPrompt.append 最前面。让模型知道自己是「在 Agent Studio
+ * 中作为某个具名智能体运行」——这样"你在哪个 agent 下 / 哪个工作空间"之类的问题能答出
+ * 可读的智能体名，而不是只能从 agw_xxx 路径反推（见用户反馈截图）。用英文书写以匹配
+ * append 既有风格（CLAUDE.md preset / 记忆指令均为英文），回答语言仍由 locale 指令决定。
+ */
+export function buildAgentIdentityBlock(agentName: string): string {
+  const name = agentName.trim() || "Untitled";
+  return (
+    `You are operating inside Agent Studio as the agent named "${name}". ` +
+    `Your current working directory is this agent's own dedicated workspace (its home directory). ` +
+    `When the user asks which agent or workspace you are running in, identify yourself as the ` +
+    `"${name}" agent in Agent Studio rather than reciting the raw directory path.`
+  );
+}
+
 export interface RunWorkerInput {
   runId: string;
   threadId: string;
@@ -91,6 +108,9 @@ export interface RunWorkerInput {
   store: RunEventStore;
   messages: MessageService;
   threads: ThreadService;
+  /** Resolves the bound agent's name → identity block injected into append.
+   *  Omitted (e.g. unit tests) → no identity context. */
+  agentWorkspaces?: AgentWorkspaceService;
   /** Resolves the bound agent's external folders → sandbox read/write roots.
    *  Omitted (e.g. unit tests) → no agent folder context. */
   agentFolders?: AgentFolderService;
@@ -142,6 +162,7 @@ export async function runWorker(input: RunWorkerInput): Promise<void> {
     store,
     messages,
     threads,
+    agentWorkspaces,
     agentFolders,
     agentLinks,
     agentMemoryStore,
@@ -315,7 +336,14 @@ export async function runWorker(input: RunWorkerInput): Promise<void> {
       memoryIndex = agentMemoryStore.indexText(agentWorkspaceId);
     }
     const links = agentLinks ? agentLinks.listByAgent(agentWorkspaceId) : [];
-    appendContext = buildAgentAppendContext(claudeMd, memoryIndex, links) ?? undefined;
+    // 身份信息（含智能体名称）置于最前，其后才是用户的 CLAUDE.md 说明 / 记忆 / 链接。
+    const agent = agentWorkspaces?.get(agentWorkspaceId) ?? null;
+    const identity = agent ? buildAgentIdentityBlock(agent.name) : null;
+    const baseContext = buildAgentAppendContext(claudeMd, memoryIndex, links);
+    appendContext =
+      [identity, baseContext]
+        .filter((s): s is string => typeof s === "string" && s.length > 0)
+        .join("\n\n") || undefined;
   }
   const extra = appendContextExtra?.trim();
   if (extra) {
