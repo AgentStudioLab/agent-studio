@@ -1,9 +1,9 @@
 {
   "defaultTitle": "New task",
   "welcome": {
-    "heading": "Hand me the task. We will move it forward today.",
-    "subtitle": "Describe the goal, choose a project folder, and I will break down the steps, use tools, and land the progress in your workspace.",
-    "learnMore": "Learn how to use Agent Studio safely."
+    "heading": "Let Agent Studio move work forward on this desktop.",
+    "subtitle": "Choose a project folder, describe the goal, and I will use local tools to move the work forward in your workspace.",
+    "learnMore": "help guide"
   },
   "input": {
     "placeholder": "How can I help you today?",

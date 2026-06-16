@@ -123,21 +123,6 @@ html, body {
     .pulse-dot { animation: none; opacity: 0.7; }
 }
 
-/* ---- Typewriter caret (NewTaskView welcome heading) ---- */
-@keyframes typewriter-caret-blink { 0%, 46% { opacity: 1; } 47%, 100% { opacity: 0; } }
-.typewriter-caret {
-    display: inline-block;
-    width: 0.08em;
-    height: 0.82em;
-    margin-left: 0.08em;
-    transform: translateY(0.08em);
-    background: hsl(var(--brand-100));
-    animation: typewriter-caret-blink 1s steps(1, end) infinite;
-}
-@media (prefers-reduced-motion: reduce) {
-    .typewriter-caret { animation: none; opacity: 0; }
-}
-
 /* ---- Task chat prose stream ----
  * Used by HTML-string `prose` ContentBlock in TaskChatStream. Scoped so
  * list markers, links, and inline <code> pick up semantic text tokens

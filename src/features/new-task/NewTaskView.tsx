@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { open as shellOpen } from "@tauri-apps/plugin-shell";
 import { AppShell } from "@/app/AppShell";
 import { useAppShell } from "@/app/AppShellContext";
 import {
@@ -41,7 +42,14 @@ import { threadStatusKey } from "@/lib/agui/react/useChat";
 import { useQueryClient } from "@tanstack/react-query";
 import { ProviderModelPicker } from "@/features/task/ProviderModelPicker";
 import type { ProviderModelSelection } from "@/lib/data/settings";
-import { useTypewriterText } from "./useTypewriterText";
+
+const SAFETY_DOCS_URL = "https://www.agentstudio.chat/docs";
+
+type ModelPickerComponent = typeof ProviderModelPicker;
+
+interface NewTaskViewProps {
+  ModelPicker?: ModelPickerComponent;
+}
 
 /** Take just the last segment of a /-separated path for a compact button label. */
 function basename(p: string): string {
@@ -50,10 +58,9 @@ function basename(p: string): string {
   return idx >= 0 ? trimmed.slice(idx + 1) : trimmed;
 }
 
-export function NewTaskView() {
+export function NewTaskView({ ModelPicker = ProviderModelPicker }: NewTaskViewProps = {}) {
   const { t } = useTranslation();
   const welcomeHeading = t("newTask.welcome.heading");
-  const welcomeHeadingText = useTypewriterText(welcomeHeading);
   const navigate = useNavigate();
   const { setPendingFirstPrompt } = useAppShell();
   const qc = useQueryClient();
@@ -137,29 +144,13 @@ export function NewTaskView() {
               />
               <h1
                 aria-label={welcomeHeading}
-                className="grid max-w-[780px] font-serif text-[44px] font-normal leading-[1.12] text-foreground"
+                className="mt-2 max-w-[860px] font-serif text-[44px] font-normal leading-[1.12] text-foreground"
               >
-                <span
-                  aria-hidden="true"
-                  className="invisible col-start-1 row-start-1"
-                >
-                  {welcomeHeading}
-                </span>
-                <span aria-hidden="true" className="col-start-1 row-start-1">
-                  {welcomeHeadingText}
-                  <span className="typewriter-caret" />
-                </span>
+                {welcomeHeading}
               </h1>
-              <p className="mt-4 max-w-[520px] text-[15px] leading-6 text-muted-foreground">
+              <p className="mt-4 max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-[15px] leading-6 text-muted-foreground">
                 {t("newTask.welcome.subtitle")}
               </p>
-              <a
-                href="#"
-                className="mt-5 inline-flex items-center gap-1 text-sm text-muted-foreground underline-offset-4 hover:underline"
-              >
-                {t("newTask.welcome.learnMore")}
-                <ExternalLink className="size-3" />
-              </a>
             </div>
             <div className="w-full">
               {/* Solid backplate occludes the dot-grid behind the prompt
@@ -258,7 +249,7 @@ export function NewTaskView() {
                     </DropdownMenu>
                   </PromptInputTools>
                   <PromptInputTools>
-                    <ProviderModelPicker
+                    <ModelPicker
                       value={providerSelection}
                       onChange={setProviderSelection}
                     />
@@ -267,6 +258,14 @@ export function NewTaskView() {
                 </PromptInputFooter>
                 </PromptInput>
               </div>
+              <button
+                type="button"
+                onClick={() => void shellOpen(SAFETY_DOCS_URL).catch(() => {})}
+                className="mx-auto mt-5 flex w-fit max-w-full items-center gap-1 overflow-hidden text-ellipsis whitespace-nowrap text-sm text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
+              >
+                {t("newTask.welcome.learnMore")}
+                <ExternalLink className="size-3" />
+              </button>
               {error && (
                 <p className="mt-2 text-sm" style={{ color: "hsl(var(--danger-100))" }}>
                   {error === "api_key_missing"
