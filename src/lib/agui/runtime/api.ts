@@ -37,6 +37,10 @@ export interface PostRunRequest {
   model?: string;
   /** 「始终允许」命令规则（CC Tool(pattern) 语法）。sidecar 在 canUseTool 内匹配。 */
   approvalRules?: string[];
+  /** 官方服务商经官网扣积分接口调用时使用的 desktop access token。 */
+  officialAuthToken?: string;
+  /** 官网 origin，由 sidecar official provider 拼接 /api/desktop/ai/chat。 */
+  officialWebsiteOrigin?: string;
 }
 
 export interface PostRegenerateRequest {
@@ -50,6 +54,10 @@ export interface PostRegenerateRequest {
   model?: string;
   /** 「始终允许」命令规则（CC Tool(pattern) 语法）。sidecar 在 canUseTool 内匹配。 */
   approvalRules?: string[];
+  /** 官方服务商经官网扣积分接口调用时使用的 desktop access token。 */
+  officialAuthToken?: string;
+  /** 官网 origin，由 sidecar official provider 拼接 /api/desktop/ai/chat。 */
+  officialWebsiteOrigin?: string;
 }
 
 export interface ResumeRequest {
@@ -133,6 +141,12 @@ export class AGUIHttpClient {
           ...(req.model ? { model: req.model } : {}),
           ...(locale ? { locale } : {}),
           ...(req.approvalRules?.length ? { approvalRules: req.approvalRules } : {}),
+          ...(req.officialAuthToken
+            ? { officialAuthToken: req.officialAuthToken }
+            : {}),
+          ...(req.officialWebsiteOrigin
+            ? { officialWebsiteOrigin: req.officialWebsiteOrigin }
+            : {}),
         }),
       },
     );

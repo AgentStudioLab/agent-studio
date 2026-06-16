@@ -40,7 +40,7 @@ describe("official provider", () => {
       expect(new Headers(init?.headers).get("authorization")).toBe(
         "Bearer access-token",
       );
-      expect(await new Request(url, init).json()).toEqual({
+      expect(await new Request(String(url), init).json()).toEqual({
         runId: "run-1",
         threadId: "thread-1",
         model: "gpt-5-mini",

@@ -1,4 +1,5 @@
 import type { DesktopAuthTokens, DesktopUser } from "./auth-types";
+import { fetchSidecar } from "@/lib/sidecar-client";
 
 const CLIENT_ID = "agent-studio-desktop";
 const REDIRECT_URI = "agent-studio://auth/callback";
@@ -26,6 +27,20 @@ export function getWebsiteOrigin(): string {
     throw new Error("desktop_api_missing_website_origin");
   }
   return origin;
+}
+
+export async function syncOfficialService(
+  websiteOrigin = getWebsiteOrigin(),
+  sidecarFetch: typeof fetchSidecar = fetchSidecar,
+): Promise<void> {
+  const res = await sidecarFetch("/settings/official-service", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ websiteOrigin }),
+  });
+  if (!res.ok) {
+    throw new Error(`official_service_sync_${res.status}`);
+  }
 }
 
 function buildWebsiteUrl(path: string): string {

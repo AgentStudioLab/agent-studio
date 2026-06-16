@@ -1,4 +1,4 @@
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, LockIcon } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { PromptInputButton } from "@/components/ai-elements/prompt-input";
 import {
@@ -33,10 +33,20 @@ function modelKey(selection: ProviderModelSelection): string {
 
 function groupModels(
   models: EnabledModelOption[],
-): Array<{ providerId: string; providerName: string; models: EnabledModelOption[] }> {
+): Array<{
+  providerId: string;
+  providerName: string;
+  managed: boolean;
+  models: EnabledModelOption[];
+}> {
   const groups = new Map<
     string,
-    { providerId: string; providerName: string; models: EnabledModelOption[] }
+    {
+      providerId: string;
+      providerName: string;
+      managed: boolean;
+      models: EnabledModelOption[];
+    }
   >();
   for (const model of models) {
     let group = groups.get(model.providerId);
@@ -44,10 +54,12 @@ function groupModels(
       group = {
         providerId: model.providerId,
         providerName: model.providerName,
+        managed: model.managed,
         models: [],
       };
       groups.set(model.providerId, group);
     }
+    group.managed = group.managed || model.managed;
     group.models.push(model);
   }
   return [...groups.values()];
@@ -142,8 +154,14 @@ export function ProviderModelPicker({
         {groups.map((group, index) => (
           <div key={group.providerId}>
             {index > 0 && <DropdownMenuSeparator />}
-            <DropdownMenuLabel className="text-xs text-muted-foreground">
-              {group.providerName}
+            <DropdownMenuLabel className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+              <span>{group.providerName}</span>
+              {group.managed && (
+                <span className="inline-flex items-center gap-1 rounded-md border border-border px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
+                  <LockIcon className="size-3" />
+                  Official
+                </span>
+              )}
             </DropdownMenuLabel>
             {group.models.map((model) => {
               const key = modelKey(model);

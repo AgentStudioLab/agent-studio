@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/app/AppShell";
 import { RenameDialog } from "@/shared/RenameDialog";
 import { useAppShell } from "@/app/AppShellContext";
@@ -27,7 +28,21 @@ import {
   useConversation,
   useMessages,
 } from "@/lib/data/queries";
-import type { ProviderModelSelection } from "@/lib/data/settings";
+import {
+  getProvider,
+  type ProviderModelSelection,
+} from "@/lib/data/settings";
+import { useAuth } from "@/features/auth/useAuth";
+import { buildOfficialRunAuthFields } from "@/features/task/officialRunAuth";
+
+interface TaskRunOptions {
+  permissionMode?: "ask" | "act-without-asking";
+  providerSelection?: ProviderModelSelection;
+  model?: string;
+  approvalRules?: string[];
+  officialAuthToken?: string;
+  officialWebsiteOrigin?: string;
+}
 
 function touchedFileToPreview(f: TouchedFile): MockFile {
   const lower = f.relativePath.toLowerCase();
@@ -63,6 +78,12 @@ export function TaskView() {
   const [renameOpen, setRenameOpen] = useState(false);
   const [providerSelection, setProviderSelection] =
     useState<ProviderModelSelection | null>(null);
+  const auth = useAuth();
+  const providerQuery = useQuery({
+    queryKey: ["provider"],
+    queryFn: getProvider,
+    staleTime: 60 * 1000,
+  });
 
   // History GET — turn-grouped; reducer reads as initialMessages via
   // setHistorical. Don't default `data` to `[]` here: that allocates a fresh
@@ -88,6 +109,48 @@ export function TaskView() {
     pendingInterrupts,
     resumeRun,
   } = useChat({ threadId: activeTaskId ?? "" });
+  const officialRunPendingRef = useRef(false);
+
+  const resolveDefaultProviderSelection = useCallback(async () => {
+    if (providerQuery.data) {
+      return providerQuery.data.defaultSelection ?? null;
+    }
+    const provider = await getProvider();
+    return provider.defaultSelection ?? null;
+  }, [providerQuery.data]);
+
+  const buildRunOptions = useCallback(
+    async (input: {
+      permissionMode?: "ask" | "act-without-asking";
+      providerSelection?: ProviderModelSelection | null;
+      model?: string | null;
+      approvalRules?: string[];
+    }): Promise<TaskRunOptions> => {
+      const explicitSelection = input.providerSelection ?? null;
+      const defaultSelection = explicitSelection
+        ? null
+        : await resolveDefaultProviderSelection();
+      const officialFields = await buildOfficialRunAuthFields({
+        auth,
+        providerSelection: explicitSelection,
+        defaultSelection,
+      });
+      if (officialFields.officialAuthToken) {
+        officialRunPendingRef.current = true;
+      }
+
+      return {
+        ...(input.permissionMode ? { permissionMode: input.permissionMode } : {}),
+        ...(explicitSelection ? { providerSelection: explicitSelection } : {}),
+        ...(input.model ? { model: input.model } : {}),
+        ...(input.approvalRules?.length
+          ? { approvalRules: input.approvalRules }
+          : {}),
+        ...officialFields,
+      };
+    },
+    [auth, resolveDefaultProviderSelection],
+  );
 
   // HITL allowlist composition (W1 design):
   //   - global: manually populated via Settings, applies everywhere
@@ -112,6 +175,7 @@ export function TaskView() {
   // useThreadPermissionMode hook subscribes to.
   const { mode: permissionMode, setMode: setPermissionMode } =
     useThreadPermissionMode(activeTaskId);
+  const queue = useMessageQueue(activeTaskId);
 
   // Seed the per-thread permission mode from the conversation's stored mode
   // (scheduled runs persist their mode on the conversation). The mode store
@@ -182,18 +246,21 @@ export function TaskView() {
     // `pendingFirstPrompt.model` remains only for legacy seeded flows such as
     // agent workspaces until those semantics are migrated separately.
     const legacyFirstModel = pendingFirstPrompt.model;
-    setPendingFirstPrompt(null);
-    setProviderSelection(firstProviderSelection);
-    if (pendingFirstPrompt.permissionMode) {
-      setPermissionMode(pendingFirstPrompt.permissionMode);
-    }
-    void send(text, {
-      permissionMode: firstMode,
-      ...(firstProviderSelection
-        ? { providerSelection: firstProviderSelection }
-        : {}),
-      ...(legacyFirstModel ? { model: legacyFirstModel } : {}),
-      ...(approvalRules.length ? { approvalRules } : {}),
+    void (async () => {
+      const runOptions = await buildRunOptions({
+        permissionMode: firstMode,
+        providerSelection: firstProviderSelection,
+        model: legacyFirstModel,
+        approvalRules,
+      });
+      setPendingFirstPrompt(null);
+      setProviderSelection(firstProviderSelection);
+      if (pendingFirstPrompt.permissionMode) {
+        setPermissionMode(pendingFirstPrompt.permissionMode);
+      }
+      await send(text, runOptions);
+    })().catch((e) => {
+      if (e instanceof RunInProgressError) queue.add(text);
     });
   }, [
     activeTaskId,
@@ -204,6 +271,8 @@ export function TaskView() {
     send,
     activeRun,
     approvalRules,
+    buildRunOptions,
+    queue.add,
   ]);
 
   // 「始终允许」的自动放行已从这里（客户端闸口）移到 sidecar 的 canUseTool：
@@ -248,9 +317,8 @@ export function TaskView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationQuery.data, activeTaskId]);
 
-  // Per-thread message queue. Lives in MessageQueueContext (app-level) so
+  // Per-thread message queue lives in MessageQueueContext (app-level) so
   // switching threads doesn't drop queued items — only an app restart does.
-  const queue = useMessageQueue(activeTaskId);
 
   // Send a message, but if the sidecar reports the thread already has a live
   // run (409 → RunInProgressError: a scheduled run, or a send from another
@@ -261,15 +329,18 @@ export function TaskView() {
   // only fires on races / multi-window.
   const sendOrQueue = useCallback(
     (text: string) => {
-      void send(text, {
-        permissionMode,
-        ...(providerSelection ? { providerSelection } : {}),
-        ...(approvalRules.length ? { approvalRules } : {}),
-      }).catch((e) => {
+      void (async () => {
+        const runOptions = await buildRunOptions({
+          permissionMode,
+          providerSelection,
+          approvalRules,
+        });
+        await send(text, runOptions);
+      })().catch((e) => {
         if (e instanceof RunInProgressError) queue.add(text);
       });
     },
-    [send, permissionMode, providerSelection, queue.add, approvalRules],
+    [send, permissionMode, providerSelection, queue.add, approvalRules, buildRunOptions],
   );
 
   // "Busy" = streaming OR HITL-paused OR a server-started run is in flight.
@@ -288,6 +359,18 @@ export function TaskView() {
   // Treating a server-known active run as busy makes the composer queue
   // instead; the auto-flush below delivers it when that run finishes.
   const isBusy = isRunning || pendingInterrupts.length > 0 || activeRun !== null;
+
+  useEffect(() => {
+    if (!officialRunPendingRef.current) return;
+    if (isRunning || activeRun !== null) return;
+
+    const shouldRefreshCredits =
+      !state.error || state.errorCode === "INSUFFICIENT_CREDITS";
+    officialRunPendingRef.current = false;
+    if (!shouldRefreshCredits) return;
+
+    void auth.refreshUser().catch(() => {});
+  }, [activeRun, auth, isRunning, state.error, state.errorCode]);
 
   // [Qdbg] TEMP — remove after diagnosing the "only one queued" issue.
   useEffect(() => {
@@ -419,11 +502,14 @@ export function TaskView() {
                 openPreview(touchedFileToPreview(touched));
               }}
               onRegenerate={(fromMessageId) =>
-                void regenerate(fromMessageId, {
-                  permissionMode,
-                  ...(providerSelection ? { providerSelection } : {}),
-                  ...(approvalRules.length ? { approvalRules } : {}),
-                }).catch(() => {
+                void (async () => {
+                  const runOptions = await buildRunOptions({
+                    permissionMode,
+                    providerSelection,
+                    approvalRules,
+                  });
+                  await regenerate(fromMessageId, runOptions);
+                })().catch(() => {
                   // Only RunInProgressError propagates here (a run went live
                   // mid-regenerate — rare race). The runtime already restored
                   // the optimistic truncation + set no error; swallow so it

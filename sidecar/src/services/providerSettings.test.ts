@@ -5,6 +5,7 @@ import {
   OFFICIAL_PROVIDER_ID,
   createProviderSettings,
 } from "./providerSettings";
+import type { OfficialServiceState } from "./officialService";
 
 function makeDb() {
   const db = new Database(":memory:");
@@ -201,21 +202,32 @@ describe("providerSettings", () => {
   });
 
   it("always exposes a managed official provider with all official models enabled", () => {
-    const settings = createProviderSettings(makeDb(), {}, {
-      getModels: () => [
-        {
-          id: "official-a",
-          displayName: "Official A",
-          description: "Official model",
-        },
-        {
-          id: "official-b",
-          displayName: "Official B",
-          description: "Official model",
-        },
-      ],
+    const officialModels = [
+      {
+        id: "official-a",
+        displayName: "Official A",
+        description: "Official model",
+      },
+      {
+        id: "official-b",
+        displayName: "Official B",
+        description: "Official model",
+      },
+    ];
+    const officialSource: OfficialServiceState = {
+      setWebsiteOrigin: () => officialSource.getSnapshot(),
+      getWebsiteOrigin: () => "https://example.test",
+      getModels: () => officialModels,
       getFetchedAt: () => "2026-06-17T00:00:00.000Z",
-    });
+      getSnapshot: () => ({
+        websiteOrigin: "https://example.test",
+        models: officialModels,
+        fetchedAt: "2026-06-17T00:00:00.000Z",
+        source: "remote",
+      }),
+      refreshModels: async () => officialSource.getSnapshot(),
+    };
+    const settings = createProviderSettings(makeDb(), {}, officialSource);
 
     const [official] = settings.listConnections();
 

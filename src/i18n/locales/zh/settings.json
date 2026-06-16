@@ -113,6 +113,7 @@
     "enabledModels": "已启用模型",
     "disabled": "已停用",
     "missingApiKey": "缺少 Key",
+    "managed": "官方",
     "connectionAddTitle": "添加模型供应商",
     "connectionEditTitle": "编辑模型供应商",
     "connectionDialogDescription": "配置 endpoint，刷新远端模型，然后启用对话中可选择的模型。",

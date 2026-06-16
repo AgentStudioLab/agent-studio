@@ -241,6 +241,7 @@ void testI18n.use(initReactI18next).init({
             enabledModels: "Enabled models",
             disabled: "Disabled",
             missingApiKey: "Missing key",
+            managed: "Official",
             connectionAddTitle: "Add model provider",
             connectionEditTitle: "Edit model provider",
             connectionDialogDescription: "Configure endpoint",
@@ -460,7 +461,80 @@ function providerFixtureWithAnthropicFirst(): ProviderState {
   };
 }
 
+function officialConnectionSummary() {
+  return {
+    id: "official",
+    name: "官方服务商",
+    profileId: "custom",
+    providerLabel: "官方服务商",
+    managed: true,
+    baseUrl: "",
+    enabled: true,
+    hasApiKey: false,
+    modelCount: 1,
+    enabledModelCount: 1,
+    defaultModelId: "gpt-5.1",
+    remoteModelsFetchedAt: "",
+    customProtocol: "openai-compatible",
+    supportsRemoteModels: true,
+    agentRuntime: {
+      protocol: "openai-compatible",
+      baseUrl: "",
+      auth: "bearer",
+      capabilities: { text: true, tools: false, fileCheckpoint: false },
+    },
+  };
+}
+
+function officialEnabledModel() {
+  return {
+    providerId: "official",
+    providerName: "官方服务商",
+    providerLabel: "官方服务商",
+    managed: true,
+    modelId: "gpt-5.1",
+    modelLabel: "GPT-5.1",
+    modelDescription: "Official model",
+    customProtocol: "openai-compatible",
+    agentRuntime: {
+      protocol: "openai-compatible",
+      baseUrl: "",
+      auth: "bearer",
+      capabilities: { text: true, tools: false, fileCheckpoint: false },
+    },
+  };
+}
+
 function connectionFixture(id: string): ProviderConnectionConfig {
+  if (id === "official") {
+    return {
+      presetId: "official",
+      presetName: "官方服务商",
+      providerId: "official",
+      providerName: "官方服务商",
+      profileId: "custom",
+      label: "官方服务商",
+      baseUrl: "",
+      apiKey: "",
+      customProtocol: "openai-compatible",
+      enabled: true,
+      managed: true,
+      models: [
+        { id: "gpt-5.1", displayName: "GPT-5.1", description: "Official model" },
+      ],
+      remoteModelsFetchedAt: "",
+      selectedModelId: "gpt-5.1",
+      enabledModelIds: ["gpt-5.1"],
+      defaultModelId: "gpt-5.1",
+      supportsRemoteModels: true,
+      agentRuntime: {
+        protocol: "openai-compatible",
+        baseUrl: "",
+        auth: "bearer",
+        capabilities: { text: true, tools: false, fileCheckpoint: false },
+      },
+    };
+  }
   const provider = providerFixture();
   const summary = provider.connections?.find((entry) => entry.id === id);
   if (!summary) throw new Error("missing fixture");
@@ -510,6 +584,29 @@ describe("ModelSection", () => {
     expect(screen.getAllByText("OpenAI").length).toBeGreaterThan(0);
     expect(screen.getByText("SiliconFlow")).toBeDefined();
     expect(screen.queryByLabelText("Provider")).toBeNull();
+  });
+
+  it("locks managed official provider rows", async () => {
+    const provider = providerFixture();
+    provider.connections = [
+      officialConnectionSummary(),
+      ...(provider.connections ?? []),
+    ] as never;
+    provider.enabledModels = [
+      officialEnabledModel(),
+      ...(provider.enabledModels ?? []),
+    ] as never;
+
+    renderModelSection(provider);
+
+    expect((await screen.findAllByText("官方服务商")).length).toBeGreaterThan(0);
+    expect(
+      screen.queryByRole("button", { name: "Edit 官方服务商" }),
+    ).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Delete 官方服务商" }),
+    ).toBeNull();
+    expect(screen.queryByText("Missing key")).toBeNull();
   });
 
   it("opens the add model dialog", async () => {
