@@ -1,19 +1,8 @@
-import {
-  FileSpreadsheet,
-  FileText,
-  Presentation,
-  type LucideIcon,
-} from "lucide-react";
+import { FileTypeIcon } from "@/features/task/FileTypeIcon";
 import { OpenerMenu } from "@/features/task/preview/OpenerMenu";
 import type { MockFile } from "@/lib/mock/types";
 
 export type ArtifactKind = "Spreadsheet" | "Presentation" | "Document";
-
-const KIND_ICON: Record<ArtifactKind, LucideIcon> = {
-  Spreadsheet: FileSpreadsheet,
-  Presentation: Presentation,
-  Document: FileText,
-};
 
 /**
  * Map the chat-side artifact kind to the MockFile.type that OpenerMenu uses
@@ -59,8 +48,10 @@ export function ArtifactInlineCard({
   absolutePath,
   onOpen,
 }: ArtifactInlineCardProps) {
-  const Icon = KIND_ICON[kind];
   const file = syntheticFile(absolutePath, title, kind);
+  // title 即文件名(含扩展名);mock 数据偶有无扩展名的 title,用单独传入的
+  // ext 补全,确保 getIconForFile 能按扩展名匹配到彩色图标。
+  const iconName = title.includes(".") ? title : `${title}.${ext.toLowerCase()}`;
 
   return (
     <div
@@ -77,12 +68,9 @@ export function ArtifactInlineCard({
       >
         <div
           className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md"
-          style={{
-            background: "hsl(var(--bg-300))",
-            color: "hsl(var(--text-300))",
-          }}
+          style={{ background: "hsl(var(--bg-300))" }}
         >
-          <Icon size={22} strokeWidth={1.5} />
+          <FileTypeIcon name={iconName} size={28} />
         </div>
         <div className="min-w-0 flex-1">
           <div

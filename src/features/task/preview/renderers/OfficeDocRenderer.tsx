@@ -98,6 +98,34 @@ export function OfficeDocRenderer({
     return () => observer.disconnect();
   }, [kind]);
 
+  // xlsx 铺满高度修复：@js-preview/excel 内嵌的 x-spreadsheet 在 init 时把画布
+  // 高度锁成 `wrapper.clientHeight || 300`，之后只在 window resize 时 reload 重算。
+  // 面板在窗口尺寸不变的情况下被拉伸/折叠（切换侧栏等）不会触发 reload，导致
+  // 高度不跟随。这里在就绪后观察容器尺寸，变化时派发一次 window resize 事件，
+  // 借 x-spreadsheet 自带的 resize 监听让它按当前容器尺寸重新铺满（宽高皆铺满，
+  // 非等比缩放）。仅 xlsx 需要。
+  useEffect(() => {
+    if (kind !== "xlsx" || status !== "ready") return;
+    const container = containerRef.current;
+    if (!container) return;
+    let first = true;
+    let raf = 0;
+    const observer = new ResizeObserver(() => {
+      // ResizeObserver 注册即回调一次（尺寸未变），跳过避免无谓 reload
+      if (first) {
+        first = false;
+        return;
+      }
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => window.dispatchEvent(new Event("resize")));
+    });
+    observer.observe(container);
+    return () => {
+      observer.disconnect();
+      cancelAnimationFrame(raf);
+    };
+  }, [kind, status]);
+
   // 流式下载错误 → 文案映射（与 PreviewBody 一致，仅 too_large 换成
   // raw 端点的 100 MiB 上限文案）
   let streamErrorMsg: string | null = null;
@@ -126,61 +154,64 @@ export function OfficeDocRenderer({
   const showOverlay = streamErrorMsg !== null || status === "failed" || status !== "ready";
 
   return (
-    <div ref={rootRef} className="flex h-full min-h-0 flex-col">
-      {/* 覆盖层：下载进度 / 解析中 / 错误。容器始终挂载（js-preview 需要
-          稳定的 DOM 节点做 init），未就绪时用 0 高度隐藏而非卸载。 */}
-      {streamErrorMsg !== null ? (
-        <FallbackNotice
-          message={streamErrorMsg}
-          onOpenExternal={onOpenExternal}
-          ctaLabel={t("task.preview.openExternal")}
-        />
-      ) : status === "failed" ? (
-        <FallbackNotice
-          message={`${t("task.preview.renderFailed")}${errorDetail ? ` (${errorDetail})` : ""}`}
-          onOpenExternal={onOpenExternal}
-          ctaLabel={t("task.preview.openExternal")}
-        />
-      ) : showOverlay ? (
-        <div className="px-6 py-10 text-center">
-          <div
-            className="text-[13px] italic"
-            style={{ color: "hsl(var(--text-400))" }}
-          >
-            {isLoading && progress !== null
-              ? t("task.preview.streamingProgress", { percent: progress })
-              : t("task.preview.loading")}
-          </div>
-          {/* 进度条：有确定进度时显示。轨道 bg-300，填充 brand-100，
-              全部走语义 token。 */}
-          {isLoading && progress !== null && (
-            <div
-              className="mx-auto mt-3 h-1 w-48 overflow-hidden rounded-full"
-              style={{ background: "hsl(var(--bg-300))" }}
-            >
-              <div
-                className="h-full rounded-full transition-[width] duration-150"
-                style={{
-                  width: `${progress}%`,
-                  background: "hsl(var(--brand-100))",
-                }}
-              />
-            </div>
-          )}
-        </div>
-      ) : null}
-
+    <div ref={rootRef} className="relative flex h-full min-h-0 flex-col">
+      {/* 渲染容器始终挂载且保持真实尺寸（不再用 height:0 折叠）——
+          @js-preview/excel 内嵌的 x-spreadsheet 在 init 时按 container.clientHeight
+          锁定画布高度，若此刻高度为 0 会退化成 300px 默认值、底部留空白。
+          未就绪时用「绝对定位的不透明覆盖层」遮住半成品，而非压扁容器。 */}
       <div
         ref={containerRef}
         className="office-doc min-h-0 flex-1 overflow-auto"
-        style={
-          showOverlay
-            ? { height: 0, flex: "0 0 0px", overflow: "hidden" }
-            : kind === "docx" && fitZoom < 1
-              ? { zoom: fitZoom }
-              : undefined
-        }
+        style={kind === "docx" && fitZoom < 1 ? { zoom: fitZoom } : undefined}
       />
+
+      {showOverlay && (
+        <div
+          className="absolute inset-0 flex flex-col items-center justify-center px-6 text-center"
+          style={{ background: "hsl(var(--bg-100))" }}
+        >
+          {streamErrorMsg !== null ? (
+            <FallbackNotice
+              message={streamErrorMsg}
+              onOpenExternal={onOpenExternal}
+              ctaLabel={t("task.preview.openExternal")}
+            />
+          ) : status === "failed" ? (
+            <FallbackNotice
+              message={`${t("task.preview.renderFailed")}${errorDetail ? ` (${errorDetail})` : ""}`}
+              onOpenExternal={onOpenExternal}
+              ctaLabel={t("task.preview.openExternal")}
+            />
+          ) : (
+            <>
+              <div
+                className="text-[13px] italic"
+                style={{ color: "hsl(var(--text-400))" }}
+              >
+                {isLoading && progress !== null
+                  ? t("task.preview.streamingProgress", { percent: progress })
+                  : t("task.preview.loading")}
+              </div>
+              {/* 进度条：有确定进度时显示。轨道 bg-300，填充 brand-100，
+                  全部走语义 token。 */}
+              {isLoading && progress !== null && (
+                <div
+                  className="mx-auto mt-3 h-1 w-48 overflow-hidden rounded-full"
+                  style={{ background: "hsl(var(--bg-300))" }}
+                >
+                  <div
+                    className="h-full rounded-full transition-[width] duration-150"
+                    style={{
+                      width: `${progress}%`,
+                      background: "hsl(var(--brand-100))",
+                    }}
+                  />
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }

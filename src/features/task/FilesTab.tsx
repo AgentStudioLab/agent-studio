@@ -1,52 +1,10 @@
 import { useCallback } from "react";
-import {
-  File as FileIcon,
-  FileSpreadsheet,
-  FileText,
-  Folder,
-  Image as ImageIcon,
-  Presentation,
-} from "lucide-react";
+import { Folder } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { FileTypeIcon } from "@/features/task/FileTypeIcon";
 import { useThreadFiles } from "@/lib/agui/react/useThreadFiles";
 import type { TouchedFile } from "@/lib/agui/runtime/derivations";
 import type { ChatState } from "@/lib/agui/runtime/types";
-
-type LucideIcon = typeof FileIcon;
-
-interface IconMeta {
-  Icon: LucideIcon;
-  color: string;
-}
-
-// Per-extension icon + color. The two literal HSL values (xlsx green,
-// pptx terracotta) are categorical-palette identifiers from the prototype —
-// see the design-tokens skill's exception clause.
-function metaForPath(path: string): IconMeta {
-  const lower = path.toLowerCase();
-  if (lower.endsWith(".xlsx") || lower.endsWith(".csv")) {
-    return { Icon: FileSpreadsheet, color: "hsl(125 40% 50%)" };
-  }
-  if (lower.endsWith(".pptx") || lower.endsWith(".key")) {
-    return { Icon: Presentation, color: "hsl(15 75% 55%)" };
-  }
-  if (lower.endsWith(".docx")) {
-    return { Icon: FileText, color: "hsl(210 60% 50%)" };
-  }
-  if (lower.endsWith(".pdf")) {
-    return { Icon: FileText, color: "hsl(0 60% 55%)" };
-  }
-  if (lower.endsWith(".png") || lower.endsWith(".jpg") || lower.endsWith(".jpeg") || lower.endsWith(".gif") || lower.endsWith(".svg") || lower.endsWith(".webp")) {
-    return { Icon: ImageIcon, color: "hsl(var(--text-400))" };
-  }
-  if (lower.endsWith(".md") || lower.endsWith(".markdown")) {
-    return { Icon: FileText, color: "hsl(var(--text-400))" };
-  }
-  if (lower.endsWith(".ts") || lower.endsWith(".tsx") || lower.endsWith(".js") || lower.endsWith(".jsx") || lower.endsWith(".py") || lower.endsWith(".rs") || lower.endsWith(".go")) {
-    return { Icon: FileText, color: "hsl(var(--accent-pro-100))" };
-  }
-  return { Icon: FileIcon, color: "hsl(var(--text-400))" };
-}
 
 function basename(p: string): string {
   const trimmed = p.replace(/\/+$/, "");
@@ -94,7 +52,6 @@ export function FilesTab({ state, workingDir, onOpenFile }: FilesTabProps) {
       </div>
       <div className="flex flex-col gap-1">
         {files.map((file) => {
-          const { Icon, color } = metaForPath(file.relativePath);
           const isNew = file.firstTool === "Write";
           return (
             <button
@@ -103,7 +60,7 @@ export function FilesTab({ state, workingDir, onOpenFile }: FilesTabProps) {
               onClick={() => handleSelect(file)}
               className="flex items-center gap-2.5 px-2 py-1.5 rounded-md hover:bg-bg-200/60 transition text-left"
             >
-              <Icon size={14} className="shrink-0" style={{ color }} />
+              <FileTypeIcon name={file.relativePath} size={16} className="shrink-0" />
               <span className="text-[13px] text-text-200 truncate flex-1">
                 {file.relativePath}
               </span>
