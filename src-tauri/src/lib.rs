@@ -119,20 +119,32 @@ async fn set_api_key(
 
 #[derive(Clone, Serialize)]
 pub struct DefaultApp {
-    /// Display name e.g. "Visual Studio Code" (basename of bundle minus .app).
+    /// 本地化显示名(Finder/Spotlight 同款,去 .app)。例如 bundle 目录是
+    /// "wpsoffice.app",这里返回 "WPS Office"。
     name: String,
-    /// Absolute bundle / executable path e.g. "/Applications/Visual Studio Code.app".
+    /// 应用 bundle 的绝对路径,例如 "/Applications/Visual Studio Code.app"。
     path: String,
+    /// 应用图标的 `data:image/png;base64,...` URL(64px 重绘后的 PNG)。
+    /// 提取失败时为 None,前端退回单字母徽标。序列化为前端约定的 camelCase。
+    #[serde(rename = "iconDataUrl")]
+    icon_data_url: Option<String>,
 }
 
-/// Resolve the system default application for a given file path.
+/// 解析某个文件路径对应的「系统默认打开应用」,并连带取出应用的本地化显示名
+/// 与图标。
 ///
-/// macOS: shells out to `osascript` calling `NSWorkspace.URLForApplicationToOpenURL:`
-/// (the modern replacement for `LSCopyDefaultApplicationURLForURL`). osascript +
-/// AppKit are preinstalled on every macOS — no extra crates or system tools required.
+/// macOS:一次 `osascript` 调用 AppKit 完成三件事——
+///   1. `NSWorkspace URLForApplicationToOpenURL:` 解析默认应用 bundle 路径
+///      (`LSCopyDefaultApplicationURLForURL` 的现代替代)。
+///   2. `NSFileManager displayNameAtPath:` 取本地化显示名(与 Finder 一致,
+///      bundle 目录名 ≠ 显示名时尤为关键,如 wpsoffice.app → "WPS Office")。
+///   3. `NSWorkspace iconForFile:` 取图标,重绘到 64px 位图后转 PNG/base64。
+///      注意必须重绘到固定尺寸:直接取 TIFFRepresentation 会带出图标的 1024px
+///      母表示(base64 ~735KB),重绘后仅 ~4KB。图标提取用 try 包裹,失败也不
+///      影响名字返回。
+/// osascript + AppKit 是每台 macOS 预装的,无需额外 crate 或系统工具。
 ///
-/// Other platforms: returns Ok(None). The frontend falls back to a hand-picked
-/// label by file type.
+/// 其它平台:返回 Ok(None),前端退回「用系统默认应用打开」的无徽标文案。
 #[tauri::command]
 async fn get_default_app(path: String) -> Result<Option<DefaultApp>, String> {
     #[cfg(target_os = "macos")]
@@ -142,47 +154,74 @@ async fn get_default_app(path: String) -> Result<Option<DefaultApp>, String> {
         if path.is_empty() {
             return Err("path is empty".into());
         }
-        // Escape backslashes + double-quotes for safe embedding in an AppleScript
-        // string literal. AppleScript doesn't support backtick or heredoc, so
-        // escaping is the only path; passing via -e per-line keeps args bounded.
+        // 转义反斜杠 + 双引号,安全嵌入 AppleScript 字符串字面量。仅原始 path
+        // 来自外部,bundle 路径是系统解析结果,无需再转义。
         let escaped = path.replace('\\', "\\\\").replace('"', "\\\"");
+        // 整段脚本作为单个 -e 传入(osascript 接受多行 -e)。脚本里没有除
+        // `{escaped}` 外的花括号,format! 不会误判占位符。
+        let script = format!(
+            r#"use framework "AppKit"
+use scripting additions
+set theURL to (current application's NSURL's fileURLWithPath:"{escaped}")
+set ws to current application's NSWorkspace's sharedWorkspace
+set appURL to (ws's URLForApplicationToOpenURL:theURL)
+if appURL is missing value then return ""
+set appPath to appURL's |path|() as text
+set fm to current application's NSFileManager's defaultManager()
+set dispName to (fm's displayNameAtPath:appPath) as text
+set b64 to ""
+try
+	set px to 64
+	set img to (ws's iconForFile:appPath)
+	set newRep to (current application's NSBitmapImageRep's alloc()'s initWithBitmapDataPlanes:(missing value) pixelsWide:px pixelsHigh:px bitsPerSample:8 samplesPerPixel:4 hasAlpha:true isPlanar:false colorSpaceName:(current application's NSDeviceRGBColorSpace) bytesPerRow:0 bitsPerPixel:0)
+	set ctx to (current application's NSGraphicsContext's graphicsContextWithBitmapImageRep:newRep)
+	current application's NSGraphicsContext's saveGraphicsState()
+	current application's NSGraphicsContext's setCurrentContext:ctx
+	img's drawInRect:(current application's NSMakeRect(0, 0, px, px)) fromRect:(current application's NSZeroRect) operation:(current application's NSCompositingOperationSourceOver) fraction:1.0
+	current application's NSGraphicsContext's restoreGraphicsState()
+	set pngData to (newRep's representationUsingType:(current application's NSBitmapImageFileTypePNG) |properties|:(current application's NSDictionary's dictionary()))
+	set b64 to (pngData's base64EncodedStringWithOptions:0) as text
+end try
+return appPath & linefeed & dispName & linefeed & b64"#
+        );
         let out = Command::new("osascript")
-            .args([
-                "-e",
-                "use framework \"AppKit\"",
-                "-e",
-                &format!(
-                    "set theURL to (current application's NSURL's fileURLWithPath:\"{escaped}\")"
-                ),
-                "-e",
-                "set ws to current application's NSWorkspace's sharedWorkspace",
-                "-e",
-                "set appURL to (ws's URLForApplicationToOpenURL:theURL)",
-                "-e",
-                "if appURL is missing value then return \"\"",
-                "-e",
-                "return appURL's |path|() as text",
-            ])
+            .args(["-e", &script])
             .output()
             .map_err(|e| format!("osascript spawn failed: {e}"))?;
         if !out.status.success() {
             let stderr = String::from_utf8_lossy(&out.stderr);
             return Err(format!("osascript failed: {stderr}"));
         }
-        let app_path = String::from_utf8_lossy(&out.stdout).trim().to_string();
+        // 输出三行:appPath \n 显示名 \n 图标 base64(后两者均无内部换行)。
+        let stdout = String::from_utf8_lossy(&out.stdout);
+        let mut lines = stdout.splitn(3, '\n');
+        let app_path = lines.next().unwrap_or("").trim().to_string();
         if app_path.is_empty() {
             return Ok(None);
         }
-        // Bundle basename → "Visual Studio Code.app" → "Visual Studio Code".
-        let name = app_path
-            .rsplit('/')
-            .next()
-            .unwrap_or(&app_path)
-            .trim_end_matches(".app")
-            .to_string();
+        let name_line = lines.next().unwrap_or("").trim().to_string();
+        let b64 = lines.next().unwrap_or("").trim().to_string();
+        // 显示名兜底:理论上 displayNameAtPath 不会空,万一为空则退回 bundle
+        // basename 去 .app(沿用旧逻辑)。
+        let name = if name_line.is_empty() {
+            app_path
+                .rsplit('/')
+                .next()
+                .unwrap_or(&app_path)
+                .trim_end_matches(".app")
+                .to_string()
+        } else {
+            name_line
+        };
+        let icon_data_url = if b64.is_empty() {
+            None
+        } else {
+            Some(format!("data:image/png;base64,{b64}"))
+        };
         Ok(Some(DefaultApp {
             name,
             path: app_path,
+            icon_data_url,
         }))
     }
     #[cfg(not(target_os = "macos"))]

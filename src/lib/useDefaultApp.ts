@@ -19,8 +19,12 @@ import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
 export interface DefaultApp {
+  /** 本地化显示名(Finder 同款),例如 "WPS Office"。 */
   name: string;
+  /** 应用 bundle 绝对路径。 */
   path: string;
+  /** 应用图标的 data:image/png;base64 URL;提取失败时为 null。 */
+  iconDataUrl: string | null;
 }
 
 type CacheEntry =

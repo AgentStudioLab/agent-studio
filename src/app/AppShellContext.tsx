@@ -100,8 +100,12 @@ export function AppShellProvider({ children }: { children: ReactNode }) {
     setSidebarCollapsedSections((s) => ({ ...s, [section]: !s[section] }));
   }, []);
   const openPreview = useCallback(
-    (file: MockFile, workingDir?: string | null) =>
-      setPreview({ file, open: true, workingDir: workingDir ?? null }),
+    (file: MockFile, workingDir?: string | null) => {
+      setPreview({ file, open: true, workingDir: workingDir ?? null });
+      // 用户若此前手动折叠了右侧面板（asideOpen=false），点击文件预览必须把它
+      // 重新展开 —— 否则 PreviewPane 因 asideVisible 为 false 不渲染，点击像没反应。
+      setAsideOpen(true);
+    },
     [],
   );
   const closePreview = useCallback(
