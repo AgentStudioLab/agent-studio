@@ -9,6 +9,7 @@
     "schedule": "定时运行",
     "turnIntoSkill": "转为技能",
     "moveToAgentSpace": "移动到智能体空间",
+    "moveOutOfAgentSpace": "移出智能体空间",
     "pin": "置顶",
     "rename": "重命名",
     "archive": "归档",

@@ -92,7 +92,9 @@ export function TaskHeader({
           </DropdownMenuItem>
           <MoveToAgentSubmenu
             conversationId={conversationId}
+            currentAgentWorkspaceId={agentWorkspaceId}
             label={t("task.header.moveToAgentSpace")}
+            moveOutLabel={t("task.header.moveOutOfAgentSpace")}
           />
           <DropdownMenuItem onSelect={onPin}>
             <Pin /> {t("task.header.pin")}

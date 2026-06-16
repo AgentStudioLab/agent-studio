@@ -9,6 +9,7 @@
     "schedule": "Schedule",
     "turnIntoSkill": "Turn into skill",
     "moveToAgentSpace": "Move to agent space",
+    "moveOutOfAgentSpace": "Move out of agent space",
     "pin": "Pin",
     "rename": "Rename",
     "archive": "Archive",
