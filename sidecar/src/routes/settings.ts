@@ -7,6 +7,7 @@ import type {
   ProviderPresetPatch,
   ProviderSettingsState,
 } from "../services/providerSettings";
+import type { OfficialServiceState } from "../services/officialService";
 import type { UserProfileSettingsState } from "../services/userProfileSettings";
 import {
   BUILT_IN_PROFILES,
@@ -22,6 +23,7 @@ import type { CustomProviderProtocol } from "../services/providerSettings";
 
 interface SettingsRouteDeps {
   fetchImpl?: ModelFetchImpl;
+  officialService?: OfficialServiceState;
 }
 
 function isValidProfileId(v: unknown): v is ProviderProfileId {
@@ -206,6 +208,32 @@ export function buildSettingsRoutes(
 ): Hono {
   const app = new Hono();
 
+  app.post("/settings/official-service", async (c) => {
+    const body = (await c.req.json().catch(() => null)) as unknown;
+    if (!isObjectBody(body) || typeof body.websiteOrigin !== "string") {
+      return c.json({ error: "invalid_body" }, 400);
+    }
+    if (!deps.officialService) {
+      return c.json({ error: "official_service_unavailable" }, 500);
+    }
+    try {
+      const officialService = deps.officialService.setWebsiteOrigin(
+        body.websiteOrigin,
+      );
+      return c.json({ officialService });
+    } catch (error) {
+      return c.json(
+        {
+          error:
+            error instanceof Error
+              ? error.message
+              : "invalid_official_service_origin",
+        },
+        400,
+      );
+    }
+  });
+
   // Legacy API-key endpoint — kept so existing frontend code keeps working.
   // Writes through to the new provider state so the api key sticks across
   // restarts (previously it was in-memory only).
@@ -348,7 +376,15 @@ export function buildSettingsRoutes(
     }
     const result = validateConnectionPatch(body);
     if (!result.ok) return c.json({ error: result.error }, 400);
-    const connection = provider.updateConnection(c.req.param("id"), result.patch);
+    let connection;
+    try {
+      connection = provider.updateConnection(c.req.param("id"), result.patch);
+    } catch (error) {
+      return c.json(
+        { error: error instanceof Error ? error.message : String(error) },
+        400,
+      );
+    }
     if (!connection) return c.json({ error: "provider_connection_not_found" }, 404);
     return c.json({ connection, ...providerEnvelope(provider) });
   });
@@ -427,11 +463,19 @@ export function buildSettingsRoutes(
     if (defaultModelId === "__invalid__") {
       return c.json({ error: "invalid_default_model_id" }, 400);
     }
-    const connection = provider.setEnabledModels(
-      c.req.param("id"),
-      modelIds,
-      defaultModelId,
-    );
+    let connection;
+    try {
+      connection = provider.setEnabledModels(
+        c.req.param("id"),
+        modelIds,
+        defaultModelId,
+      );
+    } catch (error) {
+      return c.json(
+        { error: error instanceof Error ? error.message : String(error) },
+        400,
+      );
+    }
     if (!connection) {
       return c.json({ error: "provider_connection_not_found" }, 404);
     }

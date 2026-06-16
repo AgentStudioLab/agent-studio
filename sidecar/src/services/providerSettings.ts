@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import type { OfficialServiceState } from "./officialService";
 import {
   BUILT_IN_PROFILES,
   getBuiltInProfile,
@@ -8,6 +9,7 @@ import {
 } from "../lib/providerProfiles";
 
 export type CustomProviderProtocol = "openai-compatible" | "anthropic";
+export const OFFICIAL_PROVIDER_ID = "official";
 
 // Persisted shape — JSON-encoded into settings.value under key "provider".
 // `apiKey` lives here too so all provider-related state is one row. The
@@ -67,6 +69,7 @@ export interface ProviderConnectionSummary {
   name: string;
   profileId: ProviderProfileId;
   providerLabel: string;
+  managed: boolean;
   baseUrl: string;
   enabled: boolean;
   hasApiKey: boolean;
@@ -99,6 +102,7 @@ export interface EnabledModelOption {
   providerId: string;
   providerName: string;
   providerLabel: string;
+  managed: boolean;
   modelId: string;
   modelLabel: string;
   modelDescription: string;
@@ -149,6 +153,7 @@ export interface CreateProviderConnectionInput {
 export interface ResolvedProviderConnection extends ResolvedProvider {
   providerId: string;
   providerName: string;
+  managed: boolean;
   enabled: boolean;
   enabledModelIds: string[];
   defaultModelId: string | null;
@@ -157,6 +162,7 @@ export interface ResolvedProviderConnection extends ResolvedProvider {
 export interface ResolvedProviderForRun extends ResolvedProvider {
   providerId: string;
   providerName: string;
+  managed: boolean;
   modelId: string | null;
 }
 
@@ -178,7 +184,7 @@ export interface ProviderSettingsState {
     id: string,
   ):
     | { ok: true }
-    | { ok: false; error: "provider_connection_not_found" | "cannot_delete_last_connection" };
+    | { ok: false; error: "provider_connection_not_found" | "cannot_delete_last_connection" | "cannot_delete_official_provider" };
   /** Set enabled models for a provider connection. */
   setEnabledModels(
     id: string,
@@ -247,6 +253,20 @@ const ANTHROPIC_FULL_CAPABILITIES = {
 
 const KEY = "provider";
 const DEFAULT_PROFILE_ID: ProviderProfileId = "anthropic";
+
+const OFFICIAL_PROVIDER_NAME = "官方服务商";
+const OFFICIAL_PROVIDER_MODELS: ProfileModel[] = [
+  {
+    id: "gpt-5.1",
+    displayName: "GPT-5.1",
+    description: "Official fallback model",
+  },
+  {
+    id: "gpt-5.1-mini",
+    displayName: "GPT-5.1 mini",
+    description: "Official fallback model",
+  },
+];
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -735,10 +755,110 @@ function resolveConnection(connection: ProviderConnection): ResolvedProviderConn
     ...resolved,
     providerId: connection.id,
     providerName: connection.name,
+    managed: false,
     enabled: connection.enabled,
     enabledModelIds: connection.enabledModelIds,
     defaultModelId: connection.defaultModelId,
   };
+}
+
+function officialModels(source?: OfficialServiceState): ProfileModel[] {
+  const models = source?.getModels() ?? OFFICIAL_PROVIDER_MODELS;
+  return models.length > 0 ? models : OFFICIAL_PROVIDER_MODELS;
+}
+
+function officialFetchedAt(source?: OfficialServiceState): string {
+  return source?.getFetchedAt() ?? "";
+}
+
+function officialRuntime(): AgentRuntime {
+  return {
+    protocol: "openai-compatible",
+    baseUrl: "",
+    auth: "bearer",
+    capabilities: OPENAI_TEXT_CAPABILITIES,
+  };
+}
+
+function resolveOfficialConnection(
+  source?: OfficialServiceState,
+): ResolvedProviderConnection {
+  const models = officialModels(source);
+  const enabledModelIds = models.map((model) => model.id);
+  const defaultModelId = enabledModelIds[0] ?? null;
+
+  return {
+    presetId: OFFICIAL_PROVIDER_ID,
+    presetName: OFFICIAL_PROVIDER_NAME,
+    profileId: "custom",
+    label: OFFICIAL_PROVIDER_NAME,
+    baseUrl: "",
+    apiKey: "",
+    customProtocol: "openai-compatible",
+    models,
+    remoteModelsFetchedAt: officialFetchedAt(source),
+    selectedModelId: defaultModelId,
+    agentRuntime: officialRuntime(),
+    supportsRemoteModels: true,
+    providerId: OFFICIAL_PROVIDER_ID,
+    providerName: OFFICIAL_PROVIDER_NAME,
+    managed: true,
+    enabled: true,
+    enabledModelIds,
+    defaultModelId,
+  };
+}
+
+function summarizeOfficialConnection(
+  source?: OfficialServiceState,
+): ProviderConnectionSummary {
+  const resolved = resolveOfficialConnection(source);
+
+  return {
+    id: OFFICIAL_PROVIDER_ID,
+    name: OFFICIAL_PROVIDER_NAME,
+    profileId: "custom",
+    providerLabel: OFFICIAL_PROVIDER_NAME,
+    managed: true,
+    baseUrl: "",
+    enabled: true,
+    hasApiKey: false,
+    modelCount: resolved.models.length,
+    enabledModelCount: resolved.enabledModelIds.length,
+    defaultModelId: resolved.defaultModelId,
+    remoteModelsFetchedAt: resolved.remoteModelsFetchedAt,
+    customProtocol: "openai-compatible",
+    agentRuntime: resolved.agentRuntime,
+    supportsRemoteModels: true,
+  };
+}
+
+function officialEnabledModelOptions(
+  source?: OfficialServiceState,
+): EnabledModelOption[] {
+  const resolved = resolveOfficialConnection(source);
+
+  return resolved.models.map((model) => ({
+    providerId: OFFICIAL_PROVIDER_ID,
+    providerName: OFFICIAL_PROVIDER_NAME,
+    providerLabel: OFFICIAL_PROVIDER_NAME,
+    managed: true,
+    modelId: model.id,
+    modelLabel: model.displayName,
+    modelDescription: model.description,
+    customProtocol: "openai-compatible",
+    agentRuntime: resolved.agentRuntime,
+  }));
+}
+
+function isOfficialSelection(
+  source: OfficialServiceState | undefined,
+  selection: ProviderModelSelection | null | undefined,
+): selection is ProviderModelSelection {
+  if (!selection || selection.providerId !== OFFICIAL_PROVIDER_ID) {
+    return false;
+  }
+  return officialModels(source).some((model) => model.id === selection.modelId);
 }
 
 function availableModelIds(connection: ProviderConnection): Set<string> {
@@ -895,6 +1015,7 @@ function summarizeConnection(
     name: connection.name,
     profileId: resolved.profileId,
     providerLabel: resolved.label,
+    managed: false,
     baseUrl: resolved.baseUrl,
     enabled: connection.enabled,
     hasApiKey: connection.apiKey.trim().length > 0,
@@ -923,6 +1044,7 @@ function enabledModelOptions(
         providerId: connection.id,
         providerName: connection.name,
         providerLabel: resolved.label,
+        managed: false,
         modelId,
         modelLabel: model.displayName,
         modelDescription: model.description,
@@ -959,6 +1081,7 @@ function resolveSelectionForRun(
     null;
   return {
     ...resolved,
+    managed: false,
     modelId,
   };
 }
@@ -1129,6 +1252,7 @@ function clonePreset(
 export function createProviderSettings(
   db: Database,
   envFallback: { apiKey?: string; baseUrl?: string },
+  officialSource?: OfficialServiceState,
 ): ProviderSettingsState {
   let cache: PersistedProviderSettingsV3 = readOrInitializeStore(db, envFallback);
 
@@ -1145,11 +1269,17 @@ export function createProviderSettings(
       return cache.defaultSelection;
     },
     listConnections(): ProviderConnectionSummary[] {
-      return cache.connections.map((connection) =>
+      return [
+        summarizeOfficialConnection(officialSource),
+        ...cache.connections.map((connection) =>
         summarizeConnection(connection),
-      );
+        ),
+      ];
     },
     getConnection(id): ResolvedProviderConnection | null {
+      if (id === OFFICIAL_PROVIDER_ID) {
+        return resolveOfficialConnection(officialSource);
+      }
       const connection = cache.connections.find((item) => item.id === id);
       return connection ? resolveConnection(connection) : null;
     },
@@ -1179,6 +1309,9 @@ export function createProviderSettings(
       return resolveConnection(connection);
     },
     updateConnection(id, patch): ResolvedProviderConnection | null {
+      if (id === OFFICIAL_PROVIDER_ID) {
+        throw new Error("official_provider_readonly");
+      }
       const connection = cache.connections.find((item) => item.id === id);
       if (!connection) return null;
       const { name, enabled, defaultModelId, ...providerPatch } = patch;
@@ -1215,8 +1348,12 @@ export function createProviderSettings(
           ok: false;
           error:
             | "provider_connection_not_found"
-            | "cannot_delete_last_connection";
+            | "cannot_delete_last_connection"
+            | "cannot_delete_official_provider";
         } {
+      if (id === OFFICIAL_PROVIDER_ID) {
+        return { ok: false, error: "cannot_delete_official_provider" };
+      }
       if (!cache.connections.some((item) => item.id === id)) {
         return { ok: false, error: "provider_connection_not_found" };
       }
@@ -1238,6 +1375,9 @@ export function createProviderSettings(
       modelIds,
       defaultModelId,
     ): ResolvedProviderConnection | null {
+      if (id === OFFICIAL_PROVIDER_ID) {
+        throw new Error("official_provider_readonly");
+      }
       const connection = cache.connections.find((item) => item.id === id);
       if (!connection) return null;
       const allowed = availableModelIds(connection);
@@ -1269,6 +1409,15 @@ export function createProviderSettings(
       return resolveConnection(nextConnection);
     },
     setDefaultSelection(selection): ProviderModelSelection | null {
+      if (isOfficialSelection(officialSource, selection)) {
+        cache = {
+          ...cache,
+          defaultSelection: selection,
+        };
+        writeRow(db, cache);
+        notify();
+        return cache.defaultSelection;
+      }
       cache = repairStore({
         version: 3,
         defaultSelection: selection,
@@ -1279,9 +1428,24 @@ export function createProviderSettings(
       return cache.defaultSelection;
     },
     listEnabledModelSelections(): EnabledModelOption[] {
-      return enabledModelOptions(cache);
+      return [
+        ...officialEnabledModelOptions(officialSource),
+        ...enabledModelOptions(cache),
+      ];
     },
     resolveSelection(selection): ResolvedProviderForRun {
+      if (isOfficialSelection(officialSource, selection)) {
+        return {
+          ...resolveOfficialConnection(officialSource),
+          modelId: selection.modelId,
+        };
+      }
+      if (isOfficialSelection(officialSource, cache.defaultSelection)) {
+        return {
+          ...resolveOfficialConnection(officialSource),
+          modelId: cache.defaultSelection.modelId,
+        };
+      }
       return resolveSelectionForRun(cache, selection);
     },
     current(): ResolvedProvider {
