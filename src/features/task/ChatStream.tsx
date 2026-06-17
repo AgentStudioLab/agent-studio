@@ -1,4 +1,5 @@
 import { useCallback, useMemo, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { Streamdown } from "streamdown";
 import type { MessageBlock, MessageView, PendingInterrupt, ToolCallView } from "@/lib/agui/runtime";
 import type { ChatRuntime } from "@/lib/agui/runtime/runtime";
@@ -30,6 +31,7 @@ import {
   ConversationContent,
   ConversationScrollButton,
 } from "@/components/ai-elements/conversation";
+import { getWebsiteOrigin } from "@/features/auth/desktop-auth-client";
 
 /* ---------------- artifact helpers ---------------- */
 
@@ -223,12 +225,23 @@ export function ChatStream({
   onRegenerate,
 }: ChatStreamProps) {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   // Regenerate is disabled while a run is active or an approval is pending —
   // re-running mid-flight would race the live turn + truncate under it.
   const regenerateBusy = isRunning || pendingInterrupts.length > 0;
   // cast: ChatRuntime.subscribe takes (state) => void; RuntimeLike expects () => void.
   // The wrapper in useRunStatus discards the state arg, so this is safe at runtime.
   const status = useRunStatus(runtime as never);
+  const isInsufficientCredits = status.errorCode === "INSUFFICIENT_CREDITS";
+  const openCreditsTopUp = useCallback(() => {
+    let url = "/pricing";
+    try {
+      url = new URL("/pricing", getWebsiteOrigin()).toString();
+    } catch {
+      // 环境缺官网 origin 时保留相对路径，避免充值按钮完全失效。
+    }
+    window.open(url, "_blank", "noopener,noreferrer");
+  }, []);
   // 命中「始终允许」规则的工具调用由 sidecar 在 canUseTool 内直接放行，根本不会
   // 产生 interrupt，因此前端不再按 allowlist 过滤 —— 凡是到达这里的 interrupt 都
   // 需要用户决策，全部渲染卡片。
@@ -367,7 +380,21 @@ export function ChatStream({
               <span>思考中</span>
             </div>
           )}
-          {error && (
+          {isInsufficientCredits && (
+            <div className="flex flex-wrap items-center gap-2 text-[13px]">
+              <span className="text-destructive">
+                {t("task.error.insufficientCredits")}
+              </span>
+              <button
+                type="button"
+                onClick={openCreditsTopUp}
+                className="rounded-md border border-border px-2 py-1 text-[12px] font-medium text-foreground transition-colors hover:bg-muted"
+              >
+                {t("task.error.topUpCredits")}
+              </button>
+            </div>
+          )}
+          {error && !isInsufficientCredits && (
             <p className="text-[13px]" style={{ color: "hsl(var(--danger-100))" }}>
               错误：{error}
             </p>

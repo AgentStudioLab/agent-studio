@@ -41,7 +41,12 @@ import { queryKeys } from "@/lib/data/queries";
 import { threadStatusKey } from "@/lib/agui/react/useChat";
 import { useQueryClient } from "@tanstack/react-query";
 import { ProviderModelPicker } from "@/features/task/ProviderModelPicker";
-import type { ProviderModelSelection } from "@/lib/data/settings";
+import { useAuth } from "@/features/auth/useAuth";
+import { buildOfficialRunAuthFields } from "@/features/task/officialRunAuth";
+import {
+  getProvider,
+  type ProviderModelSelection,
+} from "@/lib/data/settings";
 
 const SAFETY_DOCS_URL = "https://www.agentstudio.chat/docs";
 
@@ -64,6 +69,7 @@ export function NewTaskView({ ModelPicker = ProviderModelPicker }: NewTaskViewPr
   const navigate = useNavigate();
   const { setPendingFirstPrompt } = useAppShell();
   const qc = useQueryClient();
+  const auth = useAuth();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // `null` = use the server default (~/.agent-studio).
@@ -97,6 +103,14 @@ export function NewTaskView({ ModelPicker = ProviderModelPicker }: NewTaskViewPr
     setSubmitting(true);
     setError(null);
     try {
+      const defaultSelection = providerSelection
+        ? null
+        : ((await getProvider()).defaultSelection ?? null);
+      await buildOfficialRunAuthFields({
+        auth,
+        providerSelection,
+        defaultSelection,
+      });
       // Start as "New task"; the sidecar summarizes the first message into a
       // real title on the first run and renames the conversation.
       const conv = await createConversation({

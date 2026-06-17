@@ -1,7 +1,11 @@
 import { describe, expect, it } from "bun:test";
 import { Database } from "bun:sqlite";
 import { migrate } from "../db";
-import { createProviderSettings } from "./providerSettings";
+import {
+  OFFICIAL_PROVIDER_ID,
+  createProviderSettings,
+} from "./providerSettings";
+import type { OfficialServiceState } from "./officialService";
 
 function makeDb() {
   const db = new Database(":memory:");
@@ -153,7 +157,9 @@ describe("providerSettings", () => {
       providerId: "preset-openai",
       modelId: "gpt-5.1",
     });
-    expect(settings.listConnections()[0]).toMatchObject({
+    expect(
+      settings.listConnections().find((item) => item.id === "preset-openai"),
+    ).toMatchObject({
       id: "preset-openai",
       name: "OpenAI",
       profileId: "openai",
@@ -162,14 +168,14 @@ describe("providerSettings", () => {
       enabledModelCount: 1,
       defaultModelId: "gpt-5.1",
     });
-    expect(settings.listEnabledModelSelections()).toEqual([
+    expect(settings.listEnabledModelSelections()).toContainEqual(
       expect.objectContaining({
         providerId: "preset-openai",
         modelId: "gpt-5.1",
         providerName: "OpenAI",
         modelLabel: "GPT-5.1",
       }),
-    ]);
+    );
   });
 
   it("creates a default Anthropic connection with env fallback", () => {
@@ -178,7 +184,9 @@ describe("providerSettings", () => {
       baseUrl: "https://env.example",
     });
 
-    const [connection] = settings.listConnections();
+    const connection = settings
+      .listConnections()
+      .find((item) => item.profileId === "anthropic");
     expect(connection).toMatchObject({
       name: "Anthropic",
       profileId: "anthropic",
@@ -190,6 +198,87 @@ describe("providerSettings", () => {
       modelId: connection?.defaultModelId,
       apiKey: "env-key",
       baseUrl: "https://env.example",
+    });
+  });
+
+  it("always exposes a managed official provider with all official models enabled", () => {
+    const officialModels = [
+      {
+        id: "official-a",
+        displayName: "Official A",
+        description: "Official model",
+      },
+      {
+        id: "official-b",
+        displayName: "Official B",
+        description: "Official model",
+      },
+    ];
+    const officialSource: OfficialServiceState = {
+      setWebsiteOrigin: () => officialSource.getSnapshot(),
+      getWebsiteOrigin: () => "https://example.test",
+      getModels: () => officialModels,
+      getFetchedAt: () => "2026-06-17T00:00:00.000Z",
+      getSnapshot: () => ({
+        websiteOrigin: "https://example.test",
+        models: officialModels,
+        fetchedAt: "2026-06-17T00:00:00.000Z",
+        source: "remote",
+      }),
+      refreshModels: async () => officialSource.getSnapshot(),
+    };
+    const settings = createProviderSettings(makeDb(), {}, officialSource);
+
+    const [official] = settings.listConnections();
+
+    expect(official).toMatchObject({
+      id: OFFICIAL_PROVIDER_ID,
+      name: "官方服务商",
+      managed: true,
+      enabled: true,
+      modelCount: 2,
+      enabledModelCount: 2,
+      defaultModelId: "official-a",
+      remoteModelsFetchedAt: "2026-06-17T00:00:00.000Z",
+    });
+    expect(settings.listEnabledModelSelections().slice(0, 2)).toEqual([
+      expect.objectContaining({
+        providerId: OFFICIAL_PROVIDER_ID,
+        modelId: "official-a",
+        managed: true,
+      }),
+      expect.objectContaining({
+        providerId: OFFICIAL_PROVIDER_ID,
+        modelId: "official-b",
+        managed: true,
+      }),
+    ]);
+    expect(
+      settings.resolveSelection({
+        providerId: OFFICIAL_PROVIDER_ID,
+        modelId: "official-b",
+      }),
+    ).toMatchObject({
+      providerId: OFFICIAL_PROVIDER_ID,
+      providerName: "官方服务商",
+      managed: true,
+      modelId: "official-b",
+      apiKey: "",
+    });
+  });
+
+  it("does not allow users to edit, delete, or disable the official provider", () => {
+    const settings = createProviderSettings(makeDb(), {});
+
+    expect(() =>
+      settings.updateConnection(OFFICIAL_PROVIDER_ID, { name: "Custom name" }),
+    ).toThrow("official_provider_readonly");
+    expect(() =>
+      settings.setEnabledModels(OFFICIAL_PROVIDER_ID, []),
+    ).toThrow("official_provider_readonly");
+    expect(settings.deleteConnection(OFFICIAL_PROVIDER_ID)).toEqual({
+      ok: false,
+      error: "cannot_delete_official_provider",
     });
   });
 

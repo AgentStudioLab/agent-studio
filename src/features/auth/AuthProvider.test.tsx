@@ -20,6 +20,9 @@ const listen = mock(
 const loadStoredAuthTokens = mock(async (): Promise<DesktopAuthTokens | null> => null);
 const saveStoredAuthTokens = mock(async (_tokens: DesktopAuthTokens): Promise<void> => {});
 const clearStoredAuthTokens = mock(async (): Promise<void> => {});
+const fetchSidecar = mock(async (): Promise<Response> =>
+  jsonResponse({ officialService: { websiteOrigin: "https://example.test" } }),
+);
 
 const createPkcePair = mock(async () => ({
   verifier: "verifier-1",
@@ -31,6 +34,7 @@ let currentLanguage = "zh";
 mock.module("@tauri-apps/plugin-shell", () => ({ open }));
 mock.module("@tauri-apps/api/core", () => ({ invoke }));
 mock.module("@tauri-apps/api/event", () => ({ listen }));
+mock.module("@/lib/sidecar-client", () => ({ fetchSidecar }));
 mock.module("react-i18next", () => ({
   I18nextProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
   initReactI18next: { type: "3rdParty", init: () => {} },
@@ -46,9 +50,11 @@ mock.module("react-i18next", () => ({
         "settings.provider.delete": "Delete",
         "settings.provider.cancel": "Cancel",
         "settings.provider.defaultModelBadge": "Default",
+        "settings.provider.setDefault": "Set default",
         "settings.provider.enabledModels": "Enabled models",
         "settings.provider.disabled": "Disabled",
         "settings.provider.missingApiKey": "Missing key",
+        "settings.provider.managed": "Official",
         "settings.provider.connectionAddTitle": "Add model provider",
         "settings.provider.connectionEditTitle": "Edit model provider",
         "settings.provider.connectionDialogDescription": "Configure endpoint",
@@ -89,6 +95,9 @@ mock.module("react-i18next", () => ({
         "task.askUser.close": "Close",
         "task.askUser.prevPage": "Prev",
         "task.askUser.nextPage": "Next page",
+        "task.error.insufficientCredits":
+          "Not enough credits. Please top up on the website.",
+        "task.error.topUpCredits": "Top up on the website",
       };
       return translations[key] ?? key;
     },
@@ -197,6 +206,10 @@ describe("AuthProvider", () => {
     saveStoredAuthTokens.mockImplementation(async () => {});
     clearStoredAuthTokens.mockClear();
     clearStoredAuthTokens.mockImplementation(async () => {});
+    fetchSidecar.mockClear();
+    fetchSidecar.mockImplementation(async () =>
+      jsonResponse({ officialService: { websiteOrigin: "https://example.test" } }),
+    );
     createPkcePair.mockClear();
     createPkcePair.mockImplementation(async () => ({
       verifier: "verifier-1",

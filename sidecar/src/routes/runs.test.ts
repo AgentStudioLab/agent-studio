@@ -298,6 +298,82 @@ describe("POST /runs — provider selection", () => {
       { providerId: "provider-openai", modelId: "gpt-5.1" },
     ]);
   });
+
+  it("forwards official auth fields to the resolved run provider", async () => {
+    const seenOfficialFields: unknown[] = [];
+    const provider = {
+      name: "fake",
+      run(ctx: { officialAuthToken?: string; officialWebsiteOrigin?: string }) {
+        seenOfficialFields.push({
+          officialAuthToken: ctx.officialAuthToken,
+          officialWebsiteOrigin: ctx.officialWebsiteOrigin,
+        });
+        return (async function* () {
+          yield { type: EventType.RUN_STARTED, runId: "r1", threadId: "t1" } as never;
+          yield { type: EventType.RUN_FINISHED, runId: "r1", threadId: "t1" } as never;
+        })();
+      },
+      resume: async function* () {},
+      getPendingInterrupts: async () => [],
+    };
+    const stub = () => undefined as never;
+    const app = new Hono();
+    app.route(
+      "/",
+      buildRunRoutes({
+        threads: {
+          upsert: () => ({ id: "t1" }),
+          get: () => ({ id: "t1", workingDir: "/tmp", agentWorkspaceId: null }),
+          touch: () => {},
+        } as never,
+        messages: {
+          countByThread: () => 0,
+          appendUser: () => ({ id: "msg_1" }),
+          appendAssistant: () => {},
+          upsertToolCall: () => {},
+          completeToolCall: () => {},
+          cancelPendingToolCallsForThread: () => {},
+          setSdkUuid: () => {},
+        } as never,
+        agentWorkspaces: stub() as never,
+        agentFolders: stub() as never,
+        agentLinks: stub() as never,
+        agentMemoryStore: stub() as never,
+        provider: provider as never,
+        resolveProvider: () => provider as never,
+        store: {
+          getThreadActiveRun: async () => null,
+          createRun: async () => {},
+          appendEvent: async () => ({ cursor: "1" }),
+          finishRun: async () => {},
+        } as never,
+        interruptBus: { cancelAll: () => {} } as never,
+        usage: { recordRun: () => {} } as never,
+      }),
+    );
+
+    const res = await app.request("/runs", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        threadId: "t1",
+        runId: "r1",
+        message: { role: "user", content: "hi" },
+        providerSelection: { providerId: "official", modelId: "gpt-5-mini" },
+        officialAuthToken: "access-token",
+        officialWebsiteOrigin: "https://www.agentstudio.chat",
+      }),
+    });
+
+    expect(res.status).toBe(202);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(seenOfficialFields).toEqual([
+      {
+        officialAuthToken: "access-token",
+        officialWebsiteOrigin: "https://www.agentstudio.chat",
+      },
+    ]);
+  });
 });
 
 describe("POST /runs — internal-only remote fields", () => {

@@ -87,6 +87,7 @@ export interface ProviderConfig {
   baseUrl: string;
   apiKey: string;
   customProtocol?: CustomProviderProtocol;
+  managed?: boolean;
   models: ProfileModel[];
   remoteModelsFetchedAt: string;
   selectedModelId: string | null;
@@ -98,6 +99,7 @@ export interface ProviderConfig {
 export interface ProviderConnectionConfig extends ProviderConfig {
   providerId: string;
   providerName: string;
+  managed: boolean;
   enabled: boolean;
   enabledModelIds: string[];
   defaultModelId: string | null;
@@ -139,6 +141,7 @@ export interface ProviderConnectionSummary {
   name: string;
   profileId: ProfileId;
   providerLabel: string;
+  managed: boolean;
   baseUrl: string;
   enabled: boolean;
   hasApiKey: boolean;
@@ -156,6 +159,7 @@ export interface EnabledModelOption {
   providerId: string;
   providerName: string;
   providerLabel: string;
+  managed: boolean;
   modelId: string;
   modelLabel: string;
   modelDescription: string;

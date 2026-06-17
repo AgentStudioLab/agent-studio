@@ -5,6 +5,7 @@ import {
   exchangeAuthCode,
   fetchDesktopMe,
   getWebsiteOrigin,
+  syncOfficialService,
 } from "./desktop-auth-client";
 
 const originalFetch = globalThis.fetch;
@@ -176,6 +177,27 @@ describe("desktop auth client", () => {
     import.meta.env.VITE_AGENT_STUDIO_WEBSITE_ORIGIN = "";
 
     expect(() => getWebsiteOrigin()).toThrow("desktop_api_missing_website_origin");
+  });
+
+  it("syncs the official website origin to the sidecar", async () => {
+    const sidecarFetch = mock(async () =>
+      jsonResponse({
+        officialService: {
+          websiteOrigin: "https://example.test",
+        },
+      }),
+    );
+
+    await syncOfficialService(undefined, sidecarFetch as never);
+
+    expect(sidecarFetch).toHaveBeenCalledWith(
+      "/settings/official-service",
+      expect.objectContaining({
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ websiteOrigin: "https://example.test/" }),
+      }),
+    );
   });
 
   it("throws a stable status error for non-JSON HTTP errors", async () => {

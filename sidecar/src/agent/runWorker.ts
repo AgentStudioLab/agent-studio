@@ -123,6 +123,8 @@ export interface RunWorkerInput {
   provider: AgentProvider;
   providerSelection?: ProviderModelSelection;
   resolveProvider?: (selection?: ProviderModelSelection | null) => AgentProvider;
+  officialAuthToken?: string;
+  officialWebsiteOrigin?: string;
   interruptBus: InterruptBus;
   abortSignal: AbortSignal;
   usage: UsageService;
@@ -169,6 +171,8 @@ export async function runWorker(input: RunWorkerInput): Promise<void> {
     provider,
     providerSelection,
     resolveProvider,
+    officialAuthToken,
+    officialWebsiteOrigin,
     interruptBus,
     abortSignal,
     usage,
@@ -361,6 +365,8 @@ export async function runWorker(input: RunWorkerInput): Promise<void> {
       cwd,
       permissionMode,
       model,
+      officialAuthToken,
+      officialWebsiteOrigin,
       autoApproveTools,
       approvalRules,
       resumeSessionAt,

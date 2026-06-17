@@ -82,6 +82,10 @@ export interface RunContext {
    * as `options.model`.
    */
   model?: string;
+  /** 官方服务商 run 的一次性官网 desktop access token；sidecar 不持久化。 */
+  officialAuthToken?: string;
+  /** 官方服务商 run 的官网 origin；由前端从配置同步/随 run 传入。 */
+  officialWebsiteOrigin?: string;
   /**
    * Per-run allow-list for background (scheduled) runs. Tool names listed here
    * are auto-approved inside `canUseTool` — AFTER the workspace sandbox and the

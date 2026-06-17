@@ -113,6 +113,92 @@ describe("createChatRuntime — fetchImpl forwarding", () => {
   });
 });
 
+describe("createChatRuntime — official provider request fields", () => {
+  it("forwards official auth fields when sending a new run", async () => {
+    const bodies: unknown[] = [];
+    const fakeFetch = mock(async (input: string | URL | Request, init = {}) => {
+      const url =
+        typeof input === "string"
+          ? input
+          : input instanceof URL
+            ? input.href
+            : input.url;
+      if (url.endsWith("/runs")) {
+        bodies.push(JSON.parse(String(init.body)));
+        return new Response(JSON.stringify({ runId: "run_1" }), {
+          status: 202,
+          headers: { "content-type": "application/json" },
+        });
+      }
+      return makeFakeSse([
+        `id: 1\nevent: RUN_FINISHED\ndata: ${JSON.stringify({
+          type: "RUN_FINISHED",
+          threadId: "t",
+          runId: "run_1",
+        })}\n\n`,
+      ])(input);
+    }) as unknown as typeof fetch;
+
+    const rt = createChatRuntime({ threadId: "t", fetchImpl: fakeFetch });
+
+    await rt.send("hello", {
+      providerSelection: { providerId: "official", modelId: "gpt-5.1" },
+      officialAuthToken: "access-token",
+      officialWebsiteOrigin: "https://example.test",
+    } as never);
+
+    expect(bodies[0]).toMatchObject({
+      officialAuthToken: "access-token",
+      officialWebsiteOrigin: "https://example.test",
+    });
+    rt.destroy();
+  });
+
+  it("forwards official auth fields when regenerating a run", async () => {
+    const bodies: unknown[] = [];
+    const fakeFetch = mock(async (input: string | URL | Request, init = {}) => {
+      const url =
+        typeof input === "string"
+          ? input
+          : input instanceof URL
+            ? input.href
+            : input.url;
+      if (url.endsWith("/threads/t/regenerate")) {
+        bodies.push(JSON.parse(String(init.body)));
+        return new Response(JSON.stringify({ runId: "run_2" }), {
+          status: 202,
+          headers: { "content-type": "application/json" },
+        });
+      }
+      return makeFakeSse([
+        `id: 1\nevent: RUN_FINISHED\ndata: ${JSON.stringify({
+          type: "RUN_FINISHED",
+          threadId: "t",
+          runId: "run_2",
+        })}\n\n`,
+      ])(input);
+    }) as unknown as typeof fetch;
+
+    const rt = createChatRuntime({
+      threadId: "t",
+      fetchImpl: fakeFetch,
+      initialMessages: [{ id: "user-1", role: "user", content: "hello" }],
+    });
+
+    await rt.regenerate("user-1", {
+      providerSelection: { providerId: "official", modelId: "gpt-5.1" },
+      officialAuthToken: "access-token",
+      officialWebsiteOrigin: "https://example.test",
+    } as never);
+
+    expect(bodies[0]).toMatchObject({
+      officialAuthToken: "access-token",
+      officialWebsiteOrigin: "https://example.test",
+    });
+    rt.destroy();
+  });
+});
+
 describe("createChatRuntime — replay idempotency", () => {
   it("attaching twice to the same run replays without duplicating blocks", async () => {
     // Two SSE servings of the same event stream, simulating: client attaches,

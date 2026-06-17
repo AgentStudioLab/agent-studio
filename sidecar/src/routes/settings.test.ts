@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, mock } from "bun:test";
 import { Database } from "bun:sqlite";
 import { Hono } from "hono";
 import { migrate } from "../db";
+import { createOfficialService } from "../services/officialService";
 import { createProviderSettings } from "../services/providerSettings";
 import { createUserProfileSettings } from "../services/userProfileSettings";
 import { buildSettingsRoutes } from "./settings";
@@ -9,11 +10,12 @@ import { buildSettingsRoutes } from "./settings";
 function makeApp() {
   const db = new Database(":memory:");
   migrate(db);
-  const provider = createProviderSettings(db, {});
+  const officialService = createOfficialService();
+  const provider = createProviderSettings(db, {}, officialService);
   const userProfile = createUserProfileSettings(db);
   const app = new Hono();
-  app.route("/", buildSettingsRoutes(provider, userProfile));
-  return app;
+  app.route("/", buildSettingsRoutes(provider, userProfile, { officialService }));
+  return { app, officialService };
 }
 
 afterEach(() => {
@@ -22,7 +24,7 @@ afterEach(() => {
 
 describe("settings provider routes", () => {
   it("rejects array bodies when fetching provider models", async () => {
-    const app = makeApp();
+    const { app } = makeApp();
 
     const res = await app.request("/settings/provider/fetch-models", {
       method: "POST",
@@ -35,7 +37,7 @@ describe("settings provider routes", () => {
   });
 
   it("fetches provider models, persists them as custom models, and returns the selected provider", async () => {
-    const app = makeApp();
+    const { app } = makeApp();
     const fetchMock = mock(async (url: string | URL | Request) => {
       expect(String(url)).toBe("https://provider.example/v1/models");
       return new Response(
@@ -87,7 +89,7 @@ describe("settings provider routes", () => {
   });
 
   it("fetches built-in provider models without converting the active preset to custom", async () => {
-    const app = makeApp();
+    const { app } = makeApp();
     const fetchMock = mock(async (url: string | URL | Request) => {
       expect(String(url)).toBe("https://api.openai.com/v1/models");
       return new Response(
@@ -150,7 +152,7 @@ describe("settings provider routes", () => {
   });
 
   it("refreshes custom Anthropic-compatible connection models through the Anthropic catalog", async () => {
-    const app = makeApp();
+    const { app } = makeApp();
     const createRes = await app.request("/settings/provider/connections", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -215,5 +217,61 @@ describe("settings provider routes", () => {
         description: "Remote model",
       },
     ]);
+  });
+
+  it("syncs the official website origin for managed official models", async () => {
+    const { app, officialService } = makeApp();
+
+    const res = await app.request("/settings/official-service", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        websiteOrigin: "https://www.agentstudio.chat/",
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      officialService: {
+        websiteOrigin: "https://www.agentstudio.chat",
+      },
+    });
+    expect(officialService.getSnapshot().websiteOrigin).toBe(
+      "https://www.agentstudio.chat",
+    );
+  });
+
+  it("rejects updates to the managed official provider through settings routes", async () => {
+    const { app } = makeApp();
+
+    const updateRes = await app.request("/settings/provider/connections/official", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Renamed" }),
+    });
+    const enabledRes = await app.request(
+      "/settings/provider/connections/official/models/enabled",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ modelIds: [] }),
+      },
+    );
+    const deleteRes = await app.request("/settings/provider/connections/official", {
+      method: "DELETE",
+    });
+
+    expect(updateRes.status).toBe(400);
+    expect(await updateRes.json()).toEqual({
+      error: "official_provider_readonly",
+    });
+    expect(enabledRes.status).toBe(400);
+    expect(await enabledRes.json()).toEqual({
+      error: "official_provider_readonly",
+    });
+    expect(deleteRes.status).toBe(400);
+    expect(await deleteRes.json()).toEqual({
+      error: "cannot_delete_official_provider",
+    });
   });
 });

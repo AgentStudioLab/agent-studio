@@ -23,6 +23,7 @@ import {
   fetchDesktopMe,
   refreshAccessToken,
   revokeRefreshToken,
+  syncOfficialService,
 } from "./desktop-auth-client";
 import {
   clearStoredAuthTokens,
@@ -422,6 +423,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       cancelled = true;
     };
   }, [applySession, applySignedOut, clearStoredAuthTokensQueued, saveStoredAuthTokensQueued]);
+
+  useEffect(() => {
+    // 官网 origin 是官方模型 catalog 和官方聊天扣积分链路的共同入口；
+    // 同步失败不影响本地登录启动，后续发送官方模型时仍会显式带 origin。
+    void syncOfficialService().catch(() => {});
+  }, []);
 
   useEffect(() => {
     let cancelled = false;

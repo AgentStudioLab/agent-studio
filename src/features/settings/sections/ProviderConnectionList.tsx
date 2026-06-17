@@ -1,4 +1,4 @@
-import { Edit3Icon, PlusIcon, Trash2Icon } from "lucide-react";
+import { Edit3Icon, LockIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type {
@@ -23,6 +23,7 @@ interface ProviderConnectionListProps {
     enabledModels: string;
     disabled: string;
     missingKey: string;
+    managed: string;
   };
 }
 
@@ -58,10 +59,16 @@ export function ProviderConnectionList({
                     {connection.name}
                   </span>
                   {isDefault && <Badge variant="secondary">{labels.default}</Badge>}
+                  {connection.managed && (
+                    <Badge variant="outline">
+                      <LockIcon />
+                      {labels.managed}
+                    </Badge>
+                  )}
                   {!connection.enabled && (
                     <Badge variant="outline">{labels.disabled}</Badge>
                   )}
-                  {!connection.hasApiKey && (
+                  {!connection.managed && !connection.hasApiKey && (
                     <Badge variant="destructive">{labels.missingKey}</Badge>
                   )}
                 </div>
@@ -86,24 +93,28 @@ export function ProviderConnectionList({
                     {labels.setDefault}
                   </Button>
                 )}
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={`${labels.edit} ${connection.name}`}
-                  onClick={() => onEdit(connection.id)}
-                >
-                  <Edit3Icon />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={`${labels.delete} ${connection.name}`}
-                  onClick={() => onDelete(connection.id)}
-                >
-                  <Trash2Icon />
-                </Button>
+                {!connection.managed && (
+                  <>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label={`${labels.edit} ${connection.name}`}
+                      onClick={() => onEdit(connection.id)}
+                    >
+                      <Edit3Icon />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label={`${labels.delete} ${connection.name}`}
+                      onClick={() => onDelete(connection.id)}
+                    >
+                      <Trash2Icon />
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
           );

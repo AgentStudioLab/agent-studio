@@ -201,7 +201,9 @@
     "rateLimit": "Rate limited — retrying in {{sec}}s",
     "generic": "Agent error: {{msg}}",
     "maxTurns": "Hit max turns — please start a new thread",
-    "maxBudget": "Hit cost cap"
+    "maxBudget": "Hit cost cap",
+    "insufficientCredits": "Not enough credits. Please top up on the website.",
+    "topUpCredits": "Top up on the website"
   },
   "retry": {
     "attempt": "Retrying {{attempt}}/{{max}}"

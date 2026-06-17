@@ -13,6 +13,7 @@ import { buildAuditRoutes } from "./routes/audit";
 import { buildUsageRoutes } from "./routes/usage";
 import { buildModelsRoutes } from "./routes/models";
 import { createProviderSettings } from "./services/providerSettings";
+import { createOfficialService } from "./services/officialService";
 import { createUserProfileSettings } from "./services/userProfileSettings";
 import { composeAppendPrompt } from "./lib/composeAppendPrompt";
 import { ThreadService } from "./services/threads";
@@ -37,6 +38,7 @@ import { buildSettingsToolsRoutes } from "./routes/settings-tools";
 import { createBunSqliteRunStore } from "./agui/store-sqlite";
 import type { AgentProvider } from "./agui/core";
 import { createAgentProviderForRuntime } from "./agui/provider-factory";
+import { createOfficialProvider } from "./agui/provider-official/official-provider";
 import { createInterruptBus } from "./agui/provider-claude";
 import { SessionMetadataStore } from "./services/sessionMetadata";
 import { buildThreadContextRoutes } from "./routes/threadContext";
@@ -98,10 +100,11 @@ const db = openDb(dbAbs);
 // (when the settings row doesn't exist yet) — after the user saves once,
 // the DB row wins. Lets a single binary serve different keys/baseUrls
 // across machines without env juggling.
+const officialService = createOfficialService();
 const providerSettings = createProviderSettings(db, {
   apiKey: process.env.ANTHROPIC_API_KEY,
   baseUrl: process.env.ANTHROPIC_BASE_URL,
-});
+}, officialService);
 const userProfileSettings = createUserProfileSettings(db);
 
 const threads = new ThreadService(db);
@@ -191,6 +194,9 @@ function buildProviderForSelection(
   selection?: { providerId: string; modelId: string } | null,
 ) {
   const current = providerSettings.resolveSelection(selection);
+  if (current.providerId === "official") {
+    return createOfficialProvider();
+  }
   if (!current.apiKey) throw new Error("api_key_missing");
   const resolveAllowedTools = (threadId: string): string[] => {
     const override = threads.getAllowedTools(threadId);
@@ -363,7 +369,12 @@ app.route("/", buildAgentLinkRoutes({ agentLinks, agentWorkspaces }));
 app.route("/", buildAgentMemoryTreeRoutes({ agentMemoryStore, agentWorkspaces }));
 app.route("/", buildAgentInstructionRoutes({ agentWorkspaces }));
 app.route("/", buildMessageRoutes(messages));
-app.route("/", buildSettingsRoutes(providerSettings, userProfileSettings));
+app.route(
+  "/",
+  buildSettingsRoutes(providerSettings, userProfileSettings, {
+    officialService,
+  }),
+);
 app.route(
   "/",
   buildRunRoutes({

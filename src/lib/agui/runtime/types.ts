@@ -127,7 +127,7 @@ export interface ChatState {
 export type RunErrorCode =
   | "AUTH_FAILED" | "RATE_LIMIT" | "UPSTREAM_5XX" | "BILLING_ERROR"
   | "MODEL_ERROR" | "MAX_TURNS" | "MAX_BUDGET" | "EXECUTION_ERROR"
-  | "WORKER_ERROR" | "CANCELLED";
+  | "WORKER_ERROR" | "CANCELLED" | "INSUFFICIENT_CREDITS";
 
 export interface RetryState {
   attempt: number;

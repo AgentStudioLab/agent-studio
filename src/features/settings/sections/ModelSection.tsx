@@ -41,7 +41,10 @@ export function ModelSection() {
 
   const openEdit = async (id: string) => {
     setDeleteMsg(null);
+    const summary = data?.connections?.find((connection) => connection.id === id);
+    if (summary?.managed) return;
     const connection = await getProviderConnection(id);
+    if (connection.managed) return;
     setEditingConnection(connection);
     setDialogMode("edit");
     setDialogOpen(true);
@@ -49,6 +52,8 @@ export function ModelSection() {
 
   const handleDelete = async (id: string) => {
     setDeleteMsg(null);
+    const summary = data?.connections?.find((connection) => connection.id === id);
+    if (summary?.managed) return;
     try {
       await deleteProviderConnection(id);
       invalidateProviderAndModels();
@@ -126,6 +131,7 @@ export function ModelSection() {
           enabledModels: t("settings.provider.enabledModels"),
           disabled: t("settings.provider.disabled"),
           missingKey: t("settings.provider.missingApiKey"),
+          managed: t("settings.provider.managed"),
         }}
       />
 

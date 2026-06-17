@@ -33,6 +33,10 @@ interface SendProviderOptions {
   /** 「始终允许」命令规则（CC Tool(pattern) 语法）：cwd + 全局 allowlist 的并集。
    *  sidecar 在 canUseTool 内匹配，命中即放行（见 features/task/bash-rule.ts）。 */
   approvalRules?: string[];
+  /** 官方服务商专用：官网 desktop access token，custom provider 不传。 */
+  officialAuthToken?: string;
+  /** 官方服务商专用：官网 origin，custom provider 不传。 */
+  officialWebsiteOrigin?: string;
 }
 
 // ============ 公开 API ============
@@ -231,6 +235,12 @@ export function createChatRuntime(opts: ChatRuntimeOptions): ChatRuntime {
         ...(sendOpts?.approvalRules?.length
           ? { approvalRules: sendOpts.approvalRules }
           : {}),
+        ...(sendOpts?.officialAuthToken
+          ? { officialAuthToken: sendOpts.officialAuthToken }
+          : {}),
+        ...(sendOpts?.officialWebsiteOrigin
+          ? { officialWebsiteOrigin: sendOpts.officialWebsiteOrigin }
+          : {}),
       });
     } catch (err) {
       if (err instanceof RunInProgressError) {
@@ -300,6 +310,12 @@ export function createChatRuntime(opts: ChatRuntimeOptions): ChatRuntime {
         ...(regenOpts?.model ? { model: regenOpts.model } : {}),
         ...(regenOpts?.approvalRules?.length
           ? { approvalRules: regenOpts.approvalRules }
+          : {}),
+        ...(regenOpts?.officialAuthToken
+          ? { officialAuthToken: regenOpts.officialAuthToken }
+          : {}),
+        ...(regenOpts?.officialWebsiteOrigin
+          ? { officialWebsiteOrigin: regenOpts.officialWebsiteOrigin }
           : {}),
       });
     } catch (err) {

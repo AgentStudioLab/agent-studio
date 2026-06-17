@@ -143,6 +143,36 @@ describe("ProviderModelPicker", () => {
     expect(button.getAttribute("aria-disabled")).toBe("true");
   });
 
+  it("marks managed official provider groups", async () => {
+    providerState = {
+      ...providerState,
+      defaultSelection: { providerId: "official", modelId: "gpt-5.1" },
+      enabledModels: [
+        {
+          providerId: "official",
+          providerName: "官方服务商",
+          providerLabel: "官方服务商",
+          managed: true,
+          modelId: "gpt-5.1",
+          modelLabel: "GPT-5.1",
+          modelDescription: "Official model",
+          agentRuntime: {
+            protocol: "openai-compatible",
+            baseUrl: "",
+            auth: "bearer",
+            capabilities: { text: true, tools: false, fileCheckpoint: false },
+          },
+        },
+        ...providerState.enabledModels,
+      ],
+    };
+
+    renderPicker();
+
+    expect(await screen.findByText("官方服务商")).toBeDefined();
+    expect(screen.getByText("Official")).toBeDefined();
+  });
+
   it("shows an empty state when no models are configured", async () => {
     providerState = { ...providerState, defaultSelection: null, enabledModels: [] };
 

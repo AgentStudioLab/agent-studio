@@ -80,6 +80,8 @@ export function buildRunRoutes(deps: MountRunsDeps): Hono {
           permissionMode?: "ask" | "act-without-asking";
           model?: string;
           providerSelection?: unknown;
+          officialAuthToken?: unknown;
+          officialWebsiteOrigin?: unknown;
           locale?: string;
           approvalRules?: unknown;
         }
@@ -105,6 +107,15 @@ export function buildRunRoutes(deps: MountRunsDeps): Hono {
         ? body.model
         : undefined;
     const providerSelection = parseProviderSelection(body.providerSelection);
+    const officialAuthToken =
+      typeof body.officialAuthToken === "string" && body.officialAuthToken.length > 0
+        ? body.officialAuthToken
+        : undefined;
+    const officialWebsiteOrigin =
+      typeof body.officialWebsiteOrigin === "string" &&
+      body.officialWebsiteOrigin.length > 0
+        ? body.officialWebsiteOrigin
+        : undefined;
     // 「始终允许」命令规则（CC 语法）。前端传 cwd + 全局 allowlist 的并集。
     const approvalRules = parseStringArray(body.approvalRules);
 
@@ -156,6 +167,8 @@ export function buildRunRoutes(deps: MountRunsDeps): Hono {
       provider: deps.provider,
       providerSelection,
       resolveProvider: deps.resolveProvider,
+      officialAuthToken,
+      officialWebsiteOrigin,
       interruptBus: deps.interruptBus,
       abortSignal: abort.signal,
       usage: deps.usage,
@@ -183,6 +196,8 @@ export function buildRunRoutes(deps: MountRunsDeps): Hono {
           permissionMode?: "ask" | "act-without-asking";
           model?: string;
           providerSelection?: unknown;
+          officialAuthToken?: unknown;
+          officialWebsiteOrigin?: unknown;
           locale?: string;
           approvalRules?: unknown;
         }
@@ -217,6 +232,15 @@ export function buildRunRoutes(deps: MountRunsDeps): Hono {
         ? body.model
         : undefined;
     const providerSelection = parseProviderSelection(body.providerSelection);
+    const officialAuthToken =
+      typeof body.officialAuthToken === "string" && body.officialAuthToken.length > 0
+        ? body.officialAuthToken
+        : undefined;
+    const officialWebsiteOrigin =
+      typeof body.officialWebsiteOrigin === "string" &&
+      body.officialWebsiteOrigin.length > 0
+        ? body.officialWebsiteOrigin
+        : undefined;
     const locale = typeof body.locale === "string" ? body.locale : undefined;
     const approvalRules = parseStringArray(body.approvalRules);
 
@@ -284,6 +308,8 @@ export function buildRunRoutes(deps: MountRunsDeps): Hono {
           provider: deps.provider,
           providerSelection,
           resolveProvider: deps.resolveProvider,
+          officialAuthToken,
+          officialWebsiteOrigin,
           interruptBus: deps.interruptBus,
           abortSignal: abort.signal,
           usage: deps.usage,

@@ -33,6 +33,19 @@ mock.module("@/lib/agui/react/useChat", () => ({
   threadStatusKey: ["thread-status"],
 }));
 
+mock.module("@/features/auth/useAuth", () => ({
+  useAuth: () => ({
+    status: "signed_out",
+    getValidAccessToken: mock(async () => {
+      throw new Error("not_signed_in");
+    }),
+  }),
+}));
+
+mock.module("@/lib/data/settings", () => ({
+  getProvider: mock(async () => ({ defaultSelection: null })),
+}));
+
 mock.module("@/features/composer/SlashEditor", () => ({
   SlashEditor: ({ placeholder }: { placeholder?: string }) => (
     <textarea aria-label={placeholder ?? "message"} name="message" />

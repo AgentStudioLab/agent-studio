@@ -113,6 +113,7 @@
     "enabledModels": "Enabled models",
     "disabled": "Disabled",
     "missingApiKey": "Missing key",
+    "managed": "Official",
     "connectionAddTitle": "Add model provider",
     "connectionEditTitle": "Edit model provider",
     "connectionDialogDescription": "Configure the endpoint, refresh its remote models, then enable the models that can be selected in conversations.",
