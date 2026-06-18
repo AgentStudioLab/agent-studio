@@ -146,6 +146,10 @@ CREATE INDEX IF NOT EXISTS idx_sched_next ON scheduled_tasks (enabled, next_run_
 -- memory (<home>/memory/, managed by AgentMemoryStore — not a DB table).
 -- Conversations + scheduled_tasks reference it via agent_workspace_id (nullable
 -- = the generic/default workspace, i.e. the "new task" behavior).
+-- source='builtin' 行由 reconcileBuiltinAgents 从仓库内 JSON 维护：定义字段
+-- （name/avatar/mounted_skills_json + CLAUDE.md）每次启动覆盖、对外只读；用户自有
+-- 数据（memory/对话/folders/links/pinned）从不被 reconcile 触碰。详见
+-- docs/superpowers/specs/2026-06-18-builtin-agents-design.md。
 CREATE TABLE IF NOT EXISTS agent_workspaces (
   id          TEXT PRIMARY KEY,
   name        TEXT NOT NULL,
@@ -153,6 +157,7 @@ CREATE TABLE IF NOT EXISTS agent_workspaces (
   home_dir    TEXT NOT NULL,
   archived    INTEGER NOT NULL DEFAULT 0,
   pinned      INTEGER NOT NULL DEFAULT 0,
+  source      TEXT NOT NULL DEFAULT 'user',
   created_at  INTEGER NOT NULL,
   updated_at  INTEGER NOT NULL
 );
@@ -293,6 +298,8 @@ export function migrate(db: Database): void {
   // '["id1","id2"]'=显式子集。运行时与全局启用集取交集。详见
   // docs/superpowers/specs/2026-06-16-per-agent-skill-mounting-design.md。
   ensureColumn(db, "agent_workspaces", "mounted_skills_json", "TEXT");
+  // 内置(只读官方预置)标记：'user'=用户创建；'builtin'=reconcileBuiltinAgents 维护。
+  ensureColumn(db, "agent_workspaces", "source", "TEXT NOT NULL DEFAULT 'user'");
   ensureColumn(db, "channel_connections", "type", "TEXT NOT NULL DEFAULT 'fake'");
   ensureColumn(db, "channel_connections", "name", "TEXT NOT NULL DEFAULT ''");
   ensureColumn(db, "channel_connections", "enabled", "INTEGER NOT NULL DEFAULT 0");

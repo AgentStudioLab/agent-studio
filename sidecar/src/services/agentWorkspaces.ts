@@ -18,6 +18,9 @@ export interface AgentWorkspace {
   /** 该 agent 挂载的技能 id 列表（三态）：null=继承全部启用技能；[]=显式不挂任何技能；
    *  非空数组=显式子集。运行时与全局启用集取交集（见 server.ts resolveSkillsConfig）。 */
   mountedSkills: string[] | null;
+  /** 'user'=用户创建、可编辑/删除；'builtin'=官方只读预置，定义由 reconcileBuiltinAgents
+   *  从仓库内 JSON 维护，路由层禁止改写（仅 pin 等用户自有操作放行）。 */
+  source: "user" | "builtin";
   createdAt: number;
   updatedAt: number;
 }
@@ -30,6 +33,7 @@ interface AgentWorkspaceRow {
   archived: number;
   pinned: number;
   mounted_skills_json: string | null;
+  source: string;
   created_at: number;
   updated_at: number;
 }
@@ -56,6 +60,7 @@ function rowToAgent(r: AgentWorkspaceRow): AgentWorkspace {
     archived: r.archived === 1,
     pinned: r.pinned === 1,
     mountedSkills: parseMountedSkills(r.mounted_skills_json),
+    source: r.source === "builtin" ? "builtin" : "user",
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -77,7 +82,7 @@ export interface UpdateAgentWorkspaceInput {
 }
 
 /** Default root for per-agent home dirs: ~/.agent-studio/agent-workspaces/<id>/ */
-const DEFAULT_BASE_DIR = join(homedir(), ".agent-studio", "agent-workspaces");
+export const DEFAULT_BASE_DIR = join(homedir(), ".agent-studio", "agent-workspaces");
 
 export class AgentWorkspaceService {
   private baseDir: string;

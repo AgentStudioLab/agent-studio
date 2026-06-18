@@ -34,6 +34,8 @@ export function buildAgentInstructionRoutes(deps: MountAgentInstructionDeps): Ho
   app.put("/agents/:id/instructions", async (c) => {
     const agent = agentWorkspaces.get(c.req.param("id"));
     if (!agent) return c.json({ error: "agent_not_found" }, 404);
+    // 内置(官方只读)：指令来自仓库内 AGENT.md，由 reconcile 维护，不可改（spec §8）。
+    if (agent.source === "builtin") return c.json({ error: "builtin_readonly" }, 403);
     const body = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;
     if (typeof body?.content !== "string") {
       return c.json({ error: "invalid_content" }, 400);

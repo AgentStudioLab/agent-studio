@@ -22,7 +22,8 @@ import { generateTitle } from "./services/titleGenerator";
 import { ScheduledTaskService } from "./services/scheduledTasks";
 import { Scheduler } from "./services/scheduler";
 import { buildScheduledRoutes } from "./routes/scheduled";
-import { AgentWorkspaceService } from "./services/agentWorkspaces";
+import { AgentWorkspaceService, DEFAULT_BASE_DIR } from "./services/agentWorkspaces";
+import { reconcileBuiltinAgents } from "./services/builtinAgents";
 import { AgentFolderService } from "./services/agentFolders";
 import { AgentLinkService } from "./services/agentLinks";
 import { AgentMemoryStore } from "./services/agentMemoryStore";
@@ -111,6 +112,10 @@ const threads = new ThreadService(db);
 const messages = new MessageService(db);
 const scheduledTasks = new ScheduledTaskService(db);
 const agentWorkspaces = new AgentWorkspaceService(db);
+// 内置(官方只读预置)智能体：把仓库内打包的 JSON/AGENT.md reconcile 进 agent_workspaces
+// （source='builtin'）+ 生成 homeDir。定义字段每次启动覆盖、用户自有数据不动。同步执行
+// （bun --compile --bytecode 不支持顶层 await）。必须用与 service 一致的 DEFAULT_BASE_DIR。
+reconcileBuiltinAgents(db, DEFAULT_BASE_DIR);
 const agentFolders = new AgentFolderService(db);
 const agentLinks = new AgentLinkService(db);
 const agentMemoryStore = new AgentMemoryStore(agentWorkspaces);
