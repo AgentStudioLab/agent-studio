@@ -59,3 +59,10 @@ export async function deleteAgentWorkspace(id: string): Promise<void> {
   const res = await authedFetch(`/agents/${id}`, { method: "DELETE" });
   if (!res.ok) throw new Error(`delete_failed_${res.status}`);
 }
+
+/** 把某个 agent（内置或普通）的定义克隆成一个新的、可编辑的用户 agent。
+ *  只复制定义（指令 + 挂载技能），不复制记忆/对话/文件空间。 */
+export async function cloneAgentWorkspace(id: string): Promise<AgentWorkspace> {
+  const res = await authedFetch(`/agents/${id}/clone`, { method: "POST" });
+  return expectJson<AgentWorkspace>(res);
+}

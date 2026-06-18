@@ -20,6 +20,8 @@ export function SkillsRailCard({ agentId }: { agentId: string }) {
   const [open, setOpen] = useState(false);
 
   const mounted = agent?.mountedSkills ?? null;
+  // 内置(官方只读)：挂载技能属于定义，来自仓库内 JSON，不提供管理入口。
+  const readOnly = agent?.source === "builtin";
 
   // id → name 映射；已卸载/未知 id 原样显示。
   const mountedNames = useMemo(() => {
@@ -41,7 +43,10 @@ export function SkillsRailCard({ agentId }: { agentId: string }) {
 
   return (
     <>
-      <RailSection title={t("agentSpace.skills.title")} action={manageAction}>
+      <RailSection
+        title={t("agentSpace.skills.title")}
+        action={readOnly ? undefined : manageAction}
+      >
         {mounted == null ? (
           <p className="py-0.5 text-sm text-muted-foreground">
             {t("agentSpace.skills.allMounted")}
@@ -63,7 +68,7 @@ export function SkillsRailCard({ agentId }: { agentId: string }) {
           </ul>
         )}
       </RailSection>
-      {agent && (
+      {agent && !readOnly && (
         <ManageSkillsModal
           agentId={agentId}
           current={mounted}

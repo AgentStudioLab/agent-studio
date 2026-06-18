@@ -14,15 +14,19 @@ import {
   useAgentInstructions,
   useSaveAgentInstructionsMutation,
 } from "@/lib/data/agent-instruction-queries";
+import { useAgentWorkspace } from "@/lib/data/agent-queries";
 import { RailSection } from "./RailSection";
 
 /** Instructions rail card: read-only preview of the agent's CLAUDE.md; the
- *  pencil action opens a modal to edit it (no inline save button). */
+ *  pencil action opens a modal to edit it (no inline save button). 内置(官方只读)
+ *  agent 的指令来自仓库内 AGENT.md，不提供编辑入口。 */
 export function InstructionsCard({ agentId }: { agentId: string }) {
   const { t } = useTranslation();
   const { data } = useAgentInstructions(agentId);
+  const { data: agent } = useAgentWorkspace(agentId);
   const [editOpen, setEditOpen] = useState(false);
   const content = (data ?? "").trim();
+  const readOnly = agent?.source === "builtin";
 
   const pencil = (
     <button
@@ -37,7 +41,10 @@ export function InstructionsCard({ agentId }: { agentId: string }) {
 
   return (
     <>
-      <RailSection title={t("agentSpace.instructions.title")} action={pencil}>
+      <RailSection
+        title={t("agentSpace.instructions.title")}
+        action={readOnly ? undefined : pencil}
+      >
         {content ? (
           <div
             role="region"
@@ -54,12 +61,14 @@ export function InstructionsCard({ agentId }: { agentId: string }) {
           </p>
         )}
       </RailSection>
-      <EditInstructionsModal
-        agentId={agentId}
-        open={editOpen}
-        onOpenChange={setEditOpen}
-        initial={data ?? ""}
-      />
+      {!readOnly && (
+        <EditInstructionsModal
+          agentId={agentId}
+          open={editOpen}
+          onOpenChange={setEditOpen}
+          initial={data ?? ""}
+        />
+      )}
     </>
   );
 }

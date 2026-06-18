@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   type CreateAgentWorkspaceArgs,
+  cloneAgentWorkspace,
   createAgentWorkspace,
   deleteAgentWorkspace,
   getAgentWorkspace,
@@ -58,6 +59,14 @@ export function useDeleteAgentWorkspaceMutation() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => deleteAgentWorkspace(id),
+    onSuccess: () => invalidate(qc),
+  });
+}
+
+export function useCloneAgentWorkspaceMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => cloneAgentWorkspace(id),
     onSuccess: () => invalidate(qc),
   });
 }

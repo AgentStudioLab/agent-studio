@@ -4,11 +4,13 @@
   "notFound": "Agent not found",
   "recents": "Recents",
   "recentsEmpty": "No conversations yet.",
+  "builtinBadge": "Official",
   "header": {
     "pin": "Pin",
     "unpin": "Unpin",
     "editDetails": "Edit details",
     "archive": "Archive",
+    "clone": "Clone to my agents",
     "moreActions": "More actions"
   },
   "context": {

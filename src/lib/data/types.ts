@@ -81,6 +81,10 @@ export interface AgentWorkspace {
   /** 挂载的技能 id 列表（三态）：null=继承全部启用技能；[]=显式不挂；非空数组=显式子集。
    *  运行时与全局启用集取交集。 */
   mountedSkills: string[] | null;
+  /** 'user'=用户创建、可编辑/删除；'builtin'=官方只读预置，定义来自仓库内 JSON，
+   *  不可改名/改头像/改指令/改技能/删除（仅 pin、聊天、文件空间等用户自有操作放行），
+   *  可"克隆为我的智能体"。 */
+  source: "user" | "builtin";
   createdAt: number;
   updatedAt: number;
 }
