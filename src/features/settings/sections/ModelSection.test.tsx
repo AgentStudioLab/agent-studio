@@ -222,6 +222,7 @@ function flattenSelectItems(
 const testI18n = i18n.createInstance();
 void testI18n.use(initReactI18next).init({
   lng: "en",
+  initImmediate: false,
   resources: {
     en: {
       translation: {
@@ -584,6 +585,15 @@ describe("ModelSection", () => {
     expect(screen.getAllByText("OpenAI").length).toBeGreaterThan(0);
     expect(screen.getByText("SiliconFlow")).toBeDefined();
     expect(screen.queryByLabelText("Provider")).toBeNull();
+  });
+
+  it("styles the default provider badge with the success palette", async () => {
+    renderModelSection(providerFixture());
+
+    const badge = await screen.findByText("Default");
+
+    expect(badge.className).toContain("bg-success-100/15");
+    expect(badge.className).toContain("text-success-100");
   });
 
   it("locks managed official provider rows", async () => {

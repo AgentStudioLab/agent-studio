@@ -7,10 +7,14 @@ import { createProviderSettings } from "../services/providerSettings";
 import { createUserProfileSettings } from "../services/userProfileSettings";
 import { buildSettingsRoutes } from "./settings";
 
-function makeApp() {
+const originalFetch = globalThis.fetch;
+
+function makeApp(options: { officialFetch?: typeof fetch } = {}) {
   const db = new Database(":memory:");
   migrate(db);
-  const officialService = createOfficialService();
+  const officialService = createOfficialService({
+    ...(options.officialFetch ? { fetchImpl: options.officialFetch } : {}),
+  });
   const provider = createProviderSettings(db, {}, officialService);
   const userProfile = createUserProfileSettings(db);
   const app = new Hono();
@@ -19,6 +23,7 @@ function makeApp() {
 }
 
 afterEach(() => {
+  globalThis.fetch = originalFetch;
   mock.restore();
 });
 
@@ -220,7 +225,12 @@ describe("settings provider routes", () => {
   });
 
   it("syncs the official website origin for managed official models", async () => {
-    const { app, officialService } = makeApp();
+    const officialFetch = mock(
+      async () => new Response("not found", { status: 404 }),
+    );
+    const { app, officialService } = makeApp({
+      officialFetch: officialFetch as unknown as typeof fetch,
+    });
 
     const res = await app.request("/settings/official-service", {
       method: "POST",
@@ -239,6 +249,78 @@ describe("settings provider routes", () => {
     expect(officialService.getSnapshot().websiteOrigin).toBe(
       "https://www.agentstudio.chat",
     );
+  });
+
+  it("refreshes official models from the website desktop api when syncing the official service", async () => {
+    const fetchMock = mock(async (url: string | URL | Request) => {
+      expect(String(url)).toBe(
+        "https://www.agentstudio.chat/api/desktop/ai/models",
+      );
+      return Response.json({
+        code: 0,
+        message: "ok",
+        data: {
+          models: [
+            {
+              id: "proxy-model-a",
+              displayName: "Proxy Model A",
+              description: "Remote official model",
+            },
+            {
+              id: "proxy-model-b",
+              displayName: "Proxy Model B",
+              description: "Remote official model",
+            },
+          ],
+        },
+      });
+    });
+    const { app } = makeApp({
+      officialFetch: fetchMock as unknown as typeof fetch,
+    });
+
+    const res = await app.request("/settings/official-service", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        websiteOrigin: "https://www.agentstudio.chat/",
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(await res.json()).toMatchObject({
+      officialService: {
+        websiteOrigin: "https://www.agentstudio.chat",
+        source: "remote",
+        models: [
+          {
+            id: "proxy-model-a",
+            displayName: "Proxy Model A",
+            description: "Remote official model",
+          },
+          {
+            id: "proxy-model-b",
+            displayName: "Proxy Model B",
+            description: "Remote official model",
+          },
+        ],
+      },
+    });
+
+    const providerRes = await app.request("/settings/provider");
+    const providerBody = (await providerRes.json()) as {
+      connections: Array<{ id: string; modelCount: number }>;
+      enabledModels: Array<{ providerId: string; modelId: string }>;
+    };
+    expect(
+      providerBody.connections.find((connection) => connection.id === "official"),
+    ).toMatchObject({ modelCount: 2 });
+    expect(
+      providerBody.enabledModels
+        .filter((model) => model.providerId === "official")
+        .map((model) => model.modelId),
+    ).toEqual(["proxy-model-a", "proxy-model-b"]);
   });
 
   it("rejects updates to the managed official provider through settings routes", async () => {

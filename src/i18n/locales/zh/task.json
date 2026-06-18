@@ -195,6 +195,10 @@
       "confirm": "确认开启"
     }
   },
+  "modelPicker": {
+    "official": "官方",
+    "selected": "已选择"
+  },
   "error": {
     "authFailed": "API key 失效或未配置",
     "configureKey": "配置 API key",

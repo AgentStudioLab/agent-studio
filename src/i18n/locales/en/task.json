@@ -195,6 +195,10 @@
       "confirm": "Yes, continue"
     }
   },
+  "modelPicker": {
+    "official": "Official",
+    "selected": "Selected"
+  },
   "error": {
     "authFailed": "API key invalid or missing",
     "configureKey": "Configure API key",

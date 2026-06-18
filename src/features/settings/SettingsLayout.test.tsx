@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, mock } from "bun:test";
 import { cleanup, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
+import zhSettings from "@/i18n/locales/zh/settings.json";
 
 mock.module("react-i18next", () => ({
   I18nextProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
@@ -45,6 +46,27 @@ function renderSettingsLayout(path = "/settings/account") {
 afterEach(() => cleanup());
 
 describe("SettingsLayout", () => {
+  it("keeps Chinese settings navigation labels at four characters", () => {
+    const labels = [
+      zhSettings.nav.account,
+      zhSettings.nav.model,
+      zhSettings.nav.permissions,
+      zhSettings.nav.remoteConnections,
+      zhSettings.nav.appearance,
+      zhSettings.nav.usage,
+    ];
+
+    expect(labels).toEqual([
+      "账号资料",
+      "模型服务",
+      "权限管理",
+      "远程连接",
+      "外观设置",
+      "用量统计",
+    ]);
+    expect(labels.every((label) => Array.from(label).length === 4)).toBe(true);
+  });
+
   it("shows a semantic icon before each settings navigation option", () => {
     renderSettingsLayout();
 

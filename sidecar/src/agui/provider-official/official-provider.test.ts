@@ -17,6 +17,15 @@ async function collect<T>(iterable: AsyncIterable<T>): Promise<T[]> {
   return events;
 }
 
+async function nextOrTimeout<T>(
+  promise: Promise<IteratorResult<T>>,
+): Promise<IteratorResult<T> | "timeout"> {
+  return Promise.race([
+    promise,
+    new Promise<"timeout">((resolve) => setTimeout(() => resolve("timeout"), 30)),
+  ]);
+}
+
 function runContext(overrides: Record<string, unknown> = {}) {
   return {
     runId: "run-1",
@@ -94,6 +103,61 @@ describe("official provider", () => {
         model: "gpt-5-mini",
       }),
     ]);
+  });
+
+  it("emits AGUI text events before the website NDJSON stream closes", async () => {
+    const encoder = new TextEncoder();
+    let streamController: ReadableStreamDefaultController<Uint8Array> | null =
+      null;
+    globalThis.fetch = mock(async () => {
+      const body = new ReadableStream<Uint8Array>({
+        start(controller) {
+          streamController = controller;
+        },
+      });
+
+      return new Response(body, {
+        headers: { "Content-Type": "application/x-ndjson" },
+      });
+    }) as unknown as typeof fetch;
+    const provider = createOfficialProvider();
+    const iterator = provider.run(runContext())[Symbol.asyncIterator]();
+
+    expect(await iterator.next()).toEqual({
+      done: false,
+      value: {
+        type: EventType.RUN_STARTED,
+        threadId: "thread-1",
+        runId: "run-1",
+      },
+    });
+
+    const firstPendingEvent = iterator.next();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    streamController?.enqueue(
+      encoder.encode(`${JSON.stringify({ type: "text_delta", text: "你" })}\n`),
+    );
+
+    const startEvent = await nextOrTimeout(firstPendingEvent);
+    if (startEvent === "timeout") {
+      streamController?.close();
+      await firstPendingEvent.catch(() => undefined);
+    }
+    expect(startEvent).not.toBe("timeout");
+    expect(startEvent).toMatchObject({
+      done: false,
+      value: { type: EventType.TEXT_MESSAGE_START, role: "assistant" },
+    });
+
+    const contentEvent = await nextOrTimeout(iterator.next());
+    expect(contentEvent).not.toBe("timeout");
+    expect(contentEvent).toMatchObject({
+      done: false,
+      value: { type: EventType.TEXT_MESSAGE_CONTENT, delta: "你" },
+    });
+
+    streamController?.close();
+    await iterator.return?.();
   });
 
   it("maps insufficient credits to the desktop error code", async () => {

@@ -58,7 +58,14 @@ export function ProviderConnectionList({
                   <span className="font-medium text-foreground">
                     {connection.name}
                   </span>
-                  {isDefault && <Badge variant="secondary">{labels.default}</Badge>}
+                  {isDefault && (
+                    <Badge
+                      variant="ghost"
+                      className="bg-success-100/15 text-success-100"
+                    >
+                      {labels.default}
+                    </Badge>
+                  )}
                   {connection.managed && (
                     <Badge variant="outline">
                       <LockIcon />

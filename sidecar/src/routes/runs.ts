@@ -99,14 +99,13 @@ export function buildRunRoutes(deps: MountRunsDeps): Hono {
     // Unknown / missing permissionMode → default to "ask" (the safe choice).
     const permissionMode: "ask" | "act-without-asking" =
       body.permissionMode === "act-without-asking" ? "act-without-asking" : "ask";
+    const providerSelection = parseProviderSelection(body.providerSelection);
     // model: light validation only — SDK echoes a clear error if the id is
-    // unknown. Empty string or non-string → undefined (provider falls back to
-    // ANTHROPIC_MODEL env).
+    // unknown. Empty string or non-string → provider selection/default fallback.
     const model =
       typeof body.model === "string" && body.model.length > 0
         ? body.model
-        : undefined;
-    const providerSelection = parseProviderSelection(body.providerSelection);
+        : providerSelection?.modelId;
     const officialAuthToken =
       typeof body.officialAuthToken === "string" && body.officialAuthToken.length > 0
         ? body.officialAuthToken
@@ -227,11 +226,11 @@ export function buildRunRoutes(deps: MountRunsDeps): Hono {
 
     const permissionMode: "ask" | "act-without-asking" =
       body.permissionMode === "act-without-asking" ? "act-without-asking" : "ask";
+    const providerSelection = parseProviderSelection(body.providerSelection);
     const model =
       typeof body.model === "string" && body.model.length > 0
         ? body.model
-        : undefined;
-    const providerSelection = parseProviderSelection(body.providerSelection);
+        : providerSelection?.modelId;
     const officialAuthToken =
       typeof body.officialAuthToken === "string" && body.officialAuthToken.length > 0
         ? body.officialAuthToken

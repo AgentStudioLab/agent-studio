@@ -33,16 +33,10 @@ import {
   type ProviderModelSelection,
 } from "@/lib/data/settings";
 import { useAuth } from "@/features/auth/useAuth";
-import { buildOfficialRunAuthFields } from "@/features/task/officialRunAuth";
-
-interface TaskRunOptions {
-  permissionMode?: "ask" | "act-without-asking";
-  providerSelection?: ProviderModelSelection;
-  model?: string;
-  approvalRules?: string[];
-  officialAuthToken?: string;
-  officialWebsiteOrigin?: string;
-}
+import {
+  buildProviderRunOptions,
+  type TaskRunOptions,
+} from "@/features/task/providerRunOptions";
 
 function touchedFileToPreview(f: TouchedFile): MockFile {
   const lower = f.relativePath.toLowerCase();
@@ -126,28 +120,17 @@ export function TaskView() {
       model?: string | null;
       approvalRules?: string[];
     }): Promise<TaskRunOptions> => {
-      const explicitSelection = input.providerSelection ?? null;
-      const defaultSelection = explicitSelection
-        ? null
-        : await resolveDefaultProviderSelection();
-      const officialFields = await buildOfficialRunAuthFields({
+      return buildProviderRunOptions({
         auth,
-        providerSelection: explicitSelection,
-        defaultSelection,
+        providerSelection: input.providerSelection,
+        resolveDefaultProviderSelection,
+        permissionMode: input.permissionMode,
+        model: input.model,
+        approvalRules: input.approvalRules,
+        onOfficialRunPending: () => {
+          officialRunPendingRef.current = true;
+        },
       });
-      if (officialFields.officialAuthToken) {
-        officialRunPendingRef.current = true;
-      }
-
-      return {
-        ...(input.permissionMode ? { permissionMode: input.permissionMode } : {}),
-        ...(explicitSelection ? { providerSelection: explicitSelection } : {}),
-        ...(input.model ? { model: input.model } : {}),
-        ...(input.approvalRules?.length
-          ? { approvalRules: input.approvalRules }
-          : {}),
-        ...officialFields,
-      };
     },
     [auth, resolveDefaultProviderSelection],
   );

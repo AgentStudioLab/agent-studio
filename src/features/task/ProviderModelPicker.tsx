@@ -1,5 +1,6 @@
 import { ChevronDown, LockIcon } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { PromptInputButton } from "@/components/ai-elements/prompt-input";
 import {
   DropdownMenu,
@@ -18,6 +19,7 @@ import {
   getProvider,
   type EnabledModelOption,
   type ProviderModelSelection,
+  setDefaultProviderSelection,
 } from "@/lib/data/settings";
 
 interface ProviderModelPickerProps {
@@ -87,6 +89,8 @@ export function ProviderModelPicker({
   disabled = false,
   disabledReason,
 }: ProviderModelPickerProps) {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
   const { data } = useQuery({
     queryKey: ["provider"],
     queryFn: getProvider,
@@ -99,6 +103,21 @@ export function ProviderModelPicker({
   const label = displayLabel(enabledModels, value, data?.defaultSelection);
   const groups = groupModels(enabledModels);
   const hasModels = enabledModels.length > 0;
+  const handleSelect = (selection: ProviderModelSelection) => {
+    onChange(selection);
+    queryClient.setQueryData(["provider"], (current: typeof data) =>
+      current ? { ...current, defaultSelection: selection } : current,
+    );
+    void setDefaultProviderSelection(selection)
+      .then((next) => {
+        queryClient.setQueryData(["provider"], (current: typeof data) =>
+          current ? { ...current, ...next, builtIn: current.builtIn } : next,
+        );
+      })
+      .catch(() => {
+        void queryClient.invalidateQueries({ queryKey: ["provider"] });
+      });
+  };
 
   if (disabled) {
     return (
@@ -159,7 +178,7 @@ export function ProviderModelPicker({
               {group.managed && (
                 <span className="inline-flex items-center gap-1 rounded-md border border-border px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
                   <LockIcon className="size-3" />
-                  Official
+                  {t("task.modelPicker.official")}
                 </span>
               )}
             </DropdownMenuLabel>
@@ -169,7 +188,7 @@ export function ProviderModelPicker({
                 <DropdownMenuItem
                   key={key}
                   onSelect={() =>
-                    onChange({
+                    handleSelect({
                       providerId: model.providerId,
                       modelId: model.modelId,
                     })
@@ -179,11 +198,11 @@ export function ProviderModelPicker({
                   <span className="text-[13px] font-medium">
                     {model.modelLabel}
                   </span>
-                  <span className="text-[12px] text-muted-foreground">
-                    {key === selectedKey
-                      ? "Selected"
-                      : model.modelDescription || model.modelId}
-                  </span>
+                  {key === selectedKey && (
+                    <span className="text-[12px] font-medium text-[hsl(var(--success-100))]">
+                      {t("task.modelPicker.selected")}
+                    </span>
+                  )}
                 </DropdownMenuItem>
               );
             })}

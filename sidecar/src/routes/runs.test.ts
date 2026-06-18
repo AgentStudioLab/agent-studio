@@ -299,12 +299,17 @@ describe("POST /runs — provider selection", () => {
     ]);
   });
 
-  it("forwards official auth fields to the resolved run provider", async () => {
+  it("forwards official auth fields and selected model to the resolved run provider", async () => {
     const seenOfficialFields: unknown[] = [];
     const provider = {
       name: "fake",
-      run(ctx: { officialAuthToken?: string; officialWebsiteOrigin?: string }) {
+      run(ctx: {
+        model?: string;
+        officialAuthToken?: string;
+        officialWebsiteOrigin?: string;
+      }) {
         seenOfficialFields.push({
+          model: ctx.model,
           officialAuthToken: ctx.officialAuthToken,
           officialWebsiteOrigin: ctx.officialWebsiteOrigin,
         });
@@ -369,6 +374,7 @@ describe("POST /runs — provider selection", () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(seenOfficialFields).toEqual([
       {
+        model: "gpt-5-mini",
         officialAuthToken: "access-token",
         officialWebsiteOrigin: "https://www.agentstudio.chat",
       },

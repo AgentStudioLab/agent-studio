@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import type { DesktopAuthTokens, DesktopUser } from "./auth-types";
@@ -130,10 +131,15 @@ const signedInTokens: DesktopAuthTokens = {
 
 const originalFetch = globalThis.fetch;
 const originalOrigin = import.meta.env.VITE_AGENT_STUDIO_WEBSITE_ORIGIN;
+let queryClient: QueryClient;
 
 function wrap({ children }: { children: ReactNode }) {
   const { AuthProvider } = require("./AuthProvider") as typeof import("./AuthProvider");
-  return <AuthProvider>{children}</AuthProvider>;
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>{children}</AuthProvider>
+    </QueryClientProvider>
+  );
 }
 
 function useAuthForTest() {
@@ -175,6 +181,9 @@ function createExpiredAccessTokens(): DesktopAuthTokens {
 
 describe("AuthProvider", () => {
   beforeEach(() => {
+    queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
     window.localStorage.clear();
     currentLanguage = "zh";
     import.meta.env.VITE_AGENT_STUDIO_WEBSITE_ORIGIN = "https://example.test";
@@ -225,6 +234,7 @@ describe("AuthProvider", () => {
 
   afterEach(() => {
     cleanup();
+    queryClient.clear();
     window.localStorage.clear();
     globalThis.fetch = originalFetch;
     import.meta.env.VITE_AGENT_STUDIO_WEBSITE_ORIGIN = originalOrigin;
@@ -236,6 +246,36 @@ describe("AuthProvider", () => {
     await waitFor(() => expect(result.current.status).toBe("signed-out"));
     expect(result.current.user).toBeNull();
     expect(result.current.tokens).toBeNull();
+  });
+
+  it("refreshes cached model picker data after syncing the official service", async () => {
+    queryClient.setQueryData(["provider"], {
+      enabledModels: [
+        {
+          providerId: "official",
+          modelId: "gpt-5.1",
+          modelLabel: "GPT-5.1",
+          modelDescription: "Official fallback model",
+        },
+      ],
+    });
+    queryClient.setQueryData(["models"], {
+      data: [
+        {
+          id: "gpt-5.1",
+          displayName: "GPT-5.1",
+          description: "Official fallback model",
+        },
+      ],
+    });
+
+    renderHook(() => useAuthForTest(), { wrapper: wrap });
+
+    await waitFor(() => expect(fetchSidecar).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(queryClient.getQueryState(["provider"])?.isInvalidated).toBe(true),
+    );
+    expect(queryClient.getQueryState(["models"])?.isInvalidated).toBe(true);
   });
 
   it("opens the authorize URL with generated PKCE state and a stable device id", async () => {

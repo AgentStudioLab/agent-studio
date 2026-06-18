@@ -62,12 +62,50 @@ function mapOfficialErrorCode(code: unknown): string {
     : "OFFICIAL_AI_ERROR";
 }
 
-async function readNdjsonLines(response: Response): Promise<OfficialNdjsonLine[]> {
-  const text = await response.text();
-  return text
-    .split(/\r?\n/)
-    .map((line) => parseLine(line))
-    .filter((line): line is OfficialNdjsonLine => line !== null);
+async function* readNdjsonLines(
+  response: Response,
+): AsyncIterable<OfficialNdjsonLine> {
+  if (!response.body) {
+    const text = await response.text();
+    for (const line of text.split(/\r?\n/)) {
+      const parsed = parseLine(line);
+      if (parsed) {
+        yield parsed;
+      }
+    }
+    return;
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  const emitBufferedLines = function* (): Iterable<OfficialNdjsonLine> {
+    let newlineIndex = buffer.indexOf("\n");
+    while (newlineIndex >= 0) {
+      const line = buffer.slice(0, newlineIndex);
+      buffer = buffer.slice(newlineIndex + 1);
+      const parsed = parseLine(line);
+      if (parsed) {
+        yield parsed;
+      }
+      newlineIndex = buffer.indexOf("\n");
+    }
+  };
+
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    yield* emitBufferedLines();
+  }
+
+  buffer += decoder.decode();
+  const parsed = parseLine(buffer);
+  if (parsed) {
+    yield parsed;
+  }
 }
 
 export function createOfficialProvider(
@@ -133,9 +171,7 @@ export function createOfficialProvider(
           }),
           signal: ctx.abortSignal,
         });
-        const lines = await readNdjsonLines(response);
-
-        for (const line of lines) {
+        for await (const line of readNdjsonLines(response)) {
           if (line.type === "text_delta") {
             const delta = typeof line.text === "string" ? line.text : "";
             if (!delta) continue;

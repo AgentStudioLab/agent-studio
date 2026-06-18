@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-shell";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   useCallback,
   useEffect,
@@ -106,6 +107,7 @@ function shouldClearSessionForAuthError(error: unknown): boolean {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { i18n } = useTranslation();
+  const queryClient = useQueryClient();
   const [status, setStatus] = useState<AuthStatus>("loading");
   const [user, setUser] = useState<DesktopUser | null>(null);
   const [tokens, setTokens] = useState<DesktopAuthTokens | null>(null);
@@ -427,8 +429,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // 官网 origin 是官方模型 catalog 和官方聊天扣积分链路的共同入口；
     // 同步失败不影响本地登录启动，后续发送官方模型时仍会显式带 origin。
-    void syncOfficialService().catch(() => {});
-  }, []);
+    void syncOfficialService()
+      .then(() => {
+        void queryClient.invalidateQueries({ queryKey: ["provider"] });
+        void queryClient.invalidateQueries({ queryKey: ["models"] });
+      })
+      .catch(() => {});
+  }, [queryClient]);
 
   useEffect(() => {
     let cancelled = false;

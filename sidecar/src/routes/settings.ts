@@ -216,11 +216,13 @@ export function buildSettingsRoutes(
     if (!deps.officialService) {
       return c.json({ error: "official_service_unavailable" }, 500);
     }
+    const officialService = deps.officialService;
     try {
-      const officialService = deps.officialService.setWebsiteOrigin(
-        body.websiteOrigin,
-      );
-      return c.json({ officialService });
+      officialService.setWebsiteOrigin(body.websiteOrigin);
+      const snapshot = await officialService
+        .refreshModels()
+        .catch(() => officialService.getSnapshot());
+      return c.json({ officialService: snapshot });
     } catch (error) {
       return c.json(
         {

@@ -2,11 +2,11 @@
   "title": "设置",
   "nav": {
     "general": "通用",
-    "account": "账号",
-    "model": "模型",
-    "permissions": "权限",
+    "account": "账号资料",
+    "model": "模型服务",
+    "permissions": "权限管理",
     "remoteConnections": "远程连接",
-    "appearance": "外观",
+    "appearance": "外观设置",
     "usage": "用量统计"
   },
   "saveButton": "保存",
