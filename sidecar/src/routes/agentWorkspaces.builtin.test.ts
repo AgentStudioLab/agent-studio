@@ -52,7 +52,7 @@ describe("builtin agent read-only guards", () => {
     const { app } = harness();
     const res = await app.request(`/agents/${BUILTIN_ID}`, json({ name: "Hacked" }));
     expect(res.status).toBe(403);
-    expect((await res.json()).error).toBe("builtin_readonly");
+    expect(((await res.json()) as { error: string }).error).toBe("builtin_readonly");
   });
 
   it("PATCH pin-only on builtin → 200 (user-owned, allowed)", async () => {

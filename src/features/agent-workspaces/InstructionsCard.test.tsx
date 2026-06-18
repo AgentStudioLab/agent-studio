@@ -3,6 +3,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 
 let instructions = "";
+let agentSource: "user" | "builtin" = "user";
 
 mock.module("react-i18next", () => ({
   I18nextProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
@@ -31,6 +32,10 @@ mock.module("@/lib/data/agent-instruction-queries", () => ({
   }),
 }));
 
+mock.module("@/lib/data/agent-queries", () => ({
+  useAgentWorkspace: () => ({ data: { source: agentSource } }),
+}));
+
 mock.module("./RailSection", () => ({
   RailSection: ({
     title,
@@ -54,6 +59,7 @@ const { InstructionsCard } = require("./InstructionsCard") as typeof import("./I
 afterEach(() => {
   cleanup();
   instructions = "";
+  agentSource = "user";
 });
 
 describe("InstructionsCard", () => {
@@ -69,5 +75,18 @@ describe("InstructionsCard", () => {
     expect(preview.className).toContain("overflow-x-hidden");
     expect(preview.tabIndex).toBe(0);
     expect(preview.querySelector("p")?.className).toContain("break-words");
+  });
+
+  it("shows the edit action for a user agent", () => {
+    instructions = "hi";
+    render(<InstructionsCard agentId="agent-1" />);
+    expect(screen.queryByLabelText("Edit")).not.toBeNull();
+  });
+
+  it("hides the edit action for a builtin (read-only) agent", () => {
+    instructions = "hi";
+    agentSource = "builtin";
+    render(<InstructionsCard agentId="agent-1" />);
+    expect(screen.queryByLabelText("Edit")).toBeNull();
   });
 });
