@@ -69,6 +69,79 @@
       }
     }
   },
+  "processGroup": {
+    "done": "Done",
+    "fallback": {
+      "file": "file",
+      "url": "url",
+      "query": "query"
+    },
+    "detail": {
+      "args": "Args",
+      "result": "Result",
+      "error": "Error",
+      "running": "Running…"
+    },
+    "toolTitles": {
+      "bash": "Running command",
+      "read": "Read {{file}}",
+      "write": "Wrote {{file}}",
+      "edit": "Edited {{file}}",
+      "glob": "Glob",
+      "globWithPattern": "Glob {{pattern}}",
+      "grep": "Grep",
+      "grepWithPattern": "Grep {{pattern}}",
+      "webFetch": "Fetched {{url}}",
+      "webSearch": "Searched {{query}}",
+      "task": "Subagent task",
+      "skill": "Skill"
+    },
+    "summary": {
+      "listSeparator": ", ",
+      "thought": "Thought",
+      "working": "Working",
+      "ranCommand": {
+        "one": "ran a command",
+        "other": "ran {{count}} commands"
+      },
+      "readFile": {
+        "one": "read a file",
+        "other": "read {{count}} files"
+      },
+      "wroteFile": {
+        "one": "wrote a file",
+        "other": "wrote {{count}} files"
+      },
+      "editedFile": {
+        "one": "edited a file",
+        "other": "edited {{count}} files"
+      },
+      "ranSearch": {
+        "one": "ran a search",
+        "other": "ran {{count}} searches"
+      },
+      "fetchedPage": {
+        "one": "fetched a page",
+        "other": "fetched {{count}} pages"
+      },
+      "ranWebSearch": {
+        "one": "ran a web search",
+        "other": "ran {{count}} web searches"
+      },
+      "ranSubagent": {
+        "one": "ran a subagent",
+        "other": "ran {{count}} subagents"
+      },
+      "usedSkill": {
+        "one": "used a skill",
+        "other": "used {{count}} skills"
+      },
+      "ranToolCall": {
+        "one": "ran a tool call",
+        "other": "ran {{count}} tool calls"
+      }
+    }
+  },
   "filesTab": {
     "fileCount": "{{count}} files",
     "newBadge": "new",

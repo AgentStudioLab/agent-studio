@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   BrainIcon,
   ChevronDown,
@@ -30,6 +31,11 @@ import {
 } from "@/components/ai-elements/code-block";
 import type { BundledLanguage } from "shiki";
 
+type Translate = (
+  key: string,
+  options?: Record<string, string | number>,
+) => string;
+
 /**
  * One mixed step inside the group. The agent's interleaved "thought (reasoning)
  * + action (tool call)" trace, in arrival order.
@@ -57,6 +63,7 @@ interface ProcessGroupProps {
  * <Reasoning> collapsible. The whole group is the collapsible primitive.
  */
 export function ProcessGroup({ steps, done }: ProcessGroupProps) {
+  const { t } = useTranslation();
   // Open while live. Auto-collapse on done transition. User can re-toggle
   // manually after that without fighting the auto-collapse.
   const [open, setOpen] = useState(!done);
@@ -66,7 +73,7 @@ export function ProcessGroup({ steps, done }: ProcessGroupProps) {
     if (done && !userToggled) setOpen(false);
   }, [done, userToggled]);
 
-  const summary = buildSummary(steps);
+  const summary = buildSummary(steps, t);
 
   return (
     // No card — the trace reads as quiet inline content (per design) so it
@@ -159,9 +166,10 @@ function ReasoningStep({
  * slot instead of their wrench/terminal/etc icon.
  */
 function ToolStep({ tool, isLast }: { tool: ToolCallView; isLast: boolean }) {
+  const { t } = useTranslation();
   const Icon = iconFor(tool.toolName);
-  const title = titleFor(tool);
-  const chip = chipFor(tool);
+  const title = titleFor(tool, t);
+  const chip = chipFor(tool, t);
   const pending = tool.status === "pending";
 
   return (
@@ -228,6 +236,7 @@ function ToolStep({ tool, isLast }: { tool: ToolCallView; isLast: boolean }) {
  * assistant's final answer.
  */
 function ToolDetailPane({ tool }: { tool: ToolCallView }) {
+  const { t } = useTranslation();
   const argsText = formatJson(tool.args);
   const resultLang = inferResultLanguage(tool.result);
   const resultText = formatResult(tool.result);
@@ -239,7 +248,7 @@ function ToolDetailPane({ tool }: { tool: ToolCallView }) {
           className="text-[10.5px] font-medium uppercase tracking-wide"
           style={{ color: "hsl(var(--text-400))" }}
         >
-          Args
+          {t("task.processGroup.detail.args")}
         </div>
         <CodeBlock code={argsText} language="json">
           <CodeBlockHeader>
@@ -263,7 +272,9 @@ function ToolDetailPane({ tool }: { tool: ToolCallView }) {
                   : "hsl(var(--text-400))",
             }}
           >
-            {tool.status === "error" ? "Error" : "Result"}
+            {tool.status === "error"
+              ? t("task.processGroup.detail.error")
+              : t("task.processGroup.detail.result")}
           </div>
           <CodeBlock code={resultText} language={resultLang}>
             <CodeBlockHeader>
@@ -282,7 +293,7 @@ function ToolDetailPane({ tool }: { tool: ToolCallView }) {
           className="text-[12px]"
           style={{ color: "hsl(var(--text-400))" }}
         >
-          Running…
+          {t("task.processGroup.detail.running")}
         </p>
       )}
     </>
@@ -313,6 +324,8 @@ function formatResult(result: unknown): string | null {
 }
 
 function DoneRow() {
+  const { t } = useTranslation();
+
   return (
     <div className="flex items-center gap-3 pt-1">
       {/* Same icon-slot footprint + size as the brain / tool step icons so
@@ -327,7 +340,7 @@ function DoneRow() {
         className="text-[13.5px]"
         style={{ color: "hsl(var(--text-200))" }}
       >
-        Done
+        {t("task.processGroup.done")}
       </span>
     </div>
   );
@@ -353,34 +366,59 @@ function iconFor(toolName: string): LucideIcon {
   return TOOL_ICON_MAP[toolName] ?? Wrench;
 }
 
-function titleFor(tool: ToolCallView): string {
+function titleFor(tool: ToolCallView, t: Translate): string {
   const args = (tool.args ?? {}) as Record<string, unknown>;
   const basename = (p: unknown): string =>
     typeof p === "string" ? (p.split("/").pop() ?? p) : "";
+  const file = (p: unknown): string =>
+    basename(p) || t("task.processGroup.fallback.file");
   switch (tool.toolName) {
     case "Bash":
-      return "Running command";
+      return t("task.processGroup.toolTitles.bash");
     case "Read":
-      return `Read ${basename(args.file_path)}`;
+      return t("task.processGroup.toolTitles.read", {
+        file: file(args.file_path),
+      });
     case "Write":
-      return `Wrote ${basename(args.file_path)}`;
+      return t("task.processGroup.toolTitles.write", {
+        file: file(args.file_path),
+      });
     case "Edit":
     case "MultiEdit":
-      return `Edited ${basename(args.file_path)}`;
+    case "NotebookEdit":
+      return t("task.processGroup.toolTitles.edit", {
+        file: file(args.file_path),
+      });
     case "Glob": {
       const pat = typeof args.pattern === "string" ? args.pattern : "";
-      return pat ? `Glob ${pat}` : "Glob";
+      return pat
+        ? t("task.processGroup.toolTitles.globWithPattern", { pattern: pat })
+        : t("task.processGroup.toolTitles.glob");
     }
     case "Grep": {
       const pat = typeof args.pattern === "string" ? args.pattern : "";
-      return pat ? `Grep ${pat}` : "Grep";
+      return pat
+        ? t("task.processGroup.toolTitles.grepWithPattern", { pattern: pat })
+        : t("task.processGroup.toolTitles.grep");
     }
     case "WebFetch":
-      return `Fetched ${typeof args.url === "string" ? args.url : "url"}`;
+      return t("task.processGroup.toolTitles.webFetch", {
+        url:
+          typeof args.url === "string"
+            ? args.url
+            : t("task.processGroup.fallback.url"),
+      });
     case "WebSearch":
-      return `Searched ${typeof args.query === "string" ? args.query : ""}`;
+      return t("task.processGroup.toolTitles.webSearch", {
+        query:
+          typeof args.query === "string"
+            ? args.query
+            : t("task.processGroup.fallback.query"),
+      });
     case "Task":
-      return "Subagent task";
+      return t("task.processGroup.toolTitles.task");
+    case "Skill":
+      return t("task.processGroup.toolTitles.skill");
     default:
       return tool.toolName;
   }
@@ -388,10 +426,11 @@ function titleFor(tool: ToolCallView): string {
 
 function chipFor(
   tool: ToolCallView,
+  t: Translate,
 ): { label: string; style: { background: string; color: string } } | null {
   if (tool.status === "error") {
     return {
-      label: "Error",
+      label: t("task.processGroup.detail.error"),
       style: {
         background: "hsl(var(--danger-100) / 0.18)",
         color: "hsl(var(--danger-100))",
@@ -406,58 +445,55 @@ function chipFor(
  * when reasoning steps are present, so the user knows the group also
  * includes thinking content even before expanding.
  */
-function buildSummary(steps: ProcessStep[]): string {
+function buildSummary(steps: ProcessStep[], t: Translate): string {
   const hasReasoning = steps.some((s) => s.kind === "reasoning");
   const tools = steps.flatMap((s) => (s.kind === "tool_call" ? [s.tool] : []));
 
-  // Aggregate tool calls into verb-led phrases per category, e.g.
-  // "Edited 6 files, read 5 files, ran 3 commands" / "Ran 7 commands, used a skill".
-  const phraseFor = (name: string): { verb: string; noun: string } => {
+  // 按工具类别合并，保留第一次出现的顺序，避免长工具流刷满标题。
+  const phraseKeyFor = (name: string): string => {
     switch (name) {
       case "Bash":
-        return { verb: "ran", noun: "command" };
+        return "ranCommand";
       case "Read":
-        return { verb: "read", noun: "file" };
+        return "readFile";
       case "Write":
-        return { verb: "wrote", noun: "file" };
+        return "wroteFile";
       case "Edit":
       case "MultiEdit":
       case "NotebookEdit":
-        return { verb: "edited", noun: "file" };
+        return "editedFile";
       case "Glob":
       case "Grep":
-        return { verb: "ran", noun: "search" };
+        return "ranSearch";
       case "WebFetch":
-        return { verb: "fetched", noun: "page" };
+        return "fetchedPage";
       case "WebSearch":
-        return { verb: "ran", noun: "web search" };
+        return "ranWebSearch";
       case "Task":
-        return { verb: "ran", noun: "subagent" };
+        return "ranSubagent";
       case "Skill":
-        return { verb: "used", noun: "skill" };
+        return "usedSkill";
       default:
-        return { verb: "ran", noun: "tool call" };
+        return "ranToolCall";
     }
   };
-  // Group by verb+noun, preserving first-occurrence order.
-  const groups = new Map<string, { verb: string; noun: string; count: number }>();
+  const groups = new Map<string, { phraseKey: string; count: number }>();
   for (const t of tools) {
-    const { verb, noun } = phraseFor(t.toolName);
-    const key = `${verb} ${noun}`;
+    const key = phraseKeyFor(t.toolName);
     const g = groups.get(key);
     if (g) g.count += 1;
-    else groups.set(key, { verb, noun, count: 1 });
+    else groups.set(key, { phraseKey: key, count: 1 });
   }
-  const plural = (noun: string) =>
-    /(?:ch|sh|s|x|z)$/.test(noun) ? `${noun}es` : `${noun}s`;
-  const article = (noun: string) => (/^[aeiou]/i.test(noun) ? "an" : "a");
-  const phrases = [...groups.values()].map(({ verb, noun, count }) =>
-    count === 1
-      ? `${verb} ${article(noun)} ${noun}`
-      : `${verb} ${count} ${plural(noun)}`,
-  );
+  const phrases = [...groups.values()].map(({ phraseKey, count }) => {
+    const countKey = count === 1 ? "one" : "other";
+    return t(`task.processGroup.summary.${phraseKey}.${countKey}`, { count });
+  });
 
-  if (phrases.length === 0) return hasReasoning ? "Thought" : "Working";
-  const joined = phrases.join(", ");
+  if (phrases.length === 0) {
+    return hasReasoning
+      ? t("task.processGroup.summary.thought")
+      : t("task.processGroup.summary.working");
+  }
+  const joined = phrases.join(t("task.processGroup.summary.listSeparator"));
   return joined.charAt(0).toUpperCase() + joined.slice(1);
 }

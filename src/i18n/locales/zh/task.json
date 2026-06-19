@@ -69,6 +69,79 @@
       }
     }
   },
+  "processGroup": {
+    "done": "完成",
+    "fallback": {
+      "file": "文件",
+      "url": "URL",
+      "query": "查询"
+    },
+    "detail": {
+      "args": "参数",
+      "result": "结果",
+      "error": "错误",
+      "running": "运行中…"
+    },
+    "toolTitles": {
+      "bash": "正在运行命令",
+      "read": "读取 {{file}}",
+      "write": "写入 {{file}}",
+      "edit": "编辑 {{file}}",
+      "glob": "匹配文件",
+      "globWithPattern": "匹配文件 {{pattern}}",
+      "grep": "搜索文本",
+      "grepWithPattern": "搜索文本 {{pattern}}",
+      "webFetch": "获取 {{url}}",
+      "webSearch": "搜索 {{query}}",
+      "task": "子智能体任务",
+      "skill": "使用技能"
+    },
+    "summary": {
+      "listSeparator": "，",
+      "thought": "思考中",
+      "working": "处理中",
+      "ranCommand": {
+        "one": "运行了 {{count}} 条命令",
+        "other": "运行了 {{count}} 条命令"
+      },
+      "readFile": {
+        "one": "读取了 {{count}} 个文件",
+        "other": "读取了 {{count}} 个文件"
+      },
+      "wroteFile": {
+        "one": "写入了 {{count}} 个文件",
+        "other": "写入了 {{count}} 个文件"
+      },
+      "editedFile": {
+        "one": "编辑了 {{count}} 个文件",
+        "other": "编辑了 {{count}} 个文件"
+      },
+      "ranSearch": {
+        "one": "执行了 {{count}} 次搜索",
+        "other": "执行了 {{count}} 次搜索"
+      },
+      "fetchedPage": {
+        "one": "获取了 {{count}} 个页面",
+        "other": "获取了 {{count}} 个页面"
+      },
+      "ranWebSearch": {
+        "one": "执行了 {{count}} 次网页搜索",
+        "other": "执行了 {{count}} 次网页搜索"
+      },
+      "ranSubagent": {
+        "one": "运行了 {{count}} 个子智能体",
+        "other": "运行了 {{count}} 个子智能体"
+      },
+      "usedSkill": {
+        "one": "使用了 {{count}} 个技能",
+        "other": "使用了 {{count}} 个技能"
+      },
+      "ranToolCall": {
+        "one": "调用了 {{count}} 个工具",
+        "other": "调用了 {{count}} 个工具"
+      }
+    }
+  },
   "filesTab": {
     "fileCount": "{{count}} 个文件",
     "newBadge": "新",

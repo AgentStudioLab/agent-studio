@@ -56,7 +56,7 @@ export function composeAppendPrompt(profile: UserProfile): string | null {
 export function languageDirective(locale: string | undefined): string | null {
   if (typeof locale !== "string") return null;
   if (locale.toLowerCase().startsWith("zh")) {
-    return "除非用户另有要求，请始终使用简体中文回答，包括你的思考过程（thinking）。";
+    return "除非用户另有要求，请始终使用简体中文回答，包括你的思考过程（thinking）、过程更新，以及工具调用前后的简短说明。";
   }
   return null;
 }
