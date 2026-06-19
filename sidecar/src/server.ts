@@ -177,7 +177,13 @@ app.use(
   }),
 );
 
-app.use("*", createRequestLogger());
+app.use(
+  "*",
+  createRequestLogger({
+    // conversations 相关接口包含高频状态轮询和列表刷新；保留其他接口日志即可。
+    skipPathPrefixes: ["/conversations"],
+  }),
+);
 
 app.use("*", async (c, next) => {
   const auth = c.req.header("Authorization");

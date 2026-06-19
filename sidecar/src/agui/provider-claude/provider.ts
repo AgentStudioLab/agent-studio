@@ -398,6 +398,11 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
         abortController: ac,
         cwd: ctx.cwd,
         env: buildEnv(),
+        // Agent Studio 的模型供应商由 DB/provider settings 决定。若让 SDK 默认读取
+        // ~/.claude/settings.json，其中的 env.ANTHROPIC_* 会覆盖这里传入的 DeepSeek/
+        // Anthropic runtime，导致同代码在不同机器上打到不同网关。Agent/CLAUDE.md
+        // 指令由 runWorker 显式读取并注入 appendContext，因此这里使用 SDK isolation mode。
+        settingSources: [],
         allowedTools,
         // External folders mounted into the bound agent (read set). Tells the
         // model these dirs are reachable beyond cwd. Omitted when there are

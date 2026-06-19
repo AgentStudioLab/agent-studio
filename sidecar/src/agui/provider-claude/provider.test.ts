@@ -44,6 +44,29 @@ describe("provider sandbox config", () => {
     expect(filesystem?.allowWrite).toEqual(["/tmp/proj"]);
   });
 
+  it("does not load user Claude Code settings that can override provider env", async () => {
+    const provider = createClaudeProvider({
+      apiKey: "deepseek-key",
+      baseUrl: "https://api.deepseek.com/anthropic",
+      model: "deepseek-chat",
+    });
+    const ac = new AbortController();
+    const stream = provider.run({
+      runId: "r_settings",
+      threadId: "t_settings",
+      userMessage: { role: "user", content: "hi" },
+      abortSignal: ac.signal,
+      cwd: "/tmp/proj",
+    });
+    for await (const _ of stream) { /* ignore */ }
+
+    const calls = querySpy.mock.calls as unknown[];
+    const lastCallArgs = calls[calls.length - 1] as unknown[];
+    const lastCall = lastCallArgs[0] as Record<string, unknown>;
+    const options = lastCall.options as Record<string, unknown>;
+    expect(options.settingSources).toEqual([]);
+  });
+
   // SDK 0.3.144 zod schema requires `updatedInput: Record` on every allow
    // result — bare `{behavior: "allow"}` blows up at runtime with:
    //   ZodError: path:["updatedInput"], expected:"record", received undefined

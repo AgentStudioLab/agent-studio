@@ -42,6 +42,28 @@ describe("request logger middleware", () => {
     expect(lines).toEqual(["[http] POST /runs -> 401 0ms"]);
   });
 
+  it("skips logs for configured path prefixes", async () => {
+    const lines: string[] = [];
+    const app = new Hono();
+    app.use(
+      "*",
+      createRequestLogger({
+        log: (line) => lines.push(line),
+        now: () => 8,
+        skipPathPrefixes: ["/conversations"],
+      }),
+    );
+    app.get("/conversations", (c) => c.json([]));
+    app.get("/conversations/:id", (c) => c.json({ id: c.req.param("id") }));
+    app.get("/settings", (c) => c.json({ ok: true }));
+
+    expect((await app.request("/conversations?limit=20")).status).toBe(200);
+    expect((await app.request("/conversations/thread_1")).status).toBe(200);
+    expect((await app.request("/settings")).status).toBe(200);
+
+    expect(lines).toEqual(["[http] GET /settings -> 200 0ms"]);
+  });
+
   it("logs thrown route errors as 500 responses", async () => {
     const lines: string[] = [];
     const app = new Hono();
