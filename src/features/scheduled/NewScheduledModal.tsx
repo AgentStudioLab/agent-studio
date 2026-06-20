@@ -377,7 +377,7 @@ export function NewScheduledModal({
             type="button"
             onClick={handleSave}
             disabled={!canSave}
-            className="rounded-md bg-text-100 px-4 py-2 text-[13.5px] font-medium text-bg-100 transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-md bg-primary px-4 py-2 text-[13.5px] font-medium text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {t("scheduled.modal.save")}
           </button>

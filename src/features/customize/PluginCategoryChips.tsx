@@ -29,7 +29,7 @@ export function PluginCategoryChips({ active, onChange }: PluginCategoryChipsPro
           className={cn(
             "rounded-full border px-3 py-1 text-xs transition-colors",
             active === c
-              ? "border-foreground bg-foreground text-background"
+              ? "border-primary bg-primary text-primary-foreground"
               : "border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground",
           )}
         >

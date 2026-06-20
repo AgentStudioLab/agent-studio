@@ -23,7 +23,7 @@ export function KeepAwakeBanner({ defaultEnabled = true }: KeepAwakeBannerProps)
         className={cn(
           "inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs transition-colors",
           enabled
-            ? "bg-[hsl(var(--accent-100))] text-[hsl(var(--oncolor-100))]"
+            ? "bg-primary text-primary-foreground hover:bg-primary/90"
             : "bg-muted text-foreground hover:bg-muted/80",
         )}
       >

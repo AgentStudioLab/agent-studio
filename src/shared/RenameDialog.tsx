@@ -87,7 +87,7 @@ export function RenameDialog({
             <Button
               type="submit"
               disabled={!canSave}
-              className="bg-foreground text-background hover:bg-foreground/90"
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
             >
               {t("task.renameDialog.save")}
             </Button>

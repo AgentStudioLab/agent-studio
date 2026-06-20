@@ -144,7 +144,7 @@ export function TasksView() {
                   <button
                     type="button"
                     onClick={() => navigate("/")}
-                    className="h-9 rounded-lg bg-foreground px-3.5 text-sm font-medium text-background transition-colors hover:bg-foreground/90"
+                    className="h-9 rounded-lg bg-primary px-3.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
                   >
                     {t("tasks.newTask")}
                   </button>
