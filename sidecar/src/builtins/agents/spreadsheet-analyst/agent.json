@@ -1,0 +1,8 @@
+{
+  "slug": "spreadsheet-analyst",
+  "name": "表格分析助手",
+  "avatar": "purple",
+  "category": "research",
+  "coverImage": "research",
+  "mountedSkills": ["agent-studio:xlsx", "agent-studio:pdf"]
+}

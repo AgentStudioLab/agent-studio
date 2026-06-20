@@ -1,0 +1,8 @@
+{
+  "slug": "writing-assistant",
+  "name": "文档写作助手",
+  "avatar": "green",
+  "category": "writing",
+  "coverImage": "writing",
+  "mountedSkills": ["agent-studio:docx", "agent-studio:doc-coauthoring", "agent-studio:pdf"]
+}

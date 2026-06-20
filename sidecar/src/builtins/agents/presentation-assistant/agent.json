@@ -1,0 +1,8 @@
+{
+  "slug": "presentation-assistant",
+  "name": "PPT/汇报助手",
+  "avatar": "amber",
+  "category": "writing",
+  "coverImage": "writing",
+  "mountedSkills": ["agent-studio:pptx", "agent-studio:docx", "agent-studio:pdf"]
+}

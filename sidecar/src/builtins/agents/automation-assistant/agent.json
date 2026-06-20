@@ -1,0 +1,8 @@
+{
+  "slug": "automation-assistant",
+  "name": "自动化任务助手",
+  "avatar": "red",
+  "category": "automation",
+  "coverImage": "automation",
+  "mountedSkills": ["agent-studio:schedule", "agent-studio:xlsx", "agent-studio:docx"]
+}

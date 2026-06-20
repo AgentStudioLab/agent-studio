@@ -10,8 +10,18 @@
 
 import codingMeta from "./coding-assistant/agent.json";
 import codingMd from "./coding-assistant/AGENT.md" with { type: "text" };
+import codeReviewerMeta from "./code-reviewer/agent.json";
+import codeReviewerMd from "./code-reviewer/AGENT.md" with { type: "text" };
 import researchMeta from "./research-assistant/agent.json";
 import researchMd from "./research-assistant/AGENT.md" with { type: "text" };
+import writingMeta from "./writing-assistant/agent.json";
+import writingMd from "./writing-assistant/AGENT.md" with { type: "text" };
+import presentationMeta from "./presentation-assistant/agent.json";
+import presentationMd from "./presentation-assistant/AGENT.md" with { type: "text" };
+import spreadsheetMeta from "./spreadsheet-analyst/agent.json";
+import spreadsheetMd from "./spreadsheet-analyst/AGENT.md" with { type: "text" };
+import automationMeta from "./automation-assistant/agent.json";
+import automationMd from "./automation-assistant/AGENT.md" with { type: "text" };
 
 export interface BuiltinAgentDef {
   /** 稳定标识，决定 id = `agw_builtin_<slug>`。改 slug 等于换一个 agent（旧的会被软下架）。 */
@@ -31,5 +41,10 @@ export interface BuiltinAgentDef {
 
 export const BUILTIN_AGENT_DEFS: BuiltinAgentDef[] = [
   { ...codingMeta, instructions: codingMd },
+  { ...codeReviewerMeta, instructions: codeReviewerMd },
   { ...researchMeta, instructions: researchMd },
+  { ...writingMeta, instructions: writingMd },
+  { ...presentationMeta, instructions: presentationMd },
+  { ...spreadsheetMeta, instructions: spreadsheetMd },
+  { ...automationMeta, instructions: automationMd },
 ];
