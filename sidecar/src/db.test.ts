@@ -67,7 +67,7 @@ describe("db migrate — Phase 1 SDK leverage schema", () => {
     const db = new Database(":memory:");
     migrate(db);
     expect(hasTable(db, "agent_workspaces")).toBe(true);
-    for (const c of ["id","name","avatar","home_dir","archived","created_at","updated_at"]) {
+    for (const c of ["id","name","avatar","home_dir","archived","category","cover_image","created_at","updated_at"]) {
       expect(hasColumn(db, "agent_workspaces", c)).toBe(true);
     }
   });

@@ -1,5 +1,7 @@
 {
   "slug": "coding-assistant",
   "name": "编码助手",
-  "avatar": "blue"
+  "avatar": "blue",
+  "category": "development",
+  "coverImage": "development"
 }

@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" role="img" aria-label="Automation workflow cover">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ebe7dc"/>
+      <stop offset=".48" stop-color="#a7aaa0"/>
+      <stop offset="1" stop-color="#333a36"/>
+    </linearGradient>
+    <radialGradient id="glow" cx=".58" cy=".18" r=".84">
+      <stop offset="0" stop-color="#fff8ea" stop-opacity=".82"/>
+      <stop offset=".56" stop-color="#d57855" stop-opacity=".18"/>
+      <stop offset="1" stop-color="#17201d" stop-opacity=".05"/>
+    </radialGradient>
+    <filter id="grain">
+      <feTurbulence type="fractalNoise" baseFrequency=".76" numOctaves="3" seed="31"/>
+      <feColorMatrix type="saturate" values="0"/>
+      <feComponentTransfer>
+        <feFuncA type="table" tableValues="0 .11"/>
+      </feComponentTransfer>
+    </filter>
+  </defs>
+  <rect width="640" height="360" fill="url(#bg)"/>
+  <rect width="640" height="360" fill="url(#glow)"/>
+  <g fill="#fff8ea" fill-opacity=".58" stroke="#222b27" stroke-opacity=".16" stroke-width="4">
+    <rect x="72" y="104" width="138" height="76" rx="22"/>
+    <rect x="250" y="205" width="140" height="76" rx="22"/>
+    <rect x="430" y="88" width="140" height="76" rx="22"/>
+  </g>
+  <g fill="none" stroke="#fff8ea" stroke-opacity=".78" stroke-width="12" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M210 142c62 0 42 101 40 101"/>
+    <path d="M390 243c74 0 54-116 40-116"/>
+    <path d="m250 243 18-20 20 20"/>
+    <path d="m430 127 20 21 25-28"/>
+  </g>
+  <g fill="#222b27" fill-opacity=".54">
+    <circle cx="112" cy="142" r="7"/>
+    <circle cx="141" cy="142" r="7"/>
+    <circle cx="170" cy="142" r="7"/>
+    <circle cx="292" cy="243" r="7"/>
+    <circle cx="321" cy="243" r="7"/>
+    <circle cx="350" cy="243" r="7"/>
+    <circle cx="470" cy="126" r="7"/>
+    <circle cx="499" cy="126" r="7"/>
+    <circle cx="528" cy="126" r="7"/>
+  </g>
+  <path d="M84 286c62-28 130-28 204 1 78 31 172 18 268-40" fill="none" stroke="#fff8ea" stroke-opacity=".28" stroke-width="15" stroke-linecap="round"/>
+  <rect width="640" height="360" filter="url(#grain)"/>
+</svg>

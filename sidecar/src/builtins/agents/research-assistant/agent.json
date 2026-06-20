@@ -2,5 +2,7 @@
   "slug": "research-assistant",
   "name": "研究助手",
   "avatar": "orange",
+  "category": "research",
+  "coverImage": "research",
   "mountedSkills": ["agent-studio:pdf", "agent-studio:docx", "agent-studio:xlsx"]
 }

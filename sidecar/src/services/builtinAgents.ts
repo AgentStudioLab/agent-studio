@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { INDEX_HEADER, MEMORY_DIR, MEMORY_INDEX } from "./agentMemoryStore";
 import { BUILTIN_AGENT_DEFS, type BuiltinAgentDef } from "../builtins/agents";
+import { normalizeAgentCategory, normalizeAgentCoverImage } from "./agentWorkspaces";
 
 /** 内置 agent 的 id 规则：固定前缀 + slug，既不与用户 `agw_<nanoid>` 撞，也肉眼可辨。 */
 export function builtinAgentId(slug: string): string {
@@ -52,6 +53,8 @@ export function reconcileBuiltinAgents(
 
     // 2) DB 行 upsert —— 只动定义字段 + archived/source，不写 pinned、不写 home_dir。
     const avatar = def.avatar ?? null;
+    const category = normalizeAgentCategory(def.category);
+    const coverImage = normalizeAgentCoverImage(def.coverImage, category);
     const mounted = serializeMountedSkills(def.mountedSkills);
     const now = Date.now();
     const exists = db
@@ -60,16 +63,18 @@ export function reconcileBuiltinAgents(
     if (!exists) {
       db.prepare(
         `INSERT INTO agent_workspaces
-           (id, name, avatar, home_dir, archived, pinned, source, mounted_skills_json, created_at, updated_at)
-         VALUES (?, ?, ?, ?, 0, 0, 'builtin', ?, ?, ?)`,
-      ).run(id, def.name, avatar, homeDir, mounted, now, now);
+           (id, name, avatar, home_dir, archived, pinned, source, category, cover_image,
+            mounted_skills_json, created_at, updated_at)
+         VALUES (?, ?, ?, ?, 0, 0, 'builtin', ?, ?, ?, ?, ?)`,
+      ).run(id, def.name, avatar, homeDir, category, coverImage, mounted, now, now);
     } else {
       db.prepare(
         `UPDATE agent_workspaces
-            SET name = ?, avatar = ?, mounted_skills_json = ?, archived = 0,
+            SET name = ?, avatar = ?, category = ?, cover_image = ?,
+                mounted_skills_json = ?, archived = 0,
                 source = 'builtin', updated_at = ?
           WHERE id = ?`,
-      ).run(def.name, avatar, mounted, now, id);
+      ).run(def.name, avatar, category, coverImage, mounted, now, id);
     }
     upserted.push(id);
   }

@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" role="img" aria-label="General assistant cover">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f0e8dc"/>
+      <stop offset=".5" stop-color="#b5aa9c"/>
+      <stop offset="1" stop-color="#403a34"/>
+    </linearGradient>
+    <radialGradient id="glow" cx=".34" cy=".2" r=".78">
+      <stop offset="0" stop-color="#fff8ec" stop-opacity=".86"/>
+      <stop offset=".58" stop-color="#d87c58" stop-opacity=".18"/>
+      <stop offset="1" stop-color="#211d19" stop-opacity=".04"/>
+    </radialGradient>
+    <filter id="grain">
+      <feTurbulence type="fractalNoise" baseFrequency=".72" numOctaves="3" seed="4"/>
+      <feColorMatrix type="saturate" values="0"/>
+      <feComponentTransfer>
+        <feFuncA type="table" tableValues="0 .1"/>
+      </feComponentTransfer>
+    </filter>
+  </defs>
+  <rect width="640" height="360" fill="url(#bg)"/>
+  <rect width="640" height="360" fill="url(#glow)"/>
+  <g transform="translate(78 62)">
+    <rect width="484" height="232" rx="30" fill="#fff8ec" fill-opacity=".46"/>
+    <rect x="34" y="42" width="188" height="54" rx="17" fill="#fff8ec" fill-opacity=".56"/>
+    <rect x="34" y="122" width="254" height="18" rx="9" fill="#2f2923" fill-opacity=".22"/>
+    <rect x="34" y="162" width="206" height="18" rx="9" fill="#2f2923" fill-opacity=".16"/>
+    <circle cx="376" cy="122" r="58" fill="#d87c58" fill-opacity=".42"/>
+    <path d="M376 82v80M336 122h80" stroke="#fff8ec" stroke-opacity=".72" stroke-width="13" stroke-linecap="round"/>
+  </g>
+  <path d="M72 306c78-28 152-29 222-4 94 34 180 17 278-34" fill="none" stroke="#fff8ec" stroke-opacity=".32" stroke-width="14" stroke-linecap="round"/>
+  <rect width="640" height="360" filter="url(#grain)"/>
+</svg>

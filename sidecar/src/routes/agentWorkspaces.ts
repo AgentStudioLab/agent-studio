@@ -2,6 +2,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { Hono } from "hono";
 import type { AgentWorkspaceService } from "../services/agentWorkspaces";
+import { normalizeAgentCategory, normalizeAgentCoverImage } from "../services/agentWorkspaces";
 import type { ThreadService } from "../services/threads";
 import type { ScheduledTaskService } from "../services/scheduledTasks";
 
@@ -31,9 +32,13 @@ export function buildAgentWorkspaceRoutes(deps: MountAgentWorkspaceDeps): Hono {
     if (!body || typeof body.name !== "string" || body.name.trim().length === 0) {
       return c.json({ error: "invalid_body" }, 400);
     }
+    const category = normalizeAgentCategory(body.category);
     const agent = agentWorkspaces.create({
       name: body.name,
       avatar: typeof body.avatar === "string" ? body.avatar : null,
+      category,
+      coverImage: normalizeAgentCoverImage(body.coverImage, category),
+      instructions: typeof body.instructions === "string" ? body.instructions : undefined,
     });
     return c.json(agent, 201);
   });
@@ -55,6 +60,8 @@ export function buildAgentWorkspaceRoutes(deps: MountAgentWorkspaceDeps): Hono {
     const touchesDefinition =
       body.name !== undefined ||
       body.avatar !== undefined ||
+      body.category !== undefined ||
+      body.coverImage !== undefined ||
       body.mountedSkills !== undefined ||
       body.archived !== undefined;
     if (existing.source === "builtin" && touchesDefinition) {
@@ -76,6 +83,19 @@ export function buildAgentWorkspaceRoutes(deps: MountAgentWorkspaceDeps): Hono {
       avatar:
         body.avatar === null || typeof body.avatar === "string"
           ? (body.avatar as string | null)
+          : undefined,
+      category:
+        body.category === null || typeof body.category === "string"
+          ? normalizeAgentCategory(body.category)
+          : undefined,
+      coverImage:
+        body.coverImage === null || typeof body.coverImage === "string"
+          ? normalizeAgentCoverImage(
+              body.coverImage,
+              body.category === null || typeof body.category === "string"
+                ? normalizeAgentCategory(body.category)
+                : existing.category,
+            )
           : undefined,
       archived: typeof body.archived === "boolean" ? body.archived : undefined,
       pinned: typeof body.pinned === "boolean" ? body.pinned : undefined,
@@ -104,7 +124,12 @@ export function buildAgentWorkspaceRoutes(deps: MountAgentWorkspaceDeps): Hono {
   app.post("/agents/:id/clone", (c) => {
     const src = agentWorkspaces.get(c.req.param("id"));
     if (!src) return c.json({ error: "not_found" }, 404);
-    const clone = agentWorkspaces.create({ name: `${src.name} (副本)`, avatar: src.avatar });
+    const clone = agentWorkspaces.create({
+      name: `${src.name} (副本)`,
+      avatar: src.avatar,
+      category: src.category,
+      coverImage: src.coverImage,
+    });
     try {
       const md = readFileSync(join(src.homeDir, "CLAUDE.md"), "utf8");
       writeFileSync(join(clone.homeDir, "CLAUDE.md"), md, "utf8");

@@ -89,7 +89,7 @@ export function AgentSpaceView() {
         <div className="relative flex min-h-0 flex-1">
           {/* Left: fixed header + composer, with only the recents list scrolling. */}
           <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-            <div className="px-12 pb-4 pt-12">
+            <div className="px-4 pb-4 pt-8 sm:px-8 sm:pt-12 lg:px-12">
               <PageColumn className="max-w-[860px]">
                 {agent ? (
                   <AgentSpaceHeader agent={agent} />
@@ -100,7 +100,7 @@ export function AgentSpaceView() {
                 )}
               </PageColumn>
             </div>
-            <div className="px-12 pb-8">
+            <div className="px-4 pb-8 sm:px-8 lg:px-12">
               <PageColumn className="max-w-[860px]">
                 <div className="rounded-2xl bg-background">
                   <PromptInput onSubmit={handleSubmit}>
@@ -116,7 +116,7 @@ export function AgentSpaceView() {
                 </div>
               </PageColumn>
             </div>
-            <div className="min-h-0 flex-1 overflow-y-auto px-12 pb-12">
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-12 sm:px-8 lg:px-12">
               <PageColumn className="max-w-[860px]">
                 {agentId && <AgentRecents agentId={agentId} />}
               </PageColumn>

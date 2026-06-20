@@ -69,6 +69,15 @@ export interface ScheduledTask {
   updatedAt: number;
 }
 
+export type AgentFunctionCategory =
+  | "development"
+  | "research"
+  | "writing"
+  | "automation"
+  | "general";
+
+export type AgentCoverImage = AgentFunctionCategory;
+
 /** A persistent Agent (智能体) — its own home dir + (P2/P3) folders, CLAUDE.md, memory. */
 export interface AgentWorkspace {
   id: string;
@@ -85,6 +94,10 @@ export interface AgentWorkspace {
    *  不可改名/改头像/改指令/改技能/删除（仅 pin、聊天、文件空间等用户自有操作放行），
    *  可"克隆为我的智能体"。 */
   source: "user" | "builtin";
+  /** 功能分类，用于智能体空间的分类 tab。旧数据/非法值在前端回退到 general。 */
+  category: AgentFunctionCategory | string | null;
+  /** 本地封面资产 id。旧数据/非法值在前端按 category 回退。 */
+  coverImage: AgentCoverImage | string | null;
   createdAt: number;
   updatedAt: number;
 }

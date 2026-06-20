@@ -19,6 +19,10 @@ export interface BuiltinAgentDef {
   name: string;
   /** 色调 token（orange|blue|purple|red|green|amber|stone）或省略 → null。 */
   avatar?: string | null;
+  /** 功能分类，用于智能体列表页的功能 tab。省略 → general。 */
+  category?: string | null;
+  /** 本地封面资产 id。省略或非法 → category 对应封面。 */
+  coverImage?: string | null;
   /** 三态：省略/null=继承全部启用技能；[]=显式不挂；数组=显式子集。 */
   mountedSkills?: string[] | null;
   /** 来自同目录 AGENT.md 的指令正文（编译期注入），reconcile 时落成 homeDir/CLAUDE.md。 */

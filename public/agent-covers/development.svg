@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" role="img" aria-label="Development workspace cover">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#edf0e6"/>
+      <stop offset=".46" stop-color="#a9b7a8"/>
+      <stop offset="1" stop-color="#263731"/>
+    </linearGradient>
+    <radialGradient id="glow" cx=".18" cy=".16" r=".9">
+      <stop offset="0" stop-color="#fff8e8" stop-opacity=".86"/>
+      <stop offset=".52" stop-color="#d58463" stop-opacity=".22"/>
+      <stop offset="1" stop-color="#10221c" stop-opacity=".06"/>
+    </radialGradient>
+    <filter id="grain">
+      <feTurbulence type="fractalNoise" baseFrequency=".74" numOctaves="3" seed="12"/>
+      <feColorMatrix type="saturate" values="0"/>
+      <feComponentTransfer>
+        <feFuncA type="table" tableValues="0 .11"/>
+      </feComponentTransfer>
+    </filter>
+  </defs>
+  <rect width="640" height="360" fill="url(#bg)"/>
+  <rect width="640" height="360" fill="url(#glow)"/>
+  <path d="M54 270c94-54 190-44 286-13 90 29 156 16 248-38v141H54z" fill="#f8f0e2" fill-opacity=".2"/>
+  <g opacity=".34" stroke="#fff7ea" stroke-width="1">
+    <path d="M76 52h492M76 102h492M76 152h492M76 202h492M76 252h492"/>
+    <path d="M122 28v276M204 28v276M286 28v276M368 28v276M450 28v276M532 28v276"/>
+  </g>
+  <g transform="translate(70 72)">
+    <rect width="300" height="196" rx="24" fill="#111a17" fill-opacity=".78"/>
+    <rect x="20" y="18" width="260" height="24" rx="12" fill="#f8f0e2" fill-opacity=".12"/>
+    <circle cx="39" cy="30" r="5" fill="#d58463"/>
+    <circle cx="58" cy="30" r="5" fill="#d8c7ad"/>
+    <circle cx="77" cy="30" r="5" fill="#9fb7a4"/>
+    <path d="M32 72h76M32 104h190M32 136h144M32 168h212" stroke="#f8f0e2" stroke-opacity=".56" stroke-width="8" stroke-linecap="round"/>
+    <path d="M132 72h108M198 136h58" stroke="#d58463" stroke-opacity=".76" stroke-width="8" stroke-linecap="round"/>
+  </g>
+  <g transform="translate(405 90)" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M62 28 20 70l42 42" stroke="#fff7ea" stroke-opacity=".8" stroke-width="16"/>
+    <path d="M120 28 162 70l-42 42" stroke="#fff7ea" stroke-opacity=".8" stroke-width="16"/>
+    <path d="m104 16-32 124" stroke="#fff7ea" stroke-opacity=".48" stroke-width="13"/>
+  </g>
+  <rect width="640" height="360" filter="url(#grain)"/>
+</svg>

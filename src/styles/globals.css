@@ -59,18 +59,19 @@ html, body {
 
 /* ---- Scrollbar (Firefox + WebKit) ---- */
 * {
-    scrollbar-color: hsl(var(--border-300) / 0.35) transparent;
+    scrollbar-color: hsl(var(--border-300) / 0.24) transparent;
     scrollbar-width: thin;
 }
-::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-thumb {
-    background: hsl(var(--border-300) / 0.35);
-    border-radius: var(--radius-sm);
+    background: hsl(var(--border-300) / 0.24);
+    border-radius: var(--radius-pill);
 }
 ::-webkit-scrollbar-thumb:hover {
-    background: hsl(var(--border-300) / 0.55);
+    background: hsl(var(--border-300) / 0.42);
 }
-::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner { background: transparent; }
 
 .u-hidden-scrollbar { scrollbar-width: none; }
 .u-hidden-scrollbar::-webkit-scrollbar { display: none; }

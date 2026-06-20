@@ -25,6 +25,8 @@ const DEF_A: BuiltinAgentDef = {
   slug: "alpha",
   name: "Alpha",
   avatar: "blue",
+  category: "development",
+  coverImage: "development",
   instructions: "# Alpha\ninstr A",
   mountedSkills: ["s1", "s2"],
 };
@@ -41,14 +43,18 @@ describe("reconcileBuiltinAgents", () => {
     expect(a.source).toBe("builtin");
     expect(a.name).toBe("Alpha");
     expect(a.avatar).toBe("blue");
+    expect(a.category).toBe("development");
+    expect(a.coverImage).toBe("development");
     expect(a.mountedSkills).toEqual(["s1", "s2"]);
     expect(a.homeDir).toBe(join(baseDir, builtinAgentId("alpha")));
     expect(readFileSync(join(a.homeDir, "CLAUDE.md"), "utf8")).toContain("instr A");
     expect(existsSync(join(a.homeDir, "memory", "MEMORY.md"))).toBe(true);
 
-    // beta: avatar 省略 → null；mountedSkills 省略 → null（继承全部）。
+    // beta: avatar 省略 → null；category/coverImage 省略 → general；mountedSkills 省略 → null（继承全部）。
     const b = service.get(builtinAgentId("beta"))!;
     expect(b.avatar).toBeNull();
+    expect(b.category).toBe("general");
+    expect(b.coverImage).toBe("general");
     expect(b.mountedSkills).toBeNull();
   });
 
@@ -66,6 +72,8 @@ describe("reconcileBuiltinAgents", () => {
       slug: "alpha",
       name: "Alpha v2",
       avatar: "red",
+      category: "research",
+      coverImage: "research",
       instructions: "new instr",
       mountedSkills: [], // 显式不挂
     };
@@ -73,6 +81,8 @@ describe("reconcileBuiltinAgents", () => {
     const a = service.get(builtinAgentId("alpha"))!;
     expect(a.name).toBe("Alpha v2");
     expect(a.avatar).toBe("red");
+    expect(a.category).toBe("research");
+    expect(a.coverImage).toBe("research");
     expect(a.mountedSkills).toEqual([]);
     expect(readFileSync(join(a.homeDir, "CLAUDE.md"), "utf8")).toBe("new instr");
   });

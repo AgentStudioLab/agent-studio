@@ -5,6 +5,43 @@ import { join } from "node:path";
 import { nanoid } from "nanoid";
 import { INDEX_HEADER, MEMORY_DIR, MEMORY_INDEX } from "./agentMemoryStore";
 
+export const AGENT_FUNCTION_CATEGORIES = [
+  "development",
+  "research",
+  "writing",
+  "automation",
+  "general",
+] as const;
+export type AgentFunctionCategory = (typeof AGENT_FUNCTION_CATEGORIES)[number];
+
+export const AGENT_COVER_IMAGES = AGENT_FUNCTION_CATEGORIES;
+export type AgentCoverImage = (typeof AGENT_COVER_IMAGES)[number];
+
+const AGENT_CATEGORY_ALIASES: Record<string, AgentFunctionCategory> = {
+  "开发构建": "development",
+  "研究分析": "research",
+  "内容写作": "writing",
+  "自动化执行": "automation",
+  "通用助手": "general",
+};
+
+export function normalizeAgentCategory(raw: unknown): AgentFunctionCategory {
+  if (typeof raw !== "string") return "general";
+  if ((AGENT_FUNCTION_CATEGORIES as readonly string[]).includes(raw)) {
+    return raw as AgentFunctionCategory;
+  }
+  return AGENT_CATEGORY_ALIASES[raw.trim()] ?? "general";
+}
+
+export function normalizeAgentCoverImage(
+  raw: unknown,
+  fallback: AgentFunctionCategory = "general",
+): AgentCoverImage {
+  return typeof raw === "string" && (AGENT_COVER_IMAGES as readonly string[]).includes(raw)
+    ? (raw as AgentCoverImage)
+    : fallback;
+}
+
 export interface AgentWorkspace {
   id: string;
   name: string;
@@ -21,6 +58,10 @@ export interface AgentWorkspace {
   /** 'user'=用户创建、可编辑/删除；'builtin'=官方只读预置，定义由 reconcileBuiltinAgents
    *  从仓库内 JSON 维护，路由层禁止改写（仅 pin 等用户自有操作放行）。 */
   source: "user" | "builtin";
+  /** 功能分类：用于前端按智能体用途生成分类 tab。 */
+  category: AgentFunctionCategory;
+  /** 前端本地封面资产 id；无效值按 category 回退。 */
+  coverImage: AgentCoverImage;
   createdAt: number;
   updatedAt: number;
 }
@@ -34,6 +75,8 @@ interface AgentWorkspaceRow {
   pinned: number;
   mounted_skills_json: string | null;
   source: string;
+  category: string | null;
+  cover_image: string | null;
   created_at: number;
   updated_at: number;
 }
@@ -52,6 +95,7 @@ function parseMountedSkills(raw: string | null): string[] | null {
 }
 
 function rowToAgent(r: AgentWorkspaceRow): AgentWorkspace {
+  const category = normalizeAgentCategory(r.category);
   return {
     id: r.id,
     name: r.name,
@@ -61,6 +105,8 @@ function rowToAgent(r: AgentWorkspaceRow): AgentWorkspace {
     pinned: r.pinned === 1,
     mountedSkills: parseMountedSkills(r.mounted_skills_json),
     source: r.source === "builtin" ? "builtin" : "user",
+    category,
+    coverImage: normalizeAgentCoverImage(r.cover_image, category),
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -70,6 +116,9 @@ export interface CreateAgentWorkspaceInput {
   id?: string;
   name: string;
   avatar?: string | null;
+  category?: AgentFunctionCategory | string | null;
+  coverImage?: AgentCoverImage | string | null;
+  instructions?: string | null;
 }
 
 export interface UpdateAgentWorkspaceInput {
@@ -77,6 +126,8 @@ export interface UpdateAgentWorkspaceInput {
   avatar?: string | null;
   archived?: boolean;
   pinned?: boolean;
+  category?: AgentFunctionCategory | string | null;
+  coverImage?: AgentCoverImage | string | null;
   /** undefined=不改；null=改回"继承全部"；数组=改为显式子集（含空数组=显式不挂）。 */
   mountedSkills?: string[] | null;
 }
@@ -103,13 +154,21 @@ export class AgentWorkspaceService {
     mkdirSync(memDir, { recursive: true });
     const memIndex = join(memDir, MEMORY_INDEX);
     if (!existsSync(memIndex)) writeFileSync(memIndex, INDEX_HEADER, "utf8");
+    // 新建时可直接初始化系统提示词；后续编辑仍由 instructions 路由维护同一份 CLAUDE.md。
+    const instructions = input.instructions?.trim() ?? "";
+    if (instructions.length > 0) {
+      writeFileSync(join(homeDir, "CLAUDE.md"), instructions, "utf8");
+    }
     const now = Date.now();
+    const category = normalizeAgentCategory(input.category);
+    const coverImage = normalizeAgentCoverImage(input.coverImage, category);
     this.db
       .prepare(
-        `INSERT INTO agent_workspaces (id, name, avatar, home_dir, archived, pinned, created_at, updated_at)
-         VALUES (?, ?, ?, ?, 0, 0, ?, ?)`,
+        `INSERT INTO agent_workspaces
+           (id, name, avatar, home_dir, archived, pinned, category, cover_image, created_at, updated_at)
+         VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?, ?)`,
       )
-      .run(id, input.name, input.avatar ?? null, homeDir, now, now);
+      .run(id, input.name, input.avatar ?? null, homeDir, category, coverImage, now, now);
     return this.get(id)!;
   }
 
@@ -151,6 +210,16 @@ export class AgentWorkspaceService {
     if (patch.pinned !== undefined) {
       sets.push("pinned = ?");
       vals.push(patch.pinned ? 1 : 0);
+    }
+    if (patch.category !== undefined) {
+      sets.push("category = ?");
+      vals.push(normalizeAgentCategory(patch.category));
+    }
+    if (patch.coverImage !== undefined) {
+      const category =
+        patch.category !== undefined ? normalizeAgentCategory(patch.category) : this.get(id)!.category;
+      sets.push("cover_image = ?");
+      vals.push(normalizeAgentCoverImage(patch.coverImage, category));
     }
     if (patch.mountedSkills !== undefined) {
       // null → 写 NULL（继承全部）；数组 → 序列化（空数组=显式不挂）。

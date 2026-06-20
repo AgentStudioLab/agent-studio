@@ -158,6 +158,8 @@ CREATE TABLE IF NOT EXISTS agent_workspaces (
   archived    INTEGER NOT NULL DEFAULT 0,
   pinned      INTEGER NOT NULL DEFAULT 0,
   source      TEXT NOT NULL DEFAULT 'user',
+  category    TEXT NOT NULL DEFAULT 'general',
+  cover_image TEXT NOT NULL DEFAULT 'general',
   created_at  INTEGER NOT NULL,
   updated_at  INTEGER NOT NULL
 );
@@ -300,6 +302,9 @@ export function migrate(db: Database): void {
   ensureColumn(db, "agent_workspaces", "mounted_skills_json", "TEXT");
   // 内置(只读官方预置)标记：'user'=用户创建；'builtin'=reconcileBuiltinAgents 维护。
   ensureColumn(db, "agent_workspaces", "source", "TEXT NOT NULL DEFAULT 'user'");
+  // 功能分类与封面图标识：前端按 category 生成 tab，cover_image 映射到本地封面资产。
+  ensureColumn(db, "agent_workspaces", "category", "TEXT NOT NULL DEFAULT 'general'");
+  ensureColumn(db, "agent_workspaces", "cover_image", "TEXT NOT NULL DEFAULT 'general'");
   ensureColumn(db, "channel_connections", "type", "TEXT NOT NULL DEFAULT 'fake'");
   ensureColumn(db, "channel_connections", "name", "TEXT NOT NULL DEFAULT ''");
   ensureColumn(db, "channel_connections", "enabled", "INTEGER NOT NULL DEFAULT 0");

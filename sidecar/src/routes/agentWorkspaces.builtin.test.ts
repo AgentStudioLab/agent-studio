@@ -17,6 +17,8 @@ const DEF: BuiltinAgentDef = {
   slug: "official",
   name: "Official",
   avatar: "blue",
+  category: "research",
+  coverImage: "research",
   instructions: "official instr",
   mountedSkills: ["s1"],
 };
@@ -97,6 +99,8 @@ describe("clone", () => {
       id: string;
       name: string;
       avatar: string | null;
+      category: string;
+      coverImage: string;
       source: string;
       mountedSkills: string[] | null;
       homeDir: string;
@@ -104,6 +108,8 @@ describe("clone", () => {
     expect(clone.source).toBe("user");
     expect(clone.name).toBe("Official (副本)");
     expect(clone.avatar).toBe("blue");
+    expect(clone.category).toBe("research");
+    expect(clone.coverImage).toBe("research");
     expect(clone.mountedSkills).toEqual(["s1"]);
     expect(clone.id).not.toBe(BUILTIN_ID);
     expect(readFileSync(join(clone.homeDir, "CLAUDE.md"), "utf8")).toBe("official instr");

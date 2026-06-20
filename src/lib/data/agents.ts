@@ -1,5 +1,5 @@
 import { authedFetch } from "../sidecar-client";
-import type { AgentWorkspace } from "./types";
+import type { AgentCoverImage, AgentFunctionCategory, AgentWorkspace } from "./types";
 
 async function expectJson<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -14,8 +14,13 @@ async function expectJson<T>(res: Response): Promise<T> {
 export interface CreateAgentWorkspaceArgs {
   name: string;
   avatar?: string | null;
+  category?: AgentFunctionCategory | null;
+  coverImage?: AgentCoverImage | null;
+  instructions?: string | null;
 }
-export type UpdateAgentWorkspaceArgs = Partial<CreateAgentWorkspaceArgs> & {
+export type UpdateAgentWorkspaceArgs = Partial<
+  Omit<CreateAgentWorkspaceArgs, "instructions">
+> & {
   archived?: boolean;
   pinned?: boolean;
   /** null=继承全部；数组=显式子集（含空数组=显式不挂）；省略=不改。 */

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { Database } from "bun:sqlite";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { migrate } from "../db";
@@ -31,8 +31,15 @@ describe("agent workspace routes", () => {
       body: JSON.stringify({ name: "Research" }),
     });
     expect(created.status).toBe(201);
-    const agent = (await created.json()) as { id: string; name: string };
+    const agent = (await created.json()) as {
+      id: string;
+      name: string;
+      category: string;
+      coverImage: string;
+    };
     expect(agent.name).toBe("Research");
+    expect(agent.category).toBe("general");
+    expect(agent.coverImage).toBe("general");
 
     const list = await app.request("/agents");
     const agents = (await list.json()) as { id: string }[];
@@ -81,6 +88,51 @@ describe("agent workspace routes", () => {
     expect(res.status).toBe(200);
     expect((await res.json() as { pinned: boolean }).pinned).toBe(true);
     expect(agentWorkspaces.get(agent.id)?.pinned).toBe(true);
+  });
+
+  it("POST and PATCH accept function category metadata for user agents", async () => {
+    const { app, agentWorkspaces } = harness();
+    const created = await app.request("/agents", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: "Build helper",
+        category: "development",
+        coverImage: "development",
+      }),
+    });
+    expect(created.status).toBe(201);
+    const agent = (await created.json()) as { id: string; category: string; coverImage: string };
+    expect(agent.category).toBe("development");
+    expect(agent.coverImage).toBe("development");
+
+    const res = await app.request(`/agents/${agent.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ category: "research", coverImage: "research" }),
+    });
+    expect(res.status).toBe(200);
+    expect(agentWorkspaces.get(agent.id)?.category).toBe("research");
+    expect(agentWorkspaces.get(agent.id)?.coverImage).toBe("research");
+  });
+
+  it("POST /agents writes initial instructions to CLAUDE.md", async () => {
+    const { app, agentWorkspaces } = harness();
+    const res = await app.request("/agents", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: "Writer",
+        instructions: "  你是一个内容写作助手。  ",
+      }),
+    });
+    expect(res.status).toBe(201);
+    const agent = (await res.json()) as { id: string };
+    const created = agentWorkspaces.get(agent.id);
+    expect(created).not.toBeNull();
+    expect(readFileSync(join(created!.homeDir, "CLAUDE.md"), "utf8")).toBe(
+      "你是一个内容写作助手。",
+    );
   });
 });
 
