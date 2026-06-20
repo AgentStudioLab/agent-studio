@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
+import { ChevronLeft } from "lucide-react";
 import { AppShell } from "@/app/AppShell";
 import { PageColumn } from "@/shared/layout/PageColumn";
 import { useAppShell } from "@/app/AppShellContext";
@@ -89,8 +90,21 @@ export function AgentSpaceView() {
         <div className="relative flex min-h-0 flex-1">
           {/* Left: fixed header + composer, with only the recents list scrolling. */}
           <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-            <div className="px-4 pb-4 pt-8 sm:px-8 sm:pt-12 lg:px-12">
+            {/* 顶部紧贴 macOS 标题栏；标记为拖拽区，保证详情页顶部空白也能拖动窗口。 */}
+            <div
+              data-tauri-drag-region
+              className="px-4 pb-4 pt-2 sm:px-8 sm:pt-2 lg:px-12"
+            >
               <PageColumn className="max-w-[860px]">
+                <button
+                  type="button"
+                  onClick={() => navigate(-1)}
+                  className="mb-3 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+                  aria-label={t("agentSpace.back")}
+                >
+                  <ChevronLeft className="size-4" />
+                  {t("agentSpace.back")}
+                </button>
                 {agent ? (
                   <AgentSpaceHeader agent={agent} />
                 ) : (

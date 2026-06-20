@@ -1,6 +1,7 @@
 {
   "promptPlaceholder": "在这个智能体空间里开始一个对话…",
   "ask": "询问",
+  "back": "返回",
   "notFound": "智能体不存在",
   "recents": "最近",
   "recentsEmpty": "还没有对话。",

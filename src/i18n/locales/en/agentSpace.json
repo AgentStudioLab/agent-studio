@@ -1,6 +1,7 @@
 {
   "promptPlaceholder": "Start a conversation in this agent space…",
   "ask": "Ask",
+  "back": "Back",
   "notFound": "Agent not found",
   "recents": "Recents",
   "recentsEmpty": "No conversations yet.",

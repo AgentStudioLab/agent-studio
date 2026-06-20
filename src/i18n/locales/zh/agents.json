@@ -4,8 +4,12 @@
   "newAgent": "新建智能体",
   "sort": "排序",
   "search": "搜索",
+  "searchOpen": "搜索智能体",
+  "searchPlaceholder": "搜索名称、分类或描述",
+  "searchClear": "清空搜索",
   "empty": "还没有智能体，点右上角新建一个。",
   "filteredEmpty": "这个分类下还没有智能体。",
+  "searchEmpty": "没有匹配的智能体。",
   "official": "官方",
   "updated": "更新于 {{date}}",
   "categories": {

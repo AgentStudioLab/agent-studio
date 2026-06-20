@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { ArrowUpDown, Search, Plus } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ArrowUpDown, Search, Plus, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { AppShell } from "@/app/AppShell";
@@ -7,8 +7,10 @@ import { PageColumn } from "@/shared/layout/PageColumn";
 import { AgentCard } from "@/features/agent-workspaces/AgentCard";
 import { NewAgentModal } from "@/features/agent-workspaces/NewAgentModal";
 import {
+  AGENT_CATEGORY_META,
   buildAgentCategoryTabs,
   filterAgentsByCategory,
+  normalizeAgentCategory,
   type AgentCategoryTabId,
 } from "@/features/agent-workspaces/agent-catalog";
 import {
@@ -24,9 +26,55 @@ export function AgentsView() {
   const createMutation = useCreateAgentWorkspaceMutation();
   const [modalOpen, setModalOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState<AgentCategoryTabId>("all");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [latestSortDirection, setLatestSortDirection] = useState<"desc" | "asc" | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const tabs = buildAgentCategoryTabs(agents);
   const selectedCategory = tabs.some((tab) => tab.id === activeCategory) ? activeCategory : "all";
-  const visibleAgents = filterAgentsByCategory(agents, selectedCategory);
+  const normalizedSearchQuery = searchQuery.trim().toLocaleLowerCase();
+  // 先按分类收窄，再应用搜索和用户触发的更新时间排序，避免改动原始 agents 顺序。
+  const visibleAgents = useMemo(() => {
+    let next = filterAgentsByCategory(agents, selectedCategory);
+
+    if (normalizedSearchQuery) {
+      next = next.filter((agent) => {
+        const category = normalizeAgentCategory(agent.category);
+        const searchableText = [
+          agent.name,
+          t(AGENT_CATEGORY_META[category].labelKey),
+          t(AGENT_CATEGORY_META[category].descriptionKey),
+        ]
+          .join(" ")
+          .toLocaleLowerCase();
+
+        return searchableText.includes(normalizedSearchQuery);
+      });
+    }
+
+    if (!latestSortDirection) return next;
+
+    return [...next].sort((a, b) => {
+      const byUpdatedAt =
+        latestSortDirection === "desc" ? b.updatedAt - a.updatedAt : a.updatedAt - b.updatedAt;
+      return byUpdatedAt || a.name.localeCompare(b.name);
+    });
+  }, [agents, latestSortDirection, normalizedSearchQuery, selectedCategory, t]);
+  const emptyMessage =
+    agents.length === 0
+      ? t("agents.empty")
+      : normalizedSearchQuery
+        ? t("agents.searchEmpty")
+        : t("agents.filteredEmpty");
+
+  useEffect(() => {
+    if (searchOpen) searchInputRef.current?.focus();
+  }, [searchOpen]);
+
+  const closeSearch = () => {
+    setSearchQuery("");
+    setSearchOpen(false);
+  };
 
   const handleSave = (data: {
     name: string;
@@ -62,18 +110,52 @@ export function AgentsView() {
                 <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                   <button
                     type="button"
-                    className="rounded-md p-2 text-muted-foreground hover:bg-state-hover hover:text-foreground"
+                    onClick={() =>
+                      setLatestSortDirection((direction) => (direction === "desc" ? "asc" : "desc"))
+                    }
                     aria-label={t("agents.sort")}
+                    aria-pressed={latestSortDirection !== null}
+                    className={cn(
+                      "flex size-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-state-hover hover:text-foreground",
+                      latestSortDirection && "bg-state-selected text-foreground",
+                    )}
                   >
                     <ArrowUpDown className="size-4" />
                   </button>
-                  <button
-                    type="button"
-                    className="rounded-md p-2 text-muted-foreground hover:bg-state-hover hover:text-foreground"
-                    aria-label={t("agents.search")}
-                  >
-                    <Search className="size-4" />
-                  </button>
+                  {searchOpen ? (
+                    <div className="flex h-9 w-full items-center gap-2 rounded-md border border-border px-3 transition-colors focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50 sm:w-[300px]">
+                      <Search className="size-4 shrink-0 text-muted-foreground" />
+                      <input
+                        ref={searchInputRef}
+                        type="search"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Escape") closeSearch();
+                        }}
+                        aria-label={t("agents.searchOpen")}
+                        placeholder={t("agents.searchPlaceholder")}
+                        className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+                      />
+                      <button
+                        type="button"
+                        onClick={closeSearch}
+                        aria-label={t("agents.searchClear")}
+                        className="flex size-5 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-state-hover hover:text-foreground"
+                      >
+                        <X className="size-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setSearchOpen(true)}
+                      className="flex size-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-state-hover hover:text-foreground"
+                      aria-label={t("agents.search")}
+                    >
+                      <Search className="size-4" />
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => setModalOpen(true)}
@@ -133,7 +215,7 @@ export function AgentsView() {
                 </div>
               ) : (
                 <div className="rounded-lg border border-dashed border-border bg-card p-8 text-sm text-muted-foreground">
-                  {agents.length === 0 ? t("agents.empty") : t("agents.filteredEmpty")}
+                  {emptyMessage}
                 </div>
               )}
             </PageColumn>

@@ -6,7 +6,11 @@ import type { AgentWorkspace } from "@/lib/data/types";
 const navigate = mock((_path: string) => {});
 const mutate = mock((_args: unknown) => {});
 
-function agent(id: string, category: AgentWorkspace["category"]): AgentWorkspace {
+function agent(
+  id: string,
+  category: AgentWorkspace["category"],
+  overrides: Partial<AgentWorkspace> = {},
+): AgentWorkspace {
   return {
     id,
     name: id,
@@ -20,19 +24,33 @@ function agent(id: string, category: AgentWorkspace["category"]): AgentWorkspace
     coverImage: category,
     createdAt: 1,
     updatedAt: 1,
+    ...overrides,
   };
 }
+
+function defaultAgents(): AgentWorkspace[] {
+  return [
+    agent("researcher", "research"),
+    agent("coder", "development"),
+  ];
+}
+
+let currentAgents = defaultAgents();
 
 mock.module("react-i18next", () => ({
   I18nextProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
   initReactI18next: { type: "3rdParty", init: () => {} },
   useTranslation: () => ({
-    t: (key: string) => {
+    t: (key: string, values?: Record<string, string>) => {
       const translations: Record<string, string> = {
         "agents.title": "智能体空间",
         "agents.subtitle": "管理智能体",
         "agents.sort": "排序",
         "agents.search": "搜索",
+        "agents.searchOpen": "搜索智能体",
+        "agents.searchPlaceholder": "搜索名称、分类或描述",
+        "agents.searchClear": "清空搜索",
+        "agents.searchEmpty": "没有匹配的智能体。",
         "agents.newAgent": "新建智能体",
         "agents.empty": "暂无智能体",
         "agents.filteredEmpty": "当前分类暂无智能体",
@@ -60,6 +78,7 @@ mock.module("react-i18next", () => ({
         "agents.categoryDescriptions.writing": "内容规划、写作与润色",
         "agents.categoryDescriptions.automation": "重复任务、流程编排与运维",
         "agents.categoryDescriptions.general": "日常任务与开放式协作",
+        "agents.updated": `更新于 ${values?.date ?? ""}`,
       };
       return translations[key] ?? key;
     },
@@ -88,20 +107,9 @@ mock.module("@/shared/layout/PageColumn", () => ({
   PageColumn: ({ children }: { children: ReactNode }) => <div>{children}</div>,
 }));
 
-mock.module("@/features/agent-workspaces/AgentCard", () => ({
-  AgentCard: ({ agent, onClick }: { agent: AgentWorkspace; onClick: () => void }) => (
-    <button type="button" onClick={onClick}>
-      {agent.name}
-    </button>
-  ),
-}));
-
 mock.module("@/lib/data/agent-queries", () => ({
   useAgentWorkspaces: () => ({
-    data: [
-      agent("researcher", "research"),
-      agent("coder", "development"),
-    ],
+    data: currentAgents,
   }),
   useCreateAgentWorkspaceMutation: () => ({ mutate }),
 }));
@@ -110,6 +118,7 @@ const { AgentsView } = require("./AgentsView") as typeof import("./AgentsView");
 
 afterEach(() => {
   cleanup();
+  currentAgents = defaultAgents();
   navigate.mockClear();
   mutate.mockClear();
 });
@@ -142,5 +151,60 @@ describe("AgentsView", () => {
       coverImage: "writing",
       instructions: "只输出中文大纲。",
     });
+  });
+
+  it("filters agents by category description from the search input", () => {
+    currentAgents = [
+      agent("weekly-writer", "writing", { name: "周更博客" }),
+      agent("code-helper", "development", { name: "代码助手" }),
+      agent("daily-helper", "general", { name: "日常助理" }),
+    ];
+
+    render(<AgentsView />);
+
+    fireEvent.click(screen.getByRole("button", { name: "搜索" }));
+    fireEvent.change(screen.getByRole("searchbox", { name: "搜索智能体" }), {
+      target: { value: "重构" },
+    });
+
+    expect(screen.getByRole("button", { name: /代码助手/ })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /周更博客/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /日常助理/ })).toBeNull();
+
+    fireEvent.change(screen.getByRole("searchbox", { name: "搜索智能体" }), {
+      target: { value: "不存在的关键词" },
+    });
+
+    expect(screen.getByText("没有匹配的智能体。")).toBeTruthy();
+  });
+
+  it("toggles latest update sorting between newest first and oldest first", () => {
+    currentAgents = [
+      agent("older", "general", { name: "较早", updatedAt: 100 }),
+      agent("newest", "general", { name: "最新", updatedAt: 300 }),
+      agent("middle", "general", { name: "中间", updatedAt: 200 }),
+    ];
+
+    render(<AgentsView />);
+
+    const visibleAgentNames = () =>
+      screen
+        .getAllByRole("button")
+        .map((button) => button.textContent ?? "")
+        .filter((text) => ["较早", "最新", "中间"].some((name) => text.includes(name)))
+        .map((text) => ["较早", "最新", "中间"].find((name) => text.includes(name)));
+
+    const sortButton = screen.getByRole("button", { name: "排序" });
+
+    fireEvent.click(sortButton);
+    expect(visibleAgentNames()).toEqual(["最新", "中间", "较早"]);
+    expect(sortButton.getAttribute("aria-pressed")).toBe("true");
+
+    fireEvent.click(sortButton);
+    expect(visibleAgentNames()).toEqual(["较早", "中间", "最新"]);
+    expect(sortButton.getAttribute("aria-pressed")).toBe("true");
+
+    fireEvent.click(sortButton);
+    expect(visibleAgentNames()).toEqual(["最新", "中间", "较早"]);
   });
 });
