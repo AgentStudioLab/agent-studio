@@ -16,18 +16,11 @@ import {
 import type { BundledLanguage } from "shiki";
 import { languageFromPath } from "@/lib/code-lang";
 import type { PendingInterrupt } from "@/lib/agui/runtime";
-import { Terminal, FileText, Search, Globe, Folder, Wrench, AlertTriangle, ChevronDown } from "lucide-react";
+import { Terminal, FileText, Search, Globe, Folder, Wrench, AlertTriangle } from "lucide-react";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { diffLines } from "diff";
-import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { assessToolRisk } from "./tool-risk";
-import { buildBashRule, bashRulePrefix, type BashRuleScope } from "./bash-rule";
+import { buildBashRule, type BashRuleScope } from "./bash-rule";
 
 // Singleton "first card wins" election. When multiple approval cards are
 // visible (rare but possible during a multi-tool turn), only the first to
@@ -79,7 +72,6 @@ export function ToolApprovalCard({ interrupt, onAllow, onDeny, onAllowAlways }: 
   // 只有 Bash 才有命令级粒度；其它工具「始终允许」= 裸工具名（整工具放行）。
   const isBash = toolName === "Bash";
   const bashCommand = String(input.command ?? "");
-  const bashPrefix = isBash ? bashRulePrefix(bashCommand) : "";
   // 命令为空的 Bash（理论上不会出现）不提供「始终允许」，避免生成退化规则
   // （Bash() / Bash(:*)）。其它工具用裸名，无此限制。
   const canAllowAlways =
@@ -171,33 +163,13 @@ export function ToolApprovalCard({ interrupt, onAllow, onDeny, onAllowAlways }: 
             拒绝
             <kbd className="ml-1 opacity-60">Esc</kbd>
           </ConfirmationAction>
-          {/* 非 Bash：单个「始终允许 {工具}」= 整工具放行（裸名规则，scope 被忽略）。 */}
-          {canAllowAlways && !isBash && (
+          {/* 单个「始终允许」按钮，不再弹下拉选粒度。Bash 走推荐的命令前缀
+              规则（与 ⌘⏎ 一致）；其它工具用裸名 = 整工具放行。 */}
+          {canAllowAlways && (
             <ConfirmationAction variant="outline" onClick={() => fireAllowAlways("prefix")} disabled={acted}>
-              始终允许 {payload.toolName}
+              {isBash ? "始终允许" : `始终允许 ${payload.toolName}`}
               <kbd className="ml-1 opacity-60">⌘⏎</kbd>
             </ConfirmationAction>
-          )}
-          {/* Bash：命令级粒度二选一（仅此命令 / 此前缀）。不提供「所有 Bash」一键放行。
-              ⌘⏎ 默认走前缀。 */}
-          {canAllowAlways && isBash && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="h-8 px-3 text-sm" disabled={acted}>
-                  始终允许
-                  <ChevronDown className="ml-1 size-3.5 opacity-60" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onSelect={() => fireAllowAlways("prefix")}>
-                  <span className="truncate">始终允许「{bashPrefix}」开头的命令</span>
-                  <kbd className="ml-auto pl-2 opacity-60">⌘⏎</kbd>
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => fireAllowAlways("exact")}>
-                  仅此命令
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
           )}
           <ConfirmationAction onClick={fireAllow} disabled={acted}>
             允许

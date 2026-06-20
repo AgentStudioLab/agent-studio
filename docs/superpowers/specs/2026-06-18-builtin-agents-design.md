@@ -91,6 +91,7 @@ sidecar/src/builtins/agents/
 - `slug`：稳定标识，决定 id（`agw_builtin_<slug>`）。**改了 slug 等于换了一个 agent**（旧的会被软隐藏）。
 - `avatar`：色调 token，取值 `orange|blue|purple|red|green|amber|stone` 之一（见 `shared/atoms/agent-avatar.ts`），可省略 → null（按 id 取确定性色调）。initials 由 name 推导，不在 JSON 里写。
 - `mountedSkills`：三态。省略 → null（继承全部启用技能）；`[]` → 显式不挂；数组 → 子集。
+  **skill id 格式（见 `skillRegistry.ts:135`）**：随 App 打包的内置技能 id = `agent-studio:<SKILL.md 的 name>`（如 `agent-studio:pdf`、`agent-studio:docx`）；个人技能（`~/.agent-studio/skills`、`~/.claude/skills`）id = 裸 `name`（无前缀）。运行时 `resolveSkillsConfig` 取 `全局启用集 ∩ mountedSkills`，写错或未启用的 id 会被交集自然丢弃、不报错。
 - 指令不写在 JSON 里 → 同目录 `AGENT.md`（可空文件 → 空 CLAUDE.md）。
 
 ### 5.2 打包（编译期约束，已实测验证）

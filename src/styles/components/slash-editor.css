@@ -19,6 +19,11 @@
     word-break: break-word;
 }
 
+/* 首页 hero 输入区更高（普通会话输入仍沿用上面的 4rem）。 */
+.slash-editor--tall .ProseMirror {
+    min-height: 6.5rem;
+}
+
 .slash-editor .ProseMirror p {
     margin: 0;
 }

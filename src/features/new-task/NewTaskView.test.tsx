@@ -44,6 +44,9 @@ mock.module("@/features/auth/useAuth", () => ({
 
 mock.module("@/lib/data/settings", () => ({
   getProvider: mock(async () => ({ defaultSelection: null })),
+  // ProviderModelPicker（NewTaskView 模块级 import）需要这个 value 导出，
+  // 否则模块加载阶段就 SyntaxError。这里只渲染 TestModelPicker，不会真正调用。
+  setDefaultProviderSelection: mock(async () => {}),
 }));
 
 mock.module("@/features/composer/SlashEditor", () => ({
@@ -123,11 +126,11 @@ describe("NewTaskView", () => {
     });
 
     expect(heading).toBeDefined();
-    expect(heading.className).toContain("mt-2");
+    expect(heading.className).toContain("font-serif");
     expect(container.querySelector(".typewriter-caret")).toBeNull();
   });
 
-  it("keeps the supporting copy and safety guide link on one line", () => {
+  it("renders the supporting copy and the safety guide link", () => {
     renderNewTaskView();
 
     const subtitle = screen.getByText(
@@ -137,11 +140,11 @@ describe("NewTaskView", () => {
       name: "Read the local safety guide",
     });
 
-    expect(subtitle.className).toContain("whitespace-nowrap");
-    expect(safetyGuide.className).toContain("whitespace-nowrap");
+    expect(subtitle).toBeDefined();
+    expect(safetyGuide).toBeDefined();
   });
 
-  it("renders the safety docs link below the prompt input", () => {
+  it("renders the safety docs link alongside the supporting copy, above the prompt input", () => {
     renderNewTaskView();
 
     const promptInput = screen
@@ -152,10 +155,11 @@ describe("NewTaskView", () => {
 
     expect(promptInput).not.toBeNull();
     expect(docsControl).not.toBeNull();
+    // 帮助指南已挪到副标题行，位于输入框之前（PRECEDING）。
     expect(
       Boolean(
         promptInput!.compareDocumentPosition(docsControl!) &
-          document.defaultView!.Node.DOCUMENT_POSITION_FOLLOWING,
+          document.defaultView!.Node.DOCUMENT_POSITION_PRECEDING,
       ),
     ).toBe(true);
   });

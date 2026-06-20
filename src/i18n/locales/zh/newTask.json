@@ -1,8 +1,8 @@
 {
   "defaultTitle": "新任务",
   "welcome": {
-    "heading": "让 Claude Agent 在本机推进任务",
-    "subtitle": "选择项目目录，描述目标，我会在本机调用工具并把进展落到你的工作区。",
+    "heading": "让 Claude 在本机推进任务",
+    "subtitle": "选好目录、说清目标，我在本机动手。",
     "learnMore": "帮助指南"
   },
   "input": {

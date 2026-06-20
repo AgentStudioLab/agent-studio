@@ -98,7 +98,7 @@
     },
     "summary": {
       "listSeparator": "，",
-      "thought": "思考中",
+      "thought": "思考链",
       "working": "处理中",
       "ranCommand": {
         "one": "运行了 {{count}} 条命令",

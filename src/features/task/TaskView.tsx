@@ -184,8 +184,16 @@ export function TaskView() {
     if (!activeTaskId) return;
     const data = messagesQuery.data;
     if (!data) return;
+    // 首轮竞态修复：新会话的 /messages 首拉返回 []。若它在 send() 乐观写入
+    // 用户消息之后才 resolve，整体替换 historical 会把用户气泡冲掉 —— 直到 run
+    // 结束 onRunFinished 失效该 query、重新拉取到已持久化的真实历史才恢复，
+    // 表现为「首轮发送时用户消息不显示、跑完才出现」。run 进行中（activeRunId
+    // 非空）server 历史为空必是早于乐观写入的过期快照，跳过即可；run 终态后
+    // activeRunId 归 null、重新拉取的非空 data 再正常 prime。getState() 同步读
+    // 真值，不进依赖数组：否则 activeRunId 归 null 时会拿着旧 [] 重新触发覆盖。
+    if (data.length === 0 && runtime.getState().activeRunId !== null) return;
     setHistoricalMessages(data);
-  }, [activeTaskId, messagesQuery.data, setHistoricalMessages]);
+  }, [activeTaskId, messagesQuery.data, setHistoricalMessages, runtime]);
 
   // Cross-session resume: if /conversations/status reports a still-running
   // (or awaiting_approval) run for this thread, attach to its runId and let

@@ -1,9 +1,17 @@
 import { useCallback, useMemo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Streamdown } from "streamdown";
-import type { MessageBlock, MessageView, PendingInterrupt, ToolCallView } from "@/lib/agui/runtime";
+import type {
+  MessageBlock,
+  MessageView,
+  PendingInterrupt,
+  ToolCallView,
+} from "@/lib/agui/runtime";
 import type { ChatRuntime } from "@/lib/agui/runtime/runtime";
-import { ArtifactInlineCard, type ArtifactKind } from "@/features/task/ArtifactInlineCard";
+import {
+  ArtifactInlineCard,
+  type ArtifactKind,
+} from "@/features/task/ArtifactInlineCard";
 import { useRunStatus } from "@/lib/agui/react/useRunStatus";
 import { useNavigate } from "react-router-dom";
 import { ToolApprovalCard } from "@/features/task/ToolApprovalCard";
@@ -17,10 +25,7 @@ import { MessageActions } from "@/features/task/MessageActions";
 import { ApiKeyMissingBanner } from "@/features/task/ApiKeyMissingBanner";
 import { RetryHint } from "@/features/task/RetryHint";
 import { RetryingPill } from "@/features/task/RetryingPill";
-import {
-  ProcessGroup,
-  type ProcessStep,
-} from "@/features/task/ProcessGroup";
+import { ProcessGroup, type ProcessStep } from "@/features/task/ProcessGroup";
 import { ThinkingSpinner } from "@/shared/atoms/ThinkingSpinner";
 import {
   STREAMDOWN_MARKDOWN_COMPONENTS,
@@ -43,18 +48,47 @@ interface ArtifactInfo {
 }
 
 const MUTATION_TOOL_NAMES: ReadonlySet<string> = new Set([
-  "Write", "Edit", "MultiEdit", "NotebookEdit",
+  "Write",
+  "Edit",
+  "MultiEdit",
+  "NotebookEdit",
 ]);
 
 const ARTIFACT_EXTENSIONS: ReadonlySet<string> = new Set([
-  "md", "markdown", "txt", "rtf",
-  "pdf", "docx", "doc",
-  "pptx", "ppt", "key",
-  "xlsx", "xls", "csv", "tsv", "ods",
-  "json", "yaml", "yml", "toml", "xml",
-  "html", "htm",
-  "png", "jpg", "jpeg", "gif", "svg", "webp", "bmp", "ico",
-  "zip", "tar", "gz", "tgz",
+  "md",
+  "markdown",
+  "txt",
+  "rtf",
+  "pdf",
+  "docx",
+  "doc",
+  "pptx",
+  "ppt",
+  "key",
+  "xlsx",
+  "xls",
+  "csv",
+  "tsv",
+  "ods",
+  "json",
+  "yaml",
+  "yml",
+  "toml",
+  "xml",
+  "html",
+  "htm",
+  "png",
+  "jpg",
+  "jpeg",
+  "gif",
+  "svg",
+  "webp",
+  "bmp",
+  "ico",
+  "zip",
+  "tar",
+  "gz",
+  "tgz",
   "ipynb",
 ]);
 
@@ -151,7 +185,8 @@ function nextAssistantHasFileEdit(
   const next = messages[userIdx + 1];
   if (!next || next.role !== "assistant") return false;
   return next.blocks.some(
-    (b) => b.kind === "tool_call" && MUTATION_TOOL_NAMES.has(b.toolCall.toolName),
+    (b) =>
+      b.kind === "tool_call" && MUTATION_TOOL_NAMES.has(b.toolCall.toolName),
   );
 }
 
@@ -270,12 +305,16 @@ export function ChatStream({
           key={it.id}
           interrupt={it}
           onAllow={() => void onResume({ decisions: [{ type: "allow" }] })}
-          onDeny={(reason) => void onResume({ decisions: [{ type: "deny", message: reason }] })}
+          onDeny={(reason) =>
+            void onResume({ decisions: [{ type: "deny", message: reason }] })
+          }
           onAllowAlways={(rule) => {
             // 1) 本地按 cwd 持久化（下次 run 经 approvalRules 注入 sidecar）。
             onAllowAlways(rule);
             // 2) 当前 run 立即生效：allow 续跑并把规则带给 sidecar 的 per-run registry。
-            void onResume({ decisions: [{ type: "allow", persistRule: rule }] });
+            void onResume({
+              decisions: [{ type: "allow", persistRule: rule }],
+            });
           }}
         />
       );
@@ -291,7 +330,9 @@ export function ChatStream({
         if (b.kind === "tool_call") matchedIds.add(b.toolCall.id);
       }
     }
-    return [...interruptsByToolId.values()].filter((it) => !matchedIds.has(it.id));
+    return [...interruptsByToolId.values()].filter(
+      (it) => !matchedIds.has(it.id),
+    );
   }, [messages, interruptsByToolId]);
 
   if (loading) {
@@ -316,14 +357,19 @@ export function ChatStream({
       <ConversationContent className="gap-0 p-0">
         <div className="mx-auto w-full max-w-[760px] space-y-6 px-8 py-6">
           {status.isAuthError && (
-            <ApiKeyMissingBanner onConfigureClick={() => navigate("/settings")} />
+            <ApiKeyMissingBanner
+              onConfigureClick={() => navigate("/settings")}
+            />
           )}
           {status.errorCode === "RATE_LIMIT" && status.retry && (
             <RetryHint delayMs={status.retry.retryDelayMs} />
           )}
           {status.retry && status.status === "running" && (
             <div className="px-4 pt-2">
-              <RetryingPill attempt={status.retry.attempt} maxRetries={status.retry.maxRetries} />
+              <RetryingPill
+                attempt={status.retry.attempt}
+                maxRetries={status.retry.maxRetries}
+              />
             </div>
           )}
           {messages.map((m, idx) => {
@@ -345,9 +391,8 @@ export function ChatStream({
             // files (drives the confirm dialog vs one-click).
             const laterRounds =
               m.role === "user"
-                ? messages
-                    .slice(idx + 1)
-                    .filter((x) => x.role === "user").length
+                ? messages.slice(idx + 1).filter((x) => x.role === "user")
+                    .length
                 : 0;
             const willRollbackFiles =
               m.role === "user" && nextAssistantHasFileEdit(messages, idx);
@@ -377,7 +422,7 @@ export function ChatStream({
               style={{ color: "hsl(var(--text-300))" }}
             >
               <ThinkingSpinner size={16} />
-              <span>思考中</span>
+              <span>{t("task.processGroup.summary.thought")}</span>
             </div>
           )}
           {isInsufficientCredits && (
@@ -395,7 +440,10 @@ export function ChatStream({
             </div>
           )}
           {error && !isInsufficientCredits && (
-            <p className="text-[13px]" style={{ color: "hsl(var(--danger-100))" }}>
+            <p
+              className="text-[13px]"
+              style={{ color: "hsl(var(--danger-100))" }}
+            >
               错误：{error}
             </p>
           )}
@@ -532,7 +580,10 @@ function MessageRow({
           for (const s of b.steps) {
             if (s.kind !== "tool_call") continue;
             const it = interruptsByToolId.get(s.tool.id);
-            if (it) { matchingInterrupt = it; break; }
+            if (it) {
+              matchingInterrupt = it;
+              break;
+            }
           }
           return (
             <div key={b.key} className="space-y-3">

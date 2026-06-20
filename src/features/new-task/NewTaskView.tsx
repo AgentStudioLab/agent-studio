@@ -1,4 +1,12 @@
-import { ChevronDown, ExternalLink, FastForward, FolderOpen, FolderPlus, Hand } from "lucide-react";
+import {
+  ChevronDown,
+  ExternalLink,
+  FastForward,
+  FolderOpen,
+  FolderPlus,
+  Hand,
+  Sparkles,
+} from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
@@ -11,7 +19,6 @@ import {
   PromptInputButton,
   PromptInputFooter,
   PromptInputSubmit,
-  PromptInputTools,
   type PromptInputMessage,
 } from "@/components/ai-elements/prompt-input";
 import { SlashEditor } from "@/features/composer/SlashEditor";
@@ -43,10 +50,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { ProviderModelPicker } from "@/features/task/ProviderModelPicker";
 import { useAuth } from "@/features/auth/useAuth";
 import { buildOfficialRunAuthFields } from "@/features/task/officialRunAuth";
-import {
-  getProvider,
-  type ProviderModelSelection,
-} from "@/lib/data/settings";
+import { getProvider, type ProviderModelSelection } from "@/lib/data/settings";
 
 const SAFETY_DOCS_URL = "https://www.agentstudio.chat/docs";
 
@@ -63,7 +67,9 @@ function basename(p: string): string {
   return idx >= 0 ? trimmed.slice(idx + 1) : trimmed;
 }
 
-export function NewTaskView({ ModelPicker = ProviderModelPicker }: NewTaskViewProps = {}) {
+export function NewTaskView({
+  ModelPicker = ProviderModelPicker,
+}: NewTaskViewProps = {}) {
   const { t } = useTranslation();
   const welcomeHeading = t("newTask.welcome.heading");
   const navigate = useNavigate();
@@ -142,146 +148,146 @@ export function NewTaskView({ ModelPicker = ProviderModelPicker }: NewTaskViewPr
 
   return (
     <>
-    <AppShell
-      main={
-        <div
-          data-tauri-drag-region
-          className="bg-dot-grid flex h-full flex-col items-center overflow-y-auto px-8 pt-[18vh]"
-        >
-          <div className="flex w-full max-w-[900px] flex-col items-center">
-            <div className="mb-8 flex flex-col items-center text-center">
-              <img
-                src="/logo/agent-studio-lockup.svg"
-                alt="Agent Studio"
-                className="mb-8 h-16 w-auto max-w-[238px] shrink-0 object-contain"
-                draggable={false}
-              />
-              <h1
-                aria-label={welcomeHeading}
-                className="mt-2 max-w-[860px] font-serif text-[44px] font-normal leading-[1.12] text-foreground"
-              >
-                {welcomeHeading}
-              </h1>
-              <p className="mt-4 max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-[15px] leading-6 text-muted-foreground">
-                {t("newTask.welcome.subtitle")}
-              </p>
-            </div>
-            <div className="w-full">
-              {/* Solid backplate occludes the dot-grid behind the prompt
-                  card. The InputGroup (rendered by PromptInput) uses a
-                  semi-transparent dark bg, so without this layer the dots
-                  bleed through. Matching the form's rounded-2xl keeps the
-                  silhouette clean. */}
+      <AppShell
+        main={
+          <div
+            data-tauri-drag-region
+            className="bg-dot-grid flex min-h-full flex-col items-center justify-center overflow-y-auto px-8 py-16"
+          >
+            <div className="w-full max-w-[672px]">
+              {/* 标题：左对齐 + 单一橙色装饰图标，去掉大 Logo（贴近参考布局） */}
+              <div className="mb-6">
+                <h1
+                  aria-label={welcomeHeading}
+                  className="flex items-center gap-3 font-serif text-[30px] font-normal leading-snug text-foreground"
+                >
+                  <Sparkles
+                    aria-hidden
+                    className="size-7 shrink-0 text-primary"
+                  />
+                  {welcomeHeading}
+                </h1>
+                <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-[14px] leading-6 text-muted-foreground">
+                  <span>{t("newTask.welcome.subtitle")}</span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void shellOpen(SAFETY_DOCS_URL).catch(() => {})
+                    }
+                    className="inline-flex items-center gap-1 underline-offset-4 transition-colors hover:text-foreground hover:underline"
+                  >
+                    {t("newTask.welcome.learnMore")}
+                    <ExternalLink className="size-3" />
+                  </button>
+                </div>
+              </div>
+              {/* 输入框：框内只保留发送按钮，控件下移到独立一行 */}
               <div className="rounded-2xl bg-background">
                 <PromptInput onSubmit={handleSubmit}>
-                  <SlashEditor placeholder={t("newTask.input.placeholder")} />
-                <PromptInputFooter className="px-4 pb-3">
-                  <PromptInputTools>
-                    <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
-                      <PopoverTrigger asChild>
-                        <PromptInputButton>
-                          <FolderOpen className="size-4" />
-                          <span>
-                            {workingDir
-                              ? basename(workingDir)
-                              : t("newTask.input.workInProject")}
-                          </span>
-                          <ChevronDown className="size-3" />
-                        </PromptInputButton>
-                      </PopoverTrigger>
-                      <PopoverContent
-                        align="start"
-                        className="w-[320px] p-1"
-                      >
-                        <button
-                          type="button"
-                          onClick={() => void handlePickFolder()}
-                          className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-[13.5px] transition-colors hover:bg-[hsl(var(--bg-100))]"
-                          style={{ color: "hsl(var(--text-100))" }}
-                        >
-                          <FolderPlus className="size-4 shrink-0" />
-                          <div className="min-w-0 flex-1">
-                            <div>{t("newTask.workInProject.chooseFolder")}</div>
-                            {workingDir && (
-                              <div
-                                className="truncate text-[11.5px]"
-                                style={{ color: "hsl(var(--text-300))" }}
-                              >
-                                {workingDir}
-                              </div>
-                            )}
-                          </div>
-                        </button>
-                      </PopoverContent>
-                    </Popover>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <PromptInputButton>
-                          {permissionMode === "act-without-asking" ? (
-                            <FastForward className="size-4" />
-                          ) : (
-                            <Hand className="size-4" />
-                          )}
-                          <span>
-                            {permissionMode === "act-without-asking"
-                              ? t("newTask.input.permissionMode.actShort")
-                              : t("newTask.input.permissionMode.askShort")}
-                          </span>
-                          <ChevronDown className="size-3" />
-                        </PromptInputButton>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="start" className="w-[320px]">
-                        <DropdownMenuItem
-                          onSelect={() => setPermissionMode("ask")}
-                          className="flex flex-col items-start gap-0.5 py-2"
-                        >
-                          <div className="flex items-center gap-2">
-                            <Hand className="size-4" />
-                            <span className="text-[13px] font-medium">
-                              {t("newTask.input.permissionMode.askTitle")}
-                            </span>
-                          </div>
-                          <span className="pl-6 text-[12px] text-muted-foreground">
-                            {t("newTask.input.permissionMode.askDesc")}
-                          </span>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onSelect={() => setConfirmAct(true)}
-                          className="flex flex-col items-start gap-0.5 py-2"
-                        >
-                          <div className="flex items-center gap-2">
-                            <FastForward className="size-4" />
-                            <span className="text-[13px] font-medium">
-                              {t("newTask.input.permissionMode.actTitle")}
-                            </span>
-                          </div>
-                          <span className="pl-6 text-[12px] text-muted-foreground">
-                            {t("newTask.input.permissionMode.actDesc")}
-                          </span>
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </PromptInputTools>
-                  <PromptInputTools>
-                    <ModelPicker
-                      value={providerSelection}
-                      onChange={setProviderSelection}
-                    />
+                  <SlashEditor
+                    placeholder={t("newTask.input.placeholder")}
+                    className="slash-editor--tall"
+                  />
+                  <PromptInputFooter className="justify-end px-4 pb-3">
                     <PromptInputSubmit />
-                  </PromptInputTools>
-                </PromptInputFooter>
+                  </PromptInputFooter>
                 </PromptInput>
               </div>
-              <button
-                type="button"
-                onClick={() => void shellOpen(SAFETY_DOCS_URL).catch(() => {})}
-                className="mx-auto mt-5 flex w-fit max-w-full items-center gap-1 overflow-hidden text-ellipsis whitespace-nowrap text-sm text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
-              >
-                {t("newTask.welcome.learnMore")}
-                <ExternalLink className="size-3" />
-              </button>
+              {/* 控件行：项目 / 提问 在左，模型选择在右 */}
+              <div className="mt-3 flex items-center justify-between gap-2">
+                <div className="flex min-w-0 items-center gap-1">
+                  <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+                    <PopoverTrigger asChild>
+                      <PromptInputButton>
+                        <FolderOpen className="size-4" />
+                        <span>
+                          {workingDir
+                            ? basename(workingDir)
+                            : t("newTask.input.workInProject")}
+                        </span>
+                        <ChevronDown className="size-3" />
+                      </PromptInputButton>
+                    </PopoverTrigger>
+                    <PopoverContent align="start" className="w-[320px] p-1">
+                      <button
+                        type="button"
+                        onClick={() => void handlePickFolder()}
+                        className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-[13.5px] transition-colors hover:bg-[hsl(var(--bg-100))]"
+                        style={{ color: "hsl(var(--text-100))" }}
+                      >
+                        <FolderPlus className="size-4 shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <div>{t("newTask.workInProject.chooseFolder")}</div>
+                          {workingDir && (
+                            <div
+                              className="truncate text-[11.5px]"
+                              style={{ color: "hsl(var(--text-300))" }}
+                            >
+                              {workingDir}
+                            </div>
+                          )}
+                        </div>
+                      </button>
+                    </PopoverContent>
+                  </Popover>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <PromptInputButton>
+                        {permissionMode === "act-without-asking" ? (
+                          <FastForward className="size-4" />
+                        ) : (
+                          <Hand className="size-4" />
+                        )}
+                        <span>
+                          {permissionMode === "act-without-asking"
+                            ? t("newTask.input.permissionMode.actShort")
+                            : t("newTask.input.permissionMode.askShort")}
+                        </span>
+                        <ChevronDown className="size-3" />
+                      </PromptInputButton>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="w-[320px]">
+                      <DropdownMenuItem
+                        onSelect={() => setPermissionMode("ask")}
+                        className="flex flex-col items-start gap-0.5 py-2"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Hand className="size-4" />
+                          <span className="text-[13px] font-medium">
+                            {t("newTask.input.permissionMode.askTitle")}
+                          </span>
+                        </div>
+                        <span className="pl-6 text-[12px] text-muted-foreground">
+                          {t("newTask.input.permissionMode.askDesc")}
+                        </span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onSelect={() => setConfirmAct(true)}
+                        className="flex flex-col items-start gap-0.5 py-2"
+                      >
+                        <div className="flex items-center gap-2">
+                          <FastForward className="size-4" />
+                          <span className="text-[13px] font-medium">
+                            {t("newTask.input.permissionMode.actTitle")}
+                          </span>
+                        </div>
+                        <span className="pl-6 text-[12px] text-muted-foreground">
+                          {t("newTask.input.permissionMode.actDesc")}
+                        </span>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+                <ModelPicker
+                  value={providerSelection}
+                  onChange={setProviderSelection}
+                />
+              </div>
               {error && (
-                <p className="mt-2 text-sm" style={{ color: "hsl(var(--danger-100))" }}>
+                <p
+                  className="mt-2 text-sm"
+                  style={{ color: "hsl(var(--danger-100))" }}
+                >
                   {error === "api_key_missing"
                     ? t("newTask.error.apiKeyMissing")
                     : t("newTask.error.generic", { msg: error })}
@@ -289,34 +295,33 @@ export function NewTaskView({ ModelPicker = ProviderModelPicker }: NewTaskViewPr
               )}
             </div>
           </div>
-        </div>
-      }
-    />
-    <AlertDialog open={confirmAct} onOpenChange={setConfirmAct}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>
-            {t("newTask.input.permissionMode.confirmTitle")}
-          </AlertDialogTitle>
-          <AlertDialogDescription>
-            {t("newTask.input.permissionMode.confirmDesc")}
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>
-            {t("newTask.input.permissionMode.cancel")}
-          </AlertDialogCancel>
-          <AlertDialogAction
-            onClick={() => {
-              setPermissionMode("act-without-asking");
-              setConfirmAct(false);
-            }}
-          >
-            {t("newTask.input.permissionMode.confirm")}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+        }
+      />
+      <AlertDialog open={confirmAct} onOpenChange={setConfirmAct}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t("newTask.input.permissionMode.confirmTitle")}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("newTask.input.permissionMode.confirmDesc")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>
+              {t("newTask.input.permissionMode.cancel")}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setPermissionMode("act-without-asking");
+                setConfirmAct(false);
+              }}
+            >
+              {t("newTask.input.permissionMode.confirm")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
