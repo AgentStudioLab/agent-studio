@@ -79,6 +79,23 @@ export function AskUserCard({ questions, onSubmit }: AskUserCardProps) {
   // see the latest value without depending on closure capture.
   const [submitted, setSubmitted] = useState(false);
   const submittedRef = useRef(false);
+  const pageRef = useRef(page);
+  const autoAdvanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autoAdvanceSeqRef = useRef(0);
+
+  useEffect(() => {
+    pageRef.current = page;
+  }, [page]);
+
+  useEffect(
+    () => () => {
+      if (autoAdvanceTimerRef.current !== null) {
+        clearTimeout(autoAdvanceTimerRef.current);
+        autoAdvanceTimerRef.current = null;
+      }
+    },
+    [],
+  );
 
   const submit = useCallback(
     (snapshot: ReadonlyMap<number, AskUserAnswer>) => {
@@ -123,12 +140,27 @@ export function AskUserCard({ questions, onSubmit }: AskUserCardProps) {
   const onSelectSingle = useCallback(
     (label: string) => {
       if (submittedRef.current) return;
+      if (autoAdvanceTimerRef.current !== null) {
+        clearTimeout(autoAdvanceTimerRef.current);
+        autoAdvanceTimerRef.current = null;
+      }
       const next = new Map(answers);
       next.set(page, { kind: "selected", labels: [label] });
       setAnswers(next);
       const isLast = page === total - 1;
-      window.setTimeout(() => {
-        if (submittedRef.current) return;
+      const seq = ++autoAdvanceSeqRef.current;
+      const expectedPage = page;
+      autoAdvanceTimerRef.current = setTimeout(() => {
+        if (seq === autoAdvanceSeqRef.current) {
+          autoAdvanceTimerRef.current = null;
+        }
+        if (
+          submittedRef.current ||
+          seq !== autoAdvanceSeqRef.current ||
+          pageRef.current !== expectedPage
+        ) {
+          return;
+        }
         if (isLast) submit(next);
         else advance();
       }, AUTO_ADVANCE_DELAY);

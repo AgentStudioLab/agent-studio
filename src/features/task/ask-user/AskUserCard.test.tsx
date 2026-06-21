@@ -106,6 +106,34 @@ describe("AskUserCard", () => {
     expect(arg.answers[1]).toEqual({ question: "size?", selected: ["Red"] });
   });
 
+  it("keeps rapid single-select timers from skipping a question", async () => {
+    const onSubmit = mock(() => {});
+    render(
+      <Wrap>
+        <AskUserCard
+          questions={[
+            SINGLE_Q,
+            { ...SINGLE_Q, question: "size?", header: "Size" },
+            { ...SINGLE_Q, question: "shape?", header: "Shape" },
+          ]}
+          onSubmit={onSubmit}
+        />
+      </Wrap>,
+    );
+
+    fireEvent.click(screen.getByText("Red"));
+    fireEvent.click(screen.getByText("Blue"));
+
+    await waitFor(() => expect(screen.getByText("size?")).toBeDefined(), {
+      timeout: 500,
+    });
+    await new Promise((resolve) => window.setTimeout(resolve, 210));
+
+    expect(screen.getByText("size?")).toBeDefined();
+    expect(screen.queryByText("shape?")).toBeNull();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
   it("multi-select toggles without advancing; counter tracks size", () => {
     const onSubmit = mock(() => {});
     render(
