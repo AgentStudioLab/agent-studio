@@ -55,10 +55,17 @@ export function SomethingElseRow({
       disabled={disabled}
       className={cn(
         "flex w-full items-start gap-3 rounded-md px-3 py-2.5 text-left transition-colors disabled:cursor-default",
-        active ? "bg-muted" : "hover:bg-muted/60",
+        active
+          ? "bg-accent text-accent-foreground ring-1 ring-primary/25"
+          : "hover:bg-muted/60",
       )}
     >
-      <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded text-muted-foreground">
+      <div
+        className={cn(
+          "mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded",
+          active ? "bg-primary text-primary-foreground" : "text-muted-foreground",
+        )}
+      >
         <Pencil size={14} />
       </div>
       <textarea

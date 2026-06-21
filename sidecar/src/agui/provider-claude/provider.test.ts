@@ -231,6 +231,32 @@ describe("provider sandbox config", () => {
     expect(settings?.permissions?.ask).toContain("WebFetch(*)");
   });
 
+  it("appends AskUserQuestion usage guidance to the Claude Code preset", async () => {
+    const provider = createClaudeProvider({ apiKey: "k" });
+    const ac = new AbortController();
+    await drain(provider.run({
+      runId: "r_ask_user_guidance",
+      threadId: "t_ask_user_guidance",
+      userMessage: { role: "user", content: "推荐几部科幻电影" },
+      abortSignal: ac.signal,
+      cwd: "/tmp/proj",
+    }));
+
+    const calls = querySpy.mock.calls as unknown[];
+    const lastCallArgs = calls[calls.length - 1] as unknown[];
+    const lastCall = lastCallArgs[0] as Record<string, unknown>;
+    const options = lastCall.options as Record<string, unknown>;
+    const systemPrompt = options.systemPrompt as {
+      type?: string;
+      preset?: string;
+      append?: string;
+    };
+    expect(systemPrompt.type).toBe("preset");
+    expect(systemPrompt.preset).toBe("claude_code");
+    expect(systemPrompt.append).toContain("AskUserQuestion");
+    expect(systemPrompt.append).toContain("preferences");
+  });
+
   it("routes AskUserQuestion through requestAskUser even in act-without-asking mode", async () => {
     const askCalls: unknown[] = [];
     let approvalCalls = 0;

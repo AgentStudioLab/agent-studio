@@ -31,7 +31,9 @@ export function MultiSelectList({
               disabled={disabled}
               className={cn(
                 "flex w-full items-start gap-3 rounded-md px-3 py-2.5 text-left transition-colors disabled:cursor-default",
-                active ? "bg-muted" : "hover:bg-muted/60",
+                active
+                  ? "bg-accent text-accent-foreground ring-1 ring-primary/25"
+                  : "hover:bg-muted/60",
               )}
               aria-pressed={active}
             >

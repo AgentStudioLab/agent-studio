@@ -31,13 +31,20 @@ export function SingleSelectList({
               disabled={disabled}
               className={cn(
                 "group flex w-full items-start gap-3 rounded-md px-3 py-2.5 text-left transition-colors disabled:cursor-default",
-                active ? "bg-muted" : "hover:bg-muted/60",
+                active
+                  ? "bg-accent text-accent-foreground ring-1 ring-primary/25"
+                  : "hover:bg-muted/60",
               )}
               data-state={active ? "active" : "inactive"}
             >
               {/* Index square. The number doubles as a keyboard hint (1-9). */}
               <div
-                className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded bg-muted text-[11px] font-medium text-muted-foreground"
+                className={cn(
+                  "mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded text-[11px] font-medium",
+                  active
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground",
+                )}
               >
                 {i + 1}
               </div>
@@ -55,10 +62,10 @@ export function SingleSelectList({
                   immediately advances to the next question. */}
               <div
                 className={cn(
-                  "mt-1 shrink-0 text-muted-foreground transition-opacity",
+                  "mt-1 shrink-0 transition-opacity",
                   active
-                    ? "opacity-100"
-                    : "opacity-0 group-hover:opacity-100",
+                    ? "text-primary opacity-100"
+                    : "text-muted-foreground opacity-0 group-hover:opacity-100",
                 )}
               >
                 <ArrowRight size={14} />

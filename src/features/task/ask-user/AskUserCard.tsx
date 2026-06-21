@@ -4,7 +4,7 @@
 //   - per-question state (answers Map<pageIndex, AskUserAnswer>)
 //   - "Something else" draft text (separate map so the draft survives page
 //      switches even before the user commits)
-//   - pagination + auto-advance on single-select
+//   - pagination + auto-advance on non-final single-select pages
 //   - keyboard shortcuts (1-9, ←/→, Enter, Esc)
 //   - flush on Send / X — translates internal state into the
 //     ask_user_answers decision payload that resume expects.
@@ -139,7 +139,7 @@ export function AskUserCard({ questions, onSubmit }: AskUserCardProps) {
     submit(answers);
   }, [answers, submit]);
 
-  // --- single-select: choosing an option auto-advances (or sends if last) ---
+  // --- single-select: choosing an option auto-advances until the final page ---
   const onSelectSingle = useCallback(
     (label: string) => {
       if (submittedRef.current) return;
@@ -164,11 +164,10 @@ export function AskUserCard({ questions, onSubmit }: AskUserCardProps) {
         ) {
           return;
         }
-        if (isLast) submit(next);
-        else advance();
+        if (!isLast) advance();
       }, AUTO_ADVANCE_DELAY);
     },
-    [advance, answers, page, submit, total],
+    [advance, answers, page, total],
   );
 
   // --- multi-select: toggle without advancing ---
@@ -318,7 +317,8 @@ export function AskUserCard({ questions, onSubmit }: AskUserCardProps) {
   const multiSelect = current.multiSelect === true;
 
   return (
-    <div className="rounded-md border border-border bg-card text-card-foreground">
+    <div className="overflow-hidden rounded-md border border-border bg-card text-card-foreground shadow-sm ring-1 ring-primary/10">
+      <div className="h-0.5 bg-primary/70" />
       <AskUserHeader
         header={header}
         page={page}

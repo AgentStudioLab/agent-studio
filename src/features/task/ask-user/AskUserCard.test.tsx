@@ -1,7 +1,7 @@
 // AskUserCard behavioral tests.
 //
 // Covers the four contract points from the spec:
-//   1. Single-select auto-advances after 150ms.
+//   1. Single-select auto-advances after 150ms until the final page.
 //   2. Multi-select toggles without advancing; "N selected" counter tracks set.
 //   3. Something else: typing populates custom answer; Cmd+Enter commits.
 //   4. X close / Send on last page submits whichever answers exist, with
@@ -80,7 +80,7 @@ describe("AskUserCard", () => {
   // *previous* test. Manually unmount after each it().
   afterEach(() => cleanup());
 
-  it("single-select auto-advances then sends on last page", async () => {
+  it("single-select auto-advances then waits for Send on the last page", async () => {
     const onSubmit = mock(() => {});
     render(
       <Wrap>
@@ -96,9 +96,13 @@ describe("AskUserCard", () => {
     await waitFor(() => expect(screen.getByText("size?")).toBeDefined(), {
       timeout: 500,
     });
-    // Pick on last page → Send fires onSubmit
+    // Pick on last page → selected state updates, but the user still confirms
+    // with Send. This avoids surprise-submitting the final answer.
     fireEvent.click(screen.getAllByText("Red")[0]!);
-    await waitFor(() => expect(onSubmit).toHaveBeenCalled(), { timeout: 500 });
+    await new Promise((resolve) => window.setTimeout(resolve, 210));
+    expect(onSubmit).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByLabelText("Send"));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1), { timeout: 500 });
     const arg = (onSubmit.mock.calls[0] as unknown[])[0] as {
       answers: { question: string; selected?: string[] }[];
     };
