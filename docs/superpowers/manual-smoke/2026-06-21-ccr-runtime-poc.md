@@ -104,6 +104,79 @@ bun build /tmp/agent-studio-ccr-asset-copy-smoke.ts --compile --outfile /tmp/age
 
 说明：`fs.copyFile` 不能从 `$bunfs` 虚拟路径复制 CCR asset；实现已改为 `Bun.file(...).arrayBuffer()` + `Bun.write(...)` 写入真实 runtime 目录。
 
+## Smoke 入口
+
+新增脚本：
+
+```bash
+cd sidecar
+bun run smoke:ccr -- --dry-run
+```
+
+必填环境变量：
+
+```bash
+AGENT_STUDIO_CCR_POC_BASE_URL=https://api.openai.com/v1
+AGENT_STUDIO_CCR_POC_API_KEY=<OpenAI-compatible API key>
+AGENT_STUDIO_CCR_POC_MODEL=<model id>
+```
+
+可选环境变量：
+
+```bash
+AGENT_STUDIO_CCR_POC_PROTOCOL=openai-compatible # 或 anthropic，默认 openai-compatible
+AGENT_STUDIO_CCR_POC_PROVIDER_ID=ccr_poc
+AGENT_STUDIO_CCR_POC_PROVIDER_NAME="CCR PoC Provider"
+AGENT_STUDIO_CCR_POC_ROUTER_API_KEY=agent-studio-ccr-poc
+AGENT_STUDIO_CCR_POC_ROUTER_PORT=3456
+AGENT_STUDIO_CCR_POC_CONFIG_DIR=/tmp/agent-studio-ccr-poc
+AGENT_STUDIO_CCR_POC_CWD=$(pwd)
+AGENT_STUDIO_CCR_POC_PROMPT="用一句中文回复：CCR text streaming smoke ok"
+```
+
+dry-run 示例：
+
+```bash
+cd sidecar
+AGENT_STUDIO_CCR_POC_BASE_URL=https://api.openai.com/v1 \
+AGENT_STUDIO_CCR_POC_API_KEY=... \
+AGENT_STUDIO_CCR_POC_MODEL=gpt-5.1 \
+bun run smoke:ccr -- --dry-run
+```
+
+dry-run 只打印已脱敏的 CCR route/config，不启动 CCR，不调用上游模型。
+
+真实 Text streaming smoke：
+
+```bash
+cd sidecar
+AGENT_STUDIO_CCR_POC_BASE_URL=https://api.openai.com/v1 \
+AGENT_STUDIO_CCR_POC_API_KEY=... \
+AGENT_STUDIO_CCR_POC_MODEL=gpt-5.1 \
+bun run smoke:ccr
+```
+
+预期输出包含：
+
+- `CCR route（已脱敏）`
+- `CCR config（已脱敏）`
+- `CCR smoke 摘要`
+
+如果 `CCR smoke 摘要.eventTypes` 包含 `RUN_STARTED`、`TEXT_MESSAGE_CONTENT`、`RUN_FINISHED`，且 `text` 非空，则可以把 PoC 矩阵的 `Text streaming` 更新为 Pass，并粘贴摘要作为证据。
+
+本轮已通过 dry-run：
+
+```bash
+AGENT_STUDIO_CCR_POC_BASE_URL=https://api.openai.com/v1 \
+AGENT_STUDIO_CCR_POC_API_KEY=sk-openai-secret \
+AGENT_STUDIO_CCR_POC_MODEL=gpt-5.1 \
+AGENT_STUDIO_CCR_POC_ROUTER_API_KEY=router-secret \
+AGENT_STUDIO_CCR_POC_ROUTER_PORT=4555 \
+bun run scripts/ccr-runtime-smoke.ts --dry-run
+```
+
+结果：只输出脱敏后的 route/config，并显示 `dry-run 完成：未启动 CCR，未调用上游模型。`
+
 ## 必须确认的问题
 
 删除 `provider-openai` 前必须确认：

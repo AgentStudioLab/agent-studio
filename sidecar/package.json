@@ -4,7 +4,8 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "bun --hot src/server.ts --port=4123 --token=dev-token"
+    "dev": "bun --hot src/server.ts --port=4123 --token=dev-token",
+    "smoke:ccr": "bun run scripts/ccr-runtime-smoke.ts"
   },
   "devDependencies": {
     "@types/bun": "latest",
