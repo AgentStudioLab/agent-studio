@@ -1,4 +1,5 @@
 use std::{
+    ffi::OsString,
     io::{Read, Write},
     net::{SocketAddr, TcpListener, TcpStream},
     sync::Mutex,
@@ -19,6 +20,17 @@ const LOOPBACK_AUTH_CALLBACK_PATH: &str = "/auth/callback";
 const WINDOW_STATE_STORE_KEY: &str = "main_window_state";
 const MIN_WINDOW_WIDTH: u32 = 1100;
 const MIN_WINDOW_HEIGHT: u32 = 720;
+const SIDECAR_BASE_ENV_KEYS: &[&str] = &[
+    "PATH",
+    "HOME",
+    "USER",
+    "LOGNAME",
+    "SHELL",
+    "TMPDIR",
+    "LANG",
+    "LC_ALL",
+    "LC_CTYPE",
+];
 
 #[derive(Clone, Serialize)]
 pub struct SidecarInfo {
@@ -292,11 +304,19 @@ fn spawn_sidecar(app: &AppHandle) -> Result<SidecarInfo, Box<dyn std::error::Err
     let mut cmd = app
         .shell()
         .sidecar("agent-studio-sidecar")?
+        // Bun reads proxy env during process startup. If the desktop shell
+        // inherits unsupported SOCKS proxy variables, sidecar fetch() fails
+        // before JS can clean process.env. Start from a small allow-list and
+        // add only the app-specific variables below.
+        .env_clear()
         .args([
             format!("--port={port}"),
             format!("--token={token}"),
             format!("--db={}", db_path.display()),
         ]);
+    for (key, value) in sidecar_base_env() {
+        cmd = cmd.env(key, value);
+    }
     if let Some(k) = api_key {
         cmd = cmd.env("ANTHROPIC_API_KEY", k);
     }
@@ -353,6 +373,13 @@ fn spawn_sidecar(app: &AppHandle) -> Result<SidecarInfo, Box<dyn std::error::Err
     });
 
     Ok(SidecarInfo { port, token })
+}
+
+fn sidecar_base_env() -> Vec<(&'static str, OsString)> {
+    SIDECAR_BASE_ENV_KEYS
+        .iter()
+        .filter_map(|key| std::env::var_os(key).map(|value| (*key, value)))
+        .collect()
 }
 
 fn is_desktop_auth_callback_url(url: &str) -> bool {
