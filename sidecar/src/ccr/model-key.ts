@@ -1,5 +1,4 @@
 const CCR_MODEL_KEY_PREFIX = "agentstudio";
-const EMPTY_SEGMENT = "_";
 
 export interface CcrModelKeyParts {
   providerId: string;
@@ -8,7 +7,8 @@ export interface CcrModelKeyParts {
 
 export function sanitizeCcrSegment(value: string): string {
   const trimmed = value.trim();
-  return encodeURIComponent(trimmed.length > 0 ? trimmed : EMPTY_SEGMENT);
+  if (!trimmed) throw new Error("ccr_model_key_empty_segment");
+  return encodeURIComponent(trimmed);
 }
 
 export function buildCcrModelKey(parts: CcrModelKeyParts): string {
@@ -26,10 +26,10 @@ export function parseCcrModelKey(value: string): CcrModelKeyParts | null {
   }
 
   try {
-    return {
-      providerId: decodeURIComponent(segments[1] ?? ""),
-      modelId: decodeURIComponent(segments[2] ?? ""),
-    };
+    const providerId = decodeURIComponent(segments[1] ?? "").trim();
+    const modelId = decodeURIComponent(segments[2] ?? "").trim();
+    if (!providerId || !modelId) return null;
+    return { providerId, modelId };
   } catch {
     return null;
   }

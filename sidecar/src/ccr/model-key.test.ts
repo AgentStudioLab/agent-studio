@@ -36,7 +36,10 @@ describe("CCR model keys", () => {
     expect(parseCcrModelKey("agentstudio/only-provider")).toBeNull();
   });
 
-  it("normalizes empty segments to a stable placeholder", () => {
-    expect(sanitizeCcrSegment("  ")).toBe("_");
+  it("rejects empty segments before encoding", () => {
+    expect(() => sanitizeCcrSegment("")).toThrow("ccr_model_key_empty_segment");
+    expect(() => buildCcrModelKey({ providerId: "p", modelId: "" })).toThrow(
+      "ccr_model_key_empty_segment",
+    );
   });
 });
