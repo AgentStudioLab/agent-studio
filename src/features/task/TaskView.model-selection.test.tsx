@@ -5,17 +5,19 @@ import {
   render,
   screen,
   waitFor,
+  act,
 } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useNavigate } from "react-router-dom";
 import type { ProviderModelSelection } from "@/lib/data/settings";
 
 const sendMock = mock(async (_text: string, _opts?: unknown) => {});
 const regenerateMock = mock(async (_id: string, _opts?: unknown) => {});
+const mutationErrorHandlers: Array<(() => void) | undefined> = [];
 const updateConversationModelMutate = mock(
   (_vars: { id: string; model: string | null }, opts?: { onError?: () => void }) => {
-    void opts;
+    mutationErrorHandlers.push(opts?.onError);
   },
 );
 let currentPickerSelection: ProviderModelSelection | null = null;
@@ -85,6 +87,17 @@ mock.module("@/features/task/TaskMessageInput", () => ({
           }
         >
           Switch model
+        </button>
+        <button
+          type="button"
+          onClick={() =>
+            onProviderSelectionChange({
+              providerId: "conn-qwen",
+              modelId: "qwen/Qwen3-Coder",
+            })
+          }
+        >
+          Switch model again
         </button>
         <button type="button" onClick={() => onSend("Next message")}>
           Send message
@@ -183,6 +196,21 @@ mock.module("@/lib/data/settings", () => ({
         },
       },
       {
+        providerId: "conn-qwen",
+        providerName: "Qwen",
+        providerLabel: "Qwen",
+        managed: false,
+        modelId: "qwen/Qwen3-Coder",
+        modelLabel: "Qwen3 Coder",
+        modelDescription: "Coding",
+        agentRuntime: {
+          protocol: "openai-compatible",
+          baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+          auth: "bearer",
+          capabilities: { text: true, tools: false, fileCheckpoint: false },
+        },
+      },
+      {
         providerId: "conn-sf",
         providerName: "SiliconFlow",
         providerLabel: "SiliconFlow",
@@ -201,18 +229,34 @@ mock.module("@/lib/data/settings", () => ({
   })),
 }));
 
-mock.module("@/lib/data/queries", () => ({
-  useArchiveConversationMutation: () => ({ mutate: mock(() => {}) }),
-  useConversation: () => ({
-    data: {
-      id: "thr_1",
-      title: "Thread",
-      workingDir: "/tmp/work",
-      model: "gpt-5.1",
+function conversationForThread(id: string | null) {
+  if (id === "thr_2") {
+    return {
+      id: "thr_2",
+      title: "Thread 2",
+      workingDir: "/tmp/work-2",
+      model: "qwen/Qwen3-Coder",
       agentWorkspaceId: null,
       scheduledTaskId: null,
       permissionMode: null,
-    },
+    };
+  }
+
+  return {
+    id: "thr_1",
+    title: "Thread",
+    workingDir: "/tmp/work",
+    model: "gpt-5.1",
+    agentWorkspaceId: null,
+    scheduledTaskId: null,
+    permissionMode: null,
+  };
+}
+
+mock.module("@/lib/data/queries", () => ({
+  useArchiveConversationMutation: () => ({ mutate: mock(() => {}) }),
+  useConversation: (threadId: string | null) => ({
+    data: conversationForThread(threadId),
   }),
   useMessages: () => ({ data: [], isLoading: false }),
   useUpdateConversationModelMutation: () => ({
@@ -222,13 +266,30 @@ mock.module("@/lib/data/queries", () => ({
 
 const { TaskView } = require("./TaskView") as typeof import("./TaskView");
 
+function ThreadNav() {
+  const navigate = useNavigate();
+  return (
+    <button type="button" onClick={() => navigate("/task/thr_2")}>
+      Go to thread 2
+    </button>
+  );
+}
+
 function renderTaskView() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <MemoryRouter initialEntries={["/task/thr_1"]}>
       <QueryClientProvider client={qc}>
         <Routes>
-          <Route path="/task/:threadId" element={<TaskView />} />
+          <Route
+            path="/task/:threadId"
+            element={
+              <>
+                <TaskView />
+                <ThreadNav />
+              </>
+            }
+          />
         </Routes>
       </QueryClientProvider>
     </MemoryRouter>,
@@ -239,6 +300,7 @@ beforeEach(() => {
   sendMock.mockClear();
   regenerateMock.mockClear();
   updateConversationModelMutate.mockClear();
+  mutationErrorHandlers.length = 0;
   currentPickerSelection = null;
 });
 
@@ -293,6 +355,57 @@ describe("TaskView conversation model selection", () => {
           providerSelection: {
             providerId: "conn-sf",
             modelId: "deepseek-ai/DeepSeek-V3.2",
+          },
+        }),
+      ),
+    );
+  });
+
+  it("does not let a stale rollback override a newer model choice", async () => {
+    renderTaskView();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Switch model" }));
+    fireEvent.click(screen.getByRole("button", { name: "Switch model again" }));
+    await act(async () => {
+      mutationErrorHandlers[0]?.();
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Send message" }));
+
+    await waitFor(() =>
+      expect(sendMock).toHaveBeenCalledWith(
+        "Next message",
+        expect.objectContaining({
+          providerSelection: {
+            providerId: "conn-qwen",
+            modelId: "qwen/Qwen3-Coder",
+          },
+        }),
+      ),
+    );
+  });
+
+  it("uses the next thread conversation model after route changes", async () => {
+    renderTaskView();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Switch model" }));
+    fireEvent.click(screen.getByRole("button", { name: "Go to thread 2" }));
+
+    await waitFor(() =>
+      expect(currentPickerSelection).toEqual({
+        providerId: "conn-qwen",
+        modelId: "qwen/Qwen3-Coder",
+      }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Send message" }));
+
+    await waitFor(() =>
+      expect(sendMock).toHaveBeenCalledWith(
+        "Next message",
+        expect.objectContaining({
+          providerSelection: {
+            providerId: "conn-qwen",
+            modelId: "qwen/Qwen3-Coder",
           },
         }),
       ),

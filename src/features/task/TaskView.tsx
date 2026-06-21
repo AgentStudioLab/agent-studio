@@ -74,6 +74,7 @@ export function TaskView() {
   const [renameOpen, setRenameOpen] = useState(false);
   const [providerSelection, setProviderSelection] =
     useState<ProviderModelSelection | null>(null);
+  const providerSelectionChangeSeqRef = useRef(0);
   const auth = useAuth();
   const providerQuery = useQuery({
     queryKey: ["provider"],
@@ -177,6 +178,11 @@ export function TaskView() {
   const { mode: permissionMode, setMode: setPermissionMode } =
     useThreadPermissionMode(activeTaskId);
   const queue = useMessageQueue(activeTaskId);
+
+  useEffect(() => {
+    providerSelectionChangeSeqRef.current += 1;
+    setProviderSelection(null);
+  }, [activeTaskId]);
 
   // Seed the per-thread permission mode from the conversation's stored mode
   // (scheduled runs persist their mode on the conversation). The mode store
@@ -339,6 +345,8 @@ export function TaskView() {
   const handleProviderSelectionChange = useCallback(
     (selection: ProviderModelSelection) => {
       const previousSelection = effectiveProviderSelection;
+      const changeSeq = providerSelectionChangeSeqRef.current + 1;
+      providerSelectionChangeSeqRef.current = changeSeq;
       // 先更新本地选择，让输入区和后续 run 立即使用新模型；PATCH 失败时回滚。
       // 已经启动的 run 不撤销，切换只影响之后的发送/重试。
       setProviderSelection(selection);
@@ -347,6 +355,7 @@ export function TaskView() {
         { id: activeTaskId, model: selection.modelId },
         {
           onError: () => {
+            if (providerSelectionChangeSeqRef.current !== changeSeq) return;
             setProviderSelection(previousSelection);
           },
         },
