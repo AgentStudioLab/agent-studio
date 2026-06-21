@@ -28,6 +28,7 @@
     "completed": "Done",
     "error": "Failed",
     "cancelled": "Cancelled",
+    "awaiting_user": "Waiting for input",
     "awaiting_approval": "Awaiting approval"
   },
   "toolbar": {
