@@ -290,10 +290,13 @@ export function ChatStream({
     (it: PendingInterrupt) => {
       if (it.reason === "ask_user") {
         const payload = it.payload as unknown as AskUserPayload;
+        const questions = Array.isArray(payload?.questions)
+          ? payload.questions
+          : [];
         return (
           <AskUserCard
             key={it.id}
-            questions={payload.questions ?? []}
+            questions={questions}
             onSubmit={(decision: AskUserAnswersDecision) =>
               void onResume({ decisions: [decision] })
             }

@@ -127,9 +127,12 @@ export function AskUserCard({ questions, onSubmit }: AskUserCardProps) {
 
   const skip = useCallback(() => {
     if (submittedRef.current) return;
-    setAnswerForPage(page, { kind: "skipped" });
-    advance();
-  }, [advance, page, setAnswerForPage]);
+    const next = new Map(answers);
+    next.set(page, { kind: "skipped" });
+    setAnswers(next);
+    if (page === total - 1) submit(next);
+    else advance();
+  }, [advance, answers, page, submit, total]);
 
   const send = useCallback(() => {
     if (submittedRef.current) return;

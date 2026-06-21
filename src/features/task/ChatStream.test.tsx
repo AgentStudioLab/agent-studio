@@ -65,8 +65,8 @@ function renderChatStream(state: ChatState) {
           messages={[]}
           isThinking={false}
           isRunning={false}
-          error="insufficient credits"
-          pendingInterrupts={[]}
+          error={state.error}
+          pendingInterrupts={state.pendingInterrupts}
           onResume={async () => {}}
           onAllowAlways={() => {}}
           onContinueAfterRestart={() => {}}
@@ -75,6 +75,21 @@ function renderChatStream(state: ChatState) {
       </MemoryRouter>
     </I18nextProvider>,
   );
+}
+
+function baseState(overrides: Partial<ChatState> = {}): ChatState {
+  return {
+    historicalMessages: [],
+    liveMessages: [],
+    isRunning: false,
+    isThinking: false,
+    activeRunId: null,
+    pendingInterrupts: [],
+    error: null,
+    lastCursor: null,
+    runStartedAt: null,
+    ...overrides,
+  };
 }
 
 describe("ChatStream", () => {
@@ -89,18 +104,10 @@ describe("ChatStream", () => {
     const openMock = mock(() => null);
     window.open = openMock as typeof window.open;
 
-    renderChatStream({
-      historicalMessages: [],
-      liveMessages: [],
-      isRunning: false,
-      isThinking: false,
-      activeRunId: null,
-      pendingInterrupts: [],
+    renderChatStream(baseState({
       error: "insufficient credits",
-      lastCursor: null,
-      runStartedAt: null,
       errorCode: "INSUFFICIENT_CREDITS" as never,
-    });
+    }));
 
     expect(
       screen.getByText("Not enough credits. Please top up on the website."),
@@ -113,5 +120,30 @@ describe("ChatStream", () => {
       "_blank",
       "noopener,noreferrer",
     );
+  });
+
+  it("normalizes malformed ask-user questions payload before rendering", () => {
+    renderChatStream(baseState({
+      pendingInterrupts: [
+        {
+          id: "ask_1",
+          reason: "ask_user",
+          payload: {
+            toolName: "AskUserQuestion",
+            questions: {
+              0: {
+                question: "malformed should not render",
+                header: "Bad payload",
+                multiSelect: false,
+                options: [{ label: "Bad option", description: "" }],
+              },
+              length: 1,
+            },
+          },
+        },
+      ],
+    }));
+
+    expect(screen.queryByText("malformed should not render")).toBeNull();
   });
 });

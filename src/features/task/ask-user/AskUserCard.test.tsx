@@ -189,6 +189,23 @@ describe("AskUserCard", () => {
     expect(arg.answers[1]).toEqual({ question: "modules?", skipped: true });
   });
 
+  it("Skip on the final page submits skipped answers", async () => {
+    const onSubmit = mock(() => {});
+    render(
+      <Wrap>
+        <AskUserCard questions={[SINGLE_Q]} onSubmit={onSubmit} />
+      </Wrap>,
+    );
+
+    fireEvent.click(screen.getByText("Skip"));
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    const arg = (onSubmit.mock.calls[0] as unknown[])[0] as {
+      answers: { question: string; skipped?: true }[];
+    };
+    expect(arg.answers).toEqual([{ question: "color?", skipped: true }]);
+  });
+
   it("renders a safe fallback when a question has missing optional fields", () => {
     const onSubmit = mock(() => {});
     render(
