@@ -62,7 +62,47 @@ Examples:
 - CCR 默认读取 `$HOME/.claude-code-router/config.json`。
 - Agent Studio 托管 CCR 时必须设置隔离 `HOME`，把配置写到 `<configDir>/.claude-code-router/config.json`，避免污染用户真实 home。
 - 配置必须包含 `PORT`、`HOST: "127.0.0.1"`、`APIKEY`、`NON_INTERACTIVE_MODE: true`、`Providers`、`Router`。
-- 发布态 sidecar 是 `bun build --compile` 单二进制，不能假设存在 `node_modules/.bin/ccr`；必须验证 CCR CLI 文件可从依赖解析，或被提取/复制到真实磁盘路径后再 spawn。
+- 发布态 sidecar 是 `bun build --compile` 单二进制，不能假设存在 `node_modules/.bin/ccr`；当前实现用 Bun file asset 把 CCR `cli.js` 与 `tiktoken_bg.wasm` 打进 sidecar，并在启动前复制到 `<configDir>/runtime/` 真实磁盘路径后 spawn。
+
+## 本地实现验证
+
+已通过：
+
+```bash
+cd sidecar && bun test src/ccr
+```
+
+结果：`16 pass, 0 fail`
+
+已通过：
+
+```bash
+cd sidecar && bun test src/ccr src/agui/provider-factory.test.ts src/agui/provider-claude/provider-env.test.ts src/services/providerSettings.test.ts src/lib/providerProfiles.test.ts
+```
+
+结果：`66 pass, 0 fail`
+
+已通过：
+
+```bash
+bun run build:sidecar -- --host-only
+```
+
+结果：`[build-sidecar] done (1 target)`
+
+已通过编译态 asset copy smoke：
+
+```bash
+bun build /tmp/agent-studio-ccr-asset-copy-smoke.ts --compile --outfile /tmp/agent-studio-ccr-asset-copy-smoke && /tmp/agent-studio-ccr-asset-copy-smoke
+```
+
+结果：
+
+```json
+{"hasShebang":true}
+```
+
+说明：`fs.copyFile` 不能从 `$bunfs` 虚拟路径复制 CCR asset；实现已改为 `Bun.file(...).arrayBuffer()` + `Bun.write(...)` 写入真实 runtime 目录。
 
 ## 必须确认的问题
 
@@ -87,3 +127,14 @@ Examples:
 | Usage | Not run |  |
 | Cancel | Not run |  |
 | Error mapping | Not run |  |
+
+## PoC Gate 结论
+
+当前不能删除 `sidecar/src/agui/provider-openai`：
+
+- 尚未用真实 OpenAI-compatible provider API key 跑通 Text streaming。
+- 尚未验证 Read/Bash/Edit tool calls、HITL approve/deny、session resume、regenerate、file checkpoint rewind。
+- 尚未验证 run-scoped model selection 经过 CCR 不需要重启服务。
+- 尚未验证 cancel、usage、error mapping 在 CCR 转发路径上的实际表现。
+
+因此本阶段只完成 Claude SDK + managed CCR runtime 的主路径接入；旧 OpenAI adapter 暂时保留为 PoC gate 未通过时的回退资产，后续拿到端到端证据后再删除。
