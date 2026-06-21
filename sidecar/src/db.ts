@@ -294,6 +294,9 @@ function ensureRunsAwaitingUserCheck(db: Database): void {
   // 避免 run_events 在父表替换期间触发约束错误，数据复制完成后立即恢复。
   if (foreignKeysEnabled) db.exec("PRAGMA foreign_keys = OFF");
   try {
+    db.exec("BEGIN IMMEDIATE");
+    // 按当前 canonical runs schema 重建：这里要与 SCHEMA 里的 runs 定义和
+    // ensureColumn 追加列保持一致，避免旧库迁移后得到一张“半新版”表。
     db.exec(`
       CREATE TABLE runs_new (
         id          TEXT PRIMARY KEY,
@@ -327,6 +330,14 @@ function ensureRunsAwaitingUserCheck(db: Database): void {
       CREATE INDEX IF NOT EXISTS idx_runs_thread_started ON runs (thread_id, started_at DESC);
       CREATE INDEX IF NOT EXISTS idx_runs_status ON runs (status);
     `);
+    db.exec("COMMIT");
+  } catch (err) {
+    try {
+      db.exec("ROLLBACK");
+    } catch {
+      // 事务可能尚未成功开启；保留原始迁移错误给调用方。
+    }
+    throw err;
   } finally {
     if (foreignKeysEnabled) db.exec("PRAGMA foreign_keys = ON");
   }

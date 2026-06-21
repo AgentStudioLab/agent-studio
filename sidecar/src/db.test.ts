@@ -97,6 +97,15 @@ describe("db migrate — Phase 1 SDK leverage schema", () => {
     });
     expect(hasColumn(db, "runs", "input_tokens")).toBe(true);
     expect(db.prepare("SELECT COUNT(*) AS count FROM run_events WHERE run_id='r1'").get()).toEqual({ count: 1 });
+    expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
+
+    const indexes = db.prepare("PRAGMA index_list(runs)").all() as Array<{ name: string }>;
+    const indexNames = indexes.map((index) => index.name);
+    expect(indexNames).toContain("idx_runs_thread_started");
+    expect(indexNames).toContain("idx_runs_status");
+
+    db.exec("DELETE FROM runs WHERE id='r1'");
+    expect(db.prepare("SELECT COUNT(*) AS count FROM run_events WHERE run_id='r1'").get()).toEqual({ count: 0 });
   });
 
   it("adds allowed_tools_json column on conversations", () => {
