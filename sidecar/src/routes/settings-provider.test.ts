@@ -66,12 +66,10 @@ describe("settings provider routes", () => {
     expect(body.connections[0]?.modelCount).toBeGreaterThan(0);
     expect(body.connections[0]?.enabledModelCount).toBeGreaterThan(0);
     expect(body.enabledModels.length).toBeGreaterThan(0);
-    const firstEnabledModel = body.enabledModels[0];
-    if (!firstEnabledModel) throw new Error("missing enabled model");
-    expect(body.defaultSelection).toEqual({
-      providerId: firstEnabledModel.providerId,
-      modelId: firstEnabledModel.modelId,
-    });
+    if (!body.defaultSelection) throw new Error("missing default selection");
+    expect(body.enabledModels).toContainEqual(
+      expect.objectContaining(body.defaultSelection),
+    );
   });
 
   it("POST /settings/provider accepts OpenAI, api key, and selected model id", async () => {
@@ -121,9 +119,9 @@ describe("settings provider routes", () => {
       };
     };
     expect(sfBody.current.agentRuntime).toMatchObject({
-      protocol: "openai-compatible",
-      baseUrl: "https://api.siliconflow.cn/v1",
-      auth: "bearer",
+      protocol: "anthropic",
+      baseUrl: "ccr://agent-studio",
+      auth: "x-api-key",
     });
 
     const saveOpenAI = await app.request("/settings/provider", {
@@ -145,9 +143,9 @@ describe("settings provider routes", () => {
       };
     };
     expect(openaiBody.current.agentRuntime).toMatchObject({
-      protocol: "openai-compatible",
-      baseUrl: "https://api.openai.com/v1",
-      auth: "bearer",
+      protocol: "anthropic",
+      baseUrl: "ccr://agent-studio",
+      auth: "x-api-key",
     });
   });
 

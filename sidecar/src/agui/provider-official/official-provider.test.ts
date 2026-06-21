@@ -26,6 +26,13 @@ async function nextOrTimeout<T>(
   ]);
 }
 
+function requireStreamController(
+  controller: ReadableStreamDefaultController<Uint8Array> | null,
+): ReadableStreamDefaultController<Uint8Array> {
+  if (!controller) throw new Error("missing stream controller");
+  return controller;
+}
+
 function runContext(overrides: Record<string, unknown> = {}) {
   return {
     runId: "run-1",
@@ -136,13 +143,13 @@ describe("official provider", () => {
 
     const firstPendingEvent = iterator.next();
     await new Promise((resolve) => setTimeout(resolve, 0));
-    streamController()?.enqueue(
+    requireStreamController(streamController()).enqueue(
       encoder.encode(`${JSON.stringify({ type: "text_delta", text: "你" })}\n`),
     );
 
     const startEvent = await nextOrTimeout(firstPendingEvent);
     if (startEvent === "timeout") {
-      streamController()?.close();
+      requireStreamController(streamController()).close();
       await firstPendingEvent.catch(() => undefined);
     }
     expect(startEvent).not.toBe("timeout");
@@ -158,7 +165,7 @@ describe("official provider", () => {
       value: { type: EventType.TEXT_MESSAGE_CONTENT, delta: "你" },
     });
 
-    streamController()?.close();
+    requireStreamController(streamController()).close();
     await iterator.return?.();
   });
 
