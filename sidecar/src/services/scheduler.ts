@@ -123,9 +123,8 @@ export class Scheduler {
     await this.deps.store.createRun(runId, threadId);
 
     const abort = new AbortController();
-    // Fire and forget — the worker drives the SDK and writes events to the
-    // store. A paused HITL becomes `awaiting_approval` (surfaced in-app); the
-    // user resumes via the existing /runs/:id/resume route.
+    // 后台触发后由 worker 驱动 SDK 并写入事件。等待用户时会停在 `awaiting_user`
+    // 并在应用内展示，用户仍通过现有 /runs/:id/resume 路由恢复。
     void runWorker({
       runId,
       threadId,

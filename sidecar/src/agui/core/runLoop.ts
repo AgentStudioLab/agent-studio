@@ -16,16 +16,14 @@ export interface RunLoopInput {
   abortSignal: AbortSignal;
   onCompleted?: () => void;
   onTerminal?: (
-    status: "completed" | "error" | "cancelled" | "awaiting_approval",
+    status: "completed" | "error" | "cancelled" | "awaiting_user",
     errorMsg?: string,
   ) => void | Promise<void>;
 }
 
 /**
- * Drive the consume → (maybe surface interrupt) loop. v1 does not implement
- * HITL auto-approve (no whitelist; first interrupt always surfaces). The
- * interrupt branch is kept so that adding tools + approvals later requires
- * only adding back the auto-approve gate.
+ * 驱动 consume →（必要时暴露 interrupt）的循环。中断统一暂停为等待用户，
+ * 具体渲染 ask-user 输入还是 tool approval 控件由 interrupt reason 决定。
  */
 export async function executeRunLoop(input: RunLoopInput): Promise<void> {
   const {
@@ -68,12 +66,12 @@ export async function executeRunLoop(input: RunLoopInput): Promise<void> {
     return;
   }
 
-  // outcome === "interrupted" — v1: surface immediately (no auto-approve).
+  // outcome === "interrupted"：立即暴露中断，并把 run 停在等待用户状态。
   await store.appendEvent(runId, {
     ...result.runFinishedEvent,
     outcome: "interrupt",
     interrupts: result.interrupts,
   } as never);
-  await store.finishRun(runId, "awaiting_approval");
-  await onTerminal?.("awaiting_approval");
+  await store.finishRun(runId, "awaiting_user");
+  await onTerminal?.("awaiting_user");
 }
