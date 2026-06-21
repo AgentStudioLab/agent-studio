@@ -32,6 +32,8 @@
 - `sidecar/src/ccr/config.test.ts`：配置生成与 API key 脱敏测试。
 - `sidecar/src/ccr/manager.ts`：私有 CCR 实例的进程管理缝合层。
 - `sidecar/src/ccr/manager.test.ts`：fake spawn 生命周期测试。
+- `sidecar/src/ccr/spawn.ts`：私有 CCR config 写盘、CLI 路径解析/提取、真实进程启动 adapter。
+- `sidecar/src/ccr/spawn.test.ts`：私有 HOME/config 写盘和 spawn 参数测试。
 - `sidecar/src/ccr/index.ts`：CCR 模块导出入口。
 - `docs/superpowers/manual-smoke/2026-06-21-ccr-runtime-poc.md`：人工 PoC 矩阵和证据记录。
 
@@ -1433,7 +1435,7 @@ import {
 spawn: CCR_SPAWN_NOT_CONFIGURED,
 ```
 
-这里先不猜 CCR 的真实 CLI 参数。真实 spawn adapter 必须等 Task 1 的 PoC 文档记录启动命令和 config path 参数后再补。
+这里先把 server 和 manager 的边界变成显式契约。真实 spawn adapter 在下一任务中实现，并且必须以 Task 1 的 CLI probe 结论为准。
 
 - [ ] **Step 4：运行 CCR 测试和 typecheck**
 
@@ -1460,7 +1462,344 @@ git commit -m "chore: make ccr spawn contract explicit"
 
 ---
 
-### Task 10：PoC Gate 通过后删除 OpenAI Runtime Adapter
+### Task 10：实现私有 CCR Config 写盘和真实 Spawn Adapter
+
+**Files:**
+- Create: `sidecar/src/ccr/spawn.ts`
+- Create: `sidecar/src/ccr/spawn.test.ts`
+- Modify: `sidecar/src/ccr/index.ts`
+- Modify: `sidecar/src/server.ts`
+- Modify: `docs/superpowers/manual-smoke/2026-06-21-ccr-runtime-poc.md`
+
+- [ ] **Step 1：记录 CCR 私有 config 约束**
+
+把 Task 1 CLI probe 的结论补进 `docs/superpowers/manual-smoke/2026-06-21-ccr-runtime-poc.md`：
+
+```markdown
+## 私有运行时约束
+
+- `@musistudio/claude-code-router@2.0.0` 顶层 CLI 暴露 `ccr start`，未暴露稳定的 `--config` 参数。
+- CCR 默认读取 `$HOME/.claude-code-router/config.json`。
+- Agent Studio 托管 CCR 时必须设置隔离 `HOME`，把配置写到 `<configDir>/.claude-code-router/config.json`，避免污染用户真实 home。
+- 配置必须包含 `PORT`、`HOST: "127.0.0.1"`、`APIKEY`、`NON_INTERACTIVE_MODE: true`、`Providers`、`Router`。
+- 发布态 sidecar 是 `bun build --compile` 单二进制，不能假设存在 `node_modules/.bin/ccr`；必须验证 CCR CLI 文件可从依赖解析，或被提取/复制到真实磁盘路径后再 spawn。
+```
+
+- [ ] **Step 2：先写失败测试，锁定私有 config 写盘**
+
+Create `sidecar/src/ccr/spawn.test.ts`:
+
+```ts
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { describe, expect, it } from "bun:test";
+import {
+  ccrPrivateConfigPath,
+  ccrPrivateHome,
+  writeCcrPrivateConfig,
+} from "./spawn";
+import type { AgentStudioCcrConfig } from "./config";
+
+function config(): AgentStudioCcrConfig {
+  return {
+    APIKEY: "router-key",
+    HOST: "127.0.0.1",
+    PORT: 4567,
+    LOG: false,
+    NON_INTERACTIVE_MODE: true,
+    Providers: [
+      {
+        name: "conn-openai",
+        api_base_url: "https://api.openai.com/v1/chat/completions",
+        api_key: "sk-openai",
+        models: ["gpt-5.1"],
+      },
+    ],
+    Router: {
+      default: "conn-openai,gpt-5.1",
+    },
+  };
+}
+
+describe("CCR spawn adapter", () => {
+  it("writes config under an isolated CCR home", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), "agent-studio-ccr-"));
+    try {
+      await writeCcrPrivateConfig({ configDir: dir, config: config() });
+
+      expect(ccrPrivateHome(dir)).toBe(dir);
+      expect(ccrPrivateConfigPath(dir)).toBe(
+        path.join(dir, ".claude-code-router", "config.json"),
+      );
+
+      const raw = await readFile(ccrPrivateConfigPath(dir), "utf8");
+      expect(JSON.parse(raw)).toEqual(config());
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+});
+```
+
+- [ ] **Step 3：运行 spawn 测试确认失败**
+
+Run:
+
+```bash
+cd sidecar && bun test src/ccr/spawn.test.ts
+```
+
+Expected:
+
+```text
+FAIL
+```
+
+失败原因应是 `Cannot find module './spawn'`。
+
+- [ ] **Step 4：实现私有 config 写盘 helper**
+
+Create `sidecar/src/ccr/spawn.ts`:
+
+```ts
+import { mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
+import type { AgentStudioCcrConfig } from "./config";
+
+export function ccrPrivateHome(configDir: string): string {
+  return configDir;
+}
+
+export function ccrPrivateConfigPath(configDir: string): string {
+  return path.join(ccrPrivateHome(configDir), ".claude-code-router", "config.json");
+}
+
+export async function writeCcrPrivateConfig(input: {
+  configDir: string;
+  config: AgentStudioCcrConfig;
+}): Promise<string> {
+  const configPath = ccrPrivateConfigPath(input.configDir);
+  await mkdir(path.dirname(configPath), { recursive: true });
+  await writeFile(configPath, `${JSON.stringify(input.config, null, 2)}\n`, "utf8");
+  return configPath;
+}
+```
+
+- [ ] **Step 5：运行 spawn 写盘测试**
+
+Run:
+
+```bash
+cd sidecar && bun test src/ccr/spawn.test.ts
+```
+
+Expected:
+
+```text
+0 fail
+```
+
+- [ ] **Step 6：先写失败测试，锁定 spawn 参数**
+
+在 `sidecar/src/ccr/spawn.test.ts` 追加：
+
+```ts
+import { spawnManagedCcr } from "./spawn";
+
+it("spawns ccr start with isolated HOME and router env", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "agent-studio-ccr-"));
+  const calls: unknown[] = [];
+  try {
+    const handle = await spawnManagedCcr(
+      {
+        port: 4567,
+        configDir: dir,
+        config: config(),
+      },
+      {
+        cliPath: "/private/ccr/dist/cli.js",
+        spawnProcess: (command, args, options) => {
+          calls.push({ command, args, options });
+          return {
+            pid: 123,
+            kill: () => true,
+            once: () => undefined,
+            unref: () => undefined,
+          };
+        },
+      },
+    );
+
+    expect(handle.pid).toBe(123);
+    expect(calls).toEqual([
+      {
+        command: process.execPath,
+        args: ["/private/ccr/dist/cli.js", "start"],
+        options: expect.objectContaining({
+          detached: true,
+          stdio: "ignore",
+          env: expect.objectContaining({
+            HOME: dir,
+            USERPROFILE: dir,
+            CCR_PRIVATE_HOME: dir,
+            CI: "true",
+            FORCE_COLOR: "0",
+          }),
+        }),
+      },
+    ]);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+```
+
+- [ ] **Step 7：运行 spawn 参数测试确认失败**
+
+Run:
+
+```bash
+cd sidecar && bun test src/ccr/spawn.test.ts
+```
+
+Expected:
+
+```text
+FAIL
+```
+
+失败原因应是 `spawnManagedCcr` 未实现。
+
+- [ ] **Step 8：实现真实 spawn adapter**
+
+在 `sidecar/src/ccr/spawn.ts` 中加入：
+
+```ts
+import { spawn } from "node:child_process";
+import { createRequire } from "node:module";
+import type { CcrSpawn, CcrSpawnInput, CcrProcessHandle } from "./manager";
+
+type SpawnProcess = typeof spawn;
+
+const require = createRequire(import.meta.url);
+
+export function resolveCcrCliPath(): string {
+  return require.resolve("@musistudio/claude-code-router/dist/cli.js");
+}
+
+export async function spawnManagedCcr(
+  input: CcrSpawnInput,
+  options: {
+    cliPath?: string;
+    spawnProcess?: SpawnProcess;
+  } = {},
+): Promise<CcrProcessHandle> {
+  await writeCcrPrivateConfig({
+    configDir: input.configDir,
+    config: {
+      ...input.config,
+      PORT: input.port,
+      HOST: "127.0.0.1",
+      NON_INTERACTIVE_MODE: true,
+    },
+  });
+
+  const cliPath = options.cliPath ?? resolveCcrCliPath();
+  const spawnProcess = options.spawnProcess ?? spawn;
+  const child = spawnProcess(process.execPath, [cliPath, "start"], {
+    detached: true,
+    stdio: "ignore",
+    env: {
+      ...process.env,
+      HOME: ccrPrivateHome(input.configDir),
+      USERPROFILE: ccrPrivateHome(input.configDir),
+      CCR_PRIVATE_HOME: ccrPrivateHome(input.configDir),
+      CI: "true",
+      FORCE_COLOR: "0",
+    },
+  });
+
+  child.unref();
+
+  return {
+    pid: child.pid ?? 0,
+    kill: (signal) => child.kill(signal),
+  };
+}
+
+export const CCR_SPAWN_MANAGED: CcrSpawn = spawnManagedCcr;
+```
+
+如果 `bunx tsc --noEmit` 报 `SpawnProcess` 类型不兼容，则把 `spawnProcess` 收窄为当前测试实际需要的函数签名，不要引入 `any`。
+
+- [ ] **Step 9：导出并接入 server**
+
+在 `sidecar/src/ccr/index.ts` 添加：
+
+```ts
+export * from "./spawn";
+```
+
+在 `sidecar/src/server.ts` 中把 import 改为：
+
+```ts
+import {
+  buildAgentStudioCcrConfig,
+  CcrManager,
+  CCR_SPAWN_MANAGED,
+  resolveCcrRuntimeRoute,
+} from "./ccr";
+```
+
+把 `spawn` 从 `CCR_SPAWN_NOT_CONFIGURED` 改为：
+
+```ts
+spawn: CCR_SPAWN_MANAGED,
+```
+
+- [ ] **Step 10：运行 CCR 测试和 typecheck**
+
+Run:
+
+```bash
+cd sidecar && bun test src/ccr && bunx tsc --noEmit
+```
+
+Expected:
+
+```text
+0 fail
+```
+
+并且 `tsc` 无输出。
+
+- [ ] **Step 11：发布态阻断检查**
+
+Run:
+
+```bash
+bun run build:sidecar -- --host-only
+```
+
+Expected:
+
+```text
+Built sidecar
+```
+
+如果编译后的 sidecar 无法解析或启动 CCR CLI，停止本任务并保留 `provider-openai`，不要进入删除 adapter 的任务。必须在 PoC 文档记录失败原因和下一步方案。
+
+- [ ] **Step 12：提交**
+
+```bash
+git add sidecar/src/ccr/spawn.ts sidecar/src/ccr/spawn.test.ts sidecar/src/ccr/index.ts sidecar/src/server.ts docs/superpowers/manual-smoke/2026-06-21-ccr-runtime-poc.md
+git commit -m "feat: spawn managed claude code router"
+```
+
+---
+
+### Task 11：PoC Gate 通过后删除 OpenAI Runtime Adapter
 
 **Files:**
 - Delete: `sidecar/src/agui/provider-openai/provider.ts`
@@ -1565,7 +1904,7 @@ git commit -m "refactor: remove openai agent runtime adapter"
 
 ---
 
-### Task 11：最终验证和文档更新
+### Task 12：最终验证和文档更新
 
 **Files:**
 - Modify: `docs/superpowers/manual-smoke/2026-06-21-ccr-runtime-poc.md`
@@ -1579,7 +1918,7 @@ git commit -m "refactor: remove openai agent runtime adapter"
 | Text streaming | Pass | Command/log/screenshot path |
 ```
 
-可用结果：`Pass`、`Fail`、`Provider limitation`。Task 10 Step 1 列出的核心 runtime 行不能保留 `Not run`。
+可用结果：`Pass`、`Fail`、`Provider limitation`。Task 11 Step 1 列出的核心 runtime 行不能保留 `Not run`。
 
 - [ ] **Step 2：给 spec 追加实施说明**
 
@@ -1643,4 +1982,3 @@ git commit -m "docs: record ccr runtime migration evidence"
 - 图片输入：`PromptInput.files`、`/runs` message parts、Claude SDK `SDKUserMessage` content blocks、CCR image block PoC。
 - 语音转写：transcription provider/model settings、音频上传校验、transcript 持久化、transcript-to-run 注入。
 - Settings UX copy：把“runtime protocol”改成“upstream protocol”，并展示模型能力标签。
-
