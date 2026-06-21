@@ -40,4 +40,23 @@ describe("buildClaudeProviderEnv", () => {
     expect(env.ANTHROPIC_BASE_URL).toBe("https://api.siliconflow.cn");
     expect(env.ANTHROPIC_MODEL).toBeUndefined();
   });
+
+  it("can target the managed CCR endpoint with a route model", () => {
+    const env = buildClaudeProviderEnv(
+      {
+        ANTHROPIC_BASE_URL: "https://stale.example",
+        ANTHROPIC_MODEL: "stale-model",
+      },
+      {
+        apiKey: "router-key",
+        baseUrl: "http://127.0.0.1:3456",
+        authMode: "x-api-key",
+        model: "agentstudio/conn_openai/gpt-5.1",
+      },
+    );
+
+    expect(env.ANTHROPIC_API_KEY).toBe("router-key");
+    expect(env.ANTHROPIC_BASE_URL).toBe("http://127.0.0.1:3456");
+    expect(env.ANTHROPIC_MODEL).toBe("agentstudio/conn_openai/gpt-5.1");
+  });
 });

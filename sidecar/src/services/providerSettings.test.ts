@@ -983,6 +983,9 @@ describe("providerSettings", () => {
     });
 
     expect(resolved.agentRuntime.protocol).toBe("anthropic");
+    if (resolved.agentRuntime.protocol !== "anthropic") {
+      throw new Error("expected anthropic runtime");
+    }
     expect(resolved.agentRuntime.baseUrl).toBe("ccr://agent-studio");
     expect(resolved.agentRuntime.auth).toBe("x-api-key");
     expect(resolved.modelId).toBe("gpt-5.1");

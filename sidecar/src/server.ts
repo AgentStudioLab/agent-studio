@@ -59,6 +59,12 @@ import { WeixinPlugin } from "./channels/plugins/weixin/WeixinPlugin";
 import { buildChannelConnectionRoutes } from "./channels/routes/channelConnections";
 import { buildRemoteTaskRoutes } from "./channels/routes/remoteTasks";
 import { runWorker } from "./agent/runWorker";
+import {
+  buildAgentStudioCcrConfig,
+  CcrManager,
+  CCR_SPAWN_NOT_CONFIGURED,
+  resolveCcrRuntimeRoute,
+} from "./ccr";
 
 type Args = { port: number; token: string; db: string };
 
@@ -106,6 +112,12 @@ const providerSettings = createProviderSettings(db, {
   apiKey: process.env.ANTHROPIC_API_KEY,
   baseUrl: process.env.ANTHROPIC_BASE_URL,
 }, officialService);
+const ccrManager = new CcrManager({
+  enabled: process.env.AGENT_STUDIO_DISABLE_CCR !== "1",
+  port: Number.parseInt(process.env.AGENT_STUDIO_CCR_PORT ?? "3456", 10),
+  configDir: path.join(path.dirname(dbAbs), "ccr"),
+  spawn: CCR_SPAWN_NOT_CONFIGURED,
+});
 const userProfileSettings = createUserProfileSettings(db);
 
 const threads = new ThreadService(db);
@@ -198,7 +210,13 @@ app.use("*", async (c, next) => {
 const providerInstances = new Map<string, AgentProvider>();
 function providerCacheKey(selection?: { providerId: string; modelId: string } | null) {
   const resolved = providerSettings.resolveSelection(selection);
-  return `${resolved.providerId}:${resolved.modelId ?? ""}:${resolved.apiKey}:${resolved.baseUrl}`;
+  if (resolved.providerId === "official") {
+    return `${resolved.providerId}:${resolved.modelId ?? ""}:${resolved.apiKey}:${resolved.baseUrl}`;
+  }
+  const route = resolveCcrRuntimeRoute(resolved, {
+    baseUrl: ccrManager.baseUrl(),
+  });
+  return `${resolved.providerId}:${route.model}:${route.baseUrl}:${resolved.apiKey}:${resolved.baseUrl}`;
 }
 function buildProviderForSelection(
   selection?: { providerId: string; modelId: string } | null,
@@ -208,14 +226,23 @@ function buildProviderForSelection(
     return createOfficialProvider();
   }
   if (!current.apiKey) throw new Error("api_key_missing");
+  const route = resolveCcrRuntimeRoute(current, { baseUrl: ccrManager.baseUrl() });
+  void ccrManager.ensure(buildAgentStudioCcrConfig([route])).catch((err) => {
+    console.error("[ccr] ensure failed:", err);
+  });
   const resolveAllowedTools = (threadId: string): string[] => {
     const override = threads.getAllowedTools(threadId);
     return override ?? settingsTools.getDefault();
   };
   return createAgentProviderForRuntime({
-    runtime: current.agentRuntime,
-    apiKey: current.apiKey,
-    defaultModel: current.modelId ?? process.env.ANTHROPIC_MODEL,
+    runtime: {
+      protocol: "anthropic",
+      baseUrl: route.baseUrl,
+      auth: route.authMode,
+      capabilities: current.agentRuntime.capabilities,
+    },
+    apiKey: route.apiKey,
+    defaultModel: route.model,
     common: {
       resolveAllowedTools,
       interruptBus,

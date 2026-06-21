@@ -73,3 +73,7 @@ export class CcrManager {
     this.handle = null;
   }
 }
+
+export const CCR_SPAWN_NOT_CONFIGURED: CcrSpawn = async () => {
+  throw new Error("ccr_spawn_not_configured");
+};
