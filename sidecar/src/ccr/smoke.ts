@@ -5,6 +5,7 @@ import type { AgentRuntime } from "../lib/providerProfiles";
 import {
   buildAgentStudioCcrConfig,
   redactAgentStudioCcrConfig,
+  type AgentStudioCcrConfigOptions,
   type AgentStudioCcrConfig,
 } from "./config";
 import type { CcrRuntimeRoute } from "./routes";
@@ -24,6 +25,9 @@ export interface CcrSmokeInput {
   configDir: string;
   cwd: string;
   prompt: string;
+  allowedTools: string[];
+  log: boolean;
+  logLevel?: AgentStudioCcrConfigOptions["logLevel"];
 }
 
 export interface CcrSmokePlan {
@@ -45,6 +49,36 @@ function envInt(env: EnvLike, name: string, fallback: number): number {
   if (!value) return fallback;
   const parsed = Number.parseInt(value, 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function envBool(env: EnvLike, name: string): boolean {
+  const value = envString(env, name)?.toLowerCase();
+  return value === "1" || value === "true" || value === "yes";
+}
+
+function envCsv(env: EnvLike, name: string): string[] {
+  return (envString(env, name) ?? "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+}
+
+function envLogLevel(
+  env: EnvLike,
+  name: string,
+): AgentStudioCcrConfigOptions["logLevel"] | undefined {
+  const value = envString(env, name);
+  if (
+    value === "fatal" ||
+    value === "error" ||
+    value === "warn" ||
+    value === "info" ||
+    value === "debug" ||
+    value === "trace"
+  ) {
+    return value;
+  }
+  return undefined;
 }
 
 function redactKey(value: string): string {
@@ -92,6 +126,9 @@ export function buildCcrSmokeInputFromEnv(env: EnvLike): CcrSmokeInput {
     prompt:
       envString(env, "AGENT_STUDIO_CCR_POC_PROMPT") ??
       "用一句中文回复：CCR text streaming smoke ok",
+    allowedTools: envCsv(env, "AGENT_STUDIO_CCR_POC_ALLOWED_TOOLS"),
+    log: envBool(env, "AGENT_STUDIO_CCR_LOG"),
+    logLevel: envLogLevel(env, "AGENT_STUDIO_CCR_LOG_LEVEL"),
   };
 }
 
@@ -165,7 +202,10 @@ export function buildCcrSmokePlan(input: CcrSmokeInput): CcrSmokePlan {
       apiKey: input.routerApiKey,
     },
   );
-  const config = buildAgentStudioCcrConfig([route]);
+  const config = buildAgentStudioCcrConfig([route], {
+    log: input.log,
+    logLevel: input.logLevel,
+  });
 
   return {
     route,

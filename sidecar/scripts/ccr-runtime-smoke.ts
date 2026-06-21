@@ -65,6 +65,11 @@ async function main(): Promise<void> {
     console.error("AGENT_STUDIO_CCR_POC_API_KEY=... \\");
     console.error("AGENT_STUDIO_CCR_POC_MODEL=gpt-5.1 \\");
     console.error("bun run scripts/ccr-runtime-smoke.ts --dry-run");
+    console.error("");
+    console.error("工具调用示例：");
+    console.error("AGENT_STUDIO_CCR_POC_ALLOWED_TOOLS=Read \\");
+    console.error("AGENT_STUDIO_CCR_POC_PROMPT='读取 package.json 的 name 字段' \\");
+    console.error("bun run scripts/ccr-runtime-smoke.ts");
     process.exitCode = 2;
     return;
   }
@@ -96,7 +101,7 @@ async function main(): Promise<void> {
       baseUrl: manager.baseUrl(),
       authMode: "x-api-key",
       model: plan.route.model,
-      allowedTools: [],
+      allowedTools: input.allowedTools,
     });
 
     const summary = createEmptyCcrSmokeSummary();

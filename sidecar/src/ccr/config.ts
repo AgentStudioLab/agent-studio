@@ -15,11 +15,17 @@ export interface AgentStudioCcrConfig {
   HOST: "127.0.0.1";
   PORT: number;
   LOG: boolean;
+  LOG_LEVEL?: "fatal" | "error" | "warn" | "info" | "debug" | "trace";
   NON_INTERACTIVE_MODE: boolean;
   Providers: AgentStudioCcrProvider[];
   Router: {
     default: string;
   };
+}
+
+export interface AgentStudioCcrConfigOptions {
+  log?: boolean;
+  logLevel?: AgentStudioCcrConfig["LOG_LEVEL"];
 }
 
 function ccrProviderNameForRoute(route: CcrRuntimeRoute): string {
@@ -56,6 +62,7 @@ function defaultRouterValue(route: CcrRuntimeRoute): string {
 
 export function buildAgentStudioCcrConfig(
   routes: CcrRuntimeRoute[],
+  options: AgentStudioCcrConfigOptions = {},
 ): AgentStudioCcrConfig {
   if (routes.length === 0) {
     throw new Error("ccr_routes_empty");
@@ -74,7 +81,8 @@ export function buildAgentStudioCcrConfig(
     APIKEY: first.apiKey,
     HOST: "127.0.0.1",
     PORT: Number(new URL(first.baseUrl).port || "3456"),
-    LOG: false,
+    LOG: options.log ?? false,
+    ...(options.logLevel ? { LOG_LEVEL: options.logLevel } : {}),
     NON_INTERACTIVE_MODE: true,
     Providers: dedupedRoutes.map(providerForRoute),
     Router: {

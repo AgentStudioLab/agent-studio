@@ -18,6 +18,7 @@ export interface CcrManagerOptions {
   port: number;
   configDir: string;
   spawn: CcrSpawn;
+  waitForReady?: (baseUrl: string) => Promise<void>;
 }
 
 export interface CcrStatus {
@@ -58,9 +59,13 @@ export class CcrManager {
         configDir: this.options.configDir,
         config,
       });
+      await (this.options.waitForReady ?? waitForCcrReady)(this.baseUrl());
       this.configSignature = nextSignature;
       this.error = undefined;
     } catch (err) {
+      this.handle?.kill();
+      this.handle = null;
+      this.configSignature = undefined;
       this.error = err instanceof Error ? err.message : String(err);
       throw err;
     }
@@ -86,3 +91,21 @@ export class CcrManager {
 export const CCR_SPAWN_NOT_CONFIGURED: CcrSpawn = async () => {
   throw new Error("ccr_spawn_not_configured");
 };
+
+export async function waitForCcrReady(baseUrl: string): Promise<void> {
+  const deadline = Date.now() + 10_000;
+  let lastError: unknown = null;
+  while (Date.now() < deadline) {
+    try {
+      const response = await fetch(baseUrl);
+      if (response.status < 500) return;
+      lastError = new Error(`HTTP ${response.status}`);
+    } catch (err) {
+      lastError = err;
+    }
+    await Bun.sleep(250);
+  }
+  throw new Error(
+    `ccr_not_ready:${lastError instanceof Error ? lastError.message : String(lastError)}`,
+  );
+}

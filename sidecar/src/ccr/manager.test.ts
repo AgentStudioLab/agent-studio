@@ -63,6 +63,7 @@ describe("CcrManager", () => {
       port: 3456,
       configDir: "/tmp/agent-studio-ccr",
       spawn,
+      waitForReady: async () => {},
     });
 
     await manager.ensure(config());
@@ -97,6 +98,7 @@ describe("CcrManager", () => {
       port: 3456,
       configDir: "/tmp/agent-studio-ccr",
       spawn,
+      waitForReady: async () => {},
     });
     const first = config();
     const second = {

@@ -61,9 +61,11 @@ import { buildRemoteTaskRoutes } from "./channels/routes/remoteTasks";
 import { runWorker } from "./agent/runWorker";
 import {
   buildAgentStudioCcrConfig,
+  type AgentStudioCcrConfigOptions,
   CcrManager,
   CCR_SPAWN_MANAGED,
   resolveCcrRuntimeRoute,
+  withCcrReady,
 } from "./ccr";
 
 type Args = { port: number; token: string; db: string };
@@ -112,12 +114,33 @@ const providerSettings = createProviderSettings(db, {
   apiKey: process.env.ANTHROPIC_API_KEY,
   baseUrl: process.env.ANTHROPIC_BASE_URL,
 }, officialService);
+
+function parseCcrLogLevel(
+  value: string | undefined,
+): AgentStudioCcrConfigOptions["logLevel"] | undefined {
+  if (
+    value === "fatal" ||
+    value === "error" ||
+    value === "warn" ||
+    value === "info" ||
+    value === "debug" ||
+    value === "trace"
+  ) {
+    return value;
+  }
+  return undefined;
+}
+
 const ccrManager = new CcrManager({
   enabled: process.env.AGENT_STUDIO_DISABLE_CCR !== "1",
   port: Number.parseInt(process.env.AGENT_STUDIO_CCR_PORT ?? "3456", 10),
   configDir: path.join(path.dirname(dbAbs), "ccr"),
   spawn: CCR_SPAWN_MANAGED,
 });
+const ccrConfigOptions: AgentStudioCcrConfigOptions = {
+  log: process.env.AGENT_STUDIO_CCR_LOG === "1",
+  logLevel: parseCcrLogLevel(process.env.AGENT_STUDIO_CCR_LOG_LEVEL),
+};
 const userProfileSettings = createUserProfileSettings(db);
 
 const threads = new ThreadService(db);
@@ -227,14 +250,12 @@ function buildProviderForSelection(
   }
   if (!current.apiKey) throw new Error("api_key_missing");
   const route = resolveCcrRuntimeRoute(current, { baseUrl: ccrManager.baseUrl() });
-  void ccrManager.ensure(buildAgentStudioCcrConfig([route])).catch((err) => {
-    console.error("[ccr] ensure failed:", err);
-  });
+  const ccrConfig = buildAgentStudioCcrConfig([route], ccrConfigOptions);
   const resolveAllowedTools = (threadId: string): string[] => {
     const override = threads.getAllowedTools(threadId);
     return override ?? settingsTools.getDefault();
   };
-  return createAgentProviderForRuntime({
+  const provider = createAgentProviderForRuntime({
     runtime: {
       protocol: "anthropic",
       baseUrl: route.baseUrl,
@@ -296,6 +317,7 @@ function buildProviderForSelection(
       },
     },
   });
+  return withCcrReady(provider, () => ccrManager.ensure(ccrConfig));
 }
 function getProvider(selection?: { providerId: string; modelId: string } | null) {
   const key = providerCacheKey(selection);

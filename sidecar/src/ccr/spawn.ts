@@ -1,4 +1,3 @@
-import { spawn } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import ccrCliAssetPath from "../../node_modules/@musistudio/claude-code-router/dist/cli.js" with { type: "file" };
@@ -6,21 +5,29 @@ import ccrWasmAssetPath from "../../node_modules/@musistudio/claude-code-router/
 import type { AgentStudioCcrConfig } from "./config";
 import type { CcrProcessHandle, CcrSpawn, CcrSpawnInput } from "./manager";
 
-interface SpawnedProcessLike {
-  pid?: number;
-  kill(signal?: NodeJS.Signals): boolean;
-  unref(): void;
+interface CcrWorkerLike {
+  terminate(): Promise<number | void> | number | void;
+  addEventListener?: (
+    type: "error",
+    listener: (event: ErrorEvent) => void,
+  ) => void;
 }
 
-type SpawnProcess = (
-  command: string,
-  args: string[],
+type CcrWorkerFactory = (
+  script: string,
   options: {
-    detached: true;
-    stdio: "ignore";
-    env: NodeJS.ProcessEnv;
+    argv: string[];
+    env: Record<string, string>;
   },
-) => SpawnedProcessLike;
+) => CcrWorkerLike;
+
+function compactEnv(env: Record<string, string | undefined>): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(env).filter((entry): entry is [string, string] => {
+      return typeof entry[1] === "string";
+    }),
+  );
+}
 
 export function ccrPrivateHome(configDir: string): string {
   return configDir;
@@ -48,24 +55,38 @@ export async function prepareCcrRuntimeAssets(input: {
   configDir: string;
   cliAssetPath?: string;
   wasmAssetPath?: string;
-}): Promise<{ cliPath: string }> {
+}): Promise<{ cliPath: string; bootstrapPath: string }> {
   const runtimeDir = path.join(input.configDir, "runtime");
   await mkdir(runtimeDir, { recursive: true });
 
   const cliPath = path.join(runtimeDir, "ccr-cli.js");
+  const bootstrapPath = path.join(runtimeDir, "ccr-bootstrap.js");
   const wasmPath = path.join(runtimeDir, "tiktoken_bg.wasm");
 
   await Bun.write(cliPath, await Bun.file(input.cliAssetPath ?? ccrCliAssetPath).arrayBuffer());
+  await Bun.write(
+    bootstrapPath,
+    [
+      "const os = require('node:os');",
+      "const privateHome = process.env.CCR_PRIVATE_HOME;",
+      "if (privateHome) os.homedir = () => privateHome;",
+      "const [, , cliPath, ...args] = process.argv;",
+      "if (!cliPath) throw new Error('ccr_cli_path_missing');",
+      "process.argv = [process.argv[0], cliPath, ...args];",
+      "require(cliPath);",
+      "",
+    ].join("\n"),
+  );
   await Bun.write(wasmPath, await Bun.file(input.wasmAssetPath ?? ccrWasmAssetPath).arrayBuffer());
 
-  return { cliPath };
+  return { cliPath, bootstrapPath };
 }
 
 export async function spawnManagedCcr(
   input: CcrSpawnInput,
   options: {
     cliPath?: string;
-    spawnProcess?: SpawnProcess;
+    workerFactory?: CcrWorkerFactory;
   } = {},
 ): Promise<CcrProcessHandle> {
   await writeCcrPrivateConfig({
@@ -81,28 +102,42 @@ export async function spawnManagedCcr(
   const runtimeAssets =
     options.cliPath === undefined
       ? await prepareCcrRuntimeAssets({ configDir: input.configDir })
-      : { cliPath: options.cliPath };
+      : {
+          cliPath: options.cliPath,
+          bootstrapPath: path.join(path.dirname(options.cliPath), "bootstrap.js"),
+        };
   const cliPath = runtimeAssets.cliPath;
-  const spawnProcess = options.spawnProcess ?? spawn;
+  const bootstrapPath = runtimeAssets.bootstrapPath;
+  const workerFactory =
+    options.workerFactory ??
+    ((script, workerOptions) => new Worker(script, workerOptions));
   const home = ccrPrivateHome(input.configDir);
-  const child = spawnProcess(process.execPath, [cliPath, "start"], {
-    detached: true,
-    stdio: "ignore",
-    env: {
-      ...process.env,
-      HOME: home,
-      USERPROFILE: home,
-      CCR_PRIVATE_HOME: home,
-      CI: "true",
-      FORCE_COLOR: "0",
-    },
+  const workerEnv = compactEnv({
+    ...process.env,
+    HOME: home,
+    USERPROFILE: home,
+    CCR_PRIVATE_HOME: home,
+    CI: "true",
+    FORCE_COLOR: "0",
+  });
+  const worker = workerFactory(bootstrapPath, {
+    argv: [cliPath, "start"],
+    env: workerEnv,
   });
 
-  child.unref();
+  worker.addEventListener?.("error", (event) => {
+    const message =
+      "message" in event && typeof event.message === "string"
+        ? event.message
+        : String(event);
+    console.error("[ccr] worker error:", message);
+  });
 
   return {
-    pid: child.pid ?? 0,
-    kill: (signal) => child.kill(signal),
+    kill: () => {
+      void worker.terminate();
+      return true;
+    },
   };
 }
 

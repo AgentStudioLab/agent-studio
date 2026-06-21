@@ -61,4 +61,21 @@ describe("CCR runtime smoke helpers", () => {
     expect(plan.route.upstream.providerName).toBe("CCR PoC Provider");
     expect(plan.route.upstream.protocol).toBe("openai-compatible");
   });
+
+  it("reads diagnostic logging and allowed tool env for PoC runs", () => {
+    const input = buildCcrSmokeInputFromEnv({
+      AGENT_STUDIO_CCR_POC_BASE_URL: "https://api.openai.com/v1",
+      AGENT_STUDIO_CCR_POC_API_KEY: "sk-openai-secret",
+      AGENT_STUDIO_CCR_POC_MODEL: "gpt-5.1",
+      AGENT_STUDIO_CCR_POC_ALLOWED_TOOLS: "Read, Glob",
+      AGENT_STUDIO_CCR_LOG: "1",
+      AGENT_STUDIO_CCR_LOG_LEVEL: "trace",
+    });
+
+    const plan = buildCcrSmokePlan(input);
+
+    expect(input.allowedTools).toEqual(["Read", "Glob"]);
+    expect(plan.config.LOG).toBe(true);
+    expect(plan.config.LOG_LEVEL).toBe("trace");
+  });
 });

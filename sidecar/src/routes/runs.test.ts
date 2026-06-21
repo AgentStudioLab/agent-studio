@@ -443,13 +443,13 @@ describe("POST /runs — provider selection", () => {
         threadId: "t1",
         runId: "r1",
         message: { role: "user", content: "hi" },
-        providerSelection: { providerId: "provider-openai", modelId: "gpt-5.1" },
+        providerSelection: { providerId: "conn-openai", modelId: "gpt-5.1" },
       }),
     });
 
     expect(res.status).toBe(202);
     expect(seenSelections).toEqual([
-      { providerId: "provider-openai", modelId: "gpt-5.1" },
+      { providerId: "conn-openai", modelId: "gpt-5.1" },
     ]);
     expect(seenModels).toEqual([undefined]);
   });

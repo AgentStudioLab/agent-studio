@@ -46,6 +46,17 @@ describe("buildAgentStudioCcrConfig", () => {
     ]);
   });
 
+  it("can enable CCR trace logs for diagnosis without changing route output", () => {
+    const config = buildAgentStudioCcrConfig([openaiRoute], {
+      log: true,
+      logLevel: "trace",
+    });
+
+    expect(config.LOG).toBe(true);
+    expect(config.LOG_LEVEL).toBe("trace");
+    expect(config.Router.default).toBe("agentstudio_conn_openai_gpt-5.1,gpt-5.1");
+  });
+
   it("deduplicates by model key and keeps the later route", () => {
     const next = {
       ...openaiRoute,

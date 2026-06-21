@@ -50,7 +50,7 @@ describe("CCR spawn adapter", () => {
     }
   });
 
-  it("spawns ccr start with isolated HOME and router env", async () => {
+  it("starts ccr in an isolated Worker instead of re-executing the sidecar binary", async () => {
     const dir = await mkdtemp(path.join(os.tmpdir(), "agent-studio-ccr-"));
     const calls: unknown[] = [];
     try {
@@ -62,25 +62,20 @@ describe("CCR spawn adapter", () => {
         },
         {
           cliPath: "/private/ccr/dist/cli.js",
-          spawnProcess: (command, args, options) => {
-            calls.push({ command, args, options });
+          workerFactory: (script, options) => {
+            calls.push({ script, options });
             return {
-              pid: 123,
-              kill: () => true,
-              unref: () => undefined,
+              terminate: () => Promise.resolve(),
             };
           },
         },
       );
 
-      expect(handle.pid).toBe(123);
       expect(calls).toEqual([
         {
-          command: process.execPath,
-          args: ["/private/ccr/dist/cli.js", "start"],
+          script: "/private/ccr/dist/bootstrap.js",
           options: expect.objectContaining({
-            detached: true,
-            stdio: "ignore",
+            argv: ["/private/ccr/dist/cli.js", "start"],
             env: expect.objectContaining({
               HOME: dir,
               USERPROFILE: dir,
@@ -91,6 +86,7 @@ describe("CCR spawn adapter", () => {
           }),
         },
       ]);
+      expect(handle.kill()).toBe(true);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
@@ -111,7 +107,16 @@ describe("CCR spawn adapter", () => {
       });
 
       expect(runtime.cliPath).toBe(path.join(dir, "runtime", "ccr-cli.js"));
+      expect(runtime.bootstrapPath).toBe(
+        path.join(dir, "runtime", "ccr-bootstrap.js"),
+      );
       expect(await readFile(runtime.cliPath, "utf8")).toBe("console.log('ccr')");
+      expect(await readFile(runtime.bootstrapPath, "utf8")).toContain(
+        "CCR_PRIVATE_HOME",
+      );
+      expect(await readFile(runtime.bootstrapPath, "utf8")).toContain(
+        "process.argv = [process.argv[0], cliPath, ...args]",
+      );
       expect(await readFile(path.join(dir, "runtime", "tiktoken_bg.wasm"), "utf8")).toBe(
         "wasm",
       );
