@@ -11,7 +11,10 @@ import type { AgentLinkService } from "../services/agentLinks";
 import type { AgentMemoryStore } from "../services/agentMemoryStore";
 import type { InterruptBus } from "../agui/provider-claude/interrupt-bus";
 import type { UsageService } from "../services/usage";
-import type { ProviderModelSelection } from "../services/providerSettings";
+import {
+  OFFICIAL_PROVIDER_ID,
+  type ProviderModelSelection,
+} from "../services/providerSettings";
 
 export interface MountRunsDeps {
   threads: ThreadService;
@@ -45,6 +48,22 @@ function parseProviderSelection(value: unknown): ProviderModelSelection | undefi
   }
   if (raw.providerId.length === 0 || raw.modelId.length === 0) return undefined;
   return { providerId: raw.providerId, modelId: raw.modelId };
+}
+
+function resolveRunModel(input: {
+  explicitModel?: unknown;
+  providerSelection?: ProviderModelSelection;
+}): string | undefined {
+  if (typeof input.explicitModel === "string" && input.explicitModel.length > 0) {
+    return input.explicitModel;
+  }
+  // 官方服务商是纯 website runtime，仍需要把用户选择的模型 id 传给 provider。
+  // 其他 provider 会先经 resolveProvider 收口成自身 runtime；CCR provider 的默认模型
+  // 是 agentstudio/... 路由 key，不能被 providerSelection.modelId 覆盖。
+  if (input.providerSelection?.providerId === OFFICIAL_PROVIDER_ID) {
+    return input.providerSelection.modelId;
+  }
+  return undefined;
 }
 
 /** 防御式解析 string[]：非数组 → undefined；过滤掉非字符串项。 */
@@ -108,12 +127,13 @@ export function buildRunRoutes(deps: MountRunsDeps): Hono {
     const permissionMode: "ask" | "act-without-asking" =
       body.permissionMode === "act-without-asking" ? "act-without-asking" : "ask";
     const providerSelection = parseProviderSelection(body.providerSelection);
-    // model: light validation only — SDK echoes a clear error if the id is
-    // unknown. Empty string or non-string → provider selection/default fallback.
-    const model =
-      typeof body.model === "string" && body.model.length > 0
-        ? body.model
-        : providerSelection?.modelId;
+    // model: only an explicit run-level override. providerSelection.modelId is
+    // consumed by resolveProvider; passing it down again would override the
+    // provider's routed default model (for CCR this must remain agentstudio/...).
+    const model = resolveRunModel({
+      explicitModel: body.model,
+      providerSelection,
+    });
     const officialAuthToken =
       typeof body.officialAuthToken === "string" && body.officialAuthToken.length > 0
         ? body.officialAuthToken
@@ -235,10 +255,10 @@ export function buildRunRoutes(deps: MountRunsDeps): Hono {
     const permissionMode: "ask" | "act-without-asking" =
       body.permissionMode === "act-without-asking" ? "act-without-asking" : "ask";
     const providerSelection = parseProviderSelection(body.providerSelection);
-    const model =
-      typeof body.model === "string" && body.model.length > 0
-        ? body.model
-        : providerSelection?.modelId;
+    const model = resolveRunModel({
+      explicitModel: body.model,
+      providerSelection,
+    });
     const officialAuthToken =
       typeof body.officialAuthToken === "string" && body.officialAuthToken.length > 0
         ? body.officialAuthToken

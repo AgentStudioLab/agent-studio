@@ -384,9 +384,11 @@ describe("POST /runs — one-run-per-thread guard", () => {
 describe("POST /runs — provider selection", () => {
   it("passes providerSelection to the run provider resolver", async () => {
     const seenSelections: unknown[] = [];
+    const seenModels: unknown[] = [];
     const provider = {
       name: "fake",
-      run() {
+      run(ctx: { model?: string }) {
+        seenModels.push(ctx.model);
         return (async function* () {
           yield { type: EventType.RUN_STARTED, runId: "r1", threadId: "t1" } as never;
           yield { type: EventType.RUN_FINISHED, runId: "r1", threadId: "t1" } as never;
@@ -449,6 +451,7 @@ describe("POST /runs — provider selection", () => {
     expect(seenSelections).toEqual([
       { providerId: "provider-openai", modelId: "gpt-5.1" },
     ]);
+    expect(seenModels).toEqual([undefined]);
   });
 
   it("forwards official auth fields and selected model to the resolved run provider", async () => {

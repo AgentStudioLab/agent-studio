@@ -31,6 +31,7 @@ export interface CcrStatus {
 export class CcrManager {
   private handle: CcrProcessHandle | null = null;
   private error: string | undefined;
+  private configSignature: string | undefined;
 
   constructor(private readonly options: CcrManagerOptions) {}
 
@@ -43,14 +44,21 @@ export class CcrManager {
       this.error = "ccr_disabled";
       return;
     }
-    if (this.handle) return;
+    const nextSignature = JSON.stringify(config);
+    if (this.handle && this.configSignature === nextSignature) return;
 
     try {
+      if (this.handle) {
+        this.handle.kill();
+        this.handle = null;
+        this.configSignature = undefined;
+      }
       this.handle = await this.options.spawn({
         port: this.options.port,
         configDir: this.options.configDir,
         config,
       });
+      this.configSignature = nextSignature;
       this.error = undefined;
     } catch (err) {
       this.error = err instanceof Error ? err.message : String(err);
@@ -71,6 +79,7 @@ export class CcrManager {
   stop(): void {
     this.handle?.kill();
     this.handle = null;
+    this.configSignature = undefined;
   }
 }
 

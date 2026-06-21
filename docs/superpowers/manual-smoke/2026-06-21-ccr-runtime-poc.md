@@ -190,14 +190,14 @@ bun run scripts/ccr-runtime-smoke.ts --dry-run
 
 | 项 | 结果 | 证据 |
 |---|---|---|
-| Text streaming | Not run |  |
+| Text streaming | Pass | 2026-06-21：`bun run smoke:ccr` 使用 OpenAI-compatible 上游 `https://aiproxy.cloud-ip.cc/v1`、模型 `gpt-5.5`。事件摘要：`RUN_STARTED: 1`、`TEXT_MESSAGE_START: 1`、`TEXT_MESSAGE_CONTENT: 5`、`TEXT_MESSAGE_END: 1`、`RUN_FINISHED: 1`；输出文本：`CCR text streaming smoke ok`。 |
 | Read/Bash/Edit tool calls | Not run |  |
 | HITL approve/deny | Not run |  |
 | Session resume | Not run |  |
 | Regenerate | Not run |  |
 | File checkpoint rewind | Not run |  |
 | Run-scoped model selection | Not run |  |
-| Usage | Not run |  |
+| Usage | Not run | 同一次 smoke 返回 `inputTokens: 0`、`outputTokens: 0`、`totalCostUsd: 0`，只能说明回调触发，不能证明上游 usage 映射有效。 |
 | Cancel | Not run |  |
 | Error mapping | Not run |  |
 
@@ -205,7 +205,6 @@ bun run scripts/ccr-runtime-smoke.ts --dry-run
 
 当前不能删除 `sidecar/src/agui/provider-openai`：
 
-- 尚未用真实 OpenAI-compatible provider API key 跑通 Text streaming。
 - 尚未验证 Read/Bash/Edit tool calls、HITL approve/deny、session resume、regenerate、file checkpoint rewind。
 - 尚未验证 run-scoped model selection 经过 CCR 不需要重启服务。
 - 尚未验证 cancel、usage、error mapping 在 CCR 转发路径上的实际表现。

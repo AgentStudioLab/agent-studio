@@ -76,4 +76,56 @@ describe("CcrManager", () => {
       pid: 42,
     });
   });
+
+  it("restarts when the desired config changes", async () => {
+    let calls = 0;
+    let kills = 0;
+    const seenDefaults: string[] = [];
+    const spawn: CcrSpawn = async (input) => {
+      calls += 1;
+      seenDefaults.push(input.config.Router.default);
+      return {
+        pid: 40 + calls,
+        kill: () => {
+          kills += 1;
+          return true;
+        },
+      };
+    };
+    const manager = new CcrManager({
+      enabled: true,
+      port: 3456,
+      configDir: "/tmp/agent-studio-ccr",
+      spawn,
+    });
+    const first = config();
+    const second = {
+      ...config(),
+      Providers: [
+        {
+          name: "agentstudio_conn_gpt-5.5",
+          api_base_url: "https://api.openai.com/v1/chat/completions",
+          api_key: "sk",
+          models: ["gpt-5.5"],
+        },
+      ],
+      Router: {
+        default: "agentstudio_conn_gpt-5.5,gpt-5.5",
+      },
+    };
+
+    await manager.ensure(first);
+    await manager.ensure(second);
+
+    expect(calls).toBe(2);
+    expect(kills).toBe(1);
+    expect(seenDefaults).toEqual([
+      "agentstudio_conn_gpt-5.1,gpt-5.1",
+      "agentstudio_conn_gpt-5.5,gpt-5.5",
+    ]);
+    expect(manager.status()).toMatchObject({
+      running: true,
+      pid: 42,
+    });
+  });
 });
