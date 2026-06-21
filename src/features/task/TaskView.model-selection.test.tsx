@@ -15,6 +15,8 @@ import type { ProviderModelSelection } from "@/lib/data/settings";
 const sendMock = mock(async (_text: string, _opts?: unknown) => {});
 const regenerateMock = mock(async (_id: string, _opts?: unknown) => {});
 const mutationErrorHandlers: Array<(() => void) | undefined> = [];
+const runningThreadIds = new Set<string>();
+const queuedMessagesByThread = new Map<string, Array<{ id: string; text: string }>>();
 const updateConversationModelMutate = mock(
   (_vars: { id: string; model: string | null }, opts?: { onError?: () => void }) => {
     mutationErrorHandlers.push(opts?.onError);
@@ -108,11 +110,11 @@ mock.module("@/features/task/TaskMessageInput", () => ({
 }));
 
 mock.module("@/lib/agui/react/useChat", () => ({
-  useChat: () => ({
+  useChat: ({ threadId }: { threadId: string }) => ({
     viewMessages: [{ id: "msg_user_1", role: "user", content: "Hello" }],
     state: {},
     runtime: { getState: () => ({ activeRunId: null }) },
-    isRunning: false,
+    isRunning: runningThreadIds.has(threadId),
     isThinking: false,
     error: null,
     send: sendMock,
@@ -153,11 +155,11 @@ mock.module("@/lib/agui/react/useThreadPermissionMode", () => ({
 }));
 
 mock.module("@/features/task/MessageQueueContext", () => ({
-  useMessageQueue: () => ({
-    items: [],
+  useMessageQueue: (threadId: string | null) => ({
+    items: queuedMessagesByThread.get(threadId ?? "") ?? [],
     add: mock(() => {}),
     remove: mock(() => {}),
-    popHead: mock(() => null),
+    popHead: mock(() => queuedMessagesByThread.get(threadId ?? "")?.shift() ?? null),
     clearUserCancelled: mock(() => {}),
     markUserCancelled: mock(() => {}),
     userCancelled: false,
@@ -301,6 +303,8 @@ beforeEach(() => {
   regenerateMock.mockClear();
   updateConversationModelMutate.mockClear();
   mutationErrorHandlers.length = 0;
+  runningThreadIds.clear();
+  queuedMessagesByThread.clear();
   currentPickerSelection = null;
 });
 
@@ -402,6 +406,28 @@ describe("TaskView conversation model selection", () => {
     await waitFor(() =>
       expect(sendMock).toHaveBeenCalledWith(
         "Next message",
+        expect.objectContaining({
+          providerSelection: {
+            providerId: "conn-qwen",
+            modelId: "qwen/Qwen3-Coder",
+          },
+        }),
+      ),
+    );
+  });
+
+  it("auto-flushes a queued message after route changes with the next thread model", async () => {
+    runningThreadIds.add("thr_1");
+    queuedMessagesByThread.set("thr_2", [{ id: "queued_1", text: "Queued on two" }]);
+    renderTaskView();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Switch model" }));
+    runningThreadIds.delete("thr_1");
+    fireEvent.click(screen.getByRole("button", { name: "Go to thread 2" }));
+
+    await waitFor(() =>
+      expect(sendMock).toHaveBeenCalledWith(
+        "Queued on two",
         expect.objectContaining({
           providerSelection: {
             providerId: "conn-qwen",

@@ -72,8 +72,10 @@ export function TaskView() {
   } = useAppShell();
   const archiveMutation = useArchiveConversationMutation();
   const [renameOpen, setRenameOpen] = useState(false);
-  const [providerSelection, setProviderSelection] =
-    useState<ProviderModelSelection | null>(null);
+  const [providerSelectionState, setProviderSelectionState] = useState<{
+    threadId: string;
+    selection: ProviderModelSelection;
+  } | null>(null);
   const providerSelectionChangeSeqRef = useRef(0);
   const auth = useAuth();
   const providerQuery = useQuery({
@@ -89,19 +91,23 @@ export function TaskView() {
   const messagesQuery = useMessages(activeTaskId);
   const conversationQuery = useConversation(activeTaskId);
   const updateConversationModel = useUpdateConversationModelMutation();
+  const localProviderSelection =
+    providerSelectionState?.threadId === activeTaskId
+      ? providerSelectionState.selection
+      : null;
   const effectiveProviderSelection = useMemo(
     () =>
       resolveThreadProviderSelection({
         conversationModel: conversationQuery.data?.model ?? null,
         enabledModels: providerQuery.data?.enabledModels ?? [],
         defaultSelection: providerQuery.data?.defaultSelection ?? null,
-        localSelection: providerSelection,
+        localSelection: localProviderSelection,
       }),
     [
       conversationQuery.data?.model,
       providerQuery.data?.enabledModels,
       providerQuery.data?.defaultSelection,
-      providerSelection,
+      localProviderSelection,
     ],
   );
   const activeRun = useActiveRunForThread(activeTaskId);
@@ -178,11 +184,6 @@ export function TaskView() {
   const { mode: permissionMode, setMode: setPermissionMode } =
     useThreadPermissionMode(activeTaskId);
   const queue = useMessageQueue(activeTaskId);
-
-  useEffect(() => {
-    providerSelectionChangeSeqRef.current += 1;
-    setProviderSelection(null);
-  }, [activeTaskId]);
 
   // Seed the per-thread permission mode from the conversation's stored mode
   // (scheduled runs persist their mode on the conversation). The mode store
@@ -269,7 +270,11 @@ export function TaskView() {
         approvalRules,
       });
       setPendingFirstPrompt(null);
-      setProviderSelection(firstProviderSelection);
+      setProviderSelectionState(
+        firstProviderSelection
+          ? { threadId: activeTaskId, selection: firstProviderSelection }
+          : null,
+      );
       if (pendingFirstPrompt.permissionMode) {
         setPermissionMode(pendingFirstPrompt.permissionMode);
       }
@@ -344,19 +349,23 @@ export function TaskView() {
   // only fires on races / multi-window.
   const handleProviderSelectionChange = useCallback(
     (selection: ProviderModelSelection) => {
+      if (!activeTaskId) return;
       const previousSelection = effectiveProviderSelection;
       const changeSeq = providerSelectionChangeSeqRef.current + 1;
       providerSelectionChangeSeqRef.current = changeSeq;
       // 先更新本地选择，让输入区和后续 run 立即使用新模型；PATCH 失败时回滚。
       // 已经启动的 run 不撤销，切换只影响之后的发送/重试。
-      setProviderSelection(selection);
-      if (!activeTaskId) return;
+      setProviderSelectionState({ threadId: activeTaskId, selection });
       updateConversationModel.mutate(
         { id: activeTaskId, model: selection.modelId },
         {
           onError: () => {
             if (providerSelectionChangeSeqRef.current !== changeSeq) return;
-            setProviderSelection(previousSelection);
+            setProviderSelectionState(
+              previousSelection
+                ? { threadId: activeTaskId, selection: previousSelection }
+                : null,
+            );
           },
         },
       );
