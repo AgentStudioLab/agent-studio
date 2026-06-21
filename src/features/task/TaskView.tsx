@@ -72,11 +72,10 @@ export function TaskView() {
   } = useAppShell();
   const archiveMutation = useArchiveConversationMutation();
   const [renameOpen, setRenameOpen] = useState(false);
-  const [providerSelectionState, setProviderSelectionState] = useState<{
-    threadId: string;
-    selection: ProviderModelSelection;
-  } | null>(null);
-  const providerSelectionChangeSeqRef = useRef(0);
+  const [providerSelectionByThread, setProviderSelectionByThread] = useState<
+    Record<string, ProviderModelSelection | null>
+  >({});
+  const providerSelectionChangeSeqRef = useRef<Record<string, number>>({});
   const auth = useAuth();
   const providerQuery = useQuery({
     queryKey: ["provider"],
@@ -91,10 +90,9 @@ export function TaskView() {
   const messagesQuery = useMessages(activeTaskId);
   const conversationQuery = useConversation(activeTaskId);
   const updateConversationModel = useUpdateConversationModelMutation();
-  const localProviderSelection =
-    providerSelectionState?.threadId === activeTaskId
-      ? providerSelectionState.selection
-      : null;
+  const localProviderSelection = activeTaskId
+    ? providerSelectionByThread[activeTaskId] ?? null
+    : null;
   const effectiveProviderSelection = useMemo(
     () =>
       resolveThreadProviderSelection({
@@ -270,11 +268,10 @@ export function TaskView() {
         approvalRules,
       });
       setPendingFirstPrompt(null);
-      setProviderSelectionState(
-        firstProviderSelection
-          ? { threadId: activeTaskId, selection: firstProviderSelection }
-          : null,
-      );
+      setProviderSelectionByThread((previous) => ({
+        ...previous,
+        [activeTaskId]: firstProviderSelection,
+      }));
       if (pendingFirstPrompt.permissionMode) {
         setPermissionMode(pendingFirstPrompt.permissionMode);
       }
@@ -350,27 +347,38 @@ export function TaskView() {
   const handleProviderSelectionChange = useCallback(
     (selection: ProviderModelSelection) => {
       if (!activeTaskId) return;
-      const previousSelection = effectiveProviderSelection;
-      const changeSeq = providerSelectionChangeSeqRef.current + 1;
-      providerSelectionChangeSeqRef.current = changeSeq;
+      const previousSelection =
+        providerSelectionByThread[activeTaskId] ?? null;
+      const changeSeq =
+        (providerSelectionChangeSeqRef.current[activeTaskId] ?? 0) + 1;
+      providerSelectionChangeSeqRef.current = {
+        ...providerSelectionChangeSeqRef.current,
+        [activeTaskId]: changeSeq,
+      };
       // 先更新本地选择，让输入区和后续 run 立即使用新模型；PATCH 失败时回滚。
       // 已经启动的 run 不撤销，切换只影响之后的发送/重试。
-      setProviderSelectionState({ threadId: activeTaskId, selection });
+      setProviderSelectionByThread((previous) => ({
+        ...previous,
+        [activeTaskId]: selection,
+      }));
       updateConversationModel.mutate(
         { id: activeTaskId, model: selection.modelId },
         {
           onError: () => {
-            if (providerSelectionChangeSeqRef.current !== changeSeq) return;
-            setProviderSelectionState(
-              previousSelection
-                ? { threadId: activeTaskId, selection: previousSelection }
-                : null,
-            );
+            if (
+              providerSelectionChangeSeqRef.current[activeTaskId] !== changeSeq
+            ) {
+              return;
+            }
+            setProviderSelectionByThread((current) => ({
+              ...current,
+              [activeTaskId]: previousSelection,
+            }));
           },
         },
       );
     },
-    [activeTaskId, effectiveProviderSelection, updateConversationModel],
+    [activeTaskId, providerSelectionByThread, updateConversationModel],
   );
 
   const sendOrQueue = useCallback(

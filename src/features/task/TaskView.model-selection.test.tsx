@@ -1,4 +1,12 @@
-import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
+import {
+  afterAll,
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  mock,
+} from "bun:test";
 import {
   cleanup,
   fireEvent,
@@ -14,13 +22,11 @@ import type { ProviderModelSelection } from "@/lib/data/settings";
 
 const sendMock = mock(async (_text: string, _opts?: unknown) => {});
 const regenerateMock = mock(async (_id: string, _opts?: unknown) => {});
-const mutationErrorHandlers: Array<(() => void) | undefined> = [];
 const runningThreadIds = new Set<string>();
 const queuedMessagesByThread = new Map<string, Array<{ id: string; text: string }>>();
+const shouldFailModelUpdates = new Set<string>();
 const updateConversationModelMutate = mock(
-  (_vars: { id: string; model: string | null }, opts?: { onError?: () => void }) => {
-    mutationErrorHandlers.push(opts?.onError);
-  },
+  (_vars: { id: string; model: string | null }) => {},
 );
 let currentPickerSelection: ProviderModelSelection | null = null;
 
@@ -79,6 +85,17 @@ mock.module("@/features/task/TaskMessageInput", () => ({
     currentPickerSelection = providerSelection;
     return (
       <div>
+        <button
+          type="button"
+          onClick={() =>
+            onProviderSelectionChange({
+              providerId: "conn-alt-openai",
+              modelId: "gpt-5.1",
+            })
+          }
+        >
+          Switch duplicate model
+        </button>
         <button
           type="button"
           onClick={() =>
@@ -178,10 +195,86 @@ mock.module("@/features/task/officialRunAuth", () => ({
   buildOfficialRunAuthFields: mock(async () => ({})),
 }));
 
+mock.module("@/lib/sidecar-client", () => ({
+  authedFetch: async (path: string, init?: RequestInit) => {
+    const method = init?.method ?? "GET";
+    if (method === "GET" && path.startsWith("/conversations/")) {
+      if (path.endsWith("/messages")) {
+        return new Response(JSON.stringify([]), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      const threadId = path.split("/")[2] ?? null;
+      return new Response(JSON.stringify(conversationForThread(threadId)), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    if (method === "PATCH" && path.startsWith("/conversations/")) {
+      const threadId = path.split("/")[2] ?? null;
+      const parsed = init?.body
+        ? (JSON.parse(String(init.body)) as {
+            archived?: boolean;
+            model?: string | null;
+          })
+        : {};
+      if ("model" in parsed) {
+        updateConversationModelMutate(
+          { id: threadId ?? "", model: parsed.model ?? null },
+        );
+        if (
+          parsed.model !== null &&
+          shouldFailModelUpdates.has(parsed.model)
+        ) {
+          return new Response(JSON.stringify({ error: "boom" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+      }
+
+      return new Response(
+        JSON.stringify({
+          ...conversationForThread(threadId),
+          model:
+            "model" in parsed
+              ? parsed.model ?? null
+              : conversationForThread(threadId).model,
+          archived: parsed.archived ?? false,
+          updatedAt: 2,
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
+    return new Response(JSON.stringify({ error: "unhandled" }), {
+      status: 404,
+      headers: { "Content-Type": "application/json" },
+    });
+  },
+}));
+
 mock.module("@/lib/data/settings", () => ({
   getProvider: mock(async () => ({
     defaultSelection: { providerId: "conn-openai", modelId: "gpt-5.1" },
     enabledModels: [
+      {
+        providerId: "conn-alt-openai",
+        providerName: "Alt OpenAI",
+        providerLabel: "Alt OpenAI",
+        managed: false,
+        modelId: "gpt-5.1",
+        modelLabel: "Alt GPT-5.1",
+        modelDescription: "Duplicate",
+        agentRuntime: {
+          protocol: "openai-compatible",
+          baseUrl: "https://alt-openai.example/v1",
+          auth: "bearer",
+          capabilities: { text: true, tools: false, fileCheckpoint: false },
+        },
+      },
       {
         providerId: "conn-openai",
         providerName: "OpenAI",
@@ -255,30 +348,29 @@ function conversationForThread(id: string | null) {
   };
 }
 
-mock.module("@/lib/data/queries", () => ({
-  useArchiveConversationMutation: () => ({ mutate: mock(() => {}) }),
-  useConversation: (threadId: string | null) => ({
-    data: conversationForThread(threadId),
-  }),
-  useMessages: () => ({ data: [], isLoading: false }),
-  useUpdateConversationModelMutation: () => ({
-    mutate: updateConversationModelMutate,
-  }),
-}));
-
+const { queryKeys } = require("@/lib/data/queries") as typeof import("@/lib/data/queries");
 const { TaskView } = require("./TaskView") as typeof import("./TaskView");
 
 function ThreadNav() {
   const navigate = useNavigate();
   return (
-    <button type="button" onClick={() => navigate("/task/thr_2")}>
-      Go to thread 2
-    </button>
+    <>
+      <button type="button" onClick={() => navigate("/task/thr_2")}>
+        Go to thread 2
+      </button>
+      <button type="button" onClick={() => navigate("/task/thr_1")}>
+        Go to thread 1
+      </button>
+    </>
   );
 }
 
 function renderTaskView() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  qc.setQueryData(queryKeys.detail("thr_1"), conversationForThread("thr_1"));
+  qc.setQueryData(queryKeys.detail("thr_2"), conversationForThread("thr_2"));
+  qc.setQueryData(queryKeys.messages("thr_1"), []);
+  qc.setQueryData(queryKeys.messages("thr_2"), []);
   return render(
     <MemoryRouter initialEntries={["/task/thr_1"]}>
       <QueryClientProvider client={qc}>
@@ -302,13 +394,17 @@ beforeEach(() => {
   sendMock.mockClear();
   regenerateMock.mockClear();
   updateConversationModelMutate.mockClear();
-  mutationErrorHandlers.length = 0;
   runningThreadIds.clear();
   queuedMessagesByThread.clear();
+  shouldFailModelUpdates.clear();
   currentPickerSelection = null;
 });
 
 afterEach(() => cleanup());
+
+afterAll(() => {
+  mock.restore();
+});
 
 describe("TaskView conversation model selection", () => {
   it("allows changing the model after messages exist and uses it for the next send", async () => {
@@ -323,12 +419,11 @@ describe("TaskView conversation model selection", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Switch model" }));
 
-    expect(updateConversationModelMutate).toHaveBeenCalledWith(
-      {
+    await waitFor(() =>
+      expect(updateConversationModelMutate).toHaveBeenCalledWith({
         id: "thr_1",
         model: "deepseek-ai/DeepSeek-V3.2",
-      },
-      expect.any(Object),
+      }),
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Send message" }));
@@ -366,13 +461,12 @@ describe("TaskView conversation model selection", () => {
   });
 
   it("does not let a stale rollback override a newer model choice", async () => {
+    shouldFailModelUpdates.add("deepseek-ai/DeepSeek-V3.2");
     renderTaskView();
 
     fireEvent.click(await screen.findByRole("button", { name: "Switch model" }));
     fireEvent.click(screen.getByRole("button", { name: "Switch model again" }));
-    await act(async () => {
-      mutationErrorHandlers[0]?.();
-    });
+    await act(async () => {});
     fireEvent.click(screen.getByRole("button", { name: "Send message" }));
 
     await waitFor(() =>
@@ -432,6 +526,62 @@ describe("TaskView conversation model selection", () => {
           providerSelection: {
             providerId: "conn-qwen",
             modelId: "qwen/Qwen3-Coder",
+          },
+        }),
+      ),
+    );
+  });
+
+  it("keeps each thread local provider selection after switching away and back", async () => {
+    renderTaskView();
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Switch duplicate model" }),
+    );
+
+    await waitFor(() =>
+      expect(currentPickerSelection).toEqual({
+        providerId: "conn-alt-openai",
+        modelId: "gpt-5.1",
+      }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Go to thread 2" }));
+
+    await waitFor(() =>
+      expect(currentPickerSelection).toEqual({
+        providerId: "conn-qwen",
+        modelId: "qwen/Qwen3-Coder",
+      }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Switch model" }));
+
+    await waitFor(() =>
+      expect(currentPickerSelection).toEqual({
+        providerId: "conn-sf",
+        modelId: "deepseek-ai/DeepSeek-V3.2",
+      }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Go to thread 1" }));
+
+    await waitFor(() =>
+      expect(currentPickerSelection).toEqual({
+        providerId: "conn-alt-openai",
+        modelId: "gpt-5.1",
+      }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Send message" }));
+
+    await waitFor(() =>
+      expect(sendMock).toHaveBeenCalledWith(
+        "Next message",
+        expect.objectContaining({
+          providerSelection: {
+            providerId: "conn-alt-openai",
+            modelId: "gpt-5.1",
           },
         }),
       ),
