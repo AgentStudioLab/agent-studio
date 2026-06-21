@@ -53,6 +53,14 @@ function parseStringArray(value: unknown): string[] | undefined {
   return value.filter((x): x is string => typeof x === "string");
 }
 
+type ResumeDecisionReason = "tool_approval" | "ask_user";
+
+function receivedReasonForDecisionType(
+  decisionType: "allow" | "deny" | "ask_user_answers" | undefined,
+): ResumeDecisionReason {
+  return decisionType === "ask_user_answers" ? "ask_user" : "tool_approval";
+}
+
 /**
  * Run lifecycle + SSE event stream. Wire events are AG-UI-shaped
  * (RUN_STARTED / TEXT_MESSAGE_* / RUN_FINISHED ...); the URL surface is
@@ -417,6 +425,23 @@ export function buildRunRoutes(deps: MountRunsDeps): Hono {
     const decision = first.payload.decisions?.[0];
     if (!decision) return c.json({ error: "missing_decision" }, 400);
 
+    const interruptTypeMismatch = async (received: ResumeDecisionReason) => {
+      const pending = (await deps.store.getRun(runId))?.pendingInterrupts?.find(
+        (interrupt) => interrupt.id === first.interruptId,
+      );
+      // resolver 返回 false 有两类含义：1) deferred 已消失（stale/idempotent）；
+      // 2) 同一个 interrupt id 仍在等待，但客户端发错了 resume 通道。只有第二类
+      // 需要 409，避免 UI 清掉仍 pending 的真实卡片。
+      if (pending && pending.reason !== received) {
+        return {
+          error: "interrupt_type_mismatch" as const,
+          expected: pending.reason,
+          received,
+        };
+      }
+      return null;
+    };
+
     // Branch on decision type. ask_user_answers goes through a dedicated bus
     // method because the deferred resolver type differs (AskUserAnswers vs
     // PermissionResult). Routing through .resolve() would shape-mismatch and
@@ -449,6 +474,10 @@ export function buildRunRoutes(deps: MountRunsDeps): Hono {
       // Only on a real resolve (ok); a stale/no-op resume must not revive a
       // run that already terminated.
       if (ok) await deps.store.markRunning(runId);
+      if (!ok) {
+        const mismatch = await interruptTypeMismatch("ask_user");
+        if (mismatch) return c.json(mismatch, 409);
+      }
       return c.json({ ok: true, alreadyResolved: !ok }, 202);
     }
 
@@ -486,6 +515,13 @@ export function buildRunRoutes(deps: MountRunsDeps): Hono {
     } else if (ok) {
       // Allow 后 agent 会继续执行，切回 running（同 ask_user 分支）。Deny 会中止到终态。
       await deps.store.markRunning(runId);
+    }
+
+    if (!ok) {
+      const mismatch = await interruptTypeMismatch(
+        receivedReasonForDecisionType(decision.type),
+      );
+      if (mismatch) return c.json(mismatch, 409);
     }
 
     return c.json({ ok: true, alreadyResolved: !ok }, 202);
