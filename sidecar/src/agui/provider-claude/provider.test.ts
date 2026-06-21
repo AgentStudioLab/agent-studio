@@ -24,11 +24,12 @@ async function drain(iterable: AsyncIterable<unknown>) {
   }
 }
 
-function lastCanUseTool() {
+function canUseToolFromCall(callIndex: number) {
   const calls = querySpy.mock.calls as unknown[];
-  const lastCallArgs = calls[calls.length - 1] as unknown[];
-  const lastCall = lastCallArgs[0] as unknown;
-  const options = (lastCall as Record<string, unknown>)?.options as Record<string, unknown>;
+  expect(calls.length).toBe(callIndex + 1);
+  const callArgs = calls[callIndex] as unknown[];
+  const call = callArgs[0] as unknown;
+  const options = (call as Record<string, unknown>)?.options as Record<string, unknown>;
   return options?.canUseTool as (
     name: string,
     input: Record<string, unknown>,
@@ -232,11 +233,15 @@ describe("provider sandbox config", () => {
 
   it("routes AskUserQuestion through requestAskUser even in act-without-asking mode", async () => {
     const askCalls: unknown[] = [];
+    let approvalCalls = 0;
 
     const provider = createClaudeProvider({
       apiKey: "test",
       interruptBus: {
-        requestApproval: async () => ({ behavior: "allow" }),
+        requestApproval: async () => {
+          approvalCalls++;
+          return { behavior: "allow" };
+        },
         requestAskUser: async (req) => {
           askCalls.push(req);
           return { answers: { "color?": "Red" } };
@@ -251,6 +256,7 @@ describe("provider sandbox config", () => {
     });
 
     const ac = new AbortController();
+    const before = querySpy.mock.calls.length;
     await drain(provider.run({
       runId: "r1",
       threadId: "t1",
@@ -260,30 +266,32 @@ describe("provider sandbox config", () => {
       abortSignal: ac.signal,
     }));
 
-    const canUseTool = lastCanUseTool();
+    const questions = [
+      {
+        question: "color?",
+        header: "Color",
+        multiSelect: false,
+        options: [{ label: "Red", description: "Warm" }],
+      },
+    ];
+    const canUseTool = canUseToolFromCall(before);
     const result = await canUseTool("AskUserQuestion", {
-      questions: [
-        {
-          question: "color?",
-          header: "Color",
-          multiSelect: false,
-          options: [{ label: "Red", description: "Warm" }],
-        },
-      ],
+      questions,
     }, { toolUseID: "ask_1" });
 
-    expect(askCalls).toHaveLength(1);
+    expect(approvalCalls).toBe(0);
+    expect(askCalls).toEqual([
+      {
+        runId: "r1",
+        threadId: "t1",
+        toolUseID: "ask_1",
+        questions,
+      },
+    ]);
     expect(result).toEqual({
       behavior: "allow",
       updatedInput: {
-        questions: [
-          {
-            question: "color?",
-            header: "Color",
-            multiSelect: false,
-            options: [{ label: "Red", description: "Warm" }],
-          },
-        ],
+        questions,
         answers: { "color?": "Red" },
       },
     });
@@ -291,11 +299,15 @@ describe("provider sandbox config", () => {
 
   it("allows malformed AskUserQuestion input so the SDK tool reports its own error", async () => {
     let askCalls = 0;
+    let approvalCalls = 0;
 
     const provider = createClaudeProvider({
       apiKey: "test",
       interruptBus: {
-        requestApproval: async () => ({ behavior: "allow" }),
+        requestApproval: async () => {
+          approvalCalls++;
+          throw new Error("approval should not be called");
+        },
         requestAskUser: async () => {
           askCalls++;
           return { answers: {} };
@@ -310,6 +322,7 @@ describe("provider sandbox config", () => {
     });
 
     const ac = new AbortController();
+    const before = querySpy.mock.calls.length;
     await drain(provider.run({
       runId: "r1",
       threadId: "t1",
@@ -319,7 +332,8 @@ describe("provider sandbox config", () => {
       abortSignal: ac.signal,
     }));
 
-    const result = await lastCanUseTool()("AskUserQuestion", {}, { toolUseID: "ask_bad" });
+    const result = await canUseToolFromCall(before)("AskUserQuestion", {}, { toolUseID: "ask_bad" });
+    expect(approvalCalls).toBe(0);
     expect(askCalls).toBe(0);
     expect(result).toEqual({ behavior: "allow", updatedInput: {} });
   });
