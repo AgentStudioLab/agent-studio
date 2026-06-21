@@ -122,6 +122,7 @@ export function NewTaskView({
       const conv = await createConversation({
         title: t("newTask.defaultTitle"),
         workingDir,
+        model: providerSelection?.modelId ?? null,
       });
       // We bypass useCreateConversationMutation (we need the returned
       // conv.id synchronously to navigate), so its onSuccess invalidation
@@ -281,6 +282,7 @@ export function NewTaskView({
                 <ModelPicker
                   value={providerSelection}
                   onChange={setProviderSelection}
+                  persistDefault
                 />
               </div>
               {error && (

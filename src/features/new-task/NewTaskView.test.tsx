@@ -1,11 +1,18 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { type ReactNode } from "react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
+import { type ReactNode, useState } from "react";
 import { MemoryRouter } from "react-router-dom";
 
 const shellOpen = mock(async (_url: string) => {});
 const setPendingFirstPrompt = mock(() => {});
+const createConversationMock = mock(async () => ({ id: "conversation-1" }));
 
 mock.module("@tauri-apps/plugin-dialog", () => ({
   open: mock(async () => null),
@@ -22,7 +29,7 @@ mock.module("@/app/AppShellContext", () => ({
 }));
 
 mock.module("@/lib/data/conversations", () => ({
-  createConversation: mock(async () => ({ id: "conversation-1" })),
+  createConversation: createConversationMock,
 }));
 
 mock.module("@/lib/data/queries", () => ({
@@ -31,6 +38,47 @@ mock.module("@/lib/data/queries", () => ({
 
 mock.module("@/lib/agui/react/useChat", () => ({
   threadStatusKey: ["thread-status"],
+}));
+
+mock.module("@/components/ai-elements/prompt-input", () => ({
+  PromptInput: ({
+    children,
+    onSubmit,
+  }: {
+    children: ReactNode;
+    onSubmit: (message: { text: string; files: unknown[] }) => void | Promise<void>;
+  }) => {
+    const [text, setText] = useState("");
+    return (
+      <form
+        onChange={(event) => {
+          const target = event.target;
+          if (target && "value" in target) {
+            const { value } = target;
+            if (typeof value === "string") {
+              setText(value);
+            }
+          }
+        }}
+        onSubmit={(event) => {
+          event.preventDefault();
+          void onSubmit({
+            files: [],
+            text,
+          });
+        }}
+      >
+        {children}
+      </form>
+    );
+  },
+  PromptInputButton: ({ children }: { children: ReactNode }) => (
+    <button type="button">{children}</button>
+  ),
+  PromptInputFooter: ({ children }: { children: ReactNode }) => (
+    <div>{children}</div>
+  ),
+  PromptInputSubmit: () => <button type="submit">Submit</button>,
 }));
 
 mock.module("@/features/auth/useAuth", () => ({
@@ -87,8 +135,24 @@ mock.module("react-i18next", () => ({
 
 const { NewTaskView } = require("./NewTaskView") as typeof import("./NewTaskView");
 
-function TestModelPicker() {
-  return <button type="button">Model</button>;
+function TestModelPicker({
+  onChange,
+}: {
+  onChange: (selection: { providerId: string; modelId: string }) => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() =>
+        onChange({
+          providerId: "conn-sf",
+          modelId: "deepseek-ai/DeepSeek-V3.2",
+        })
+      }
+    >
+      Model
+    </button>
+  );
 }
 
 function renderNewTaskView() {
@@ -107,6 +171,7 @@ function renderNewTaskView() {
 beforeEach(() => {
   shellOpen.mockClear();
   setPendingFirstPrompt.mockClear();
+  createConversationMock.mockClear();
 });
 
 afterEach(() => {
@@ -174,5 +239,28 @@ describe("NewTaskView", () => {
     );
 
     expect(shellOpen).toHaveBeenCalledWith("https://www.agentstudio.chat/docs");
+  });
+
+  it("stores the selected model on the created conversation", async () => {
+    renderNewTaskView();
+
+    fireEvent.click(screen.getByRole("button", { name: "Model" }));
+    fireEvent.change(screen.getByLabelText("How can I help you today?"), {
+      target: { value: "Build the thing" },
+    });
+    fireEvent.submit(
+      screen.getByLabelText("How can I help you today?").closest("form")!,
+    );
+
+    await screen.findByRole("heading", {
+      name: "Let Agent Studio move work forward on this desktop.",
+    });
+    await waitFor(() => {
+      expect(createConversationMock).toHaveBeenCalledWith({
+        title: "New task",
+        workingDir: null,
+        model: "deepseek-ai/DeepSeek-V3.2",
+      });
+    });
   });
 });
