@@ -61,7 +61,7 @@ export function ProviderConnectionList({
                   {isDefault && (
                     <Badge
                       variant="ghost"
-                      className="bg-success-100/15 text-success-100"
+                      className="bg-success-100/15 text-success-100 hover:bg-success-100/15 hover:text-success-100"
                     >
                       {labels.default}
                     </Badge>

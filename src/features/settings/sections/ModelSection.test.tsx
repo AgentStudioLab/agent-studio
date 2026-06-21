@@ -594,6 +594,8 @@ describe("ModelSection", () => {
 
     expect(badge.className).toContain("bg-success-100/15");
     expect(badge.className).toContain("text-success-100");
+    expect(badge.className).toContain("hover:bg-success-100/15");
+    expect(badge.className).toContain("hover:text-success-100");
   });
 
   it("locks managed official provider rows", async () => {
