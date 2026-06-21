@@ -5,16 +5,16 @@
 
 export interface AskUserOption {
   label: string;
-  description: string;
+  description?: string;
   /** Optional preview content per SDK schema; not rendered in the inline card yet. */
   preview?: string;
 }
 
 export interface AskUserQuestionDef {
   question: string;
-  header: string;
-  multiSelect: boolean;
-  options: AskUserOption[];
+  header?: string;
+  multiSelect?: boolean;
+  options?: AskUserOption[];
 }
 
 /** Decoded payload of an interrupt with reason === "ask_user". */

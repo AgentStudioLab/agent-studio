@@ -261,7 +261,7 @@ export function ChatStream({
 }: ChatStreamProps) {
   const navigate = useNavigate();
   const { t } = useTranslation();
-  // Regenerate is disabled while a run is active or an approval is pending —
+  // Regenerate is disabled while a run is active or waiting for user action —
   // re-running mid-flight would race the live turn + truncate under it.
   const regenerateBusy = isRunning || pendingInterrupts.length > 0;
   // cast: ChatRuntime.subscribe takes (state) => void; RuntimeLike expects () => void.
@@ -378,7 +378,7 @@ export function ChatStream({
               m.role === "assistant" &&
               idx === messages.length - 1;
             const isLastMessage = idx === messages.length - 1;
-            // Parked at awaiting_approval (tool approval / ask-user): isRunning
+            // Parked at awaiting_user / legacy awaiting_approval: isRunning
             // is already false but the live turn isn't finished — it's paused
             // mid-flight. Treat it like streaming for artifact reveal so the
             // turn's file cards stay hidden until the run actually completes.
@@ -523,8 +523,8 @@ function MessageRow({
    *  Artifact cards stay hidden until streaming flips false — matches the
    *  "produce → reveal" rhythm of Cowork (full text first, then the card). */
   streaming: boolean;
-  /** True when this turn is paused at awaiting_approval (tool approval /
-   *  ask-user). The turn isn't finished, so artifact cards stay hidden — same
+  /** True when this turn is waiting for user action. The turn isn't finished,
+   *  so artifact cards stay hidden — same
    *  as `streaming`, just for the parked-mid-flight case where isRunning has
    *  already gone false. */
   parkedForApproval: boolean;
@@ -564,8 +564,8 @@ function MessageRow({
   // tool may succeed early in the turn while the model is still composing
   // the explanatory text — showing the card mid-stream feels premature
   // ("here's the file, also still talking"). Reveal once the turn settles.
-  // Also hold while parked at awaiting_approval: the turn paused for a tool
-  // approval / ask-user is not finished, so its earlier-succeeded writes must
+  // Also hold while parked at awaiting_user / legacy awaiting_approval: the
+  // turn paused for user action is not finished, so its earlier-succeeded writes must
   // not surface yet — reveal only when the run actually completes.
   const artifacts =
     streaming || parkedForApproval

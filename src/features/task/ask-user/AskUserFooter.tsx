@@ -15,6 +15,7 @@ interface AskUserFooterProps {
   showSelectedCount: boolean;
   isLastPage: boolean;
   canAdvance: boolean;
+  submitted: boolean;
   onSkip: () => void;
   onAdvance: () => void;
 }
@@ -24,52 +25,36 @@ export function AskUserFooter({
   showSelectedCount,
   isLastPage,
   canAdvance,
+  submitted,
   onSkip,
   onAdvance,
 }: AskUserFooterProps) {
   const { t } = useTranslation();
   return (
-    <footer
-      className="flex items-center gap-2 px-4 pb-3 pt-2"
-      style={{ borderTop: "1px solid hsl(var(--border-300) / 0.08)" }}
-    >
-      <div
-        className="min-w-0 flex-1 text-[12px]"
-        style={{ color: "hsl(var(--text-400))" }}
-      >
+    <footer className="flex items-center gap-2 border-t border-border px-4 pb-3 pt-2">
+      <div className="min-w-0 flex-1 text-[12px] text-muted-foreground">
         {showSelectedCount &&
           t("task.askUser.selectedCount", { count: selectedCount })}
       </div>
       <button
         type="button"
         onClick={onSkip}
-        className="rounded-md border px-3 py-1 text-[12px] transition hover:bg-muted"
-        style={{
-          color: "hsl(var(--text-200))",
-          borderColor: "hsl(var(--border-300) / 0.2)",
-        }}
+        disabled={submitted}
+        className="rounded-md border border-border px-3 py-1 text-[12px] text-foreground transition hover:bg-muted disabled:opacity-40"
       >
         {t("task.askUser.skip")}
       </button>
       <button
         type="button"
         onClick={onAdvance}
-        disabled={!canAdvance}
+        disabled={submitted || !canAdvance}
         aria-label={isLastPage ? t("task.askUser.send") : t("task.askUser.next")}
         className={cn(
           "flex h-7 items-center gap-1 rounded-md px-3 text-[12px] font-medium transition disabled:opacity-40",
           isLastPage
-            ? "text-[hsl(var(--oncolor-100))]"
-            : "border",
+            ? "bg-primary text-primary-foreground"
+            : "border border-border text-foreground hover:bg-muted",
         )}
-        style={
-          isLastPage
-            ? { background: "hsl(var(--brand-100))" }
-            : {
-                color: "hsl(var(--text-100))",
-                borderColor: "hsl(var(--border-300) / 0.2)",
-              }
-        }
       >
         {isLastPage ? (
           <>

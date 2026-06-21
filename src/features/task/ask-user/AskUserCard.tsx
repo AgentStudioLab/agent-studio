@@ -9,6 +9,8 @@
 //   - flush on Send / X — translates internal state into the
 //     ask_user_answers decision payload that resume expects.
 //
+// 快捷键是 Agent Studio 的交互增强，不声明与 Claude Code 默认 UI 完全一致。
+//
 // The card renders inline in the chat stream replacing what would otherwise
 // be a generic <ToolApprovalCard>. Both share the same interrupt mechanic
 // but the resume payload shape differs (see types.ts / protocol.ts).
@@ -39,15 +41,16 @@ function buildDecisionFromMap(
 ): AskUserAnswersDecision {
   const entries: AskUserAnswerEntry[] = questions.map((q, i) => {
     const a = answers.get(i) ?? { kind: "untouched" as const };
+    const question = q.question || "";
     switch (a.kind) {
       case "selected":
-        return { question: q.question, selected: a.labels };
+        return { question, selected: a.labels };
       case "custom":
-        return { question: q.question, custom: a.text };
+        return { question, custom: a.text };
       case "skipped":
       case "untouched":
       default:
-        return { question: q.question, skipped: true as const };
+        return { question, skipped: true as const };
     }
   });
   return { type: "ask_user_answers", answers: entries };
@@ -106,17 +109,20 @@ export function AskUserCard({ questions, onSubmit }: AskUserCardProps) {
   }, [total]);
 
   const skip = useCallback(() => {
+    if (submittedRef.current) return;
     setAnswerForPage(page, { kind: "skipped" });
     advance();
   }, [advance, page, setAnswerForPage]);
 
   const send = useCallback(() => {
+    if (submittedRef.current) return;
     submit(answers);
   }, [answers, submit]);
 
   // --- single-select: choosing an option auto-advances (or sends if last) ---
   const onSelectSingle = useCallback(
     (label: string) => {
+      if (submittedRef.current) return;
       const next = new Map(answers);
       next.set(page, { kind: "selected", labels: [label] });
       setAnswers(next);
@@ -132,6 +138,7 @@ export function AskUserCard({ questions, onSubmit }: AskUserCardProps) {
   // --- multi-select: toggle without advancing ---
   const onToggleMulti = useCallback(
     (label: string) => {
+      if (submittedRef.current) return;
       setAnswers((prev) => {
         const next = new Map(prev);
         const cur = next.get(page);
@@ -150,6 +157,7 @@ export function AskUserCard({ questions, onSubmit }: AskUserCardProps) {
 
   // --- something else: focus, edit, commit ---
   const onCustomFocus = useCallback(() => {
+    if (submittedRef.current) return;
     setAnswerForPage(page, {
       kind: "custom",
       text: drafts.get(page) ?? "",
@@ -158,6 +166,7 @@ export function AskUserCard({ questions, onSubmit }: AskUserCardProps) {
 
   const onCustomChange = useCallback(
     (text: string) => {
+      if (submittedRef.current) return;
       setDrafts((prev) => {
         const next = new Map(prev);
         next.set(page, text);
@@ -169,6 +178,7 @@ export function AskUserCard({ questions, onSubmit }: AskUserCardProps) {
   );
 
   const onCustomCommit = useCallback(() => {
+    if (submittedRef.current) return;
     const isLast = page === total - 1;
     if (isLast) send();
     else advance();
@@ -190,6 +200,7 @@ export function AskUserCard({ questions, onSubmit }: AskUserCardProps) {
   }, [currentAnswer]);
 
   const handleAdvance = useCallback(() => {
+    if (submittedRef.current) return;
     if (isLast) send();
     else advance();
   }, [advance, isLast, send]);
@@ -233,7 +244,7 @@ export function AskUserCard({ questions, onSubmit }: AskUserCardProps) {
       // toggles. Out-of-range numbers are ignored.
       const n = Number(e.key);
       if (Number.isInteger(n) && n >= 1 && n <= 9) {
-        const opt = current?.options[n - 1];
+        const opt = current?.options?.[n - 1];
         if (!opt) return;
         e.preventDefault();
         if (current.multiSelect) onToggleMulti(opt.label);
@@ -266,46 +277,43 @@ export function AskUserCard({ questions, onSubmit }: AskUserCardProps) {
 
   const showCustomActive = currentAnswer.kind === "custom";
   const customDraft = drafts.get(page) ?? "";
+  const options = current.options ?? [];
+  const header = current.header ?? "";
+  const multiSelect = current.multiSelect === true;
 
   return (
-    <div
-      className="rounded-xl"
-      style={{
-        background: "hsl(var(--bg-200) / 0.6)",
-        border: "1px solid hsl(var(--border-300) / 0.12)",
-      }}
-    >
+    <div className="rounded-md border border-border bg-card text-card-foreground">
       <AskUserHeader
-        header={current.header}
+        header={header}
         page={page}
         total={total}
         onPrev={() => setPage(Math.max(0, page - 1))}
         onNext={() => setPage(Math.min(total - 1, page + 1))}
         onClose={send}
+        submitted={submitted}
       />
       {/* Question text — full sentence under the header chip. */}
-      <p
-        className="px-4 pt-1 pb-2 text-[14px] leading-[1.55]"
-        style={{ color: "hsl(var(--text-100))" }}
-      >
+      <p className="px-4 pt-1 pb-2 text-[14px] leading-[1.55] text-foreground">
         {current.question}
       </p>
       <div className="px-2 pb-2">
-        {current.multiSelect ? (
+        {multiSelect ? (
           <MultiSelectList
-            options={current.options}
+            options={options}
             selected={selectedSet}
             onToggle={onToggleMulti}
+            disabled={submitted}
           />
         ) : (
           <SingleSelectList
-            options={current.options}
+            options={options}
             selectedLabel={
               currentAnswer.kind === "selected" && currentAnswer.labels.length === 1
                 ? currentAnswer.labels[0]!
                 : null
             }
             onSelect={onSelectSingle}
+            disabled={submitted}
           />
         )}
         <SomethingElseRow
@@ -314,13 +322,15 @@ export function AskUserCard({ questions, onSubmit }: AskUserCardProps) {
           onChange={onCustomChange}
           onFocus={onCustomFocus}
           onCommit={onCustomCommit}
+          disabled={submitted}
         />
       </div>
       <AskUserFooter
         selectedCount={selectedCount}
-        showSelectedCount={current.multiSelect}
+        showSelectedCount={multiSelect}
         isLastPage={isLast}
         canAdvance={canAdvance}
+        submitted={submitted}
         onSkip={skip}
         onAdvance={handleAdvance}
       />

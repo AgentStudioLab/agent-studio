@@ -160,4 +160,52 @@ describe("AskUserCard", () => {
     expect(arg.answers[0]).toEqual({ question: "color?", skipped: true });
     expect(arg.answers[1]).toEqual({ question: "modules?", skipped: true });
   });
+
+  it("renders a safe fallback when a question has missing optional fields", () => {
+    const onSubmit = mock(() => {});
+    render(
+      <Wrap>
+        <AskUserCard
+          questions={[
+            {
+              question: "continue?",
+              header: "",
+              multiSelect: false,
+              options: [{ label: "Yes", description: "" }],
+            },
+          ]}
+          onSubmit={onSubmit}
+        />
+      </Wrap>,
+    );
+
+    expect(screen.getByText("continue?")).toBeDefined();
+    expect(screen.getByText("Yes")).toBeDefined();
+  });
+
+  it("disables repeated submit after the first decision", async () => {
+    const onSubmit = mock(() => {});
+    render(
+      <Wrap>
+        <AskUserCard questions={[MULTI_Q]} onSubmit={onSubmit} />
+      </Wrap>,
+    );
+
+    fireEvent.click(screen.getByText("Auth"));
+    const send = screen.getByLabelText("Send");
+    fireEvent.click(send);
+    fireEvent.click(send);
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+  });
+
+  it("does not render approval terminology", () => {
+    const onSubmit = mock(() => {});
+    render(
+      <Wrap>
+        <AskUserCard questions={[SINGLE_Q]} onSubmit={onSubmit} />
+      </Wrap>,
+    );
+    expect(screen.queryByText(/approve|approval|deny/i)).toBeNull();
+  });
 });
