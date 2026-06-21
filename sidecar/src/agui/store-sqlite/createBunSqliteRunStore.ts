@@ -10,6 +10,14 @@ import type {
   ThreadStatus,
 } from "../core/store-types";
 
+function isAwaitingUserStatus(status: RunStatus): boolean {
+  return status === "awaiting_user" || status === "awaiting_approval";
+}
+
+function isActiveRunStatus(status: RunStatus): boolean {
+  return status === "running" || isAwaitingUserStatus(status);
+}
+
 /**
  * bun:sqlite implementation of RunEventStore. Wraps writes in a synchronous
  * tx so cursor assignment + event insert + last_seq bump are atomic. The
@@ -36,9 +44,9 @@ export function createBunSqliteRunStore(db: Database): RunEventStore {
   const updateRunFinish = db.prepare(
     "UPDATE runs SET status = ?, error_msg = ?, ended_at = ? WHERE id = ?",
   );
-  // Non-terminal: awaiting_approval → running (HITL resolved, agent resumes).
-  // Clears ended_at since the run is no longer finished. No bus signal — the
-  // run isn't ending, so SSE streamers must keep listening.
+  // 非终态迁移：awaiting_user / 旧版 awaiting_approval → running。
+  // HITL 已解决且 agent 恢复执行时清空 ended_at；这里不发 run-end 信号，
+  // 因为 SSE 监听者仍需要继续等待后续事件。
   const markRunningStmt = db.prepare(
     "UPDATE runs SET status = 'running', ended_at = NULL WHERE id = ?",
   );
@@ -58,7 +66,7 @@ export function createBunSqliteRunStore(db: Database): RunEventStore {
     "UPDATE runs SET status = 'error', error_msg = 'process restart', ended_at = ? WHERE status = 'running'",
   );
   const selectAwaitingOrphans = db.prepare(
-    "SELECT id, thread_id FROM runs WHERE status = 'awaiting_approval'",
+    "SELECT id, thread_id FROM runs WHERE status IN ('awaiting_user', 'awaiting_approval')",
   );
   const awaitingOrphanUpdate = db.prepare(
     "UPDATE runs SET status = 'cancelled', error_msg = 'process restart', ended_at = ? WHERE id = ?",
@@ -89,7 +97,7 @@ export function createBunSqliteRunStore(db: Database): RunEventStore {
     lastSeq: number;
   }): RunSnapshot {
     let pendingInterrupts: RunSnapshot["pendingInterrupts"];
-    if (row.status === "awaiting_approval") {
+    if (isAwaitingUserStatus(row.status)) {
       const last = selectLastEvent.get(row.runId) as { payload: string } | undefined;
       if (last) {
         try {
@@ -150,7 +158,7 @@ export function createBunSqliteRunStore(db: Database): RunEventStore {
       // Only the thread's LATEST run matters — an old orphaned "running" row
       // would otherwise wedge the thread permanently (boot reconcile flips
       // those to error/cancelled, but scope it here anyway).
-      return row.status === "running" || row.status === "awaiting_approval"
+      return isActiveRunStatus(row.status)
         ? { runId: row.runId, status: row.status }
         : null;
     },
@@ -227,13 +235,11 @@ export function createBunSqliteRunStore(db: Database): RunEventStore {
       const result = orphanUpdate.run(now);
       const runningCount = Number(result.changes ?? 0);
 
-      // Also reconcile awaiting_approval orphans — their in-memory HITL deferreds
-      // were wiped on process restart, so the user's deny click would 409.
-      // Append a synthetic RUN_ERROR(CANCELLED, reason: process_restart) event so
-      // SSE replay terminates the frontend's awaiting state cleanly. The caller
-      // (server.ts) persists a system note in each affected thread so the user
-      // sees a "继续上次任务" affordance on next reload — without the note the
-      // page would silently swap the HITL card for nothing.
+      // 同步修复 awaiting_user / 旧版 awaiting_approval 孤儿 run：进程重启会丢失
+      // 内存里的 HITL deferred，用户再点击解决会得到 409。
+      // 补写 RUN_ERROR(CANCELLED, reason: process_restart)，让 SSE replay 能干净地
+      // 结束前端等待态；调用方（server.ts）会给线程补系统消息，展示“继续上次任务”
+      // 入口，避免 HITL 卡片在刷新后静默消失。
       const awaitingRows = selectAwaitingOrphans.all() as Array<{
         id: string;
         thread_id: string;

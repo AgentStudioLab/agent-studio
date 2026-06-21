@@ -11,6 +11,7 @@ export type RunStatus =
   | "completed"
   | "error"
   | "cancelled"
+  | "awaiting_user"
   | "awaiting_approval";
 
 export interface ThreadStatus {
@@ -46,23 +47,19 @@ export interface RunEventStore {
     errorMsg?: string,
   ): Promise<void>;
   /**
-   * Flip a run from `awaiting_approval` back to `running` after its HITL
-   * interrupt is resolved (tool allowed / ask-user answered) and the agent
-   * resumes work. Unlike {@link finishRun} this is NON-terminal: it does not
-   * emit the run-end signal, so in-flight SSE streamers keep listening. Without
-   * this the run keeps a stale `awaiting_approval` status while it's actually
-   * executing, and the sidebar shows "awaiting approval" for work in progress.
-   * Idempotent.
+   * HITL 中断解决后，把 `awaiting_user`（或旧版 `awaiting_approval`）切回
+   * `running`，表示 agent 已恢复执行。它不同于 {@link finishRun}：这是非终态
+   * 迁移，不会发出 run-end 信号，因此正在监听的 SSE 流会继续等待后续事件。
+   * 若不重置状态，侧边栏会把已经恢复执行的任务继续显示为“等待用户”。
+   * 幂等。
    */
   markRunning(runId: string): Promise<void>;
   getRun(runId: string): Promise<RunSnapshot | null>;
   /**
-   * The thread's most-recent run iff it is still non-terminal (running |
-   * awaiting_approval) — i.e. an in-flight run that a new run would collide
-   * with on the same SDK session. null when the latest run is terminal or the
-   * thread has no runs. Used to reject concurrent runs on one thread (POST
-   * /runs + regenerate), so a scheduled run + a user follow-up can't resume the
-   * same session simultaneously.
+   * 仅当线程最新 run 仍处于非终态（running、awaiting_user 或旧版
+   * awaiting_approval）时返回它；旧的孤儿 run 不应阻塞新 run。该结果用于
+   * 拒绝同一线程上的并发执行，避免 scheduled run 与用户 follow-up 同时恢复
+   * 同一个 SDK session。
    */
   getThreadActiveRun(
     threadId: string,
@@ -77,10 +74,9 @@ export interface RunEventStore {
 }
 
 /**
- * Boot-time reconcile output. The server uses `awaitingOrphans` to persist
- * a system note ("上次审批未完成时应用被关闭…") in each affected thread, so
- * the user sees a "继续上次任务" affordance on next reload instead of an
- * empty silence where the HITL card used to be.
+ * 启动期孤儿 run 修复结果。server 会用 `awaitingOrphans` 给受影响线程补一条
+ * 系统消息，让用户下次加载时看到“继续上次任务”的入口，而不是原 HITL 卡片位置
+ * 突然变空。这里同时包含 `awaiting_user` 和旧版 `awaiting_approval`。
  */
 export interface ReconcileResult {
   runningCount: number;

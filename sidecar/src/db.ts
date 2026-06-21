@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS runs (
   id          TEXT PRIMARY KEY,
   thread_id   TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
   status      TEXT NOT NULL DEFAULT 'running'
-              CHECK (status IN ('running','completed','error','cancelled','awaiting_approval')),
+              CHECK (status IN ('running','completed','error','cancelled','awaiting_user','awaiting_approval')),
   last_seq    INTEGER NOT NULL DEFAULT 0,
   error_msg   TEXT,
   started_at  INTEGER NOT NULL,
