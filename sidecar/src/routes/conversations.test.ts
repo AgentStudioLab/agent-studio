@@ -113,4 +113,27 @@ describe("conversation routes — model", () => {
       rmSync(baseDir, { recursive: true, force: true });
     }
   });
+
+  it("PATCH /conversations/:id rejects invalid pinned without mutating pinned or model", async () => {
+    const { app, baseDir, threads } = harness();
+    try {
+      const thread = threads.create({
+        title: "Invalid pinned patch",
+        model: "existing-model",
+      });
+
+      const res = await app.request(`/conversations/${thread.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pinned: "false", model: "gpt-5.1" }),
+      });
+
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: "invalid_pinned" });
+      expect(threads.get(thread.id)?.pinned).toBe(false);
+      expect(threads.get(thread.id)?.model).toBe("existing-model");
+    } finally {
+      rmSync(baseDir, { recursive: true, force: true });
+    }
+  });
 });

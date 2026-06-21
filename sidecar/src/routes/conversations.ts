@@ -85,6 +85,11 @@ export function buildConversationRoutes(deps: MountConversationsDeps): Hono {
         return c.json({ error: "invalid_title" }, 400);
       }
     }
+    if (body?.pinned !== undefined) {
+      if (typeof body.pinned !== "boolean") {
+        return c.json({ error: "invalid_pinned" }, 400);
+      }
+    }
     if (body?.archived !== undefined) {
       if (typeof body.archived !== "boolean") {
         return c.json({ error: "invalid_archived" }, 400);
