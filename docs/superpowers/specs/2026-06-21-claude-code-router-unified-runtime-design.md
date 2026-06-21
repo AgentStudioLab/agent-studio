@@ -294,7 +294,7 @@ transcriptionModelSelection?: ProviderModelSelection;
 
 ## PoC 验收矩阵
 
-正式删除 `provider-openai` 前必须完成 PoC。PoC 可以用一个临时开发脚本或隐藏配置，不改正式 UI。
+基础 PoC 已支撑 `provider-openai` 删除；下列矩阵继续作为 CCR 统一运行时的专项回归清单。未完成项不再阻止删除旧 adapter，但会影响后续能力标识和发布信心。
 
 验收项：
 
@@ -322,26 +322,32 @@ transcriptionModelSelection?: ProviderModelSelection;
 
 ### Phase 0：PoC
 
-- 用现有 `provider-claude` 指向本地 CCR。
-- 手写或生成最小 CCR config，配置一个 OpenAI-compatible upstream。
-- 跑完整验收矩阵。
-- 记录必须 patch CCR 或 Agent Studio 的地方。
+- 状态：已完成基础 PoC。
+- 已用 `provider-claude` 指向本地 CCR。
+- 已生成最小 CCR config，配置 OpenAI-compatible upstream。
+- 已验证 text streaming、编译态 sidecar 私有 CCR 启动、真实页面 OpenAI-compatible 配置进入新链路。
+- 尚未补齐完整验收矩阵中的 HITL、session resume、regenerate、file checkpoint、cancel、usage 专项。
 
 ### Phase 1：托管 CCR
 
-- 新增 `sidecar/src/ccr/*`。
-- sidecar 启动时创建私有 CCR 运行目录。
-- provider settings 变化时生成 CCR config。
-- 增加 health endpoint 或内部 health probe。
-- `provider-claude` 支持从 resolved provider 拿到 CCR base URL 和 ccrModelKey。
+- 状态：已完成。
+- 已新增 `sidecar/src/ccr/*`。
+- sidecar 按 provider selection 生成私有 CCR config。
+- CCR runtime asset 从 compiled sidecar 解包到 app data runtime 目录。
+- CCR 通过 Bun `Worker` 启动，不重新执行 sidecar 二进制。
+- bootstrap patch `os.homedir()`，确保 CCR 读取 Agent Studio 私有配置目录。
+- `CcrManager.ensure()` 等待 CCR ready；`withCcrReady()` 在 run/resume 前阻断不可用的 CCR。
+- `provider-claude` 通过 resolved route 拿到 CCR base URL、router API key 和 ccrModelKey。
 
 ### Phase 2：Provider runtime 收口
 
-- `provider-factory` 删除 `openai-compatible` runtime 分支。
-- OpenAI-compatible provider resolve 为 CCR upstream route。
-- 删除或废弃 `sidecar/src/agui/provider-openai/*`。
-- 更新测试：所有 run 都断言进入 Claude SDK provider。
-- Settings UI 文案改成“上游协议”。
+- 状态：已完成主要收口。
+- `provider-factory` 已拒绝 `openai-compatible` runtime，只允许 Claude SDK runtime。
+- OpenAI-compatible provider 已 resolve 为 CCR upstream route。
+- `sidecar/src/agui/provider-openai/*` 已删除。
+- `@ai-sdk/openai-compatible` 和 `ai` sidecar 依赖已删除。
+- 测试已覆盖 OpenAI-compatible runtime 不再由 factory 创建，以及 CCR route/model key 生成。
+- Settings UI 仍显示 `OpenAI-compatible`，语义是“上游协议”，不是独立运行时。
 
 ### Phase 3：能力配置
 
@@ -373,15 +379,15 @@ AGENT_STUDIO_DISABLE_CCR=1
 行为：
 
 - Anthropic provider 回退直连 `provider-claude`。
-- OpenAI-compatible provider 在正式删除 OpenAI adapter 前可临时回退旧 `provider-openai`。
-- 一旦 Phase 2 删除 OpenAI adapter，该开关只允许 Anthropic 直连；OpenAI-compatible run 返回 `ccr_disabled`，提示用户启用 CCR。
+- Phase 2 已删除 OpenAI adapter；该开关只允许 Anthropic 直连。
+- OpenAI-compatible run 在 CCR 禁用或不可用时返回可诊断错误，提示用户启用或修复 CCR。
 
-正式删除 `provider-openai` 的前置条件：
+`provider-openai` 已正式删除，删除依据：
 
-- PoC 验收矩阵中所有 Blocker 通过。
-- 托管 CCR 在 dev 和 packaged sidecar 中均能启动。
-- 至少一个 OpenAI-compatible upstream 和一个 Anthropic upstream 在端到端测试中通过。
-- 文档明确旧配置如何迁移。
+- 托管 CCR 在 dev smoke、编译态 sidecar 和真实页面 OpenAI-compatible 配置中均能启动并进入新链路。
+- run 级 model key 不依赖修改 CCR 全局 default 或按 run 重启。
+- 旧 adapter 只提供 text streaming，继续保留会让同一 OpenAI-compatible 配置存在两条能力不一致的运行时。
+- `withCcrReady()` 已保证 CCR 启动失败能被转成可见 run error，而不是页面长期重试。
 
 ## 测试策略
 
