@@ -54,3 +54,5 @@ storybook-static
 # Claude Code session state
 .claude/scheduled_tasks.json
 .claude/scheduled_tasks.lock
+
+*.bun-build
