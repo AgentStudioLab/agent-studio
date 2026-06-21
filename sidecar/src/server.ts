@@ -142,15 +142,14 @@ skillRegistry.init();
 // sidebar pulse dot doesn't lie. Synchronous SQL UPDATE — must stay sync
 // because `bun build --compile --bytecode` does not support top-level await.
 const reconcile = store.reconcileOrphans();
-// For each awaiting_approval orphan, drop a system note so the user sees a
-// "继续上次任务" affordance on next reload. The note's distinct content prefix
-// is how groupIntoTurns assigns `reason: "process_restart"` to the notice
-// block — no DB migration needed.
+// 为每个 awaiting_user / 旧版 awaiting_approval 孤儿 run 补一条系统消息，让用户下次
+// 打开时能看到“继续上次任务”入口。独立内容前缀会被 groupIntoTurns 解析成
+// `reason: "process_restart"`，无需额外 DB 迁移。
 for (const o of reconcile.awaitingOrphans) {
   try {
     messages.appendSystemNote(
       o.threadId,
-      "[process_restart] 上次审批未完成时应用被关闭，agent 已停止",
+      "[process_restart] 上次等待用户时应用被关闭，agent 已停止",
     );
   } catch (err) {
     console.warn("[boot] failed to append process_restart note", o, err);

@@ -10,12 +10,14 @@ interface SingleSelectListProps {
   options: AskUserOption[];
   selectedLabel: string | null;
   onSelect: (label: string) => void;
+  disabled?: boolean;
 }
 
 export function SingleSelectList({
   options,
   selectedLabel,
   onSelect,
+  disabled = false,
 }: SingleSelectListProps) {
   return (
     <ul className="flex flex-col">
@@ -26,36 +28,32 @@ export function SingleSelectList({
             <button
               type="button"
               onClick={() => onSelect(opt.label)}
+              disabled={disabled}
               className={cn(
-                "group flex w-full items-start gap-3 rounded-md px-3 py-2.5 text-left transition-colors",
+                "group flex w-full items-start gap-3 rounded-md px-3 py-2.5 text-left transition-colors disabled:cursor-default",
                 active
-                  ? "bg-[hsl(var(--bg-200))]"
-                  : "hover:bg-[hsl(var(--bg-200)/0.5)]",
+                  ? "bg-accent text-accent-foreground ring-1 ring-primary/25"
+                  : "hover:bg-muted/60",
               )}
               data-state={active ? "active" : "inactive"}
             >
               {/* Index square. The number doubles as a keyboard hint (1-9). */}
               <div
-                className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded text-[11px] font-medium"
-                style={{
-                  background: "hsl(var(--bg-300))",
-                  color: "hsl(var(--text-300))",
-                }}
+                className={cn(
+                  "mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded text-[11px] font-medium",
+                  active
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground",
+                )}
               >
                 {i + 1}
               </div>
               <div className="min-w-0 flex-1">
-                <div
-                  className="text-[13px] font-medium leading-tight"
-                  style={{ color: "hsl(var(--text-100))" }}
-                >
+                <div className="text-[13px] font-medium leading-tight text-foreground">
                   {opt.label}
                 </div>
                 {opt.description && (
-                  <div
-                    className="mt-0.5 text-[12px] leading-[1.45]"
-                    style={{ color: "hsl(var(--text-400))" }}
-                  >
+                  <div className="mt-0.5 text-[12px] leading-[1.45] text-muted-foreground">
                     {opt.description}
                   </div>
                 )}
@@ -66,10 +64,9 @@ export function SingleSelectList({
                 className={cn(
                   "mt-1 shrink-0 transition-opacity",
                   active
-                    ? "opacity-100"
-                    : "opacity-0 group-hover:opacity-100",
+                    ? "text-primary opacity-100"
+                    : "text-muted-foreground opacity-0 group-hover:opacity-100",
                 )}
-                style={{ color: "hsl(var(--text-300))" }}
               >
                 <ArrowRight size={14} />
               </div>

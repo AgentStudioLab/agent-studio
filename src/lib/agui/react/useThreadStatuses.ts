@@ -13,6 +13,7 @@ export interface ThreadStatusItem {
     | "completed"
     | "error"
     | "cancelled"
+    | "awaiting_user"
     | "awaiting_approval";
   lastCursor: string | null;
   scheduledTaskId: string | null;
@@ -21,7 +22,7 @@ export interface ThreadStatusItem {
 
 /**
  * One-row-per-thread snapshot of run state. Drives:
- *   1. Sidebar pulse dot (status === "running" | "awaiting_approval")
+ *   1. Sidebar pulse dot (status === "running" | "awaiting_user" | legacy "awaiting_approval")
  *   2. Page-refresh resume — TaskView selects this thread's entry and, if
  *      a non-terminal run is in flight, attaches to its lastRunId. SSE
  *      replays the event log from cursor 0 and the reducer rebuilds the
@@ -48,7 +49,7 @@ export function useThreadStatuses() {
 
 export interface ActiveRunRef {
   runId: string;
-  status: "running" | "awaiting_approval";
+  status: "running" | "awaiting_user" | "awaiting_approval";
   lastCursor: string | null;
 }
 
@@ -63,7 +64,11 @@ export function useActiveRunForThread(threadId: string | null): ActiveRunRef | n
     if (!threadId || !data) return null;
     const entry = data.find((t) => t.threadId === threadId);
     if (!entry || !entry.lastRunId) return null;
-    if (entry.status !== "running" && entry.status !== "awaiting_approval") {
+    if (
+      entry.status !== "running" &&
+      entry.status !== "awaiting_user" &&
+      entry.status !== "awaiting_approval"
+    ) {
       return null;
     }
     return {

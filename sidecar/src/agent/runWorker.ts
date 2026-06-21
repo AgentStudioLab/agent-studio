@@ -150,7 +150,7 @@ export interface RunWorkerInput {
   appendContextExtra?: string;
   /** Internal completion callback for remote tasks. Public routes never expose it. */
   onTerminalResult?: (result: {
-    status: "completed" | "error" | "cancelled" | "awaiting_approval";
+    status: "completed" | "error" | "cancelled" | "awaiting_user";
     assistantText: string;
     errorMsg?: string;
   }) => Promise<void>;
@@ -189,12 +189,9 @@ export async function runWorker(input: RunWorkerInput): Promise<void> {
   } = input;
 
   // Buffer the structured messages/tool_calls writes until the run reaches a
-  // truly terminal state. This is the "single source of truth" guarantee for
-  // in-flight turns: while a run is streaming or paused on HITL approval, the
-  // only authoritative representation is the AG-UI event log in run_events.
-  // /conversations/:id/messages reads from messages/tool_calls — if we flush
-  // mid-run, the client gets both a persisted half-turn AND the SSE-replay
-  // rebuild of the same turn, producing duplicates after cross-session resume.
+  // 直到真正终态才落库结构化消息/tool_calls，保证运行中的 turn 只有 run_events
+  // 一个权威来源。run 仍在流式输出或等待用户时，如果提前 flush，跨会话恢复会同时
+  // 读到半截持久化消息和 SSE 回放重建的同一轮，造成重复展示。
   type PendingAssistant = { id: string; content: string; reasoning?: string; sdkUuid?: string };
   type PendingToolCall = { parentMessageId: string; id: string; toolName: string; args: unknown };
   type PendingToolResult = {
@@ -242,7 +239,7 @@ export async function runWorker(input: RunWorkerInput): Promise<void> {
   }
 
   async function notifyTerminalResult(
-    status: "completed" | "error" | "cancelled" | "awaiting_approval",
+    status: "completed" | "error" | "cancelled" | "awaiting_user",
     assistantText: string,
     errorMsg?: string,
   ): Promise<void> {

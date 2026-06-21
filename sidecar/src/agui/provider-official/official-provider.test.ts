@@ -107,12 +107,14 @@ describe("official provider", () => {
 
   it("emits AGUI text events before the website NDJSON stream closes", async () => {
     const encoder = new TextEncoder();
-    let streamController: ReadableStreamDefaultController<Uint8Array> | null =
-      null;
+    const streamControllerRef: {
+      current: ReadableStreamDefaultController<Uint8Array> | null;
+    } = { current: null };
+    const streamController = () => streamControllerRef.current;
     globalThis.fetch = mock(async () => {
       const body = new ReadableStream<Uint8Array>({
         start(controller) {
-          streamController = controller;
+          streamControllerRef.current = controller;
         },
       });
 
@@ -134,13 +136,13 @@ describe("official provider", () => {
 
     const firstPendingEvent = iterator.next();
     await new Promise((resolve) => setTimeout(resolve, 0));
-    streamController?.enqueue(
+    streamController()?.enqueue(
       encoder.encode(`${JSON.stringify({ type: "text_delta", text: "你" })}\n`),
     );
 
     const startEvent = await nextOrTimeout(firstPendingEvent);
     if (startEvent === "timeout") {
-      streamController?.close();
+      streamController()?.close();
       await firstPendingEvent.catch(() => undefined);
     }
     expect(startEvent).not.toBe("timeout");
@@ -156,7 +158,7 @@ describe("official provider", () => {
       value: { type: EventType.TEXT_MESSAGE_CONTENT, delta: "你" },
     });
 
-    streamController?.close();
+    streamController()?.close();
     await iterator.return?.();
   });
 

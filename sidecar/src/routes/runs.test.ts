@@ -11,10 +11,12 @@ import { Hono } from "hono";
 import { EventType } from "@ag-ui/core";
 import { buildRunRoutes } from "./runs";
 import type { InterruptBus } from "../agui/provider-claude/interrupt-bus";
+import type { RunSnapshot } from "../agui/core";
 
 function makeApp(opts: {
   resolveReturns: boolean;
   onAbort?: () => void;
+  pendingInterrupts?: RunSnapshot["pendingInterrupts"];
 }) {
   const bus: InterruptBus = {
     requestApproval: async () => ({ behavior: "allow" }) as never,
@@ -32,6 +34,13 @@ function makeApp(opts: {
   // The allow / ask-user resume path flips the run back to running on a
   // successful resolve, so the store needs a markRunning spy.
   const markRunning = mock(async () => {});
+  const getRun = mock(async (runId: string) => ({
+    runId,
+    threadId: "t1",
+    status: "awaiting_user" as const,
+    lastCursor: "0",
+    pendingInterrupts: opts.pendingInterrupts,
+  }));
   // 「始终允许」沉淀规则走 bus.addRule —— spy 验证它被正确调用。
   const addRule = mock((_runId: string, _rule: string) => {});
   bus.addRule = addRule;
@@ -46,7 +55,7 @@ function makeApp(opts: {
       agentLinks: stub() as never,
       agentMemoryStore: stub() as never,
       provider: stub() as never,
-      store: { markRunning } as never,
+      store: { markRunning, getRun } as never,
       interruptBus: bus,
       usage: stub() as never,
     }),
@@ -60,6 +69,10 @@ const allowBody = JSON.stringify({
 
 const denyBody = JSON.stringify({
   resumes: [{ interruptId: "tu_1", payload: { decisions: [{ type: "deny" }] } }],
+});
+
+const askUserAnswersBody = JSON.stringify({
+  resumes: [{ interruptId: "tu_1", payload: { decisions: [{ type: "ask_user_answers" }] } }],
 });
 
 describe("POST /runs/:runId/resume — idempotent semantics", () => {
@@ -100,10 +113,60 @@ describe("POST /runs/:runId/resume — idempotent semantics", () => {
     expect(res.status).toBe(202);
   });
 
+  it("returns 409 when ask_user_answers targets a pending tool approval interrupt", async () => {
+    const { app } = makeApp({
+      resolveReturns: false,
+      pendingInterrupts: [{ id: "tu_1", reason: "tool_approval", payload: {} }],
+    });
+    const res = await app.request("/runs/r1/resume", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: askUserAnswersBody,
+    });
+
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as {
+      error: string;
+      expected: string;
+      received: string;
+    };
+    expect(body).toEqual({
+      error: "interrupt_type_mismatch",
+      expected: "tool_approval",
+      received: "ask_user",
+    });
+  });
+
+  it("returns 409 when allow targets a pending ask-user interrupt", async () => {
+    const { app } = makeApp({
+      resolveReturns: false,
+      pendingInterrupts: [{ id: "ask_1", reason: "ask_user", payload: {} }],
+    });
+    const res = await app.request("/runs/r1/resume", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        resumes: [
+          { interruptId: "ask_1", payload: { decisions: [{ type: "allow" }] } },
+        ],
+      }),
+    });
+
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as {
+      error: string;
+      expected: string;
+      received: string;
+    };
+    expect(body).toEqual({
+      error: "interrupt_type_mismatch",
+      expected: "ask_user",
+      received: "tool_approval",
+    });
+  });
+
   it("flips the run back to running on a successful allow resume", async () => {
-    // Regression: after resolving an interrupt the agent keeps working, so the
-    // run must leave awaiting_approval — otherwise the sidebar shows "awaiting
-    // approval" (ShieldAlert) for work in progress.
+    // 回归覆盖：中断被允许后 agent 会继续执行，run 必须离开等待用户状态。
     const { app, markRunning } = makeApp({ resolveReturns: true });
     await app.request("/runs/r1/resume", {
       method: "POST",
@@ -175,6 +238,79 @@ describe("POST /runs/:runId/resume — idempotent semantics", () => {
     });
     expect(deny.addRule).not.toHaveBeenCalled();
   });
+
+  it("maps ask_user_answers decisions to the SDK answers record", async () => {
+    const seen: unknown[] = [];
+    const bus: InterruptBus = {
+      requestApproval: async () => ({ behavior: "allow" }),
+      requestAskUser: async () => ({ answers: {} }),
+      resolve: () => false,
+      resolveAskUser: (_runId, _interruptId, result) => {
+        seen.push(result);
+        return true;
+      },
+      cancelAll: () => {},
+      seedRules: () => {},
+      addRule: () => {},
+      getRules: () => new Set<string>(),
+    };
+    const markRunning = mock(async () => {});
+    const stub = () => undefined as never;
+    const app = new Hono();
+    app.route(
+      "/",
+      buildRunRoutes({
+        threads: stub() as never,
+        messages: stub() as never,
+        agentWorkspaces: stub() as never,
+        agentFolders: stub() as never,
+        agentLinks: stub() as never,
+        agentMemoryStore: stub() as never,
+        provider: stub() as never,
+        store: { markRunning } as never,
+        interruptBus: bus,
+        usage: stub() as never,
+      }),
+    );
+
+    const res = await app.request("/runs/r1/resume", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        resumes: [
+          {
+            interruptId: "ask_1",
+            payload: {
+              decisions: [
+                {
+                  type: "ask_user_answers",
+                  answers: [
+                    { question: "single?", selected: ["A"] },
+                    { question: "multi?", selected: ["A", "B"] },
+                    { question: "custom?", custom: "free text" },
+                    { question: "skip?", skipped: true },
+                  ],
+                },
+              ],
+            },
+          },
+        ],
+      }),
+    });
+
+    expect(res.status).toBe(202);
+    expect(seen).toEqual([
+      {
+        answers: {
+          "single?": "A",
+          "multi?": "A,B",
+          "custom?": "free text",
+          "skip?": "",
+        },
+      },
+    ]);
+    expect(markRunning).toHaveBeenCalledWith("r1");
+  });
 });
 
 describe("POST /runs — one-run-per-thread guard", () => {
@@ -226,6 +362,22 @@ describe("POST /runs — one-run-per-thread guard", () => {
       activeRunId: "r1",
       status: "running",
     });
+  });
+
+  it("returns 409 run_in_progress when the thread is awaiting_user", async () => {
+    const app = makeApp({ runId: "r1", status: "awaiting_user" });
+    const res = await app.request("/runs", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: runBody,
+    });
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as {
+      error: string;
+      activeRunId: string;
+    };
+    expect(body.error).toBe("run_in_progress");
+    expect(body.activeRunId).toBe("r1");
   });
 });
 

@@ -20,6 +20,7 @@ interface SomethingElseRowProps {
   onFocus: () => void;
   /** Called on Cmd/Ctrl+Enter — single-shot commit (parent advances page). */
   onCommit: () => void;
+  disabled?: boolean;
 }
 
 export function SomethingElseRow({
@@ -28,6 +29,7 @@ export function SomethingElseRow({
   onChange,
   onFocus,
   onCommit,
+  disabled = false,
 }: SomethingElseRowProps) {
   const { t } = useTranslation();
   const ref = useRef<HTMLTextAreaElement | null>(null);
@@ -46,19 +48,23 @@ export function SomethingElseRow({
     <button
       type="button"
       onClick={() => {
+        if (disabled) return;
         onFocus();
         ref.current?.focus();
       }}
+      disabled={disabled}
       className={cn(
-        "flex w-full items-start gap-3 rounded-md px-3 py-2.5 text-left transition-colors",
+        "flex w-full items-start gap-3 rounded-md px-3 py-2.5 text-left transition-colors disabled:cursor-default",
         active
-          ? "bg-[hsl(var(--bg-200))]"
-          : "hover:bg-[hsl(var(--bg-200)/0.5)]",
+          ? "bg-accent text-accent-foreground ring-1 ring-primary/25"
+          : "hover:bg-muted/60",
       )}
     >
       <div
-        className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded"
-        style={{ color: "hsl(var(--text-400))" }}
+        className={cn(
+          "mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded",
+          active ? "bg-primary text-primary-foreground" : "text-muted-foreground",
+        )}
       >
         <Pencil size={14} />
       </div>
@@ -66,6 +72,7 @@ export function SomethingElseRow({
         ref={ref}
         value={value}
         rows={1}
+        disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
         onFocus={onFocus}
         onKeyDown={(e) => {
@@ -75,8 +82,7 @@ export function SomethingElseRow({
           }
         }}
         placeholder={t("task.askUser.somethingElsePlaceholder")}
-        className="min-w-0 flex-1 resize-none border-0 bg-transparent text-[13px] leading-[1.55] outline-none placeholder:opacity-60"
-        style={{ color: "hsl(var(--text-100))" }}
+        className="min-w-0 flex-1 resize-none border-0 bg-transparent text-[13px] leading-[1.55] text-foreground outline-none placeholder:text-muted-foreground placeholder:opacity-60 disabled:cursor-default"
         // Prevent the parent <button>'s click handler from re-focusing/blurring
         // when the user clicks inside the textarea to move the caret.
         onClick={(e) => e.stopPropagation()}

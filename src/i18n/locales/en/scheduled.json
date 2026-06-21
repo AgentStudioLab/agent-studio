@@ -4,7 +4,7 @@
   "subtitleSuffix": "in any existing task to set one up.",
   "empty": "No scheduled tasks yet.",
   "badge": {
-    "awaiting": "Needs approval"
+    "awaiting": "Waiting for input"
   },
   "card": {
     "paused": "Paused"
@@ -28,6 +28,7 @@
     "completed": "Done",
     "error": "Failed",
     "cancelled": "Cancelled",
+    "awaiting_user": "Waiting for input",
     "awaiting_approval": "Awaiting approval"
   },
   "toolbar": {

@@ -60,7 +60,7 @@ function replaceLastTurn(
 
 const NOTICE_CONTENT: Record<NoticeReason, string> = {
   user: "已被用户中止",
-  process_restart: "上次审批未完成时应用被关闭，agent 已停止",
+  process_restart: "上次等待用户时应用被关闭，agent 已停止",
 };
 
 function makeNoticeBlock(reason: NoticeReason): MessageBlock {
@@ -166,8 +166,8 @@ export function applyEvent(
       const message = (event as { message?: string }).message;
       // Clear pendingInterrupts: the run is dead, server's HITL deferred Map
       // entries are either resolved/rejected or wiped (process restart). A
-      // stale approval card pointing at this run would POST /resume → 409.
-      // Symmetric to the c4f18e1 server-side reconcile of awaiting_approval.
+      // stale HITL card pointing at this run would POST /resume → 409.
+      // 和服务端等待用户状态的 process_restart 归并保持对称。
       //
       // CANCELLED is a user action (stop button OR HITL deny), not a fault:
       //   - suppress the error banner (no "错误：xxx" text)
@@ -353,7 +353,7 @@ function handleReasoningEnd(state: ChatState, ev: AGUIEventLike): ChatState {
 
 function handleRunFinished(state: ChatState, ev: AGUIEventLike): ChatState {
   // HITL 中断：把 pendingInterrupts 填上，pending 工具调用保持原样
-  // —— spinner 同时承担"这个调用正在等审批"的视觉信号。
+  // —— spinner 同时承担“这个调用正在等待用户处理”的视觉信号。
   if (ev.outcome === "interrupt" && Array.isArray(ev.interrupts)) {
     return {
       ...state,

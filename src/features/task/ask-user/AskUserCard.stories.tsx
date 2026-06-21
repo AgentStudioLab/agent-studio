@@ -8,7 +8,7 @@ const meta: Meta<typeof AskUserCard> = {
   parameters: { layout: "centered" },
   decorators: [
     (Story) => (
-      <div style={{ width: 560, background: "hsl(var(--bg-100))", padding: 16 }}>
+      <div className="w-[560px] bg-background p-4">
         <Story />
       </div>
     ),

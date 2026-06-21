@@ -18,6 +18,25 @@ mock.module("@anthropic-ai/claude-agent-sdk", () => ({
 
 const { createClaudeProvider } = await import("./provider");
 
+async function drain(iterable: AsyncIterable<unknown>) {
+  for await (const _ of iterable) {
+    // 消费完整 provider stream，确保 querySpy 已捕获 SDK options。
+  }
+}
+
+function canUseToolFromCall(callIndex: number) {
+  const calls = querySpy.mock.calls as unknown[];
+  expect(calls.length).toBe(callIndex + 1);
+  const callArgs = calls[callIndex] as unknown[];
+  const call = callArgs[0] as unknown;
+  const options = (call as Record<string, unknown>)?.options as Record<string, unknown>;
+  return options?.canUseTool as (
+    name: string,
+    input: Record<string, unknown>,
+    opts: { toolUseID: string; title?: string; description?: string },
+  ) => Promise<{ behavior: string; updatedInput?: Record<string, unknown>; message?: string }>;
+}
+
 describe("provider sandbox config", () => {
   it("passes sandbox.filesystem.allowWrite=[cwd] to sdkQuery", async () => {
     const provider = createClaudeProvider({ apiKey: "k", allowedTools: ["Bash"] });
@@ -210,5 +229,138 @@ describe("provider sandbox config", () => {
     expect(settings?.permissions?.ask).toContain("Edit(*)");
     expect(settings?.permissions?.ask).toContain("MultiEdit(*)");
     expect(settings?.permissions?.ask).toContain("WebFetch(*)");
+  });
+
+  it("appends AskUserQuestion usage guidance to the Claude Code preset", async () => {
+    const provider = createClaudeProvider({ apiKey: "k" });
+    const ac = new AbortController();
+    await drain(provider.run({
+      runId: "r_ask_user_guidance",
+      threadId: "t_ask_user_guidance",
+      userMessage: { role: "user", content: "推荐几部科幻电影" },
+      abortSignal: ac.signal,
+      cwd: "/tmp/proj",
+    }));
+
+    const calls = querySpy.mock.calls as unknown[];
+    const lastCallArgs = calls[calls.length - 1] as unknown[];
+    const lastCall = lastCallArgs[0] as Record<string, unknown>;
+    const options = lastCall.options as Record<string, unknown>;
+    const systemPrompt = options.systemPrompt as {
+      type?: string;
+      preset?: string;
+      append?: string;
+    };
+    expect(systemPrompt.type).toBe("preset");
+    expect(systemPrompt.preset).toBe("claude_code");
+    expect(systemPrompt.append).toContain("AskUserQuestion");
+    expect(systemPrompt.append).toContain("preferences");
+  });
+
+  it("routes AskUserQuestion through requestAskUser even in act-without-asking mode", async () => {
+    const askCalls: unknown[] = [];
+    let approvalCalls = 0;
+
+    const provider = createClaudeProvider({
+      apiKey: "test",
+      interruptBus: {
+        requestApproval: async () => {
+          approvalCalls++;
+          return { behavior: "allow" };
+        },
+        requestAskUser: async (req) => {
+          askCalls.push(req);
+          return { answers: { "color?": "Red" } };
+        },
+        resolve: () => false,
+        resolveAskUser: () => false,
+        cancelAll: () => {},
+        seedRules: () => {},
+        addRule: () => {},
+        getRules: () => new Set<string>(),
+      },
+    });
+
+    const ac = new AbortController();
+    const before = querySpy.mock.calls.length;
+    await drain(provider.run({
+      runId: "r1",
+      threadId: "t1",
+      userMessage: { role: "user", content: "hi" },
+      cwd: "/tmp",
+      permissionMode: "act-without-asking",
+      abortSignal: ac.signal,
+    }));
+
+    const questions = [
+      {
+        question: "color?",
+        header: "Color",
+        multiSelect: false,
+        options: [{ label: "Red", description: "Warm" }],
+      },
+    ];
+    const canUseTool = canUseToolFromCall(before);
+    const result = await canUseTool("AskUserQuestion", {
+      questions,
+    }, { toolUseID: "ask_1" });
+
+    expect(approvalCalls).toBe(0);
+    expect(askCalls).toEqual([
+      {
+        runId: "r1",
+        threadId: "t1",
+        toolUseID: "ask_1",
+        questions,
+      },
+    ]);
+    expect(result).toEqual({
+      behavior: "allow",
+      updatedInput: {
+        questions,
+        answers: { "color?": "Red" },
+      },
+    });
+  });
+
+  it("allows malformed AskUserQuestion input so the SDK tool reports its own error", async () => {
+    let askCalls = 0;
+    let approvalCalls = 0;
+
+    const provider = createClaudeProvider({
+      apiKey: "test",
+      interruptBus: {
+        requestApproval: async () => {
+          approvalCalls++;
+          throw new Error("approval should not be called");
+        },
+        requestAskUser: async () => {
+          askCalls++;
+          return { answers: {} };
+        },
+        resolve: () => false,
+        resolveAskUser: () => false,
+        cancelAll: () => {},
+        seedRules: () => {},
+        addRule: () => {},
+        getRules: () => new Set<string>(),
+      },
+    });
+
+    const ac = new AbortController();
+    const before = querySpy.mock.calls.length;
+    await drain(provider.run({
+      runId: "r1",
+      threadId: "t1",
+      userMessage: { role: "user", content: "hi" },
+      cwd: "/tmp",
+      permissionMode: "ask",
+      abortSignal: ac.signal,
+    }));
+
+    const result = await canUseToolFromCall(before)("AskUserQuestion", {}, { toolUseID: "ask_bad" });
+    expect(approvalCalls).toBe(0);
+    expect(askCalls).toBe(0);
+    expect(result).toEqual({ behavior: "allow", updatedInput: {} });
   });
 });

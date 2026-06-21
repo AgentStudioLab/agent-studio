@@ -216,14 +216,15 @@
     "collapse": "收起"
   },
   "askUser": {
-    "pageOf": "{{page}} of {{total}}",
-    "somethingElse": "Something else",
+    "pageOf": "第 {{page}} / {{total}} 题",
+    "somethingElse": "其他",
     "somethingElsePlaceholder": "写下你的想法……",
-    "selectedCount_one": "{{count}} selected",
-    "selectedCount_other": "{{count}} selected",
-    "skip": "Skip",
-    "send": "Send",
-    "next": "Next",
+    "selectedCount": "已选 {{count}} 项",
+    "selectedCount_one": "已选 {{count}} 项",
+    "selectedCount_other": "已选 {{count}} 项",
+    "skip": "跳过",
+    "send": "发送",
+    "next": "下一步",
     "close": "关闭",
     "prevPage": "上一题",
     "nextPage": "下一题"

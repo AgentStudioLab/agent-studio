@@ -22,7 +22,7 @@ interface UserMessageProps {
   laterRounds?: number;
   /** Whether this turn's answer made Write/Edit/NotebookEdit file changes. */
   willRollbackFiles?: boolean;
-  /** Disable regenerate (a run is active / awaiting approval). */
+  /** run 正在执行或等待用户操作时禁用 regenerate。 */
   regenerateDisabled?: boolean;
 }
 

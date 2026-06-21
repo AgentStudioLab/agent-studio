@@ -1,6 +1,11 @@
 import { afterAll, afterEach, describe, expect, it, mock } from "bun:test";
 import { cleanup, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
+import type { ScheduledTask } from "@/lib/data/types";
+import type { ThreadStatusItem } from "@/lib/agui/react/useThreadStatuses";
+
+let scheduledTasks: ScheduledTask[] = [];
+let threadStatuses: ThreadStatusItem[] = [];
 
 mock.module("@tauri-apps/plugin-dialog", () => ({
   open: mock(async () => null),
@@ -17,6 +22,7 @@ mock.module("react-i18next", () => ({
         "scheduled.toolbar.sort": "排序",
         "scheduled.toolbar.search": "搜索",
         "scheduled.toolbar.newTask": "新建任务",
+        "scheduled.badge.awaiting": "等待用户",
         "scheduled.empty": "暂无计划任务",
         "scheduled.moreIdeas.label": "更多灵感",
         "scheduled.moreIdeas.dailyBrief": "每日简报",
@@ -49,7 +55,20 @@ mock.module("@/shared/layout/PageColumn", () => ({
 }));
 
 mock.module("@/features/scheduled/ScheduledCard", () => ({
-  ScheduledCard: () => null,
+  ScheduledCard: ({
+    task,
+    needsAttention,
+    needsAttentionLabel,
+  }: {
+    task: ScheduledTask;
+    needsAttention?: boolean;
+    needsAttentionLabel?: string;
+  }) => (
+    <article aria-label={task.name}>
+      <h2>{task.name}</h2>
+      {needsAttention ? <span>{needsAttentionLabel}</span> : null}
+    </article>
+  ),
 }));
 
 mock.module("@/components/ui/alert-dialog", () => ({
@@ -67,12 +86,12 @@ mock.module("@/lib/data/scheduled-queries", () => ({
   useCreateScheduledTaskMutation: () => ({ mutate: mock(() => {}) }),
   useDeleteScheduledTaskMutation: () => ({ mutate: mock(() => {}) }),
   useRunScheduledTaskMutation: () => ({ mutate: mock(() => {}) }),
-  useScheduledTasks: () => ({ data: [], isLoading: false }),
+  useScheduledTasks: () => ({ data: scheduledTasks, isLoading: false }),
   useUpdateScheduledTaskMutation: () => ({ mutate: mock(() => {}) }),
 }));
 
 mock.module("@/lib/agui/react/useThreadStatuses", () => ({
-  useThreadStatuses: () => ({ data: [] }),
+  useThreadStatuses: () => ({ data: threadStatuses }),
 }));
 
 mock.module("@/lib/models", () => ({
@@ -85,6 +104,8 @@ mock.module("@/lib/models", () => ({
 const { ScheduledListView } = require("./ScheduledListView") as typeof import("./ScheduledListView");
 
 afterEach(() => {
+  scheduledTasks = [];
+  threadStatuses = [];
   cleanup();
 });
 
@@ -93,6 +114,46 @@ afterAll(() => {
 });
 
 describe("ScheduledListView", () => {
+  it("shows the awaiting badge for awaiting_user scheduled runs", () => {
+    scheduledTasks = [
+      {
+        id: "task_1",
+        name: "Daily brief",
+        description: "Summarize the day",
+        prompt: "brief me",
+        agentWorkspaceId: null,
+        workingDir: null,
+        model: null,
+        permissionMode: "ask",
+        frequency: "daily",
+        timeOfDay: "09:00",
+        weekday: null,
+        enabled: true,
+        allowedTools: [],
+        nextRunAt: null,
+        lastRunAt: null,
+        createdAt: 1,
+        updatedAt: 1,
+      },
+    ];
+    threadStatuses = [
+      {
+        threadId: "thread_1",
+        title: "Daily brief run",
+        lastRunId: "run_1",
+        status: "awaiting_user",
+        lastCursor: null,
+        scheduledTaskId: "task_1",
+        updatedAt: 1,
+      },
+    ];
+
+    render(<ScheduledListView />);
+
+    expect(screen.getByRole("article", { name: "Daily brief" })).toBeDefined();
+    expect(screen.getByText("等待用户")).toBeDefined();
+  });
+
   it("uses the system theme color for the new task action", () => {
     render(<ScheduledListView />);
 

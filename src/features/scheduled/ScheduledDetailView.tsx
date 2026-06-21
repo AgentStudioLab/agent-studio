@@ -30,6 +30,8 @@ import {
 const STATUS_STYLE: Record<ScheduledRun["status"], string> = {
   completed: "bg-[hsl(var(--success-100)/0.15)] text-[hsl(var(--success-100))]",
   error: "bg-[hsl(var(--danger-100)/0.15)] text-[hsl(var(--danger-100))]",
+  awaiting_user:
+    "bg-[hsl(var(--warning-100)/0.15)] text-[hsl(var(--warning-100))]",
   awaiting_approval:
     "bg-[hsl(var(--warning-100)/0.15)] text-[hsl(var(--warning-100))]",
   running: "bg-[hsl(var(--brand-100)/0.15)] text-[hsl(var(--brand-100))]",

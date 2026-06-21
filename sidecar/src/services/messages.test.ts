@@ -1,12 +1,8 @@
-// Covers:
-//   1. The `[reason]` content-prefix → notice.reason parser inside
-//      groupIntoTurns. The frontend uses notice.reason === "process_restart" to
-//      render the "继续上次任务" CTA after the user reopens an app whose HITL
-//      approval was pending at exit.
-//   2. tool_calls.side_effects round-trip — completeToolCall writes the JSON
-//      column; listByThread reads it back into ToolCallDTO.sideEffects. Without
-//      this, Bash-produced artifacts (pptx / xlsx / etc) vanish from the Files
-//      Tab after a thread reload.
+// 覆盖：
+//   1. groupIntoTurns 内部的 `[reason]` 内容前缀 → notice.reason 解析。前端依赖
+//      notice.reason === "process_restart" 在重启后给等待用户的中断展示继续入口。
+//   2. tool_calls.side_effects 往返：completeToolCall 写 JSON 列，listByThread
+//      读回 ToolCallDTO.sideEffects。否则 Bash 产物会在刷新线程后从 Files Tab 消失。
 
 import { describe, expect, it } from "bun:test";
 import { Database } from "bun:sqlite";
@@ -32,14 +28,14 @@ describe("groupIntoTurns — notice reason parsing", () => {
     const turns = groupIntoTurns([
       row("user", "do a thing"),
       row("assistant", "ok"),
-      row("system", "[process_restart] 上次审批未完成时应用被关闭，agent 已停止"),
+      row("system", "[process_restart] 上次等待用户时应用被关闭，agent 已停止"),
     ]);
     const assistant = turns.find((t) => t.role === "assistant");
     if (!assistant || assistant.role !== "assistant") throw new Error("expected assistant turn");
     const notice = assistant.blocks.find((b) => b.kind === "notice");
     if (!notice || notice.kind !== "notice") throw new Error("expected notice block");
     expect(notice.reason).toBe("process_restart");
-    expect(notice.content).toBe("上次审批未完成时应用被关闭，agent 已停止");
+    expect(notice.content).toBe("上次等待用户时应用被关闭，agent 已停止");
   });
 
   it("leaves legacy plain content unchanged (reason undefined)", () => {

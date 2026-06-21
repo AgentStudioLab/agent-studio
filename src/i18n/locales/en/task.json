@@ -219,6 +219,7 @@
     "pageOf": "{{page}} of {{total}}",
     "somethingElse": "Something else",
     "somethingElsePlaceholder": "Write your own answer…",
+    "selectedCount": "{{count}} selected",
     "selectedCount_one": "{{count}} selected",
     "selectedCount_other": "{{count}} selected",
     "skip": "Skip",

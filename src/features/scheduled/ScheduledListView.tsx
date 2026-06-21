@@ -43,11 +43,14 @@ export function ScheduledListView() {
   const deleteMutation = useDeleteScheduledTaskMutation();
   const runNowMutation = useRunScheduledTaskMutation();
 
-  // Scheduled tasks with a spawned run currently paused on HITL approval.
+  // 定时任务的派生 run 正在等待用户处理；兼容旧的 awaiting_approval 状态。
   const awaitingTaskIds = useMemo(() => {
     const set = new Set<string>();
     for (const s of statuses) {
-      if (s.status === "awaiting_approval" && s.scheduledTaskId) {
+      if (
+        (s.status === "awaiting_user" || s.status === "awaiting_approval") &&
+        s.scheduledTaskId
+      ) {
         set.add(s.scheduledTaskId);
       }
     }

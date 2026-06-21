@@ -1,7 +1,7 @@
 // AskUserCard behavioral tests.
 //
 // Covers the four contract points from the spec:
-//   1. Single-select auto-advances after 150ms.
+//   1. Single-select auto-advances after 150ms until the final page.
 //   2. Multi-select toggles without advancing; "N selected" counter tracks set.
 //   3. Something else: typing populates custom answer; Cmd+Enter commits.
 //   4. X close / Send on last page submits whichever answers exist, with
@@ -80,7 +80,7 @@ describe("AskUserCard", () => {
   // *previous* test. Manually unmount after each it().
   afterEach(() => cleanup());
 
-  it("single-select auto-advances then sends on last page", async () => {
+  it("single-select auto-advances then waits for Send on the last page", async () => {
     const onSubmit = mock(() => {});
     render(
       <Wrap>
@@ -96,14 +96,46 @@ describe("AskUserCard", () => {
     await waitFor(() => expect(screen.getByText("size?")).toBeDefined(), {
       timeout: 500,
     });
-    // Pick on last page → Send fires onSubmit
+    // Pick on last page → selected state updates, but the user still confirms
+    // with Send. This avoids surprise-submitting the final answer.
     fireEvent.click(screen.getAllByText("Red")[0]!);
-    await waitFor(() => expect(onSubmit).toHaveBeenCalled(), { timeout: 500 });
+    await new Promise((resolve) => window.setTimeout(resolve, 210));
+    expect(onSubmit).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByLabelText("Send"));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1), { timeout: 500 });
     const arg = (onSubmit.mock.calls[0] as unknown[])[0] as {
       answers: { question: string; selected?: string[] }[];
     };
     expect(arg.answers[0]).toEqual({ question: "color?", selected: ["Red"] });
     expect(arg.answers[1]).toEqual({ question: "size?", selected: ["Red"] });
+  });
+
+  it("keeps rapid single-select timers from skipping a question", async () => {
+    const onSubmit = mock(() => {});
+    render(
+      <Wrap>
+        <AskUserCard
+          questions={[
+            SINGLE_Q,
+            { ...SINGLE_Q, question: "size?", header: "Size" },
+            { ...SINGLE_Q, question: "shape?", header: "Shape" },
+          ]}
+          onSubmit={onSubmit}
+        />
+      </Wrap>,
+    );
+
+    fireEvent.click(screen.getByText("Red"));
+    fireEvent.click(screen.getByText("Blue"));
+
+    await waitFor(() => expect(screen.getByText("size?")).toBeDefined(), {
+      timeout: 500,
+    });
+    await new Promise((resolve) => window.setTimeout(resolve, 210));
+
+    expect(screen.getByText("size?")).toBeDefined();
+    expect(screen.queryByText("shape?")).toBeNull();
+    expect(onSubmit).not.toHaveBeenCalled();
   });
 
   it("multi-select toggles without advancing; counter tracks size", () => {
@@ -159,5 +191,68 @@ describe("AskUserCard", () => {
     };
     expect(arg.answers[0]).toEqual({ question: "color?", skipped: true });
     expect(arg.answers[1]).toEqual({ question: "modules?", skipped: true });
+  });
+
+  it("Skip on the final page submits skipped answers", async () => {
+    const onSubmit = mock(() => {});
+    render(
+      <Wrap>
+        <AskUserCard questions={[SINGLE_Q]} onSubmit={onSubmit} />
+      </Wrap>,
+    );
+
+    fireEvent.click(screen.getByText("Skip"));
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    const arg = (onSubmit.mock.calls[0] as unknown[])[0] as {
+      answers: { question: string; skipped?: true }[];
+    };
+    expect(arg.answers).toEqual([{ question: "color?", skipped: true }]);
+  });
+
+  it("renders a safe fallback when a question has missing optional fields", () => {
+    const onSubmit = mock(() => {});
+    render(
+      <Wrap>
+        <AskUserCard
+          questions={[
+            {
+              question: "continue?",
+              options: [{ label: "Yes" }],
+            } as unknown as AskUserQuestionDef,
+          ]}
+          onSubmit={onSubmit}
+        />
+      </Wrap>,
+    );
+
+    expect(screen.getByText("continue?")).toBeDefined();
+    expect(screen.getByText("Yes")).toBeDefined();
+  });
+
+  it("disables repeated submit after the first decision", async () => {
+    const onSubmit = mock(() => {});
+    render(
+      <Wrap>
+        <AskUserCard questions={[MULTI_Q]} onSubmit={onSubmit} />
+      </Wrap>,
+    );
+
+    fireEvent.click(screen.getByText("Auth"));
+    const send = screen.getByLabelText("Send");
+    fireEvent.click(send);
+    fireEvent.click(send);
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+  });
+
+  it("does not render approval terminology", () => {
+    const onSubmit = mock(() => {});
+    render(
+      <Wrap>
+        <AskUserCard questions={[SINGLE_Q]} onSubmit={onSubmit} />
+      </Wrap>,
+    );
+    expect(screen.queryByText(/approve|approval|deny/i)).toBeNull();
   });
 });

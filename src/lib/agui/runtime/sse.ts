@@ -12,7 +12,7 @@ export type ResumableCloseReason = "finished" | "error" | "cursor_expired" | "ab
 
 /**
  * attempt 退避计数的上限。`500 * 2 ** 30 ≈ 5e11ms`，且 `Math.min(30_000, …)` 早就把
- * 延迟限到 30s —— 这里只是防止 attempt 这个数字本身在长时间 awaiting_approval
+ * 延迟限到 30s —— 这里只是防止 attempt 这个数字本身在长时间 awaiting_user
  * 等场景下无界累加（理论上能涨到 Number.MAX_SAFE_INTEGER）。
  */
 const MAX_RETRY_ATTEMPT = 30;
@@ -66,7 +66,7 @@ export function createResumableRun(opts: ResumableRunOptions): { abort: () => vo
     if (aborted) return;
     aborted = true;
     // 终态事件也要主动 abort fetch。否则 RUN_FINISHED(outcome=interrupt)
-    // 会让 response stream 半开：服务端 streamFrom 看到 awaiting_approval
+    // 会让 response stream 半开：服务端 streamFrom 看到 awaiting_user / legacy awaiting_approval
     // 不主动关 generator，bus listener 一直挂着。下一次 resume 时新事件
     // 会被同时序列化写到老连接和新 after=cursor 连接 —— 老连接没人读但
     // 一直在膨胀。这里主动 abort 把 server 的 streamSSE signal 触发掉，
@@ -94,7 +94,7 @@ export function createResumableRun(opts: ResumableRunOptions): { abort: () => vo
     while (!aborted) {
       const finalUrl = buildUrl();
       // 标记本次连接是否真的收到了事件。
-      // 如果服务端立刻关（如 awaiting_approval 且 cursor 已追到 lastSeq），
+      // 如果服务端立刻关（如 awaiting_user / legacy awaiting_approval 且 cursor 已追到 lastSeq），
       // 没有这个标记就会紧密重连死循环。和网络错误共用同一套退避。
       let receivedAny = false;
 
@@ -138,7 +138,7 @@ export function createResumableRun(opts: ResumableRunOptions): { abort: () => vo
         //  - 本次连接收到过事件 → 多半是流中途的网络抖动，
         //    重置 attempt 计数立刻重连
         //  - 一个事件没收到 → 服务端处于"无事件可发"状态
-        //    （如 awaiting_approval）。走和网络错误同样的退避，
+        //    （如 awaiting_user / legacy awaiting_approval）。走和网络错误同样的退避，
         //    避免 tight-loop 把服务端打爆
         if (receivedAny) {
           attempt = 0;

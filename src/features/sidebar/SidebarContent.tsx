@@ -66,6 +66,7 @@ function aguiToMockStatus(
   switch (status) {
     case "running":
       return "active";
+    case "awaiting_user":
     case "awaiting_approval":
       return "awaiting";
     case "error":

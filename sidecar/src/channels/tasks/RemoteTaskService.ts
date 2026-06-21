@@ -237,11 +237,7 @@ export class RemoteTaskService {
 
   async handleTerminalResult(
     taskId: string,
-    result: {
-      status: "completed" | "error" | "cancelled" | "awaiting_approval";
-      assistantText: string;
-      errorMsg?: string;
-    },
+    result: Parameters<NonNullable<RunWorkerInput["onTerminalResult"]>>[0],
   ): Promise<void> {
     const task = this.get(taskId);
     if (!task) return;

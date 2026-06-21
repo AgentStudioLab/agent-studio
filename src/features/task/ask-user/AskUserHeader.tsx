@@ -15,6 +15,7 @@ interface AskUserHeaderProps {
   onPrev: () => void;
   onNext: () => void;
   onClose: () => void;
+  submitted: boolean;
 }
 
 export function AskUserHeader({
@@ -24,23 +25,18 @@ export function AskUserHeader({
   onPrev,
   onNext,
   onClose,
+  submitted,
 }: AskUserHeaderProps) {
   const { t } = useTranslation();
-  const canPrev = page > 0;
-  const canNext = page < total - 1;
+  const canPrev = !submitted && page > 0;
+  const canNext = !submitted && page < total - 1;
 
   return (
     <header className="flex items-center gap-3 px-4 pt-3">
-      <span
-        className="min-w-0 flex-1 truncate text-[13px]"
-        style={{ color: "hsl(var(--text-200))" }}
-      >
+      <span className="min-w-0 flex-1 truncate text-[13px] text-muted-foreground">
         {header}
       </span>
-      <div
-        className="flex items-center gap-0.5 text-[12px]"
-        style={{ color: "hsl(var(--text-400))" }}
-      >
+      <div className="flex items-center gap-0.5 text-[12px] text-muted-foreground">
         <button
           type="button"
           aria-label={t("task.askUser.prevPage")}
@@ -73,8 +69,8 @@ export function AskUserHeader({
         type="button"
         aria-label={t("task.askUser.close")}
         onClick={onClose}
-        className="rounded p-1 transition hover:bg-muted hover:text-foreground"
-        style={{ color: "hsl(var(--text-300))" }}
+        disabled={submitted}
+        className="rounded p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:opacity-40"
       >
         <X size={14} />
       </button>

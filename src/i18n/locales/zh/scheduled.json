@@ -4,7 +4,7 @@
   "subtitleSuffix": "即可创建。",
   "empty": "还没有定时任务。",
   "badge": {
-    "awaiting": "待审批"
+    "awaiting": "等待用户"
   },
   "card": {
     "paused": "已暂停"
@@ -28,6 +28,7 @@
     "completed": "已完成",
     "error": "失败",
     "cancelled": "已取消",
+    "awaiting_user": "等待用户",
     "awaiting_approval": "等待审批"
   },
   "toolbar": {

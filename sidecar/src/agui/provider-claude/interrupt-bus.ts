@@ -45,20 +45,19 @@ export interface AskUserRequest {
 
 export interface InterruptBus {
   /**
-   * Called from canUseTool: writes a synthetic RUN_FINISHED(outcome:"interrupt")
-   * to the store, flips status to "awaiting_approval", returns a Promise
-   * that resolves when /resume calls bus.resolve() (or with deny if cancelled).
+   * canUseTool 调用：写入合成 RUN_FINISHED(outcome:"interrupt")，把 run
+   * 切到 "awaiting_user" 表示等待用户决策，再等 /resume 调 bus.resolve()
+   * 返回允许或拒绝。
    */
   requestApproval(req: ApprovalRequest): Promise<PermissionResult>;
   /**
-   * Same RUN_FINISHED(interrupt) mechanic, but the interrupt's reason is
-   * "ask_user" and the resolved value is the structured answers map. Used
-   * by canUseTool when toolName === "AskUserQuestion".
+   * 复用 RUN_FINISHED(interrupt) 传输机制，但 interrupt reason 为
+   * "ask_user"，恢复值是结构化答案表。toolName === "AskUserQuestion"
+   * 时由 canUseTool 触发，表示等待用户输入。
    *
-   * The two flows can't share a deferred map — the resolver types differ.
-   * Keeping them separate also lets the resume route reject mismatched
-   * payloads cleanly (asking for ask_user answers on a tool_approval
-   * interrupt is a protocol error).
+   * 两条路径不能共用 deferred map：resolver 类型不同。分离后 resume route
+   * 也能干净地拒绝错配 payload（例如给 tool_approval interrupt 发送
+   * ask_user answers 是协议错误）。
    */
   requestAskUser(req: AskUserRequest): Promise<AskUserAnswers>;
   /**
@@ -69,10 +68,9 @@ export interface InterruptBus {
   /** Same as resolve, but for ask_user interrupts. */
   resolveAskUser(runId: string, interruptId: string, result: AskUserAnswers): boolean;
   /**
-   * Called from runWorker on terminal status: rejects every pending deferred
-   * for the run as `deny` (approval) / empty-answers (ask_user) so the SDK
-   * side unblocks and tears down cleanly. Also drops this run's approval-rule
-   * set (in-memory hygiene; runId is never reused).
+   * runWorker 进入终态时调用：把该 run 的所有 pending deferred 释放为
+   * `deny`（tool approval）或空答案（ask_user），让 SDK 侧解除等待并清理。
+   * 同时丢弃本 run 的 approval-rule 集合（内存卫生；runId 不会复用）。
    */
   cancelAll(runId: string): void;
 
@@ -95,10 +93,9 @@ export interface CreateInterruptBusOptions {
 
 export function createInterruptBus(opts: CreateInterruptBusOptions): InterruptBus {
   const { store } = opts;
-  // Two maps keyed by `${runId}:${interruptId}` — separate because the
-  // resolver value type differs. resolve() / resolveAskUser() each look up
-  // in their own map, so a stale or mistargeted resume request fails cleanly
-  // (returns false) instead of forcing the wrong shape onto a deferred.
+  // 两个 map 都按 `${runId}:${interruptId}` 索引；分开存放是因为 resolver
+  // 值类型不同。resolve() / resolveAskUser() 各查各的 map，让过期或打错类型的
+  // resume 请求干净地返回 false，而不是把错误 shape 塞进 deferred。
   const permissionDeferreds = new Map<string, (r: PermissionResult) => void>();
   const askUserDeferreds = new Map<string, (r: AskUserAnswers) => void>();
   // 命令级「始终允许」规则，按 runId。值为 CC 规则串集合（见 approval-rules.ts）。
@@ -136,7 +133,7 @@ export function createInterruptBus(opts: CreateInterruptBusOptions): InterruptBu
       } as unknown as AGUIEvent;
 
       await store.appendEvent(req.runId, event);
-      await store.finishRun(req.runId, "awaiting_approval");
+      await store.finishRun(req.runId, "awaiting_user");
 
       return pending;
     },
@@ -169,7 +166,7 @@ export function createInterruptBus(opts: CreateInterruptBusOptions): InterruptBu
       } as unknown as AGUIEvent;
 
       await store.appendEvent(req.runId, event);
-      await store.finishRun(req.runId, "awaiting_approval");
+      await store.finishRun(req.runId, "awaiting_user");
 
       return pending;
     },

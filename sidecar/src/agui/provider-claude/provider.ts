@@ -48,6 +48,13 @@ import { languageDirective } from "../../lib/composeAppendPrompt";
 
 export type ClaudeProviderAuthMode = "x-api-key" | "bearer";
 
+const ASK_USER_PROMPT_GUIDANCE = [
+  "AskUserQuestion guidance:",
+  "- When a task depends on the user's preferences, constraints, audience, taste, or a trade-off that would materially change the answer, ask 1-3 concise questions with AskUserQuestion before proceeding.",
+  "- Prefer multiple-choice options with short descriptions and include a flexible fallback such as \"Something else\" when appropriate.",
+  "- Do not interrupt for obvious defaults or low-impact details; make a reasonable assumption instead.",
+].join("\n");
+
 export interface ClaudeProviderOptions {
   /**
    * API key required by claude-agent-sdk. Forwarded through `options.env`
@@ -350,7 +357,7 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
     // instructions, so a user who asked for another language still wins.
     const localeDirective = languageDirective(ctxRun.locale);
     const combinedAppend =
-      [appendPrompt, ctxRun.appendContext, localeDirective]
+      [appendPrompt, ctxRun.appendContext, ASK_USER_PROMPT_GUIDANCE, localeDirective]
         .filter((s): s is string => typeof s === "string" && s.trim().length > 0)
         .join("\n\n") || null;
 

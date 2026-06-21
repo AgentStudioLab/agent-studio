@@ -1,7 +1,25 @@
-import { describe, expect, it } from "bun:test";
-import { renderHook, act } from "@testing-library/react";
-import { useRunStatus } from "./useRunStatus";
+import { afterEach, describe, expect, it } from "bun:test";
+import { cleanup, render, renderHook, act, screen } from "@testing-library/react";
+import { useRunStatus, type RuntimeLike } from "./useRunStatus";
 import { createInitialState, type ChatState } from "../runtime/types";
+
+afterEach(() => cleanup());
+
+function Probe({ runtime }: { runtime: RuntimeLike }) {
+  const status = useRunStatus(runtime);
+  return (
+    <output>
+      {status.status}:{status.waitingReason ?? "none"}
+    </output>
+  );
+}
+
+function runtimeWith(state: ChatState): RuntimeLike {
+  return {
+    getState: () => state,
+    subscribe: () => () => {},
+  };
+}
 
 // Minimal fake runtime: just getState + subscribe (matches useSyncExternalStore contract)
 function makeFakeRuntime(initial: ChatState) {
@@ -21,6 +39,42 @@ function makeFakeRuntime(initial: ChatState) {
 }
 
 describe("useRunStatus", () => {
+  it("derives awaiting_user_input for ask_user interrupts", () => {
+    render(
+      <Probe
+        runtime={runtimeWith({
+          ...createInitialState(),
+          pendingInterrupts: [
+            {
+              id: "ask_1",
+              reason: "ask_user",
+              payload: { toolName: "AskUserQuestion", questions: [] },
+            },
+          ],
+        })}
+      />,
+    );
+    expect(screen.getByText("awaiting_user:ask_user")).toBeDefined();
+  });
+
+  it("derives awaiting_tool_approval for tool approval interrupts", () => {
+    render(
+      <Probe
+        runtime={runtimeWith({
+          ...createInitialState(),
+          pendingInterrupts: [
+            {
+              id: "tool_1",
+              reason: "tool_approval",
+              payload: { toolName: "Bash", input: {} },
+            },
+          ],
+        })}
+      />,
+    );
+    expect(screen.getByText("awaiting_user:tool_approval")).toBeDefined();
+  });
+
   it("returns errorCode + isAuthError true for AUTH_FAILED", () => {
     const rt = makeFakeRuntime({
       ...createInitialState(),

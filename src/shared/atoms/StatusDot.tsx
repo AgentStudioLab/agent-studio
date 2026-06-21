@@ -20,7 +20,7 @@ interface StatusDotProps {
 /**
  * Status indicator that matches the Claude Desktop prototype sidebar item.
  * - active:   success-100/30 pulse halo + success-100 center dot (running)
- * - awaiting: warning-100 ShieldAlert icon (HITL approval pending — amber
+ * - awaiting: warning-100 ShieldAlert icon (user action pending — amber
  *             caution, matching ToolApprovalCard's own warning color, so the
  *             sidebar signals "user action required" vs "agent thinking")
  * - done:     success-100 fill + white check
@@ -62,7 +62,7 @@ export function StatusDot({ status, className, size = 12 }: StatusDotProps) {
     return (
       <span
         role="status"
-        aria-label="awaiting approval"
+        aria-label="awaiting user"
         className={cn("inline-flex items-center justify-center", className)}
         style={{ width: size, height: size, color: "hsl(var(--warning-100))" }}
       >
