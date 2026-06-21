@@ -57,6 +57,17 @@ html, body {
     overscroll-behavior: contain;
 }
 
+/* ---- Interactive cursor ----
+ * 统一直接 <button>、ARIA button、shadcn Button 的可点击游标。使用 :where()
+ * 保持零特异性，避免覆盖局部的 cursor-not-allowed / cursor-text 等语义。 */
+:where(
+    button:not(:disabled):not([aria-disabled="true"]):not([data-disabled="true"]),
+    [role="button"]:not([aria-disabled="true"]):not([data-disabled="true"]),
+    [data-slot="button"]:not([aria-disabled="true"]):not([data-disabled="true"])
+) {
+    cursor: pointer;
+}
+
 /* ---- Scrollbar (Firefox + WebKit) ---- */
 * {
     scrollbar-color: hsl(var(--border-300) / 0.24) transparent;
