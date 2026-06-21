@@ -18,6 +18,24 @@ mock.module("@anthropic-ai/claude-agent-sdk", () => ({
 
 const { createClaudeProvider } = await import("./provider");
 
+async function drain(iterable: AsyncIterable<unknown>) {
+  for await (const _ of iterable) {
+    // 消费完整 provider stream，确保 querySpy 已捕获 SDK options。
+  }
+}
+
+function lastCanUseTool() {
+  const calls = querySpy.mock.calls as unknown[];
+  const lastCallArgs = calls[calls.length - 1] as unknown[];
+  const lastCall = lastCallArgs[0] as unknown;
+  const options = (lastCall as Record<string, unknown>)?.options as Record<string, unknown>;
+  return options?.canUseTool as (
+    name: string,
+    input: Record<string, unknown>,
+    opts: { toolUseID: string; title?: string; description?: string },
+  ) => Promise<{ behavior: string; updatedInput?: Record<string, unknown>; message?: string }>;
+}
+
 describe("provider sandbox config", () => {
   it("passes sandbox.filesystem.allowWrite=[cwd] to sdkQuery", async () => {
     const provider = createClaudeProvider({ apiKey: "k", allowedTools: ["Bash"] });
@@ -210,5 +228,99 @@ describe("provider sandbox config", () => {
     expect(settings?.permissions?.ask).toContain("Edit(*)");
     expect(settings?.permissions?.ask).toContain("MultiEdit(*)");
     expect(settings?.permissions?.ask).toContain("WebFetch(*)");
+  });
+
+  it("routes AskUserQuestion through requestAskUser even in act-without-asking mode", async () => {
+    const askCalls: unknown[] = [];
+
+    const provider = createClaudeProvider({
+      apiKey: "test",
+      interruptBus: {
+        requestApproval: async () => ({ behavior: "allow" }),
+        requestAskUser: async (req) => {
+          askCalls.push(req);
+          return { answers: { "color?": "Red" } };
+        },
+        resolve: () => false,
+        resolveAskUser: () => false,
+        cancelAll: () => {},
+        seedRules: () => {},
+        addRule: () => {},
+        getRules: () => new Set<string>(),
+      },
+    });
+
+    const ac = new AbortController();
+    await drain(provider.run({
+      runId: "r1",
+      threadId: "t1",
+      userMessage: { role: "user", content: "hi" },
+      cwd: "/tmp",
+      permissionMode: "act-without-asking",
+      abortSignal: ac.signal,
+    }));
+
+    const canUseTool = lastCanUseTool();
+    const result = await canUseTool("AskUserQuestion", {
+      questions: [
+        {
+          question: "color?",
+          header: "Color",
+          multiSelect: false,
+          options: [{ label: "Red", description: "Warm" }],
+        },
+      ],
+    }, { toolUseID: "ask_1" });
+
+    expect(askCalls).toHaveLength(1);
+    expect(result).toEqual({
+      behavior: "allow",
+      updatedInput: {
+        questions: [
+          {
+            question: "color?",
+            header: "Color",
+            multiSelect: false,
+            options: [{ label: "Red", description: "Warm" }],
+          },
+        ],
+        answers: { "color?": "Red" },
+      },
+    });
+  });
+
+  it("allows malformed AskUserQuestion input so the SDK tool reports its own error", async () => {
+    let askCalls = 0;
+
+    const provider = createClaudeProvider({
+      apiKey: "test",
+      interruptBus: {
+        requestApproval: async () => ({ behavior: "allow" }),
+        requestAskUser: async () => {
+          askCalls++;
+          return { answers: {} };
+        },
+        resolve: () => false,
+        resolveAskUser: () => false,
+        cancelAll: () => {},
+        seedRules: () => {},
+        addRule: () => {},
+        getRules: () => new Set<string>(),
+      },
+    });
+
+    const ac = new AbortController();
+    await drain(provider.run({
+      runId: "r1",
+      threadId: "t1",
+      userMessage: { role: "user", content: "hi" },
+      cwd: "/tmp",
+      permissionMode: "ask",
+      abortSignal: ac.signal,
+    }));
+
+    const result = await lastCanUseTool()("AskUserQuestion", {}, { toolUseID: "ask_bad" });
+    expect(askCalls).toBe(0);
+    expect(result).toEqual({ behavior: "allow", updatedInput: {} });
   });
 });
