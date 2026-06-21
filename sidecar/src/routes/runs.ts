@@ -445,8 +445,7 @@ export function buildRunRoutes(deps: MountRunsDeps): Hono {
         first.interruptId,
         { answers },
       );
-      // The agent resumes work now — flip the run back to running so the
-      // sidebar stops showing "awaiting approval" while it's executing again.
+      // Agent 已拿到用户输入并恢复执行；切回 running，避免侧边栏继续显示等待用户。
       // Only on a real resolve (ok); a stale/no-op resume must not revive a
       // run that already terminated.
       if (ok) await deps.store.markRunning(runId);
@@ -485,8 +484,7 @@ export function buildRunRoutes(deps: MountRunsDeps): Hono {
     if (decision.type === "deny" && ok) {
       aborters.get(runId)?.abort();
     } else if (ok) {
-      // Allow: the agent resumes work — flip the run back to running (see the
-      // ask_user branch). Deny is excluded: it aborts to a terminal status.
+      // Allow 后 agent 会继续执行，切回 running（同 ask_user 分支）。Deny 会中止到终态。
       await deps.store.markRunning(runId);
     }
 

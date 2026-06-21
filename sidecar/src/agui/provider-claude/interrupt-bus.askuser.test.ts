@@ -16,7 +16,56 @@ function fakeStore(): RunEventStore {
   } as unknown as RunEventStore;
 }
 
+function observableStore() {
+  const appended: unknown[] = [];
+  const finished: Array<{ runId: string; status: string }> = [];
+  return {
+    store: {
+      appendEvent: async (_runId: string, event: unknown) => {
+        appended.push(event);
+        return { cursor: String(appended.length), event };
+      },
+      finishRun: async (runId: string, status: string) => {
+        finished.push({ runId, status });
+      },
+    } as unknown as RunEventStore,
+    appended,
+    finished,
+  };
+}
+
 describe("InterruptBus — ask_user flow", () => {
+  it("requestAskUser writes an ask_user interrupt and flips to awaiting_user", async () => {
+    const { store, appended, finished } = observableStore();
+    const bus = createInterruptBus({ store });
+
+    void bus.requestAskUser({
+      runId: "r1",
+      threadId: "t1",
+      toolUseID: "ask_1",
+      questions: [
+        {
+          question: "color?",
+          header: "Color",
+          multiSelect: false,
+          options: [{ label: "Red", description: "Warm" }],
+        },
+      ],
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(finished).toEqual([{ runId: "r1", status: "awaiting_user" }]);
+    expect(appended).toHaveLength(1);
+    const event = appended[0] as {
+      outcome?: string;
+      interrupts?: Array<{ id: string; reason: string; payload: unknown }>;
+    };
+    expect(event.outcome).toBe("interrupt");
+    expect(event.interrupts?.[0]?.id).toBe("ask_1");
+    expect(event.interrupts?.[0]?.reason).toBe("ask_user");
+  });
+
   it("resolves requestAskUser with the answers passed to resolveAskUser", async () => {
     const bus = createInterruptBus({ store: fakeStore() });
     const promise = bus.requestAskUser({

@@ -51,7 +51,7 @@ describe("interrupt-bus", () => {
     expect((ev.interrupts as Array<{ id: string; reason: string }>)[0]?.id).toBe("tu_1");
     expect((ev.interrupts as Array<{ reason: string }>)[0]?.reason).toBe("tool_approval");
 
-    expect(finished).toEqual([{ runId: "run_1", status: "awaiting_approval" }]);
+    expect(finished).toEqual([{ runId: "run_1", status: "awaiting_user" }]);
 
     let settled = false;
     void pending.then(() => { settled = true; });
