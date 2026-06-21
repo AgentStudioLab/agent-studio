@@ -169,10 +169,8 @@ describe("AskUserCard", () => {
           questions={[
             {
               question: "continue?",
-              header: "",
-              multiSelect: false,
-              options: [{ label: "Yes", description: "" }],
-            },
+              options: [{ label: "Yes" }],
+            } as unknown as AskUserQuestionDef,
           ]}
           onSubmit={onSubmit}
         />

@@ -128,6 +128,7 @@ export function AskUserCard({ questions, onSubmit }: AskUserCardProps) {
       setAnswers(next);
       const isLast = page === total - 1;
       window.setTimeout(() => {
+        if (submittedRef.current) return;
         if (isLast) submit(next);
         else advance();
       }, AUTO_ADVANCE_DELAY);
