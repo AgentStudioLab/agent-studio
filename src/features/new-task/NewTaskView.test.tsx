@@ -12,7 +12,7 @@ import { MemoryRouter } from "react-router-dom";
 
 const shellOpen = mock(async (_url: string) => {});
 const setPendingFirstPrompt = mock(() => {});
-const createConversationMock = mock(async () => ({ id: "conversation-1" }));
+const createConversationRequests: RequestInit[] = [];
 
 mock.module("@tauri-apps/plugin-dialog", () => ({
   open: mock(async () => null),
@@ -28,16 +28,22 @@ mock.module("@/app/AppShellContext", () => ({
   useAppShell: () => ({ setPendingFirstPrompt }),
 }));
 
-mock.module("@/lib/data/conversations", () => ({
-  createConversation: createConversationMock,
-}));
-
-mock.module("@/lib/data/queries", () => ({
-  queryKeys: { recents: ["recents"] },
-}));
-
-mock.module("@/lib/agui/react/useChat", () => ({
-  threadStatusKey: ["thread-status"],
+mock.module("@/lib/sidecar-client", () => ({
+  fetchSidecar: mock(async () => new Response(null, { status: 204 })),
+  getSidecarInfo: mock(async () => ({ port: 0, token: "test-token" })),
+  authedFetch: mock(async (path: string, init?: RequestInit) => {
+    if (path === "/conversations" && init?.method === "POST") {
+      createConversationRequests.push(init);
+      return new Response(JSON.stringify({ id: "conversation-1" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    return new Response(JSON.stringify({ error: "unhandled" }), {
+      status: 404,
+      headers: { "Content-Type": "application/json" },
+    });
+  }),
 }));
 
 mock.module("@/components/ai-elements/prompt-input", () => ({
@@ -104,6 +110,7 @@ mock.module("@/features/composer/SlashEditor", () => ({
 }));
 
 mock.module("react-i18next", () => ({
+  initReactI18next: { type: "3rdParty", init: () => {} },
   useTranslation: () => ({
     t: (key: string) => {
       const translations: Record<string, string> = {
@@ -171,7 +178,7 @@ function renderNewTaskView() {
 beforeEach(() => {
   shellOpen.mockClear();
   setPendingFirstPrompt.mockClear();
-  createConversationMock.mockClear();
+  createConversationRequests.length = 0;
 });
 
 afterEach(() => {
@@ -256,7 +263,8 @@ describe("NewTaskView", () => {
       name: "Let Agent Studio move work forward on this desktop.",
     });
     await waitFor(() => {
-      expect(createConversationMock).toHaveBeenCalledWith({
+      expect(createConversationRequests).toHaveLength(1);
+      expect(JSON.parse(String(createConversationRequests[0]?.body))).toEqual({
         title: "New task",
         workingDir: null,
         model: "deepseek-ai/DeepSeek-V3.2",
