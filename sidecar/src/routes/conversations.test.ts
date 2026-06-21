@@ -91,4 +91,26 @@ describe("conversation routes — model", () => {
       rmSync(baseDir, { recursive: true, force: true });
     }
   });
+
+  it("PATCH /conversations/:id does not persist model when a later field is invalid", async () => {
+    const { app, baseDir, threads } = harness();
+    try {
+      const thread = threads.create({
+        title: "Invalid mixed patch",
+        model: "existing-model",
+      });
+
+      const res = await app.request(`/conversations/${thread.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model: "gpt-5.1", agentWorkspaceId: 123 }),
+      });
+
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: "invalid_agent_workspace_id" });
+      expect(threads.get(thread.id)?.model).toBe("existing-model");
+    } finally {
+      rmSync(baseDir, { recursive: true, force: true });
+    }
+  });
 });

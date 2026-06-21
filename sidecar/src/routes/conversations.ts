@@ -84,16 +84,11 @@ export function buildConversationRoutes(deps: MountConversationsDeps): Hono {
       if (typeof body.title !== "string" || body.title.length === 0) {
         return c.json({ error: "invalid_title" }, 400);
       }
-      threads.rename(id, body.title);
-    }
-    if (body?.pinned !== undefined) {
-      threads.updatePin(id, body.pinned);
     }
     if (body?.archived !== undefined) {
       if (typeof body.archived !== "boolean") {
         return c.json({ error: "invalid_archived" }, 400);
       }
-      threads.updateArchived(id, body.archived);
     }
     if (body?.workingDir !== undefined) {
       // Pass null through to clear (fall back to default); empty string is
@@ -104,7 +99,6 @@ export function buildConversationRoutes(deps: MountConversationsDeps): Hono {
       if (typeof body.workingDir === "string" && body.workingDir.length === 0) {
         return c.json({ error: "invalid_working_dir" }, 400);
       }
-      threads.updateWorkingDir(id, body.workingDir);
     }
     if (body?.model !== undefined) {
       if (body.model !== null && typeof body.model !== "string") {
@@ -113,7 +107,6 @@ export function buildConversationRoutes(deps: MountConversationsDeps): Hono {
       if (typeof body.model === "string" && body.model.length === 0) {
         return c.json({ error: "invalid_model" }, 400);
       }
-      threads.updateModel(id, body.model);
     }
     if (body?.agentWorkspaceId !== undefined) {
       if (body.agentWorkspaceId !== null && typeof body.agentWorkspaceId !== "string") {
@@ -122,6 +115,24 @@ export function buildConversationRoutes(deps: MountConversationsDeps): Hono {
       if (body.agentWorkspaceId && !agentWorkspaces.get(body.agentWorkspaceId)) {
         return c.json({ error: "agent_not_found" }, 404);
       }
+    }
+
+    if (body?.title !== undefined) {
+      threads.rename(id, body.title);
+    }
+    if (body?.pinned !== undefined) {
+      threads.updatePin(id, body.pinned);
+    }
+    if (body?.archived !== undefined) {
+      threads.updateArchived(id, body.archived);
+    }
+    if (body?.workingDir !== undefined) {
+      threads.updateWorkingDir(id, body.workingDir);
+    }
+    if (body?.model !== undefined) {
+      threads.updateModel(id, body.model);
+    }
+    if (body?.agentWorkspaceId !== undefined) {
       // Move into a space → working_dir follows the agent home; move out
       // (null) → clear working_dir so it falls back to the default workspace.
       const home = body.agentWorkspaceId
