@@ -406,4 +406,47 @@ describe("useUpdateConversationModelMutation", () => {
       ),
     ).toHaveLength(1);
   });
+
+  it("does not let a delayed stale onMutate overwrite a newer optimistic model", async () => {
+    deferNextModelResponse("gpt-5.1-mini");
+    deferNextModelResponse("deepseek-ai/DeepSeek-V3.2");
+    const qc = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    qc.setQueryData(queryKeys.detail("thr_1"), existingConversation);
+    const originalCancelQueries = qc.cancelQueries.bind(qc);
+    let resolveFirstCancel: () => void = () => {};
+    let cancelCalls = 0;
+    qc.cancelQueries = ((filters) => {
+      cancelCalls += 1;
+      if (cancelCalls === 1) {
+        return new Promise<void>((resolve) => {
+          resolveFirstCancel = resolve;
+        });
+      }
+      return originalCancelQueries(filters);
+    }) as typeof qc.cancelQueries;
+    const { result } = renderHook(() => useUpdateConversationModelMutation(), {
+      wrapper: wrapper(qc),
+    });
+
+    result.current.mutate({ id: "thr_1", model: "gpt-5.1-mini" });
+    await waitFor(() => expect(cancelCalls).toBe(1));
+
+    result.current.mutate({
+      id: "thr_1",
+      model: "deepseek-ai/DeepSeek-V3.2",
+    });
+    await waitFor(() =>
+      expect(
+        (qc.getQueryData(queryKeys.detail("thr_1")) as Conversation).model,
+      ).toBe("deepseek-ai/DeepSeek-V3.2"),
+    );
+
+    resolveFirstCancel();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(
+      (qc.getQueryData(queryKeys.detail("thr_1")) as Conversation).model,
+    ).toBe("deepseek-ai/DeepSeek-V3.2");
+  });
 });

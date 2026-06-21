@@ -139,6 +139,9 @@ export function useUpdateConversationModelMutation() {
       const mutationId = ++conversationModelMutationSeq;
       latestConversationModelMutation.set(vars.id, mutationId);
       await qc.cancelQueries({ queryKey: key });
+      if (latestConversationModelMutation.get(vars.id) !== mutationId) {
+        return { previous: undefined, mutationId };
+      }
       const previous =
         qc.getQueryData<Awaited<ReturnType<typeof getConversation>>>(key);
       qc.setQueryData(
