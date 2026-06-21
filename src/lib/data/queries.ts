@@ -141,15 +141,25 @@ export function useUpdateConversationModelMutation() {
         (current: Awaited<ReturnType<typeof getConversation>> | undefined) =>
           current ? { ...current, model: vars.model } : current,
       );
-      return { previous };
+      return { previous, optimisticModel: vars.model };
     },
     onError: (_err, vars, context) => {
-      if (context?.previous) {
+      const current =
+        qc.getQueryData<Awaited<ReturnType<typeof getConversation>>>(
+          queryKeys.detail(vars.id),
+        );
+      if (context?.previous && current?.model === context.optimisticModel) {
         qc.setQueryData(queryKeys.detail(vars.id), context.previous);
       }
     },
-    onSuccess: (updated) => {
-      qc.setQueryData(queryKeys.detail(updated.id), updated);
+    onSuccess: (updated, vars, context) => {
+      const current =
+        qc.getQueryData<Awaited<ReturnType<typeof getConversation>>>(
+          queryKeys.detail(vars.id),
+        );
+      if (current?.model === context?.optimisticModel) {
+        qc.setQueryData(queryKeys.detail(updated.id), updated);
+      }
     },
     onSettled: (_data, _error, vars) => {
       qc.invalidateQueries({ queryKey: queryKeys.detail(vars.id) });

@@ -12,6 +12,12 @@ notifyManager.setScheduler(queueMicrotask);
 
 const fetchCalls: Array<{ path: string; init?: RequestInit }> = [];
 let shouldFail = false;
+const deferredByModel = new Map<
+  string,
+  {
+    promise: Promise<Response>;
+  }
+>();
 
 const existingConversation: Conversation = {
   id: "thr_1",
@@ -30,12 +36,17 @@ const existingConversation: Conversation = {
 mock.module("../sidecar-client", () => ({
   authedFetch: async (path: string, init?: RequestInit) => {
     fetchCalls.push({ path, init });
-    if (shouldFail) {
-      return new Response(JSON.stringify({ error: "boom" }), { status: 500 });
-    }
     const parsed = init?.body
       ? (JSON.parse(String(init.body)) as { model: string | null })
       : { model: null };
+    const deferred =
+      parsed.model === null ? undefined : deferredByModel.get(parsed.model);
+    if (deferred) {
+      return deferred.promise;
+    }
+    if (shouldFail) {
+      return new Response(JSON.stringify({ error: "boom" }), { status: 500 });
+    }
     return new Response(
       JSON.stringify({
         ...existingConversation,
@@ -59,6 +70,7 @@ function wrapper(qc: QueryClient) {
 beforeEach(() => {
   fetchCalls.length = 0;
   shouldFail = false;
+  deferredByModel.clear();
 });
 
 describe("useUpdateConversationModelMutation", () => {
@@ -118,5 +130,94 @@ describe("useUpdateConversationModelMutation", () => {
     expect(
       (qc.getQueryData(queryKeys.detail("thr_1")) as Conversation).model,
     ).toBe("gpt-5.1");
+  });
+
+  it("does not let a stale success overwrite a newer optimistic model", async () => {
+    let resolveStaleSuccess: (response: Response) => void = () => {};
+    deferredByModel.set("gpt-5.1-mini", {
+      promise: new Promise<Response>((resolve) => {
+        resolveStaleSuccess = resolve;
+      }),
+    });
+    const qc = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    qc.setQueryData(queryKeys.detail("thr_1"), existingConversation);
+    const { result } = renderHook(() => useUpdateConversationModelMutation(), {
+      wrapper: wrapper(qc),
+    });
+
+    result.current.mutate({ id: "thr_1", model: "gpt-5.1-mini" });
+    await waitFor(() =>
+      expect(
+        (qc.getQueryData(queryKeys.detail("thr_1")) as Conversation).model,
+      ).toBe("gpt-5.1-mini"),
+    );
+
+    result.current.mutate({ id: "thr_1", model: "deepseek-ai/DeepSeek-V3.2" });
+    await waitFor(() =>
+      expect(
+        (qc.getQueryData(queryKeys.detail("thr_1")) as Conversation).model,
+      ).toBe("deepseek-ai/DeepSeek-V3.2"),
+    );
+
+    resolveStaleSuccess(
+      new Response(
+        JSON.stringify({
+          ...existingConversation,
+          model: "gpt-5.1-mini",
+          updatedAt: 3,
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+
+    await waitFor(() =>
+      expect(
+        (qc.getQueryData(queryKeys.detail("thr_1")) as Conversation).updatedAt,
+      ).toBe(2),
+    );
+    expect(
+      (qc.getQueryData(queryKeys.detail("thr_1")) as Conversation).model,
+    ).toBe("deepseek-ai/DeepSeek-V3.2");
+  });
+
+  it("does not let a stale error roll back a newer optimistic model", async () => {
+    let resolveStaleError: (response: Response) => void = () => {};
+    deferredByModel.set("gpt-5.1-mini", {
+      promise: new Promise<Response>((resolve) => {
+        resolveStaleError = resolve;
+      }),
+    });
+    const qc = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    qc.setQueryData(queryKeys.detail("thr_1"), existingConversation);
+    const { result } = renderHook(() => useUpdateConversationModelMutation(), {
+      wrapper: wrapper(qc),
+    });
+
+    result.current.mutate({ id: "thr_1", model: "gpt-5.1-mini" });
+    await waitFor(() =>
+      expect(
+        (qc.getQueryData(queryKeys.detail("thr_1")) as Conversation).model,
+      ).toBe("gpt-5.1-mini"),
+    );
+
+    result.current.mutate({ id: "thr_1", model: "deepseek-ai/DeepSeek-V3.2" });
+    await waitFor(() =>
+      expect(
+        (qc.getQueryData(queryKeys.detail("thr_1")) as Conversation).model,
+      ).toBe("deepseek-ai/DeepSeek-V3.2"),
+    );
+
+    resolveStaleError(
+      new Response(JSON.stringify({ error: "boom" }), { status: 500 }),
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(
+      (qc.getQueryData(queryKeys.detail("thr_1")) as Conversation).model,
+    ).toBe("deepseek-ai/DeepSeek-V3.2");
   });
 });
