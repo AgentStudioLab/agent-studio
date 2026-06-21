@@ -256,6 +256,14 @@ interface ColumnInfo {
   name: string;
 }
 
+interface TableSql {
+  sql: string | null;
+}
+
+interface ForeignKeyState {
+  foreign_keys: number;
+}
+
 /**
  * Idempotent column adds for DBs created before a column was introduced.
  * SQLite 3.35+ has `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`, but Bun's
@@ -271,6 +279,57 @@ function ensureColumn(
   const rows = db.prepare(`PRAGMA table_info(${table})`).all() as ColumnInfo[];
   if (rows.some((r) => r.name === column)) return;
   db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
+}
+
+function ensureRunsAwaitingUserCheck(db: Database): void {
+  const table = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='runs'").get() as
+    | TableSql
+    | undefined;
+  if (!table?.sql || table.sql.includes("'awaiting_user'")) return;
+
+  const fkState = db.prepare("PRAGMA foreign_keys").get() as ForeignKeyState;
+  const foreignKeysEnabled = fkState.foreign_keys === 1;
+
+  // SQLite 不能 ALTER CHECK constraint；旧库必须重建 runs 表。先关闭外键，
+  // 避免 run_events 在父表替换期间触发约束错误，数据复制完成后立即恢复。
+  if (foreignKeysEnabled) db.exec("PRAGMA foreign_keys = OFF");
+  try {
+    db.exec(`
+      CREATE TABLE runs_new (
+        id          TEXT PRIMARY KEY,
+        thread_id   TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+        status      TEXT NOT NULL DEFAULT 'running'
+                    CHECK (status IN ('running','completed','error','cancelled','awaiting_user','awaiting_approval')),
+        last_seq    INTEGER NOT NULL DEFAULT 0,
+        error_msg   TEXT,
+        started_at  INTEGER NOT NULL,
+        ended_at    INTEGER,
+        input_tokens INTEGER,
+        output_tokens INTEGER,
+        cache_creation_tokens INTEGER,
+        cache_read_tokens INTEGER,
+        total_cost_usd REAL,
+        permission_denials TEXT,
+        model_used TEXT
+      );
+      INSERT INTO runs_new (
+        id, thread_id, status, last_seq, error_msg, started_at, ended_at,
+        input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens,
+        total_cost_usd, permission_denials, model_used
+      )
+      SELECT
+        id, thread_id, status, last_seq, error_msg, started_at, ended_at,
+        input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens,
+        total_cost_usd, permission_denials, model_used
+      FROM runs;
+      DROP TABLE runs;
+      ALTER TABLE runs_new RENAME TO runs;
+      CREATE INDEX IF NOT EXISTS idx_runs_thread_started ON runs (thread_id, started_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_runs_status ON runs (status);
+    `);
+  } finally {
+    if (foreignKeysEnabled) db.exec("PRAGMA foreign_keys = ON");
+  }
 }
 
 export function migrate(db: Database): void {
@@ -290,6 +349,7 @@ export function migrate(db: Database): void {
   ensureColumn(db, "runs", "total_cost_usd", "REAL");
   ensureColumn(db, "runs", "permission_denials", "TEXT");
   ensureColumn(db, "runs", "model_used", "TEXT");
+  ensureRunsAwaitingUserCheck(db);
   ensureColumn(db, "scheduled_tasks", "working_dir", "TEXT");
   ensureColumn(db, "scheduled_tasks", "permission_mode", "TEXT NOT NULL DEFAULT 'ask'");
   ensureColumn(db, "scheduled_tasks", "weekday", "INTEGER");
