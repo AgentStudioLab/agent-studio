@@ -25,6 +25,7 @@ import {
 interface ProviderModelPickerProps {
   value: ProviderModelSelection | null;
   onChange: (selection: ProviderModelSelection) => void;
+  persistDefault?: boolean;
   disabled?: boolean;
   disabledReason?: string;
 }
@@ -86,6 +87,7 @@ function displayLabel(
 export function ProviderModelPicker({
   value,
   onChange,
+  persistDefault = false,
   disabled = false,
   disabledReason,
 }: ProviderModelPickerProps) {
@@ -105,6 +107,7 @@ export function ProviderModelPicker({
   const hasModels = enabledModels.length > 0;
   const handleSelect = (selection: ProviderModelSelection) => {
     onChange(selection);
+    if (!persistDefault) return;
     queryClient.setQueryData(["provider"], (current: typeof data) =>
       current ? { ...current, defaultSelection: selection } : current,
     );
