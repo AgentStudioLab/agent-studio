@@ -15,6 +15,7 @@ export interface CreateConversationArgs {
   title?: string;
   agentWorkspaceId?: string | null;
   workingDir?: string | null;
+  model?: string | null;
 }
 
 export async function updateWorkingDir(
@@ -25,6 +26,18 @@ export async function updateWorkingDir(
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ workingDir }),
+  });
+  return expectJson<Conversation>(res);
+}
+
+export async function updateConversationModel(
+  id: string,
+  model: string | null,
+): Promise<Conversation> {
+  const res = await authedFetch(`/conversations/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ model }),
   });
   return expectJson<Conversation>(res);
 }

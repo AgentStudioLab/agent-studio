@@ -13,6 +13,7 @@ import {
   moveConversationToAgent,
   renameConversation,
   togglePin,
+  updateConversationModel,
 } from "./conversations";
 
 export const queryKeys = {
@@ -122,6 +123,37 @@ export function useDeleteConversationMutation() {
   return useMutation({
     mutationFn: (id: string) => deleteConversation(id),
     onSuccess: () => invalidateConversationLists(qc),
+  });
+}
+
+export function useUpdateConversationModelMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { id: string; model: string | null }) =>
+      updateConversationModel(vars.id, vars.model),
+    onMutate: async (vars) => {
+      const key = queryKeys.detail(vars.id);
+      await qc.cancelQueries({ queryKey: key });
+      const previous =
+        qc.getQueryData<Awaited<ReturnType<typeof getConversation>>>(key);
+      qc.setQueryData(
+        key,
+        (current: Awaited<ReturnType<typeof getConversation>> | undefined) =>
+          current ? { ...current, model: vars.model } : current,
+      );
+      return { previous };
+    },
+    onError: (_err, vars, context) => {
+      if (context?.previous) {
+        qc.setQueryData(queryKeys.detail(vars.id), context.previous);
+      }
+    },
+    onSuccess: (updated) => {
+      qc.setQueryData(queryKeys.detail(updated.id), updated);
+    },
+    onSettled: (_data, _error, vars) => {
+      qc.invalidateQueries({ queryKey: queryKeys.detail(vars.id) });
+    },
   });
 }
 
