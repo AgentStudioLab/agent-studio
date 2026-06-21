@@ -4,7 +4,7 @@
   "subtitleSuffix": "in any existing task to set one up.",
   "empty": "No scheduled tasks yet.",
   "badge": {
-    "awaiting": "Needs approval"
+    "awaiting": "Waiting for input"
   },
   "card": {
     "paused": "Paused"
