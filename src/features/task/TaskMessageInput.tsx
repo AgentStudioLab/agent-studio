@@ -75,19 +75,6 @@ export function TaskMessageInput({
 
   const handleSubmit = async (msg: PromptInputMessage) => {
     const text = msg.text.trim();
-    // [Qdbg] TEMP — remove after diagnosing the "only one queued" issue.
-    console.log("[Qdbg] submit", {
-      streaming,
-      override: overrideIntentRef.current,
-      textLen: text.length,
-      branch: !text
-        ? "empty-return"
-        : streaming
-          ? overrideIntentRef.current
-            ? "override"
-            : "queue"
-          : "send",
-    });
     if (!text) return;
     if (streaming) {
       if (overrideIntentRef.current) {
