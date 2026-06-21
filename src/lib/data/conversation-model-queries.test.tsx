@@ -44,9 +44,17 @@ const existingConversation: Conversation = {
   updatedAt: 1,
 };
 
+let detailResponse: Conversation = existingConversation;
+
 mock.module("../sidecar-client", () => ({
   authedFetch: async (path: string, init?: RequestInit) => {
     fetchCalls.push({ path, init });
+    if (!init?.method && path === "/conversations/thr_1") {
+      return new Response(JSON.stringify(detailResponse), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
     const parsed = init?.body
       ? (JSON.parse(String(init.body)) as { model: string | null })
       : { model: null };
@@ -77,6 +85,7 @@ mock.module("../sidecar-client", () => ({
 
 const { queryKeys, useUpdateConversationModelMutation } =
   require("./queries") as typeof import("./queries");
+const { useConversation } = require("./queries") as typeof import("./queries");
 
 function wrapper(qc: QueryClient) {
   return ({ children }: { children: ReactNode }) => (
@@ -87,6 +96,7 @@ function wrapper(qc: QueryClient) {
 beforeEach(() => {
   fetchCalls.length = 0;
   shouldFail = false;
+  detailResponse = existingConversation;
   deferredByModel.clear();
 });
 
@@ -334,5 +344,66 @@ describe("useUpdateConversationModelMutation", () => {
     expect(
       (qc.getQueryData(queryKeys.detail("thr_1")) as Conversation).model,
     ).toBe("gpt-5.1-mini");
+  });
+
+  it("does not let stale settled invalidation refetch over a newer optimistic model", async () => {
+    const resolveStaleSuccess = deferNextModelResponse("gpt-5.1-mini");
+    deferNextModelResponse("deepseek-ai/DeepSeek-V3.2");
+    const qc = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const { result } = renderHook(
+      () => ({
+        conversation: useConversation("thr_1"),
+        mutation: useUpdateConversationModelMutation(),
+      }),
+      { wrapper: wrapper(qc) },
+    );
+
+    await waitFor(() =>
+      expect(result.current.conversation.data?.model).toBe("gpt-5.1"),
+    );
+
+    result.current.mutation.mutate({ id: "thr_1", model: "gpt-5.1-mini" });
+    await waitFor(() =>
+      expect(result.current.conversation.data?.model).toBe("gpt-5.1-mini"),
+    );
+
+    result.current.mutation.mutate({
+      id: "thr_1",
+      model: "deepseek-ai/DeepSeek-V3.2",
+    });
+    await waitFor(() =>
+      expect(result.current.conversation.data?.model).toBe(
+        "deepseek-ai/DeepSeek-V3.2",
+      ),
+    );
+
+    detailResponse = {
+      ...existingConversation,
+      title: "Server stale detail",
+      model: "gpt-5.1-mini",
+      updatedAt: 3,
+    };
+    resolveStaleSuccess(
+      new Response(
+        JSON.stringify({
+          ...existingConversation,
+          model: "gpt-5.1-mini",
+          updatedAt: 3,
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(result.current.conversation.data?.model).toBe(
+      "deepseek-ai/DeepSeek-V3.2",
+    );
+    expect(
+      fetchCalls.filter(
+        (call) => call.path === "/conversations/thr_1" && !call.init?.method,
+      ),
+    ).toHaveLength(1);
   });
 });

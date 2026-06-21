@@ -166,11 +166,11 @@ export function useUpdateConversationModelMutation() {
     },
     onSettled: (_data, _error, vars, context) => {
       if (
-        context &&
-        latestConversationModelMutation.get(vars.id) === context.mutationId
+        latestConversationModelMutation.get(vars.id) !== context?.mutationId
       ) {
-        latestConversationModelMutation.delete(vars.id);
+        return;
       }
+      latestConversationModelMutation.delete(vars.id);
       qc.invalidateQueries({ queryKey: queryKeys.detail(vars.id) });
     },
   });
