@@ -62,7 +62,7 @@ import { runWorker } from "./agent/runWorker";
 import {
   buildAgentStudioCcrConfig,
   CcrManager,
-  CCR_SPAWN_NOT_CONFIGURED,
+  CCR_SPAWN_MANAGED,
   resolveCcrRuntimeRoute,
 } from "./ccr";
 
@@ -116,7 +116,7 @@ const ccrManager = new CcrManager({
   enabled: process.env.AGENT_STUDIO_DISABLE_CCR !== "1",
   port: Number.parseInt(process.env.AGENT_STUDIO_CCR_PORT ?? "3456", 10),
   configDir: path.join(path.dirname(dbAbs), "ccr"),
-  spawn: CCR_SPAWN_NOT_CONFIGURED,
+  spawn: CCR_SPAWN_MANAGED,
 });
 const userProfileSettings = createUserProfileSettings(db);
 
