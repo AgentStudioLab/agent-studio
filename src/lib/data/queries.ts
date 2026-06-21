@@ -168,13 +168,15 @@ export function useUpdateConversationModelMutation() {
       }
     },
     onSettled: (_data, _error, vars, context) => {
-      if (
-        latestConversationModelMutation.get(vars.id) !== context?.mutationId
-      ) {
+      const latest = latestConversationModelMutation.get(vars.id);
+      if (latest === context?.mutationId) {
+        latestConversationModelMutation.delete(vars.id);
+        qc.invalidateQueries({ queryKey: queryKeys.detail(vars.id) });
         return;
       }
-      latestConversationModelMutation.delete(vars.id);
-      qc.invalidateQueries({ queryKey: queryKeys.detail(vars.id) });
+      if (latest === undefined) {
+        qc.invalidateQueries({ queryKey: queryKeys.detail(vars.id) });
+      }
     },
   });
 }

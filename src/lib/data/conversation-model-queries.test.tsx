@@ -407,6 +407,63 @@ describe("useUpdateConversationModelMutation", () => {
     ).toHaveLength(1);
   });
 
+  it("reconciles when an older pending mutation fails after the newer failure rolled back", async () => {
+    const resolveOlderError = deferNextModelResponse("gpt-5.1-mini");
+    const resolveNewerError = deferNextModelResponse("deepseek-ai/DeepSeek-V3.2");
+    const qc = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    qc.setQueryData(queryKeys.detail("thr_1"), existingConversation);
+    const originalInvalidateQueries = qc.invalidateQueries.bind(qc);
+    const invalidatedDetailKeys: Array<readonly unknown[]> = [];
+    qc.invalidateQueries = ((filters) => {
+      if (filters?.queryKey) {
+        invalidatedDetailKeys.push(filters.queryKey);
+      }
+      return originalInvalidateQueries(filters);
+    }) as typeof qc.invalidateQueries;
+    const { result } = renderHook(() => useUpdateConversationModelMutation(), {
+      wrapper: wrapper(qc),
+    });
+
+    result.current.mutate({ id: "thr_1", model: "gpt-5.1-mini" });
+    await waitFor(() =>
+      expect(
+        (qc.getQueryData(queryKeys.detail("thr_1")) as Conversation).model,
+      ).toBe("gpt-5.1-mini"),
+    );
+
+    result.current.mutate({
+      id: "thr_1",
+      model: "deepseek-ai/DeepSeek-V3.2",
+    });
+    await waitFor(() =>
+      expect(
+        (qc.getQueryData(queryKeys.detail("thr_1")) as Conversation).model,
+      ).toBe("deepseek-ai/DeepSeek-V3.2"),
+    );
+
+    resolveNewerError(
+      new Response(JSON.stringify({ error: "newer failed" }), { status: 500 }),
+    );
+    await waitFor(() =>
+      expect(
+        (qc.getQueryData(queryKeys.detail("thr_1")) as Conversation).model,
+      ).toBe("gpt-5.1-mini"),
+    );
+    expect(invalidatedDetailKeys).toEqual([queryKeys.detail("thr_1")]);
+
+    resolveOlderError(
+      new Response(JSON.stringify({ error: "older failed" }), { status: 500 }),
+    );
+    await waitFor(() =>
+      expect(invalidatedDetailKeys).toEqual([
+        queryKeys.detail("thr_1"),
+        queryKeys.detail("thr_1"),
+      ]),
+    );
+  });
+
   it("does not let a delayed stale onMutate overwrite a newer optimistic model", async () => {
     deferNextModelResponse("gpt-5.1-mini");
     deferNextModelResponse("deepseek-ai/DeepSeek-V3.2");
