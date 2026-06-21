@@ -27,6 +27,7 @@ import {
   useArchiveConversationMutation,
   useConversation,
   useMessages,
+  useUpdateConversationModelMutation,
 } from "@/lib/data/queries";
 import {
   getProvider,
@@ -37,6 +38,7 @@ import {
   buildProviderRunOptions,
   type TaskRunOptions,
 } from "@/features/task/providerRunOptions";
+import { resolveThreadProviderSelection } from "@/features/task/threadModelSelection";
 
 function touchedFileToPreview(f: TouchedFile): MockFile {
   const lower = f.relativePath.toLowerCase();
@@ -85,6 +87,22 @@ export function TaskView() {
   // (setHistorical → state change → re-render → new [] → effect → …).
   const messagesQuery = useMessages(activeTaskId);
   const conversationQuery = useConversation(activeTaskId);
+  const updateConversationModel = useUpdateConversationModelMutation();
+  const effectiveProviderSelection = useMemo(
+    () =>
+      resolveThreadProviderSelection({
+        conversationModel: conversationQuery.data?.model ?? null,
+        enabledModels: providerQuery.data?.enabledModels ?? [],
+        defaultSelection: providerQuery.data?.defaultSelection ?? null,
+        localSelection: providerSelection,
+      }),
+    [
+      conversationQuery.data?.model,
+      providerQuery.data?.enabledModels,
+      providerQuery.data?.defaultSelection,
+      providerSelection,
+    ],
+  );
   const activeRun = useActiveRunForThread(activeTaskId);
 
   // ChatRuntime per threadId. send/cancel/state come from here.
@@ -318,12 +336,31 @@ export function TaskView() {
   // error state. This is the client half of the backend's one-run-per-thread
   // guard — the composer's busy-gating prevents it in the common case, so this
   // only fires on races / multi-window.
+  const handleProviderSelectionChange = useCallback(
+    (selection: ProviderModelSelection) => {
+      const previousSelection = effectiveProviderSelection;
+      // 先更新本地选择，让输入区和后续 run 立即使用新模型；PATCH 失败时回滚。
+      // 已经启动的 run 不撤销，切换只影响之后的发送/重试。
+      setProviderSelection(selection);
+      if (!activeTaskId) return;
+      updateConversationModel.mutate(
+        { id: activeTaskId, model: selection.modelId },
+        {
+          onError: () => {
+            setProviderSelection(previousSelection);
+          },
+        },
+      );
+    },
+    [activeTaskId, effectiveProviderSelection, updateConversationModel],
+  );
+
   const sendOrQueue = useCallback(
     (text: string) => {
       void (async () => {
         const runOptions = await buildRunOptions({
           permissionMode,
-          providerSelection,
+          providerSelection: effectiveProviderSelection,
           approvalRules,
         });
         await send(text, runOptions);
@@ -331,7 +368,14 @@ export function TaskView() {
         if (e instanceof RunInProgressError) queue.add(text);
       });
     },
-    [send, permissionMode, providerSelection, queue.add, approvalRules, buildRunOptions],
+    [
+      send,
+      permissionMode,
+      effectiveProviderSelection,
+      queue.add,
+      approvalRules,
+      buildRunOptions,
+    ],
   );
 
   // "Busy" = streaming OR HITL-paused OR a server-started run is in flight.
@@ -496,7 +540,7 @@ export function TaskView() {
                 void (async () => {
                   const runOptions = await buildRunOptions({
                     permissionMode,
-                    providerSelection,
+                    providerSelection: effectiveProviderSelection,
                     approvalRules,
                   });
                   await regenerate(fromMessageId, runOptions);
@@ -545,9 +589,8 @@ export function TaskView() {
               />
               <TaskMessageInput
                 threadId={activeTaskId}
-                modelLocked={viewMessages.length > 0}
-                providerSelection={providerSelection}
-                onProviderSelectionChange={setProviderSelection}
+                providerSelection={effectiveProviderSelection}
+                onProviderSelectionChange={handleProviderSelectionChange}
                 onSend={(text) => {
                   queue.clearUserCancelled();
                   sendOrQueue(text);

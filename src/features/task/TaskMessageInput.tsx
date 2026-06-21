@@ -48,8 +48,6 @@ interface TaskMessageInputProps {
   onStop?: () => void;
   /** True while the run is in flight. */
   streaming?: boolean;
-  /** Lock the model picker — the session has started, model is fixed. */
-  modelLocked?: boolean;
   providerSelection: ProviderModelSelection | null;
   onProviderSelectionChange: (selection: ProviderModelSelection) => void;
 }
@@ -61,7 +59,6 @@ export function TaskMessageInput({
   onOverride,
   onStop,
   streaming = false,
-  modelLocked = false,
   providerSelection,
   onProviderSelectionChange,
 }: TaskMessageInputProps) {
@@ -178,8 +175,6 @@ export function TaskMessageInput({
           </PromptInputTools>
           <PromptInputTools>
             <ProviderModelPicker
-              disabled={modelLocked}
-              disabledReason={t("task.input.modelLocked")}
               value={providerSelection}
               onChange={onProviderSelectionChange}
             />
