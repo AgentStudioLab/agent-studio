@@ -133,6 +133,7 @@ export interface ScheduledRun {
     | "completed"
     | "error"
     | "cancelled"
+    | "awaiting_user"
     | "awaiting_approval";
   lastRunId: string | null;
   createdAt: number;

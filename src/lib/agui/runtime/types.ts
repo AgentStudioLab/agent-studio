@@ -43,10 +43,9 @@ export interface ToolCallView {
 /**
  * Notice block reasons drive the UI affordance attached to "已被用户中止":
  *   - "user"            (default): user pressed Stop / denied a tool. No CTA.
- *   - "process_restart": the sidecar process exited while an HITL approval
- *     was pending — the in-memory deferred is gone and the run was reconciled
- *     to cancelled on next boot. Frontend renders a "继续上次任务" button so
- *     the user can resume via a fresh prompt (SDK session id replays context).
+ *   - "process_restart": sidecar 进程在等待用户处理时退出；内存中的 deferred
+ *     已丢失，重启后 run 会被归并为 cancelled。前端展示“继续上次任务”，让用户
+ *     通过新 prompt 续上上下文（SDK session id 会重放历史）。
  */
 export type NoticeReason = "user" | "process_restart";
 

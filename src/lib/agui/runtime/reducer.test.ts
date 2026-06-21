@@ -73,6 +73,27 @@ describe("reducer — RUN_STARTED captures runStartedAt", () => {
   });
 });
 
+describe("reducer — process restart notice", () => {
+  it("uses neutral waiting copy for process_restart", () => {
+    const buf = new Map<string, string>();
+    const next = applyEvent(
+      createInitialState(),
+      {
+        type: "RUN_ERROR",
+        code: "CANCELLED",
+        reason: "process_restart",
+        message: "process restart",
+      },
+      buf,
+    );
+    const turn = next.liveMessages[0];
+    if (!turn || turn.role !== "assistant") throw new Error("expected assistant notice");
+    const notice = turn.blocks[0];
+    if (!notice || notice.kind !== "notice") throw new Error("expected notice");
+    expect(notice.content).toBe("上次等待用户时应用被关闭，agent 已停止");
+  });
+});
+
 describe("reducer — CUSTOM file.side_effects updates ToolCallView", () => {
   function makeStateWithBashCall(toolCallId: string): ChatState {
     const buf = new Map<string, string>();

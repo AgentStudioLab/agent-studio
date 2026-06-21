@@ -10,8 +10,18 @@
 import { useCallback, useMemo, useSyncExternalStore } from "react";
 import type { ChatState, RunErrorCode, RetryState } from "../runtime/types";
 
+export type WaitingReason = "tool_approval" | "ask_user" | "unknown";
+
 export interface RunStatus {
-  status: "idle" | "running" | "completed" | "error" | "cancelled" | "awaiting_approval";
+  status:
+    | "idle"
+    | "running"
+    | "completed"
+    | "error"
+    | "cancelled"
+    | "awaiting_user"
+    | "awaiting_approval";
+  waitingReason?: WaitingReason;
   errorCode?: RunErrorCode;
   errorMessage?: string;
   retry?: RetryState;
@@ -35,13 +45,16 @@ export function useRunStatus(runtime: RuntimeLike): RunStatus {
     const isAuthError = code === "AUTH_FAILED";
     const isRetryable =
       code === "RATE_LIMIT" || code === "UPSTREAM_5XX" || code === "EXECUTION_ERROR";
+    const firstInterrupt = state.pendingInterrupts[0];
+    const waitingReason = firstInterrupt?.reason ?? undefined;
     let status: RunStatus["status"] = "idle";
     if (state.isRunning) status = "running";
     else if (code) status = "error";
-    else if (state.pendingInterrupts.length > 0) status = "awaiting_approval";
+    else if (firstInterrupt) status = "awaiting_user";
 
     return {
       status,
+      waitingReason,
       errorCode: code,
       errorMessage: state.error ?? undefined,
       retry: state.retry,
