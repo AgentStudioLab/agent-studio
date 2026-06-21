@@ -40,6 +40,11 @@ import {
 } from "@/features/task/providerRunOptions";
 import { resolveThreadProviderSelection } from "@/features/task/threadModelSelection";
 
+type ProviderSelectionMutationState = {
+  selection: ProviderModelSelection;
+  status: "pending" | "success" | "failed";
+};
+
 function touchedFileToPreview(f: TouchedFile): MockFile {
   const lower = f.relativePath.toLowerCase();
   let type: MockFile["type"] = "generic";
@@ -76,6 +81,10 @@ export function TaskView() {
     Record<string, ProviderModelSelection | null>
   >({});
   const providerSelectionChangeSeqRef = useRef<Record<string, number>>({});
+  const providerSelectionLocalSeqRef = useRef<Record<string, number>>({});
+  const providerSelectionMutationStateRef = useRef<
+    Record<string, Record<number, ProviderSelectionMutationState>>
+  >({});
   const auth = useAuth();
   const providerQuery = useQuery({
     queryKey: ["provider"],
@@ -347,38 +356,105 @@ export function TaskView() {
   const handleProviderSelectionChange = useCallback(
     (selection: ProviderModelSelection) => {
       if (!activeTaskId) return;
-      const previousSelection =
-        providerSelectionByThread[activeTaskId] ?? null;
+      const previousSelectionSeq =
+        providerSelectionLocalSeqRef.current[activeTaskId] ?? 0;
       const changeSeq =
         (providerSelectionChangeSeqRef.current[activeTaskId] ?? 0) + 1;
       providerSelectionChangeSeqRef.current = {
         ...providerSelectionChangeSeqRef.current,
         [activeTaskId]: changeSeq,
       };
+      providerSelectionLocalSeqRef.current = {
+        ...providerSelectionLocalSeqRef.current,
+        [activeTaskId]: changeSeq,
+      };
+      providerSelectionMutationStateRef.current = {
+        ...providerSelectionMutationStateRef.current,
+        [activeTaskId]: {
+          ...(providerSelectionMutationStateRef.current[activeTaskId] ?? {}),
+          [changeSeq]: { selection, status: "pending" },
+        },
+      };
+
+      const restoreProviderSelection = (targetSeq: number) => {
+        const states =
+          providerSelectionMutationStateRef.current[activeTaskId] ?? {};
+        const targetState = states[targetSeq];
+        if (targetState && targetState.status !== "failed") {
+          providerSelectionLocalSeqRef.current = {
+            ...providerSelectionLocalSeqRef.current,
+            [activeTaskId]: targetSeq,
+          };
+          setProviderSelectionByThread((current) => ({
+            ...current,
+            [activeTaskId]: targetState.selection,
+          }));
+          return;
+        }
+
+        // 连续失败时不能回到一个已失败的中间选择；向前找最近一次成功的选择，
+        // 找不到就清掉本地覆盖，让 conversation/default 的耐久状态重新生效。
+        for (let seq = targetSeq - 1; seq > 0; seq -= 1) {
+          const state = states[seq];
+          if (state?.status === "success") {
+            providerSelectionLocalSeqRef.current = {
+              ...providerSelectionLocalSeqRef.current,
+              [activeTaskId]: seq,
+            };
+            setProviderSelectionByThread((current) => ({
+              ...current,
+              [activeTaskId]: state.selection,
+            }));
+            return;
+          }
+        }
+
+        providerSelectionLocalSeqRef.current = {
+          ...providerSelectionLocalSeqRef.current,
+          [activeTaskId]: 0,
+        };
+        setProviderSelectionByThread((current) => ({
+          ...current,
+          [activeTaskId]: null,
+        }));
+      };
+
       // 先更新本地选择，让输入区和后续 run 立即使用新模型；PATCH 失败时回滚。
       // 已经启动的 run 不撤销，切换只影响之后的发送/重试。
       setProviderSelectionByThread((previous) => ({
         ...previous,
         [activeTaskId]: selection,
       }));
-      updateConversationModel.mutate(
-        { id: activeTaskId, model: selection.modelId },
-        {
-          onError: () => {
-            if (
-              providerSelectionChangeSeqRef.current[activeTaskId] !== changeSeq
-            ) {
-              return;
+      void updateConversationModel
+        .mutateAsync({ id: activeTaskId, model: selection.modelId })
+        .then(() => {
+          providerSelectionMutationStateRef.current = {
+            ...providerSelectionMutationStateRef.current,
+            [activeTaskId]: {
+              ...(providerSelectionMutationStateRef.current[activeTaskId] ??
+                {}),
+              [changeSeq]: { selection, status: "success" },
+            },
+          };
+        })
+        .catch(() => {
+          providerSelectionMutationStateRef.current = {
+            ...providerSelectionMutationStateRef.current,
+            [activeTaskId]: {
+              ...(providerSelectionMutationStateRef.current[activeTaskId] ?? {}),
+              [changeSeq]: { selection, status: "failed" },
+            },
+          };
+          if (providerSelectionChangeSeqRef.current[activeTaskId] !== changeSeq) {
+            if (providerSelectionLocalSeqRef.current[activeTaskId] === changeSeq) {
+              restoreProviderSelection(changeSeq);
             }
-            setProviderSelectionByThread((current) => ({
-              ...current,
-              [activeTaskId]: previousSelection,
-            }));
-          },
-        },
-      );
+            return;
+          }
+          restoreProviderSelection(previousSelectionSeq);
+        });
     },
-    [activeTaskId, providerSelectionByThread, updateConversationModel],
+    [activeTaskId, updateConversationModel],
   );
 
   const sendOrQueue = useCallback(

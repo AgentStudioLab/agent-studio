@@ -25,6 +25,8 @@ const regenerateMock = mock(async (_id: string, _opts?: unknown) => {});
 const runningThreadIds = new Set<string>();
 const queuedMessagesByThread = new Map<string, Array<{ id: string; text: string }>>();
 const shouldFailModelUpdates = new Set<string>();
+const delayedModelUpdateFailures = new Map<string, Promise<void>>();
+const releaseModelUpdateFailure = new Map<string, () => void>();
 const updateConversationModelMutate = mock(
   (_vars: { id: string; model: string | null }) => {},
 );
@@ -228,6 +230,7 @@ mock.module("@/lib/sidecar-client", () => ({
           parsed.model !== null &&
           shouldFailModelUpdates.has(parsed.model)
         ) {
+          await delayedModelUpdateFailures.get(parsed.model);
           return new Response(JSON.stringify({ error: "boom" }), {
             status: 500,
             headers: { "Content-Type": "application/json" },
@@ -351,6 +354,16 @@ function conversationForThread(id: string | null) {
 const { queryKeys } = require("@/lib/data/queries") as typeof import("@/lib/data/queries");
 const { TaskView } = require("./TaskView") as typeof import("./TaskView");
 
+function delayModelUpdateFailure(model: string) {
+  shouldFailModelUpdates.add(model);
+  delayedModelUpdateFailures.set(
+    model,
+    new Promise<void>((resolve) => {
+      releaseModelUpdateFailure.set(model, resolve);
+    }),
+  );
+}
+
 function ThreadNav() {
   const navigate = useNavigate();
   return (
@@ -397,6 +410,8 @@ beforeEach(() => {
   runningThreadIds.clear();
   queuedMessagesByThread.clear();
   shouldFailModelUpdates.clear();
+  delayedModelUpdateFailures.clear();
+  releaseModelUpdateFailure.clear();
   currentPickerSelection = null;
 });
 
@@ -476,6 +491,45 @@ describe("TaskView conversation model selection", () => {
           providerSelection: {
             providerId: "conn-qwen",
             modelId: "qwen/Qwen3-Coder",
+          },
+        }),
+      ),
+    );
+  });
+
+  it("rolls stacked model update failures back to the durable conversation model", async () => {
+    delayModelUpdateFailure("deepseek-ai/DeepSeek-V3.2");
+    delayModelUpdateFailure("qwen/Qwen3-Coder");
+    renderTaskView();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Switch model" }));
+    fireEvent.click(screen.getByRole("button", { name: "Switch model again" }));
+
+    releaseModelUpdateFailure.get("qwen/Qwen3-Coder")?.();
+    await waitFor(() =>
+      expect(currentPickerSelection).toEqual({
+        providerId: "conn-sf",
+        modelId: "deepseek-ai/DeepSeek-V3.2",
+      }),
+    );
+
+    releaseModelUpdateFailure.get("deepseek-ai/DeepSeek-V3.2")?.();
+    await waitFor(() =>
+      expect(currentPickerSelection).toEqual({
+        providerId: "conn-openai",
+        modelId: "gpt-5.1",
+      }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Send message" }));
+
+    await waitFor(() =>
+      expect(sendMock).toHaveBeenCalledWith(
+        "Next message",
+        expect.objectContaining({
+          providerSelection: {
+            providerId: "conn-openai",
+            modelId: "gpt-5.1",
           },
         }),
       ),
