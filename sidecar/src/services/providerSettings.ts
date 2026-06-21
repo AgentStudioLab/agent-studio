@@ -251,6 +251,12 @@ const ANTHROPIC_FULL_CAPABILITIES = {
   fileCheckpoint: true,
 } satisfies AgentRuntime["capabilities"];
 
+const CCR_FULL_CAPABILITIES = {
+  text: true,
+  tools: true,
+  fileCheckpoint: true,
+} satisfies AgentRuntime["capabilities"];
+
 const KEY = "provider";
 const DEFAULT_PROFILE_ID: ProviderProfileId = "anthropic";
 
@@ -301,6 +307,22 @@ function resolveRuntimeBaseUrl(runtime: AgentRuntime, baseUrl: string): AgentRun
     ...runtime,
     baseUrl: baseUrl.trim().replace(/\/+$/, ""),
   };
+}
+
+function ccrRoutedRuntime(): AgentRuntime {
+  return {
+    protocol: "anthropic",
+    baseUrl: "ccr://agent-studio",
+    auth: "x-api-key",
+    capabilities: CCR_FULL_CAPABILITIES,
+  };
+}
+
+function runtimeForResolvedProvider(resolved: ResolvedProvider): AgentRuntime {
+  return resolved.customProtocol === "openai-compatible" ||
+    resolved.agentRuntime.protocol === "openai-compatible"
+    ? ccrRoutedRuntime()
+    : resolved.agentRuntime;
 }
 
 function isProviderProfileId(value: string): value is ProviderProfileId {
@@ -682,12 +704,7 @@ function resolve(persisted: ProviderPreset): ResolvedProvider {
             auth: "x-api-key",
             capabilities: ANTHROPIC_FULL_CAPABILITIES,
           }
-        : {
-            protocol: "openai-compatible",
-            baseUrl: normalizeOpenAICompatibleBaseUrl(persisted.baseUrl),
-            auth: "bearer",
-            capabilities: OPENAI_TEXT_CAPABILITIES,
-          };
+        : ccrRoutedRuntime();
     return {
       presetId: persisted.id,
       presetName: persisted.name,
@@ -740,10 +757,17 @@ function resolve(persisted: ProviderPreset): ResolvedProvider {
     label: builtIn.label,
     baseUrl,
     apiKey: persisted.apiKey,
+    customProtocol:
+      builtIn.agentRuntime.protocol === "openai-compatible"
+        ? "openai-compatible"
+        : undefined,
     models: activeRemoteModels.length > 0 ? activeRemoteModels : builtIn.models,
     remoteModelsFetchedAt,
     selectedModelId: persisted.selectedModelId,
-    agentRuntime: resolveRuntimeBaseUrl(builtIn.agentRuntime, baseUrl),
+    agentRuntime:
+      builtIn.agentRuntime.protocol === "openai-compatible"
+        ? ccrRoutedRuntime()
+        : resolveRuntimeBaseUrl(builtIn.agentRuntime, baseUrl),
     supportsRemoteModels: builtIn.supportsRemoteModels,
     compatibilityNote: builtIn.compatibilityNote,
   };
@@ -753,6 +777,7 @@ function resolveConnection(connection: ProviderConnection): ResolvedProviderConn
   const resolved = resolve(connectionToPreset(connection));
   return {
     ...resolved,
+    agentRuntime: runtimeForResolvedProvider(resolved),
     providerId: connection.id,
     providerName: connection.name,
     managed: false,

@@ -897,7 +897,7 @@ describe("providerSettings", () => {
     });
   });
 
-  it("resolves SiliconFlow runtime through its OpenAI-compatible /v1 base URL", () => {
+  it("resolves SiliconFlow runtime through CCR while preserving upstream base URL", () => {
     const settings = createProviderSettings(makeDb(), {});
 
     settings.update({
@@ -909,13 +909,14 @@ describe("providerSettings", () => {
     const current = settings.current();
     expect(current.baseUrl).toBe("https://api.siliconflow.cn/v1");
     expect(current.agentRuntime).toMatchObject({
-      protocol: "openai-compatible",
-      baseUrl: "https://api.siliconflow.cn/v1",
-      auth: "bearer",
+      protocol: "anthropic",
+      baseUrl: "ccr://agent-studio",
+      auth: "x-api-key",
     });
+    expect(current.customProtocol).toBe("openai-compatible");
   });
 
-  it("resolves OpenAI-compatible runtime for OpenAI providers", () => {
+  it("resolves OpenAI-compatible runtime through CCR for OpenAI providers", () => {
     const settings = createProviderSettings(makeDb(), {});
 
     settings.update({
@@ -925,13 +926,14 @@ describe("providerSettings", () => {
     });
 
     expect(settings.current().agentRuntime).toMatchObject({
-      protocol: "openai-compatible",
-      baseUrl: "https://api.openai.com/v1",
-      auth: "bearer",
+      protocol: "anthropic",
+      baseUrl: "ccr://agent-studio",
+      auth: "x-api-key",
     });
+    expect(settings.current().customProtocol).toBe("openai-compatible");
   });
 
-  it("normalizes custom baseUrl as OpenAI-compatible runtime for custom providers", () => {
+  it("resolves custom OpenAI-compatible providers through CCR", () => {
     const settings = createProviderSettings(makeDb(), {});
 
     settings.update({
@@ -941,17 +943,49 @@ describe("providerSettings", () => {
     });
 
     expect(settings.current().agentRuntime).toMatchObject({
-      protocol: "openai-compatible",
-      baseUrl: "https://gateway.example/v1",
-      auth: "bearer",
+      protocol: "anthropic",
+      baseUrl: "ccr://agent-studio",
+      auth: "x-api-key",
     });
+    expect(settings.current().baseUrl).toBe("https://gateway.example");
 
     settings.update({ baseUrl: "https://gateway.example/v1" });
 
     expect(settings.current().agentRuntime).toMatchObject({
-      protocol: "openai-compatible",
-      baseUrl: "https://gateway.example/v1",
-      auth: "bearer",
+      protocol: "anthropic",
+      baseUrl: "ccr://agent-studio",
+      auth: "x-api-key",
     });
+    expect(settings.current().baseUrl).toBe("https://gateway.example/v1");
+  });
+
+  it("resolves OpenAI-compatible selections as CCR-routed Anthropic runtime", () => {
+    const state = createProviderSettings(makeDb(), {});
+    const conn = state.createConnection({
+      name: "OpenAI Main",
+      profileId: "openai",
+      baseUrl: "https://api.openai.com/v1",
+      apiKey: "sk-openai",
+    });
+    state.updateConnection(conn.providerId, {
+      remoteModels: [
+        { id: "gpt-5.1", displayName: "GPT-5.1", description: "Remote model" },
+      ],
+      remoteModelsProviderId: "openai",
+      remoteModelsBaseUrl: "https://api.openai.com/v1",
+      remoteModelsFetchedAt: "2026-06-21T00:00:00.000Z",
+    });
+    state.setEnabledModels(conn.providerId, ["gpt-5.1"], "gpt-5.1");
+
+    const resolved = state.resolveSelection({
+      providerId: conn.providerId,
+      modelId: "gpt-5.1",
+    });
+
+    expect(resolved.agentRuntime.protocol).toBe("anthropic");
+    expect(resolved.agentRuntime.baseUrl).toBe("ccr://agent-studio");
+    expect(resolved.agentRuntime.auth).toBe("x-api-key");
+    expect(resolved.modelId).toBe("gpt-5.1");
+    expect(resolved.customProtocol).toBe("openai-compatible");
   });
 });

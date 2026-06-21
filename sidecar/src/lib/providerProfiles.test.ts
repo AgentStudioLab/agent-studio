@@ -87,7 +87,7 @@ describe("providerProfiles", () => {
     });
   });
 
-  it("configures SiliconFlow model list and runtime as OpenAI-compatible", () => {
+  it("configures SiliconFlow model list and upstream protocol as OpenAI-compatible", () => {
     const cn = getBuiltInProfile("siliconflow-cn");
     const global = getBuiltInProfile("siliconflow");
 
@@ -120,7 +120,7 @@ describe("providerProfiles", () => {
     });
   });
 
-  it("configures OpenAI-compatible providers with OpenAI text runtime", () => {
+  it("configures OpenAI-compatible providers with upstream protocol metadata", () => {
     const openai = getBuiltInProfile("openai");
     const dashscope = getBuiltInProfile("dashscope");
 
@@ -141,6 +141,14 @@ describe("providerProfiles", () => {
       tools: false,
       fileCheckpoint: false,
     });
+  });
+
+  it("describes OpenAI-compatible runtime convergence through CCR", () => {
+    const openai = getBuiltInProfile("openai");
+
+    expect(openai?.compatibilityNote).toBe(
+      "OpenAI-compatible providers run through Agent Studio's managed Claude Code Router so they can share the Claude Agent SDK runtime. Tool reliability still depends on the selected upstream model.",
+    );
   });
 
   it("keeps a curated fallback model list for every built-in provider", () => {

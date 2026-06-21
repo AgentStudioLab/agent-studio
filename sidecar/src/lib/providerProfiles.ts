@@ -79,7 +79,7 @@ type ProviderProfileInput =
     agentRuntime?: AgentRuntime;
   };
 const RUNTIME_COMPATIBILITY_NOTE =
-  "OpenAI-compatible runtime currently supports text streaming only; tool calls and file rewind are not connected yet.";
+  "OpenAI-compatible providers run through Agent Studio's managed Claude Code Router so they can share the Claude Agent SDK runtime. Tool reliability still depends on the selected upstream model.";
 
 const ANTHROPIC_FULL_CAPABILITIES: AgentRuntimeCapabilities = {
   text: true,
