@@ -99,7 +99,10 @@ function applyTaskUpdate(tasks: Map<string, AgentTask>, tc: ToolCallView, now: n
   // 最稳定的变更来源，因此先按 args 应用，再用 result.task 补齐 SDK 回传字段。
   const result = asRecord(parseToolResult(tc.result));
   const resultTask = asRecord(result?.task);
-  const deleted = booleanField(args, "deleted") ?? booleanField(resultTask, "deleted");
+  const deleted =
+    stringField(args, "status") === "deleted" ||
+    booleanField(args, "deleted") === true ||
+    booleanField(resultTask, "deleted") === true;
   if (deleted) {
     tasks.delete(id);
     return;

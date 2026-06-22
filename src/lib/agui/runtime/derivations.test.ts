@@ -87,6 +87,27 @@ describe("deriveAgentTasks", () => {
       },
     ]);
   });
+
+  it("removes deleted tasks from TaskUpdate tool history when no snapshot exists", () => {
+    const state: ChatState = {
+      ...createInitialState(),
+      historicalMessages: [
+        taskToolCallBlock(
+          "tc_create",
+          "TaskCreate",
+          { subject: "写 normalizer" },
+          JSON.stringify({ task: { id: "task_1", subject: "写 normalizer" } }),
+        ),
+        taskToolCallBlock(
+          "tc_delete",
+          "TaskUpdate",
+          { taskId: "task_1", status: "deleted" },
+          JSON.stringify({ success: true, taskId: "task_1", updatedFields: ["status"] }),
+        ),
+      ],
+    };
+    expect(deriveAgentTasks(state)).toEqual([]);
+  });
 });
 
 function fileToolCall(
