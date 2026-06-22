@@ -55,6 +55,22 @@ const ASK_USER_PROMPT_GUIDANCE = [
   "- Do not interrupt for obvious defaults or low-impact details; make a reasonable assumption instead.",
 ].join("\n");
 
+export const DEFAULT_TASK_TOOLS = [
+  "TaskCreate",
+  "TaskGet",
+  "TaskUpdate",
+  "TaskList",
+] as const;
+
+const TASK_TOOL_PROMPT_GUIDANCE = [
+  "Task tracking guidance:",
+  "- For non-trivial multi-step work, create and maintain a short task list with TaskCreate and TaskUpdate.",
+  "- Create tasks early, keep them concrete, and update status whenever progress changes.",
+  "- Keep at most one task in_progress at a time.",
+  "- Mark completed work as completed before the final response.",
+  "- Use TaskList or TaskGet only when you need to inspect or resync current task state.",
+].join("\n");
+
 export interface ClaudeProviderOptions {
   /**
    * API key required by claude-agent-sdk. Forwarded through `options.env`
@@ -219,6 +235,7 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
       ...(opts.resolveAllowedTools
         ? opts.resolveAllowedTools(ctx.threadId)
         : opts.allowedTools ?? []),
+      ...DEFAULT_TASK_TOOLS,
       // The in-process MCP tools aren't in the user's built-in allow-list, so
       // the SDK would never offer them unless we add them here explicitly. The
       // remember tool is agent-scoped — only on a bound run.
@@ -250,6 +267,10 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
       input: Record<string, unknown>,
       sdkOpts,
     ) => {
+      if ((DEFAULT_TASK_TOOLS as readonly string[]).includes(toolName)) {
+        return { behavior: "allow" as const, updatedInput: input };
+      }
+
       // AskUserQuestion is a form, not a tool approval. Sandbox doesn't apply
       // (no fs access), and act-without-asking is irrelevant — the agent
       // explicitly asked for user input, so we MUST surface the form even
@@ -357,7 +378,13 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
     // instructions, so a user who asked for another language still wins.
     const localeDirective = languageDirective(ctxRun.locale);
     const combinedAppend =
-      [appendPrompt, ctxRun.appendContext, ASK_USER_PROMPT_GUIDANCE, localeDirective]
+      [
+        appendPrompt,
+        ctxRun.appendContext,
+        ASK_USER_PROMPT_GUIDANCE,
+        TASK_TOOL_PROMPT_GUIDANCE,
+        localeDirective,
+      ]
         .filter((s): s is string => typeof s === "string" && s.trim().length > 0)
         .join("\n\n") || null;
 

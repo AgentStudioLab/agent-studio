@@ -3,6 +3,7 @@ import type { Database } from "bun:sqlite";
 export const DEFAULT_ALLOWED_TOOLS: string[] = [
   "Bash", "Read", "Write", "Edit",
   "Glob", "Grep", "WebFetch", "WebSearch", "Task",
+  "TaskCreate", "TaskGet", "TaskUpdate", "TaskList",
 ];
 
 const KEY = "allowedTools";
