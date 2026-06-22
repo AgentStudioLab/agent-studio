@@ -164,7 +164,7 @@ function applyUpdateResult(
   if (!pending || output?.success !== true) return snapshot;
 
   const resultTaskId = readString(output.taskId);
-  if (resultTaskId && resultTaskId !== pending.taskId) return snapshot;
+  if (resultTaskId !== pending.taskId) return snapshot;
 
   const { [result.toolCallId]: _removed, ...pendingUpdates } =
     snapshot.pendingUpdates;
@@ -273,9 +273,9 @@ function parseUpdateInput(input: unknown): PendingUpdate | null {
   return {
     taskId,
     ...(status ? { status } : {}),
-    ...(subject ? { subject } : {}),
-    ...(description ? { description } : {}),
-    ...(activeForm ? { activeForm } : {}),
+    ...(subject !== null ? { subject } : {}),
+    ...(description !== null ? { description } : {}),
+    ...(activeForm !== null ? { activeForm } : {}),
   };
 }
 

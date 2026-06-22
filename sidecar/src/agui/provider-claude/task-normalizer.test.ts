@@ -93,6 +93,101 @@ describe("task normalizer", () => {
     expect(snapshot.tasks).toEqual([]);
   });
 
+  it("does not mutate a task when TaskUpdate result is missing taskId", () => {
+    let snapshot = createTaskSnapshot(1000);
+    snapshot = handleTaskToolCall(snapshot, {
+      toolCallId: "tc_create",
+      toolName: "TaskCreate",
+      input: { subject: "保留任务", description: "不能被误改" },
+    });
+    snapshot = handleTaskToolResult(snapshot, {
+      toolCallId: "tc_create",
+      toolName: "TaskCreate",
+      result: { task: { id: "task_1", subject: "保留任务" } },
+    });
+    snapshot = handleTaskToolCall(snapshot, {
+      toolCallId: "tc_update_missing_id",
+      toolName: "TaskUpdate",
+      input: { taskId: "task_1", status: "completed" },
+    });
+    snapshot = handleTaskToolResult(snapshot, {
+      toolCallId: "tc_update_missing_id",
+      toolName: "TaskUpdate",
+      result: { success: true, updatedFields: ["status"] },
+    });
+    expect(snapshot.tasks[0]).toMatchObject({
+      id: "task_1",
+      status: "pending",
+      description: "不能被误改",
+    });
+  });
+
+  it("does not mutate a task when TaskUpdate result taskId is mismatched", () => {
+    let snapshot = createTaskSnapshot(1000);
+    snapshot = handleTaskToolCall(snapshot, {
+      toolCallId: "tc_create",
+      toolName: "TaskCreate",
+      input: { subject: "目标任务", description: "只能改自己" },
+    });
+    snapshot = handleTaskToolResult(snapshot, {
+      toolCallId: "tc_create",
+      toolName: "TaskCreate",
+      result: { task: { id: "task_1", subject: "目标任务" } },
+    });
+    snapshot = handleTaskToolCall(snapshot, {
+      toolCallId: "tc_update_mismatch",
+      toolName: "TaskUpdate",
+      input: { taskId: "task_1", status: "completed" },
+    });
+    snapshot = handleTaskToolResult(snapshot, {
+      toolCallId: "tc_update_mismatch",
+      toolName: "TaskUpdate",
+      result: { success: true, taskId: "task_2", updatedFields: ["status"] },
+    });
+    expect(snapshot.tasks[0]).toMatchObject({
+      id: "task_1",
+      status: "pending",
+      description: "只能改自己",
+    });
+  });
+
+  it("updates TaskUpdate string fields when the new value is empty", () => {
+    let snapshot = createTaskSnapshot(1000);
+    snapshot = handleTaskToolCall(snapshot, {
+      toolCallId: "tc_create",
+      toolName: "TaskCreate",
+      input: {
+        subject: "清理表单",
+        description: "旧描述",
+        activeForm: "正在清理",
+      },
+    });
+    snapshot = handleTaskToolResult(snapshot, {
+      toolCallId: "tc_create",
+      toolName: "TaskCreate",
+      result: { task: { id: "task_1", subject: "清理表单" } },
+    });
+    snapshot = handleTaskToolCall(snapshot, {
+      toolCallId: "tc_clear",
+      toolName: "TaskUpdate",
+      input: {
+        taskId: "task_1",
+        description: "",
+        activeForm: "",
+      },
+    });
+    snapshot = handleTaskToolResult(snapshot, {
+      toolCallId: "tc_clear",
+      toolName: "TaskUpdate",
+      result: { success: true, taskId: "task_1", updatedFields: ["description", "activeForm"] },
+    });
+    expect(snapshot.tasks[0]).toMatchObject({
+      id: "task_1",
+      description: "",
+      activeForm: "",
+    });
+  });
+
   it("resyncs from TaskList result", () => {
     const snapshot = handleTaskToolResult(createTaskSnapshot(2000), {
       toolCallId: "tc_list",
