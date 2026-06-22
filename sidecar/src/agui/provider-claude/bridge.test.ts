@@ -370,6 +370,70 @@ describe("bridge — assistant message persistence", () => {
   });
 });
 
+describe("bridge — agent task snapshots", () => {
+  it("emits CUSTOM agent.tasks after TaskCreate result", async () => {
+    const sdkStream = (async function* () {
+      yield { type: "system", subtype: "init", session_id: "s1" };
+      yield {
+        type: "assistant",
+        message: {
+          content: [
+            {
+              type: "tool_use",
+              id: "task_create_1",
+              name: "TaskCreate",
+              input: {
+                subject: "实现任务面板",
+                description: "输入框上方展示 tasks",
+                activeForm: "实现任务面板",
+              },
+            },
+          ],
+        },
+      };
+      yield {
+        type: "user",
+        message: {
+          role: "user",
+          content: [
+            {
+              type: "tool_result",
+              tool_use_id: "task_create_1",
+              content: JSON.stringify({
+                task: { id: "task_1", subject: "实现任务面板" },
+              }),
+            },
+          ],
+        },
+      };
+      yield { type: "result", subtype: "success", is_error: false, result: "" };
+    })();
+
+    const events = await drain(
+      claudeSdkToAgui(sdkStream as AsyncIterable<SDKMessage>, {
+        threadId: "t",
+        runId: "r",
+      }),
+    );
+
+    const taskEvent = events.find(
+      (event) => event.type === "CUSTOM" && event.name === "agent.tasks",
+    );
+    expect(taskEvent?.value).toEqual({
+      tasks: [
+        {
+          id: "task_1",
+          subject: "实现任务面板",
+          description: "输入框上方展示 tasks",
+          activeForm: "实现任务面板",
+          status: "pending",
+          updatedAt: expect.any(Number),
+        },
+      ],
+    });
+  });
+});
+
 describe("bridge — user prompt uuid capture (regenerate checkpoint)", () => {
   // With `extraArgs: { 'replay-user-messages': null }`, the SDK re-delivers
   // user prompts as SDKUserMessageReplay (isReplay:true) carrying the uuid
