@@ -13,6 +13,7 @@ import {
   moveConversationToAgent,
   renameConversation,
   togglePin,
+  updateConversationModel,
 } from "./conversations";
 
 export const queryKeys = {
@@ -23,6 +24,9 @@ export const queryKeys = {
   messages: (conversationId: string) =>
     ["conversations", conversationId, "messages"] as const,
 };
+
+let conversationModelMutationSeq = 0;
+const latestConversationModelMutation = new Map<string, number>();
 
 export function useConversation(id: string | null) {
   return useQuery({
@@ -122,6 +126,58 @@ export function useDeleteConversationMutation() {
   return useMutation({
     mutationFn: (id: string) => deleteConversation(id),
     onSuccess: () => invalidateConversationLists(qc),
+  });
+}
+
+export function useUpdateConversationModelMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { id: string; model: string | null }) =>
+      updateConversationModel(vars.id, vars.model),
+    onMutate: async (vars) => {
+      const key = queryKeys.detail(vars.id);
+      const mutationId = ++conversationModelMutationSeq;
+      latestConversationModelMutation.set(vars.id, mutationId);
+      await qc.cancelQueries({ queryKey: key });
+      if (latestConversationModelMutation.get(vars.id) !== mutationId) {
+        return { previous: undefined, mutationId };
+      }
+      const previous =
+        qc.getQueryData<Awaited<ReturnType<typeof getConversation>>>(key);
+      qc.setQueryData(
+        key,
+        (current: Awaited<ReturnType<typeof getConversation>> | undefined) =>
+          current ? { ...current, model: vars.model } : current,
+      );
+      return { previous, mutationId };
+    },
+    onError: (_err, vars, context) => {
+      if (
+        context?.previous &&
+        latestConversationModelMutation.get(vars.id) === context.mutationId
+      ) {
+        qc.setQueryData(queryKeys.detail(vars.id), context.previous);
+      }
+    },
+    onSuccess: (updated, vars, context) => {
+      if (
+        context &&
+        latestConversationModelMutation.get(vars.id) === context.mutationId
+      ) {
+        qc.setQueryData(queryKeys.detail(updated.id), updated);
+      }
+    },
+    onSettled: (_data, _error, vars, context) => {
+      const latest = latestConversationModelMutation.get(vars.id);
+      if (latest === context?.mutationId) {
+        latestConversationModelMutation.delete(vars.id);
+        qc.invalidateQueries({ queryKey: queryKeys.detail(vars.id) });
+        return;
+      }
+      if (latest === undefined) {
+        qc.invalidateQueries({ queryKey: queryKeys.detail(vars.id) });
+      }
+    },
   });
 }
 

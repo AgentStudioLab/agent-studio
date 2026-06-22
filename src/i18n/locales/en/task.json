@@ -249,7 +249,6 @@
     "placeholder": "Write a message...",
     "ask": "Ask",
     "legacyModel": "Legacy Model",
-    "modelLocked": "The model can't be changed once a session has started. Start a new session to use a different model.",
     "disclaimer": "Agent Studio is AI and can make mistakes. Please double-check responses.",
     "models": {
       "opus": { "displayName": "Opus 4.7", "description": "Most capable for ambitious work" },

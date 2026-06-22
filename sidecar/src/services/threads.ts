@@ -195,6 +195,15 @@ export class ThreadService {
     return this.get(id)!;
   }
 
+  /** Update the conversation default model. null means this thread falls back to
+   *  the global provider default when starting a run. */
+  updateModel(id: string, model: string | null): Thread {
+    this.db
+      .prepare("UPDATE conversations SET model = ?, updated_at = ? WHERE id = ?")
+      .run(model, Date.now(), id);
+    return this.get(id)!;
+  }
+
   /** Move a conversation into / out of an agent workspace. Pass null to
    *  unbind (clears the binding; cwd handling is the route's concern). */
   updateAgentWorkspace(

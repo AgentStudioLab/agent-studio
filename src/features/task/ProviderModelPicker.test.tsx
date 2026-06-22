@@ -120,6 +120,7 @@ function renderPicker(
     providerId: "conn-openai",
     modelId: "gpt-5.1",
   },
+  persistDefault = false,
 ) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
@@ -129,6 +130,7 @@ function renderPicker(
           disabled={disabled}
           value={value}
           onChange={onChangeMock}
+          persistDefault={persistDefault}
         />
       </TooltipProvider>
     </QueryClientProvider>,
@@ -204,8 +206,22 @@ describe("ProviderModelPicker", () => {
     );
   });
 
-  it("persists the selected provider model as the next default", async () => {
+  it("does not persist the selected model globally by default", async () => {
     renderPicker();
+
+    fireEvent.click(await screen.findByText("DeepSeek V3.2"));
+
+    await waitFor(() =>
+      expect(onChangeMock).toHaveBeenCalledWith({
+        providerId: "conn-sf",
+        modelId: "deepseek-ai/DeepSeek-V3.2",
+      }),
+    );
+    expect(setDefaultProviderSelectionMock).not.toHaveBeenCalled();
+  });
+
+  it("persists the selected provider model as the next default when requested", async () => {
+    renderPicker(false, { providerId: "conn-openai", modelId: "gpt-5.1" }, true);
 
     fireEvent.click(await screen.findByText("DeepSeek V3.2"));
 

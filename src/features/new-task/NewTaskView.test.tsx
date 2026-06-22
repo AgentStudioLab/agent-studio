@@ -1,11 +1,18 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { type ReactNode } from "react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
+import { type ReactNode, useState } from "react";
 import { MemoryRouter } from "react-router-dom";
 
 const shellOpen = mock(async (_url: string) => {});
 const setPendingFirstPrompt = mock(() => {});
+const createConversationRequests: RequestInit[] = [];
 
 mock.module("@tauri-apps/plugin-dialog", () => ({
   open: mock(async () => null),
@@ -21,16 +28,63 @@ mock.module("@/app/AppShellContext", () => ({
   useAppShell: () => ({ setPendingFirstPrompt }),
 }));
 
-mock.module("@/lib/data/conversations", () => ({
-  createConversation: mock(async () => ({ id: "conversation-1" })),
+mock.module("@/lib/sidecar-client", () => ({
+  fetchSidecar: mock(async () => new Response(null, { status: 204 })),
+  getSidecarInfo: mock(async () => ({ port: 0, token: "test-token" })),
+  authedFetch: mock(async (path: string, init?: RequestInit) => {
+    if (path === "/conversations" && init?.method === "POST") {
+      createConversationRequests.push(init);
+      return new Response(JSON.stringify({ id: "conversation-1" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    return new Response(JSON.stringify({ error: "unhandled" }), {
+      status: 404,
+      headers: { "Content-Type": "application/json" },
+    });
+  }),
 }));
 
-mock.module("@/lib/data/queries", () => ({
-  queryKeys: { recents: ["recents"] },
-}));
-
-mock.module("@/lib/agui/react/useChat", () => ({
-  threadStatusKey: ["thread-status"],
+mock.module("@/components/ai-elements/prompt-input", () => ({
+  PromptInput: ({
+    children,
+    onSubmit,
+  }: {
+    children: ReactNode;
+    onSubmit: (message: { text: string; files: unknown[] }) => void | Promise<void>;
+  }) => {
+    const [text, setText] = useState("");
+    return (
+      <form
+        onChange={(event) => {
+          const target = event.target;
+          if (target && "value" in target) {
+            const { value } = target;
+            if (typeof value === "string") {
+              setText(value);
+            }
+          }
+        }}
+        onSubmit={(event) => {
+          event.preventDefault();
+          void onSubmit({
+            files: [],
+            text,
+          });
+        }}
+      >
+        {children}
+      </form>
+    );
+  },
+  PromptInputButton: ({ children }: { children: ReactNode }) => (
+    <button type="button">{children}</button>
+  ),
+  PromptInputFooter: ({ children }: { children: ReactNode }) => (
+    <div>{children}</div>
+  ),
+  PromptInputSubmit: () => <button type="submit">Submit</button>,
 }));
 
 mock.module("@/features/auth/useAuth", () => ({
@@ -56,6 +110,7 @@ mock.module("@/features/composer/SlashEditor", () => ({
 }));
 
 mock.module("react-i18next", () => ({
+  initReactI18next: { type: "3rdParty", init: () => {} },
   useTranslation: () => ({
     t: (key: string) => {
       const translations: Record<string, string> = {
@@ -87,8 +142,24 @@ mock.module("react-i18next", () => ({
 
 const { NewTaskView } = require("./NewTaskView") as typeof import("./NewTaskView");
 
-function TestModelPicker() {
-  return <button type="button">Model</button>;
+function TestModelPicker({
+  onChange,
+}: {
+  onChange: (selection: { providerId: string; modelId: string }) => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() =>
+        onChange({
+          providerId: "conn-sf",
+          modelId: "deepseek-ai/DeepSeek-V3.2",
+        })
+      }
+    >
+      Model
+    </button>
+  );
 }
 
 function renderNewTaskView() {
@@ -107,6 +178,7 @@ function renderNewTaskView() {
 beforeEach(() => {
   shellOpen.mockClear();
   setPendingFirstPrompt.mockClear();
+  createConversationRequests.length = 0;
 });
 
 afterEach(() => {
@@ -174,5 +246,29 @@ describe("NewTaskView", () => {
     );
 
     expect(shellOpen).toHaveBeenCalledWith("https://www.agentstudio.chat/docs");
+  });
+
+  it("stores the selected model on the created conversation", async () => {
+    renderNewTaskView();
+
+    fireEvent.click(screen.getByRole("button", { name: "Model" }));
+    fireEvent.change(screen.getByLabelText("How can I help you today?"), {
+      target: { value: "Build the thing" },
+    });
+    fireEvent.submit(
+      screen.getByLabelText("How can I help you today?").closest("form")!,
+    );
+
+    await screen.findByRole("heading", {
+      name: "Let Agent Studio move work forward on this desktop.",
+    });
+    await waitFor(() => {
+      expect(createConversationRequests).toHaveLength(1);
+      expect(JSON.parse(String(createConversationRequests[0]?.body))).toEqual({
+        title: "New task",
+        workingDir: null,
+        model: "deepseek-ai/DeepSeek-V3.2",
+      });
+    });
   });
 });

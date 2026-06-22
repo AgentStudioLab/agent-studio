@@ -249,7 +249,6 @@
     "placeholder": "输入消息……",
     "ask": "提问",
     "legacyModel": "Legacy 模型",
-    "modelLocked": "会话开始后不能更换模型。新建会话才能使用其他模型。",
     "disclaimer": "Agent Studio 是 AI，可能会出错。请仔细核对回复。",
     "models": {
       "opus": { "displayName": "Opus 4.7", "description": "最强能力，应对硬核任务" },
