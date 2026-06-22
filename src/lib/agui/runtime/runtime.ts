@@ -20,6 +20,7 @@ import { ThinkingTimer } from "./thinking";
 import { createResumableRun } from "./sse";
 import { AGUIHttpClient, RunInProgressError, type AGUIApiOptions } from "./api";
 import { buildResumeRequest } from "./protocol";
+import { deriveAgentTasksFromMessages } from "./derivations";
 
 export interface ProviderModelSelection {
   providerId: string;
@@ -97,9 +98,18 @@ export function createChatRuntime(opts: ChatRuntimeOptions): ChatRuntime {
   });
 
   // —— 状态与订阅 ——
+  function stateFromHistoricalMessages(rawMessages: unknown[]): Pick<ChatState, "historicalMessages" | "tasks" | "hasTaskSnapshot"> {
+    const historicalMessages = buildViewMessages(rawMessages);
+    return {
+      historicalMessages,
+      tasks: deriveAgentTasksFromMessages(historicalMessages),
+      hasTaskSnapshot: false,
+    };
+  }
+
   let state: ChatState = {
     ...createInitialState(),
-    historicalMessages: buildViewMessages(opts.initialMessages ?? []),
+    ...stateFromHistoricalMessages(opts.initialMessages ?? []),
   };
   const listeners = new Set<(s: ChatState) => void>();
 
@@ -136,11 +146,17 @@ export function createChatRuntime(opts: ChatRuntimeOptions): ChatRuntime {
       if (reason === "finished") {
         // 没等待中的 interrupt 才把 live 归档进 historical
         if (s.pendingInterrupts.length === 0) {
+          const historicalMessages = [...s.historicalMessages, ...s.liveMessages];
+          const tasks = s.hasTaskSnapshot
+            ? deriveAgentTasksFromMessages([], s.liveMessages, s.tasks)
+            : deriveAgentTasksFromMessages(historicalMessages);
           next = {
             ...next,
             activeRunId: null,
-            historicalMessages: [...s.historicalMessages, ...s.liveMessages],
+            historicalMessages,
             liveMessages: [],
+            tasks,
+            hasTaskSnapshot: s.hasTaskSnapshot,
           };
           argsBuffer.clear();
         }
@@ -404,7 +420,7 @@ export function createChatRuntime(opts: ChatRuntimeOptions): ChatRuntime {
   }
 
   function setHistoricalMessages(turns: unknown[]): void {
-    setState({ historicalMessages: buildViewMessages(turns) });
+    setState(stateFromHistoricalMessages(turns));
   }
 
   function reset(initialMessages?: unknown[]): void {
@@ -416,7 +432,7 @@ export function createChatRuntime(opts: ChatRuntimeOptions): ChatRuntime {
     argsBuffer.clear();
     setState({
       ...createInitialState(),
-      historicalMessages: buildViewMessages(initialMessages ?? []),
+      ...stateFromHistoricalMessages(initialMessages ?? []),
     });
   }
 

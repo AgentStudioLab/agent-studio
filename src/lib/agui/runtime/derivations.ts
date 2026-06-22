@@ -226,14 +226,31 @@ function taskCallsInTurns(messages: MessageView[]): ToolCallView[] {
  * readbacks in chronological order to recover a best-effort display list.
  */
 export function deriveAgentTasks(state: ChatState): AgentTask[] {
-  if (state.hasTaskSnapshot) return state.tasks;
+  if (state.hasTaskSnapshot) {
+    return deriveAgentTasksFromMessages([], state.liveMessages, state.tasks);
+  }
 
+  return deriveAgentTasksFromMessages(state.historicalMessages, state.liveMessages);
+}
+
+/**
+ * Replay task tool calls directly from message views.
+ *
+ * This intentionally ignores `ChatState.hasTaskSnapshot` so runtime callers can
+ * rebuild task state after replacing history without carrying a stale live
+ * snapshot from a previous run/thread.
+ */
+export function deriveAgentTasksFromMessages(
+  historicalMessages: MessageView[],
+  liveMessages: MessageView[] = [],
+  seedTasks: AgentTask[] = [],
+): AgentTask[] {
   const calls = [
-    ...taskCallsInTurns(state.historicalMessages),
-    ...taskCallsInTurns(state.liveMessages),
+    ...taskCallsInTurns(historicalMessages),
+    ...taskCallsInTurns(liveMessages),
   ];
 
-  const tasks = new Map<string, AgentTask>();
+  const tasks = new Map(seedTasks.map((task) => [task.id, task]));
   for (const call of calls) {
     const now = Date.now();
     if (call.toolName === "TaskCreate") {

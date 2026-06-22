@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import {
   deriveAgentTasks,
+  deriveAgentTasksFromMessages,
   deriveInvokedSkills,
   deriveProgressPhases,
   deriveTouchedFiles,
@@ -83,6 +84,56 @@ describe("deriveAgentTasks", () => {
         description: "覆盖 create/update",
         activeForm: "写 normalizer",
         status: "completed",
+        updatedAt: expect.any(Number),
+      },
+    ]);
+  });
+
+  it("replays task calls from raw historical and live messages without relying on snapshot state", () => {
+    const historicalMessages = [
+      taskToolCallBlock(
+        "tc_create",
+        "TaskCreate",
+        { subject: "跨 run 任务", description: "先创建" },
+        JSON.stringify({ task: { id: "task_1", subject: "跨 run 任务" } }),
+      ),
+    ];
+    const liveMessages = [
+      taskToolCallBlock(
+        "tc_update",
+        "TaskUpdate",
+        { taskId: "task_1", status: "completed" },
+        JSON.stringify({ success: true, taskId: "task_1", updatedFields: ["status"] }),
+      ),
+    ];
+
+    expect(deriveAgentTasksFromMessages(historicalMessages, liveMessages)).toEqual([
+      {
+        id: "task_1",
+        subject: "跨 run 任务",
+        description: "先创建",
+        status: "completed",
+        updatedAt: expect.any(Number),
+      },
+    ]);
+  });
+
+  it("can surface a TaskUpdate-only history when no agent.tasks snapshot was replayed", () => {
+    const tasks = deriveAgentTasksFromMessages([
+      taskToolCallBlock(
+        "tc_update",
+        "TaskUpdate",
+        { taskId: "task_1", subject: "延迟同步任务", status: "in_progress" },
+        JSON.stringify({ success: true, taskId: "task_1", updatedFields: ["subject", "status"] }),
+      ),
+    ]);
+
+    expect(tasks).toEqual([
+      {
+        id: "task_1",
+        subject: "延迟同步任务",
+        description: "",
+        status: "in_progress",
         updatedAt: expect.any(Number),
       },
     ]);

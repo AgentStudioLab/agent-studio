@@ -8,6 +8,7 @@ import { createChatRuntime } from "./runtime";
 import type { AGUIEventLike } from "./types";
 import { applyEvent, appendInterruptedNotice } from "./reducer";
 import { createInitialState } from "./types";
+import { deriveAgentTasks } from "./derivations";
 
 function makeFakeSse(frames: string[]) {
   return mock(async (url: string | URL | Request) => {
@@ -300,6 +301,246 @@ describe("createChatRuntime — replay idempotency", () => {
     await new Promise((r) => setTimeout(r, 80));
     // Exactly one HTTP request to /events.
     expect(callCount).toBe(1);
+
+    rt.destroy();
+  });
+});
+
+describe("createChatRuntime — task history replacement", () => {
+  const taskCreateTurn = {
+    id: "assistant-create",
+    role: "assistant",
+    blocks: [
+      {
+        kind: "tool_call",
+        toolCall: {
+          id: "tc_create",
+          toolName: "TaskCreate",
+          args: { subject: "历史任务", description: "来自历史" },
+          result: JSON.stringify({ task: { id: "task_1", subject: "历史任务" } }),
+          status: "success",
+        },
+      },
+    ],
+  };
+
+  const taskUpdateTurn = {
+    id: "assistant-update",
+    role: "assistant",
+    blocks: [
+      {
+        kind: "tool_call",
+        toolCall: {
+          id: "tc_update",
+          toolName: "TaskUpdate",
+          args: { taskId: "task_1", status: "completed" },
+          result: JSON.stringify({
+            success: true,
+            taskId: "task_1",
+            updatedFields: ["status"],
+          }),
+          status: "success",
+        },
+      },
+    ],
+  };
+
+  const snapshotFrames = [
+    `id: 1\nevent: CUSTOM\ndata: ${JSON.stringify({
+      type: "CUSTOM",
+      name: "agent.tasks",
+      value: {
+        tasks: [
+          {
+            id: "stale",
+            subject: "过期快照",
+            description: "",
+            status: "completed",
+            updatedAt: 1000,
+          },
+        ],
+      },
+    })}\n\n`,
+    `id: 2\nevent: RUN_FINISHED\ndata: ${JSON.stringify({
+      type: "RUN_FINISHED",
+      threadId: "t",
+      runId: "r",
+    })}\n\n`,
+  ];
+
+  async function runtimeWithStaleSnapshot() {
+    const rt = createChatRuntime({
+      threadId: "t",
+      fetchImpl: makeFakeSse(snapshotFrames),
+    });
+    rt.attachToRun("r");
+    await new Promise((r) => setTimeout(r, 50));
+    expect(deriveAgentTasks(rt.getState())).toMatchObject([{ id: "stale" }]);
+    return rt;
+  }
+
+  it("setHistoricalMessages clears stale snapshot tasks when replacement history has no task calls", async () => {
+    const rt = await runtimeWithStaleSnapshot();
+
+    rt.setHistoricalMessages([
+      {
+        id: "assistant-text",
+        role: "assistant",
+        blocks: [{ kind: "text", id: "txt_1", content: "没有任务" }],
+      },
+    ]);
+
+    expect(rt.getState().hasTaskSnapshot).toBe(false);
+    expect(rt.getState().tasks).toEqual([]);
+    expect(deriveAgentTasks(rt.getState())).toEqual([]);
+
+    rt.destroy();
+  });
+
+  it("setHistoricalMessages replays replacement task history after a stale snapshot", async () => {
+    const rt = await runtimeWithStaleSnapshot();
+
+    rt.setHistoricalMessages([taskCreateTurn, taskUpdateTurn]);
+
+    expect(rt.getState().hasTaskSnapshot).toBe(false);
+    expect(deriveAgentTasks(rt.getState())).toMatchObject([
+      { id: "task_1", subject: "历史任务", status: "completed" },
+    ]);
+
+    rt.destroy();
+  });
+
+  it("reset initializes task fallback state from initial history instead of preserving snapshots", async () => {
+    const rt = await runtimeWithStaleSnapshot();
+
+    rt.reset([taskCreateTurn, taskUpdateTurn]);
+
+    expect(rt.getState().hasTaskSnapshot).toBe(false);
+    expect(deriveAgentTasks(rt.getState())).toMatchObject([
+      { id: "task_1", subject: "历史任务", status: "completed" },
+    ]);
+
+    rt.destroy();
+  });
+
+  it("overlays live TaskUpdate calls on a prior snapshot and keeps the result after archive", async () => {
+    const frames = [
+      `id: 1\nevent: CUSTOM\ndata: ${JSON.stringify({
+        type: "CUSTOM",
+        name: "agent.tasks",
+        value: {
+          tasks: [
+            {
+              id: "task_1",
+              subject: "跨 run 任务",
+              description: "来自上一个 run",
+              status: "pending",
+              updatedAt: 1000,
+            },
+          ],
+        },
+      })}\n\n`,
+      `id: 2\nevent: TOOL_CALL_START\ndata: ${JSON.stringify({
+        type: "TOOL_CALL_START",
+        toolCallId: "tc_update",
+        toolCallName: "TaskUpdate",
+        parentMessageId: "assistant-update",
+      })}\n\n`,
+      `id: 3\nevent: TOOL_CALL_ARGS\ndata: ${JSON.stringify({
+        type: "TOOL_CALL_ARGS",
+        toolCallId: "tc_update",
+        delta: JSON.stringify({ taskId: "task_1", status: "completed" }),
+      })}\n\n`,
+      `id: 4\nevent: TOOL_CALL_RESULT\ndata: ${JSON.stringify({
+        type: "TOOL_CALL_RESULT",
+        toolCallId: "tc_update",
+        content: JSON.stringify({ success: true, taskId: "task_1", updatedFields: ["status"] }),
+      })}\n\n`,
+      `id: 5\nevent: RUN_FINISHED\ndata: ${JSON.stringify({
+        type: "RUN_FINISHED",
+        threadId: "t",
+        runId: "r",
+      })}\n\n`,
+    ];
+    const rt = createChatRuntime({ threadId: "t", fetchImpl: makeFakeSse(frames) });
+    const snapshots: Array<ReturnType<typeof deriveAgentTasks>> = [];
+    const unsubscribe = rt.subscribe((state) => {
+      snapshots.push(deriveAgentTasks(state));
+    });
+
+    rt.attachToRun("r");
+    await new Promise((r) => setTimeout(r, 50));
+    unsubscribe();
+
+    expect(snapshots).toContainEqual([
+      {
+        id: "task_1",
+        subject: "跨 run 任务",
+        description: "来自上一个 run",
+        status: "completed",
+        updatedAt: expect.any(Number),
+      },
+    ]);
+    expect(rt.getState().hasTaskSnapshot).toBe(true);
+    expect(deriveAgentTasks(rt.getState())).toMatchObject([
+      { id: "task_1", subject: "跨 run 任务", status: "completed" },
+    ]);
+
+    rt.destroy();
+  });
+
+  it("does not replay stale historical TaskList results over a newer snapshot on archive", async () => {
+    const staleEmptyListTurn = {
+      id: "assistant-list",
+      role: "assistant",
+      blocks: [
+        {
+          kind: "tool_call",
+          toolCall: {
+            id: "tc_list",
+            toolName: "TaskList",
+            args: {},
+            result: JSON.stringify({ tasks: [] }),
+            status: "success",
+          },
+        },
+      ],
+    };
+    const frames = [
+      `id: 1\nevent: CUSTOM\ndata: ${JSON.stringify({
+        type: "CUSTOM",
+        name: "agent.tasks",
+        value: {
+          tasks: [
+            {
+              id: "task_snapshot",
+              subject: "新快照任务",
+              description: "",
+              status: "pending",
+              updatedAt: 2000,
+            },
+          ],
+        },
+      })}\n\n`,
+      `id: 2\nevent: RUN_FINISHED\ndata: ${JSON.stringify({
+        type: "RUN_FINISHED",
+        threadId: "t",
+        runId: "r",
+      })}\n\n`,
+    ];
+    const rt = createChatRuntime({
+      threadId: "t",
+      initialMessages: [staleEmptyListTurn],
+      fetchImpl: makeFakeSse(frames),
+    });
+
+    rt.attachToRun("r");
+    await new Promise((r) => setTimeout(r, 50));
+
+    expect(rt.getState().hasTaskSnapshot).toBe(true);
+    expect(deriveAgentTasks(rt.getState())).toMatchObject([
+      { id: "task_snapshot", subject: "新快照任务", status: "pending" },
+    ]);
 
     rt.destroy();
   });
