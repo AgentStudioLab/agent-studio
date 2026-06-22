@@ -61,7 +61,7 @@ export function TaskTodosTrigger({ tasks }: TaskTodosTriggerProps) {
         </PopoverTrigger>
         <PopoverContent
           align="start"
-          className="w-[min(720px,calc(100vw-32px))] p-3"
+          className="w-[min(720px,calc(100vw_-_32px))] p-3"
         >
           <PopoverHeader>
             <PopoverTitle>{t("task.todos.title")}</PopoverTitle>
