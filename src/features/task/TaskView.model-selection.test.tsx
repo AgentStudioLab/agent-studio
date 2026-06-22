@@ -67,7 +67,7 @@ mock.module("@/features/task/TaskRightPanel", () => ({
 }));
 
 mock.module("@/features/task/QueuedMessagesPanel", () => ({
-  QueuedMessagesPanel: () => null,
+  QueuedMessagesPanel: () => <div data-testid="queue-panel" />,
 }));
 
 mock.module("@/features/task/PreviewPane", () => ({
@@ -86,7 +86,7 @@ mock.module("@/features/task/TaskMessageInput", () => ({
   }) => {
     currentPickerSelection = providerSelection;
     return (
-      <div>
+      <div data-testid="message-input">
         <button
           type="button"
           onClick={() =>
@@ -126,6 +126,33 @@ mock.module("@/features/task/TaskMessageInput", () => ({
       </div>
     );
   },
+}));
+
+mock.module("react-i18next", () => ({
+  useTranslation: () => ({
+    t: (key: string, values?: Record<string, number>) => {
+      if (key === "task.todos.trigger") {
+        return `Tasks ${values?.completed ?? 0}/${values?.total ?? 0}`;
+      }
+      if (key === "task.todos.activePrefix") return "Now";
+      return key;
+    },
+  }),
+}));
+
+mock.module("@/lib/agui/react/useThreadTasks", () => ({
+  useThreadTasks: () => ({
+    tasks: [
+      {
+        id: "task_1",
+        subject: "Wire the task trigger",
+        description: "",
+        activeForm: "Wiring the task trigger",
+        status: "in_progress",
+        updatedAt: 1,
+      },
+    ],
+  }),
 }));
 
 mock.module("@/lib/agui/react/useChat", () => ({
@@ -422,6 +449,22 @@ afterAll(() => {
 });
 
 describe("TaskView conversation model selection", () => {
+  it("renders the task trigger above the message input when tasks exist", async () => {
+    renderTaskView();
+
+    const queuePanel = await screen.findByTestId("queue-panel");
+    const taskTrigger = await screen.findByRole("button", { name: /tasks 0\/1/i });
+    const messageInput = screen.getByTestId("message-input");
+    const following = document.defaultView!.Node.DOCUMENT_POSITION_FOLLOWING;
+
+    expect(
+      queuePanel.compareDocumentPosition(taskTrigger) & following,
+    ).toBeTruthy();
+    expect(
+      taskTrigger.compareDocumentPosition(messageInput) & following,
+    ).toBeTruthy();
+  });
+
   it("allows changing the model after messages exist and uses it for the next send", async () => {
     renderTaskView();
 
