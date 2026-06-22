@@ -13,6 +13,7 @@
 import { nanoid } from "nanoid";
 import type {
   AGUIEventLike,
+  AgentTask,
   ChatState,
   MessageBlock,
   MessageView,
@@ -117,6 +118,29 @@ export function appendInterruptedNotice(
  */
 export type ArgsBuffer = Map<string, string>;
 
+function isAgentTaskStatus(v: unknown): v is AgentTask["status"] {
+  return v === "pending" || v === "in_progress" || v === "completed";
+}
+
+function parseAgentTasks(value: unknown): AgentTask[] | null {
+  if (!value || typeof value !== "object") return null;
+  const tasks = (value as { tasks?: unknown }).tasks;
+  if (!Array.isArray(tasks)) return null;
+
+  return tasks.filter((task): task is AgentTask => {
+    if (!task || typeof task !== "object") return false;
+    const raw = task as Record<string, unknown>;
+    return (
+      typeof raw.id === "string" &&
+      typeof raw.subject === "string" &&
+      typeof raw.description === "string" &&
+      isAgentTaskStatus(raw.status) &&
+      typeof raw.updatedAt === "number" &&
+      (raw.activeForm === undefined || typeof raw.activeForm === "string")
+    );
+  });
+}
+
 /**
  * 把单个 event 应用到 state，返回新 state。
  * argsBuffer 是 mutable 的（性能考虑）—— 同一 run 内会持续累积。
@@ -207,6 +231,15 @@ export function applyEvent(
             ts: Date.now(),
           },
         };
+      } else if (name === "agent.tasks") {
+        const tasks = parseAgentTasks((event as { value?: unknown }).value);
+        if (tasks) {
+          next = {
+            ...next,
+            tasks,
+            hasTaskSnapshot: true,
+          };
+        }
       } else if (name === "file.side_effects") {
         const value = (event as { value?: Record<string, unknown> }).value ?? {};
         const toolCallId = value.toolCallId;

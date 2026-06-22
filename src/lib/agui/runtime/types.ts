@@ -82,6 +82,17 @@ export interface PendingInterrupt {
   payload: Record<string, unknown>;
 }
 
+export type AgentTaskStatus = "pending" | "in_progress" | "completed";
+
+export interface AgentTask {
+  id: string;
+  subject: string;
+  description: string;
+  activeForm?: string;
+  status: AgentTaskStatus;
+  updatedAt: number;
+}
+
 /**
  * AG-UI 事件的最小约束 —— 只要求 type 字段。
  * 具体事件类型见 reducer 中的 case 列表。
@@ -121,6 +132,10 @@ export interface ChatState {
   errorCode?: RunErrorCode;
   /** 最近一次 retry 状态 */
   retry?: RetryState;
+  /** bridge 最新推送的 agent task 快照，供输入框上方的任务面板展示 */
+  tasks: AgentTask[];
+  /** 是否已经收到过显式 task 快照；用于区分“还没同步”和“同步结果为空” */
+  hasTaskSnapshot: boolean;
 }
 
 export type RunErrorCode =
@@ -152,5 +167,7 @@ export function createInitialState(): ChatState {
     error: null,
     lastCursor: null,
     runStartedAt: null,
+    tasks: [],
+    hasTaskSnapshot: false,
   };
 }
