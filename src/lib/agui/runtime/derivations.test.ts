@@ -108,6 +108,166 @@ describe("deriveAgentTasks", () => {
     };
     expect(deriveAgentTasks(state)).toEqual([]);
   });
+
+  it("ignores TaskUpdate when result reports failure", () => {
+    const state: ChatState = {
+      ...createInitialState(),
+      historicalMessages: [
+        taskToolCallBlock(
+          "tc_create",
+          "TaskCreate",
+          { subject: "保留任务", description: "不能被失败结果修改" },
+          JSON.stringify({ task: { id: "task_1", subject: "保留任务" } }),
+        ),
+        taskToolCallBlock(
+          "tc_update",
+          "TaskUpdate",
+          { taskId: "task_1", status: "completed" },
+          JSON.stringify({ success: false, taskId: "task_1" }),
+        ),
+      ],
+    };
+    expect(deriveAgentTasks(state)[0]).toMatchObject({
+      id: "task_1",
+      status: "pending",
+      description: "不能被失败结果修改",
+    });
+  });
+
+  it("ignores TaskUpdate when result taskId is missing or mismatched", () => {
+    const state: ChatState = {
+      ...createInitialState(),
+      historicalMessages: [
+        taskToolCallBlock(
+          "tc_create",
+          "TaskCreate",
+          { subject: "目标任务", description: "只能被匹配结果修改" },
+          JSON.stringify({ task: { id: "task_1", subject: "目标任务" } }),
+        ),
+        taskToolCallBlock(
+          "tc_missing_id",
+          "TaskUpdate",
+          { taskId: "task_1", status: "completed" },
+          JSON.stringify({ success: true, updatedFields: ["status"] }),
+        ),
+        taskToolCallBlock(
+          "tc_mismatch",
+          "TaskUpdate",
+          { taskId: "task_1", subject: "错误修改" },
+          JSON.stringify({ success: true, taskId: "task_2", updatedFields: ["subject"] }),
+        ),
+      ],
+    };
+    expect(deriveAgentTasks(state)[0]).toMatchObject({
+      id: "task_1",
+      subject: "目标任务",
+      status: "pending",
+      description: "只能被匹配结果修改",
+    });
+  });
+
+  it("applies TaskUpdate when result omits success but taskId matches", () => {
+    const state: ChatState = {
+      ...createInitialState(),
+      historicalMessages: [
+        taskToolCallBlock(
+          "tc_create",
+          "TaskCreate",
+          { subject: "兼容旧结果" },
+          JSON.stringify({ task: { id: "task_1", subject: "兼容旧结果" } }),
+        ),
+        taskToolCallBlock(
+          "tc_update",
+          "TaskUpdate",
+          { taskId: "task_1", status: "completed" },
+          JSON.stringify({ taskId: "task_1", updatedFields: ["status"] }),
+        ),
+      ],
+    };
+    expect(deriveAgentTasks(state)[0]).toMatchObject({
+      id: "task_1",
+      status: "completed",
+    });
+  });
+
+  it("resyncs fallback tasks from TaskList result", () => {
+    const state: ChatState = {
+      ...createInitialState(),
+      historicalMessages: [
+        taskToolCallBlock(
+          "tc_create",
+          "TaskCreate",
+          { subject: "旧任务" },
+          JSON.stringify({ task: { id: "old", subject: "旧任务" } }),
+        ),
+        taskToolCallBlock(
+          "tc_list",
+          "TaskList",
+          {},
+          {
+            tasks: [
+              { id: "task_1", subject: "列表任务 A", status: "running" },
+              { id: "task_2", subject: "列表任务 B", status: "completed" },
+              { id: "task_deleted", subject: "删除任务", status: "deleted" },
+              { id: "task_bad", status: "pending" },
+            ],
+          },
+        ),
+      ],
+    };
+    expect(deriveAgentTasks(state)).toEqual([
+      {
+        id: "task_1",
+        subject: "列表任务 A",
+        description: "",
+        status: "in_progress",
+        updatedAt: expect.any(Number),
+      },
+      {
+        id: "task_2",
+        subject: "列表任务 B",
+        description: "",
+        status: "completed",
+        updatedAt: expect.any(Number),
+      },
+    ]);
+  });
+
+  it("upserts a fallback task from TaskGet result", () => {
+    const state: ChatState = {
+      ...createInitialState(),
+      historicalMessages: [
+        taskToolCallBlock(
+          "tc_create",
+          "TaskCreate",
+          { subject: "旧标题", description: "旧描述" },
+          JSON.stringify({ task: { id: "task_1", subject: "旧标题" } }),
+        ),
+        taskToolCallBlock(
+          "tc_get",
+          "TaskGet",
+          { taskId: "task_1" },
+          {
+            task: {
+              id: "task_1",
+              subject: "读取标题",
+              description: "读取描述",
+              status: "running",
+            },
+          },
+        ),
+      ],
+    };
+    expect(deriveAgentTasks(state)).toEqual([
+      {
+        id: "task_1",
+        subject: "读取标题",
+        description: "读取描述",
+        status: "in_progress",
+        updatedAt: expect.any(Number),
+      },
+    ]);
+  });
 });
 
 function fileToolCall(

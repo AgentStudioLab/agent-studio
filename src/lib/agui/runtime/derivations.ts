@@ -26,8 +26,13 @@ const AGENT_TASK_STATUSES: ReadonlySet<AgentTask["status"]> = new Set([
   "completed",
 ]);
 
-function isAgentTaskStatus(value: unknown): value is AgentTask["status"] {
-  return typeof value === "string" && AGENT_TASK_STATUSES.has(value as AgentTask["status"]);
+function normalizeAgentTaskStatus(value: unknown): AgentTask["status"] | null {
+  if (typeof value !== "string") return null;
+  if (AGENT_TASK_STATUSES.has(value as AgentTask["status"])) {
+    return value as AgentTask["status"];
+  }
+  // SDK 历史/边缘负载里可能出现 running；UI 侧统一按进行中处理。
+  return value === "running" ? "in_progress" : null;
 }
 
 function parseToolResult(result: unknown): unknown {
@@ -57,6 +62,42 @@ function booleanField(source: Record<string, unknown> | null, key: string): bool
   return typeof value === "boolean" ? value : undefined;
 }
 
+function upsertTask(tasks: Map<string, AgentTask>, task: AgentTask): void {
+  tasks.set(task.id, task);
+}
+
+function normalizeTaskListItem(value: unknown, now: number): AgentTask | null {
+  const task = asRecord(value);
+  const id = stringField(task, "id");
+  const subject = stringField(task, "subject");
+  const status = normalizeAgentTaskStatus(task?.status);
+  if (!id || !subject || !status) return null;
+
+  return {
+    id,
+    subject,
+    description: "",
+    status,
+    updatedAt: now,
+  };
+}
+
+function normalizeTaskGetItem(value: unknown, now: number): AgentTask | null {
+  const task = asRecord(value);
+  const id = stringField(task, "id");
+  const subject = stringField(task, "subject");
+  const status = normalizeAgentTaskStatus(task?.status);
+  if (!id || !subject || !status) return null;
+
+  return {
+    id,
+    subject,
+    description: stringField(task, "description") ?? "",
+    status,
+    updatedAt: now,
+  };
+}
+
 function taskFromTaskCreate(tc: ToolCallView, now: number): AgentTask | null {
   const args = asRecord(tc.args);
   if (!args) return null;
@@ -74,16 +115,16 @@ function taskFromTaskCreate(tc: ToolCallView, now: number): AgentTask | null {
 
   const resultStatus = resultTask?.status;
   const argsStatus = args.status;
+  const normalizedStatus =
+    normalizeAgentTaskStatus(resultStatus) ??
+    normalizeAgentTaskStatus(argsStatus) ??
+    "pending";
   return {
     id,
     subject,
     description: stringField(resultTask, "description") ?? stringField(args, "description") ?? "",
     activeForm: stringField(resultTask, "activeForm") ?? stringField(args, "activeForm"),
-    status: isAgentTaskStatus(resultStatus)
-      ? resultStatus
-      : isAgentTaskStatus(argsStatus)
-        ? argsStatus
-        : "pending",
+    status: normalizedStatus,
     updatedAt: now,
   };
 }
@@ -96,8 +137,12 @@ function applyTaskUpdate(tasks: Map<string, AgentTask>, tc: ToolCallView, now: n
   if (!id) return;
 
   // TaskUpdate 的 result 可能只表示成功，也可能回传最新 task；args 是协议上
-  // 最稳定的变更来源，因此先按 args 应用，再用 result.task 补齐 SDK 回传字段。
+  // 最稳定的变更来源；但必须先确认 result 成功且 taskId 匹配，避免把失败
+  // 或串线的工具结果误重放到 fallback 任务列表里。
   const result = asRecord(parseToolResult(tc.result));
+  const resultTaskId = stringField(result, "taskId");
+  if (!result || result.success === false || resultTaskId !== id) return;
+
   const resultTask = asRecord(result?.task);
   const deleted =
     stringField(args, "status") === "deleted" ||
@@ -118,19 +163,37 @@ function applyTaskUpdate(tasks: Map<string, AgentTask>, tc: ToolCallView, now: n
 
   const argsStatus = args.status;
   const resultStatus = resultTask?.status;
+  const normalizedStatus =
+    normalizeAgentTaskStatus(argsStatus) ??
+    normalizeAgentTaskStatus(resultStatus) ??
+    existing.status;
   const next: AgentTask = {
     ...existing,
     subject: stringField(args, "subject") ?? stringField(resultTask, "subject") ?? existing.subject,
     description: stringField(args, "description") ?? stringField(resultTask, "description") ?? existing.description,
     activeForm: stringField(args, "activeForm") ?? stringField(resultTask, "activeForm") ?? existing.activeForm,
-    status: isAgentTaskStatus(argsStatus)
-      ? argsStatus
-      : isAgentTaskStatus(resultStatus)
-        ? resultStatus
-        : existing.status,
+    status: normalizedStatus,
     updatedAt: now,
   };
-  tasks.set(id, next);
+  upsertTask(tasks, next);
+}
+
+function applyTaskList(tasks: Map<string, AgentTask>, tc: ToolCallView, now: number): void {
+  const result = asRecord(parseToolResult(tc.result));
+  const resultTasks = result?.tasks;
+  if (!Array.isArray(resultTasks)) return;
+
+  tasks.clear();
+  for (const item of resultTasks) {
+    const task = normalizeTaskListItem(item, now);
+    if (task) upsertTask(tasks, task);
+  }
+}
+
+function applyTaskGet(tasks: Map<string, AgentTask>, tc: ToolCallView, now: number): void {
+  const result = asRecord(parseToolResult(tc.result));
+  const task = normalizeTaskGetItem(result?.task, now);
+  if (task) upsertTask(tasks, task);
 }
 
 function taskCallsInTurns(messages: MessageView[]): ToolCallView[] {
@@ -140,7 +203,12 @@ function taskCallsInTurns(messages: MessageView[]): ToolCallView[] {
     for (const block of m.blocks) {
       if (
         block.kind === "tool_call" &&
-        (block.toolCall.toolName === "TaskCreate" || block.toolCall.toolName === "TaskUpdate")
+        (
+          block.toolCall.toolName === "TaskCreate" ||
+          block.toolCall.toolName === "TaskUpdate" ||
+          block.toolCall.toolName === "TaskList" ||
+          block.toolCall.toolName === "TaskGet"
+        )
       ) {
         out.push(block.toolCall);
       }
@@ -154,8 +222,8 @@ function taskCallsInTurns(messages: MessageView[]): ToolCallView[] {
  *
  * Primary path: sidecar replays explicit `agent.tasks` snapshots into
  * `state.tasks`. Fallback path: older history may only contain Task tool
- * calls, so we replay TaskCreate/TaskUpdate in chronological order to
- * recover a best-effort display list.
+ * calls, so we replay create/update operations plus TaskList/TaskGet
+ * readbacks in chronological order to recover a best-effort display list.
  */
 export function deriveAgentTasks(state: ChatState): AgentTask[] {
   if (state.hasTaskSnapshot) return state.tasks;
@@ -170,10 +238,18 @@ export function deriveAgentTasks(state: ChatState): AgentTask[] {
     const now = Date.now();
     if (call.toolName === "TaskCreate") {
       const task = taskFromTaskCreate(call, now);
-      if (task) tasks.set(task.id, task);
+      if (task) upsertTask(tasks, task);
       continue;
     }
-    applyTaskUpdate(tasks, call, now);
+    if (call.toolName === "TaskUpdate") {
+      applyTaskUpdate(tasks, call, now);
+      continue;
+    }
+    if (call.toolName === "TaskList") {
+      applyTaskList(tasks, call, now);
+      continue;
+    }
+    applyTaskGet(tasks, call, now);
   }
   return [...tasks.values()];
 }
