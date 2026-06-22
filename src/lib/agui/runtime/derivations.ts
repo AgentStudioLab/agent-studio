@@ -1,12 +1,12 @@
-import type { ChatState, MessageView, ToolCallView } from "./types";
+import type { AgentTask, ChatState, MessageView, ToolCallView } from "./types";
 
 // ============ Progress phases (4-phase fixed pipeline) ============
 //
 // Manus / Cowork / ChatGPT-canvas style: the UI shows a fixed set of high-
 // level phases instead of one row per tool call. Tool invocations are
 // bucketed by name into a phase; the most recent phase is "active". This
-// gives a stable progress feeling even for models that never call TodoWrite
-// (DeepSeek-Reasoner skips it; raw Claude does too on small tasks).
+// gives a stable progress feeling even for models that only expose coarse
+// task snapshots or skip explicit planning tools on small tasks.
 
 export type PhaseId = "context" | "plan" | "execute" | "finish";
 export type PhaseStatus = "pending" | "active" | "completed";
@@ -20,48 +20,125 @@ export interface PhaseEntry {
   lastToolLabel: string | null;
 }
 
-export type TodoStatus = "pending" | "in_progress" | "completed";
-
-export interface TodoEntry {
-  content: string;
-  activeForm?: string;
-  status: TodoStatus;
-}
-
-const TODO_STATUSES: ReadonlySet<TodoStatus> = new Set([
+const AGENT_TASK_STATUSES: ReadonlySet<AgentTask["status"]> = new Set([
   "pending",
   "in_progress",
   "completed",
 ]);
 
-function isTodoEntry(v: unknown): v is TodoEntry {
-  if (typeof v !== "object" || v === null) return false;
-  const o = v as Record<string, unknown>;
-  if (typeof o.content !== "string" || o.content.length === 0) return false;
-  if (typeof o.status !== "string") return false;
-  if (!TODO_STATUSES.has(o.status as TodoStatus)) return false;
-  if (o.activeForm !== undefined && typeof o.activeForm !== "string") return false;
-  return true;
+function isAgentTaskStatus(value: unknown): value is AgentTask["status"] {
+  return typeof value === "string" && AGENT_TASK_STATUSES.has(value as AgentTask["status"]);
 }
 
-function extractTodosFromArgs(args: unknown): TodoEntry[] | null {
-  if (typeof args !== "object" || args === null) return null;
-  const todos = (args as { todos?: unknown }).todos;
-  if (!Array.isArray(todos)) return null;
-  const valid = todos.filter(isTodoEntry);
-  // Return null only when an args-shaped TodoWrite produced ZERO valid
-  // entries from a NON-EMPTY input list — that's a malformed call we want
-  // to skip backward past. Empty input list returns [] (counts as "newest
-  // call wins") and any-valid returns the filtered subset.
-  return todos.length === 0 || valid.length > 0 ? valid : null;
+function parseToolResult(result: unknown): unknown {
+  if (typeof result !== "string") return result;
+  try {
+    return JSON.parse(result);
+  } catch {
+    return null;
+  }
 }
 
-function todoCallsInTurns(messages: MessageView[]): ToolCallView[] {
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return typeof value === "object" && value !== null
+    ? value as Record<string, unknown>
+    : null;
+}
+
+function stringField(source: Record<string, unknown> | null, key: string): string | undefined {
+  if (!source) return undefined;
+  const value = source[key];
+  return typeof value === "string" ? value : undefined;
+}
+
+function booleanField(source: Record<string, unknown> | null, key: string): boolean | undefined {
+  if (!source) return undefined;
+  const value = source[key];
+  return typeof value === "boolean" ? value : undefined;
+}
+
+function taskFromTaskCreate(tc: ToolCallView, now: number): AgentTask | null {
+  const args = asRecord(tc.args);
+  if (!args) return null;
+
+  const result = asRecord(parseToolResult(tc.result));
+  const resultTask = asRecord(result?.task);
+  const id =
+    stringField(resultTask, "id") ??
+    stringField(result, "taskId") ??
+    stringField(result, "id") ??
+    stringField(args, "taskId") ??
+    stringField(args, "id");
+  const subject = stringField(resultTask, "subject") ?? stringField(args, "subject");
+  if (!id || !subject) return null;
+
+  const resultStatus = resultTask?.status;
+  const argsStatus = args.status;
+  return {
+    id,
+    subject,
+    description: stringField(resultTask, "description") ?? stringField(args, "description") ?? "",
+    activeForm: stringField(resultTask, "activeForm") ?? stringField(args, "activeForm"),
+    status: isAgentTaskStatus(resultStatus)
+      ? resultStatus
+      : isAgentTaskStatus(argsStatus)
+        ? argsStatus
+        : "pending",
+    updatedAt: now,
+  };
+}
+
+function applyTaskUpdate(tasks: Map<string, AgentTask>, tc: ToolCallView, now: number): void {
+  const args = asRecord(tc.args);
+  if (!args) return;
+
+  const id = stringField(args, "taskId") ?? stringField(args, "id");
+  if (!id) return;
+
+  // TaskUpdate 的 result 可能只表示成功，也可能回传最新 task；args 是协议上
+  // 最稳定的变更来源，因此先按 args 应用，再用 result.task 补齐 SDK 回传字段。
+  const result = asRecord(parseToolResult(tc.result));
+  const resultTask = asRecord(result?.task);
+  const deleted = booleanField(args, "deleted") ?? booleanField(resultTask, "deleted");
+  if (deleted) {
+    tasks.delete(id);
+    return;
+  }
+
+  const existing = tasks.get(id) ?? {
+    id,
+    subject: stringField(args, "subject") ?? stringField(resultTask, "subject") ?? "",
+    description: "",
+    status: "pending",
+    updatedAt: now,
+  };
+
+  const argsStatus = args.status;
+  const resultStatus = resultTask?.status;
+  const next: AgentTask = {
+    ...existing,
+    subject: stringField(args, "subject") ?? stringField(resultTask, "subject") ?? existing.subject,
+    description: stringField(args, "description") ?? stringField(resultTask, "description") ?? existing.description,
+    activeForm: stringField(args, "activeForm") ?? stringField(resultTask, "activeForm") ?? existing.activeForm,
+    status: isAgentTaskStatus(argsStatus)
+      ? argsStatus
+      : isAgentTaskStatus(resultStatus)
+        ? resultStatus
+        : existing.status,
+    updatedAt: now,
+  };
+  tasks.set(id, next);
+}
+
+function taskCallsInTurns(messages: MessageView[]): ToolCallView[] {
   const out: ToolCallView[] = [];
   for (const m of messages) {
     if (m.role !== "assistant") continue;
     for (const block of m.blocks) {
-      if (block.kind === "tool_call" && block.toolCall.toolName === "TodoWrite") {
+      if (
+        block.kind === "tool_call" &&
+        (block.toolCall.toolName === "TaskCreate" || block.toolCall.toolName === "TaskUpdate")
+      ) {
         out.push(block.toolCall);
       }
     }
@@ -70,22 +147,32 @@ function todoCallsInTurns(messages: MessageView[]): ToolCallView[] {
 }
 
 /**
- * Latest TodoWrite invocation's `todos` array. Walks historicalMessages
- * (DB-loaded) then liveMessages (streaming). The chronological assumption
- * is: messages are appended in order, so the LAST TodoWrite call across
- * both lists is the agent's current plan. Each TodoWrite is a full
- * replacement — agents call this whenever the plan changes.
+ * Derive the task list shown above the composer.
+ *
+ * Primary path: sidecar replays explicit `agent.tasks` snapshots into
+ * `state.tasks`. Fallback path: older history may only contain Task tool
+ * calls, so we replay TaskCreate/TaskUpdate in chronological order to
+ * recover a best-effort display list.
  */
-export function deriveTodos(state: ChatState): TodoEntry[] {
+export function deriveAgentTasks(state: ChatState): AgentTask[] {
+  if (state.hasTaskSnapshot) return state.tasks;
+
   const calls = [
-    ...todoCallsInTurns(state.historicalMessages),
-    ...todoCallsInTurns(state.liveMessages),
+    ...taskCallsInTurns(state.historicalMessages),
+    ...taskCallsInTurns(state.liveMessages),
   ];
-  for (let i = calls.length - 1; i >= 0; i--) {
-    const todos = extractTodosFromArgs(calls[i]!.args);
-    if (todos !== null) return todos;
+
+  const tasks = new Map<string, AgentTask>();
+  for (const call of calls) {
+    const now = Date.now();
+    if (call.toolName === "TaskCreate") {
+      const task = taskFromTaskCreate(call, now);
+      if (task) tasks.set(task.id, task);
+      continue;
+    }
+    applyTaskUpdate(tasks, call, now);
   }
-  return [];
+  return [...tasks.values()];
 }
 
 export type FileTool =
@@ -271,7 +358,7 @@ function basenameFromArgs(args: unknown, key: string): string | null {
 }
 
 /** Build a short, human-readable label for a tool call. Used by the Process
- *  Tab fallback timeline when the agent never calls TodoWrite. */
+ *  Tab fallback timeline when no explicit phase snapshot is available. */
 function labelForToolCall(tc: ToolCallView): string {
   const args = tc.args;
   switch (tc.toolName) {
@@ -321,8 +408,14 @@ function labelForToolCall(tc: ToolCallView): string {
       }
       return "WebSearch";
     }
-    case "TodoWrite":
-      return "Plan update";
+    case "TaskCreate":
+      return "Task create";
+    case "TaskUpdate":
+      return "Task update";
+    case "TaskGet":
+      return "Task get";
+    case "TaskList":
+      return "Task list";
     default:
       return tc.toolName;
   }
@@ -349,12 +442,19 @@ const EXECUTE_TOOLS: ReadonlySet<string> = new Set([
   "Bash",
 ]);
 
+const TASK_TOOL_NAMES: ReadonlySet<string> = new Set([
+  "TaskCreate",
+  "TaskGet",
+  "TaskUpdate",
+  "TaskList",
+]);
+
 type CategorizablePhase = Exclude<PhaseId, "finish">;
 
 const PHASE_ORDER: readonly PhaseId[] = ["context", "plan", "execute", "finish"];
 
 function phaseForTool(name: string): CategorizablePhase | null {
-  if (name === "TodoWrite") return "plan";
+  if (TASK_TOOL_NAMES.has(name)) return "plan";
   if (CONTEXT_TOOLS.has(name)) return "context";
   if (EXECUTE_TOOLS.has(name)) return "execute";
   return null;

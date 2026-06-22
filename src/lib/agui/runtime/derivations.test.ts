@@ -1,8 +1,8 @@
 import { describe, expect, it } from "bun:test";
 import {
+  deriveAgentTasks,
   deriveInvokedSkills,
   deriveProgressPhases,
-  deriveTodos,
   deriveTouchedFiles,
 } from "./derivations";
 import type { ChatState, MessageView } from "./types";
@@ -12,9 +12,11 @@ function withMessages(messages: MessageView[]): ChatState {
   return { ...createInitialState(), liveMessages: messages };
 }
 
-function todoToolCallBlock(
+function taskToolCallBlock(
   toolCallId: string,
-  todos: Array<{ content: string; activeForm?: string; status: string }>,
+  toolName: string,
+  args: Record<string, unknown>,
+  result: unknown = null,
 ): MessageView {
   return {
     id: `msg_${toolCallId}`,
@@ -24,106 +26,65 @@ function todoToolCallBlock(
         kind: "tool_call",
         toolCall: {
           id: toolCallId,
-          toolName: "TodoWrite",
-          args: { todos },
-          result: null,
-          status: "pending",
+          toolName,
+          args,
+          result,
+          status: result ? "success" : "pending",
         },
       },
     ],
   };
 }
 
-describe("deriveTodos", () => {
-  it("returns empty array when no TodoWrite calls present", () => {
-    expect(deriveTodos(createInitialState())).toEqual([]);
+describe("deriveAgentTasks", () => {
+  it("returns state.tasks when a snapshot has been replayed", () => {
+    const state: ChatState = {
+      ...createInitialState(),
+      hasTaskSnapshot: true,
+      tasks: [
+        {
+          id: "task_1",
+          subject: "from snapshot",
+          description: "",
+          status: "completed",
+          updatedAt: 1000,
+        },
+      ],
+    };
+    expect(deriveAgentTasks(state)).toEqual(state.tasks);
   });
 
-  it("ignores non-TodoWrite tool calls", () => {
-    const state = withMessages([
-      {
-        id: "m1",
-        role: "assistant",
-        blocks: [
-          {
-            kind: "tool_call",
-            toolCall: {
-              id: "t1",
-              toolName: "Read",
-              args: { file_path: "/x" },
-              result: null,
-              status: "pending",
-            },
-          },
-        ],
-      },
-    ]);
-    expect(deriveTodos(state)).toEqual([]);
-  });
-
-  it("returns the todos array from the most recent TodoWrite call", () => {
-    const state = withMessages([
-      todoToolCallBlock("tc1", [
-        { content: "old", status: "completed" },
-      ]),
-      todoToolCallBlock("tc2", [
-        { content: "newest A", activeForm: "Doing A", status: "in_progress" },
-        { content: "newest B", status: "pending" },
-      ]),
-    ]);
-    expect(deriveTodos(state)).toEqual([
-      { content: "newest A", activeForm: "Doing A", status: "in_progress" },
-      { content: "newest B", status: "pending" },
-    ]);
-  });
-
-  it("walks both historicalMessages and liveMessages, latest wins", () => {
+  it("derives tasks from TaskCreate and TaskUpdate tool history when no snapshot exists", () => {
     const state: ChatState = {
       ...createInitialState(),
       historicalMessages: [
-        todoToolCallBlock("tc1", [{ content: "h", status: "completed" }]),
-      ],
-      liveMessages: [
-        todoToolCallBlock("tc2", [{ content: "l", status: "pending" }]),
+        taskToolCallBlock(
+          "tc_create",
+          "TaskCreate",
+          {
+            subject: "写 normalizer",
+            description: "覆盖 create/update",
+            activeForm: "写 normalizer",
+          },
+          JSON.stringify({ task: { id: "task_1", subject: "写 normalizer" } }),
+        ),
+        taskToolCallBlock(
+          "tc_update",
+          "TaskUpdate",
+          { taskId: "task_1", status: "completed" },
+          JSON.stringify({ success: true, taskId: "task_1", updatedFields: ["status"] }),
+        ),
       ],
     };
-    expect(deriveTodos(state)).toEqual([
-      { content: "l", status: "pending" },
-    ]);
-  });
-
-  it("filters out malformed todo entries gracefully", () => {
-    const state = withMessages([
-      todoToolCallBlock("tc", [
-        { content: "valid", status: "pending" },
-        // @ts-expect-error — intentionally malformed
-        { status: "pending" }, // no content
-        // @ts-expect-error — intentionally malformed
-        { content: "bad-status", status: "weird" },
-      ]),
-    ]);
-    expect(deriveTodos(state)).toEqual([
-      { content: "valid", status: "pending" },
-    ]);
-  });
-
-  it("falls back to previous call when latest TodoWrite has all-malformed entries", () => {
-    const state = withMessages([
-      todoToolCallBlock("tc-good", [
-        { content: "good", status: "pending" },
-      ]),
-      todoToolCallBlock("tc-bad", [
-        // @ts-expect-error — all malformed
-        { status: "pending" },
-        // @ts-expect-error — all malformed
-        { content: "wrong-status", status: "weird" },
-      ]),
-    ]);
-    // tc-bad is more recent but produces null from extractTodosFromArgs
-    // (all entries fail isTodoEntry on a non-empty input). The selector
-    // must scan backward and return tc-good's todos.
-    expect(deriveTodos(state)).toEqual([
-      { content: "good", status: "pending" },
+    expect(deriveAgentTasks(state)).toEqual([
+      {
+        id: "task_1",
+        subject: "写 normalizer",
+        description: "覆盖 create/update",
+        activeForm: "写 normalizer",
+        status: "completed",
+        updatedAt: expect.any(Number),
+      },
     ]);
   });
 });
@@ -423,13 +384,13 @@ describe("deriveProgressPhases", () => {
     expect(ctx.lastToolLabel).toBe("Glob *.md");
   });
 
-  it("TodoWrite lands in plan phase", () => {
+  it("Task tools land in plan phase", () => {
     const state: ChatState = {
       ...createInitialState(),
       isRunning: true,
       liveMessages: [
         toolCallMsg("a", "Read", { file_path: "/x/a.md" }),
-        toolCallMsg("b", "TodoWrite", { todos: [] }),
+        toolCallMsg("b", "TaskCreate", { subject: "Plan", description: "Plan work" }),
       ],
     };
     const phases = deriveProgressPhases(state);
@@ -473,7 +434,7 @@ describe("deriveProgressPhases", () => {
     expect(phases.find((p) => p.id === "finish")!.status).toBe("active");
   });
 
-  it("skipped phase still renders completed when later phase is active (e.g. DeepSeek skips TodoWrite)", () => {
+  it("skipped phase still renders completed when later phase is active", () => {
     const state: ChatState = {
       ...createInitialState(),
       isRunning: true,
@@ -484,7 +445,7 @@ describe("deriveProgressPhases", () => {
     };
     const phases = deriveProgressPhases(state);
     expect(phases.find((p) => p.id === "context")!.status).toBe("completed");
-    // No TodoWrite was called, but execute is active → plan still rendered as completed (skipped).
+    // No Task tool was called, but execute is active → plan still renders as completed (skipped).
     expect(phases.find((p) => p.id === "plan")!.status).toBe("completed");
     expect(phases.find((p) => p.id === "plan")!.count).toBe(0);
     expect(phases.find((p) => p.id === "plan")!.lastToolLabel).toBe(null);
