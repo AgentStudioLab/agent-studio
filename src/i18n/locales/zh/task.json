@@ -229,6 +229,17 @@
     "prevPage": "上一题",
     "nextPage": "下一题"
   },
+  "todos": {
+    "trigger": "任务 {{completed}}/{{total}}",
+    "title": "任务",
+    "empty": "暂无任务",
+    "activePrefix": "当前",
+    "status": {
+      "pending": "待处理",
+      "in_progress": "进行中",
+      "completed": "已完成"
+    }
+  },
   "timeline": {
     "done": "完成",
     "stepsCount": "{{count}} 步"
