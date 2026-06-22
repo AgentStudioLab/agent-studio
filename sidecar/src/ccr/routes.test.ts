@@ -53,8 +53,9 @@ describe("resolveCcrRuntimeRoute", () => {
     });
   });
 
-  it("routes Anthropic providers through CCR by default", () => {
-    const route = resolveCcrRuntimeRoute(
+  it("rejects Anthropic providers so they stay on direct Claude Agent SDK", () => {
+    expect(() =>
+      resolveCcrRuntimeRoute(
       provider({
         providerId: "conn_anthropic",
         providerName: "Anthropic",
@@ -71,10 +72,8 @@ describe("resolveCcrRuntimeRoute", () => {
           capabilities: { text: true, tools: true, fileCheckpoint: true },
         },
       }),
-    );
-
-    expect(route.model).toBe("agentstudio/conn_anthropic/claude-sonnet-4-6");
-    expect(route.upstream.protocol).toBe("anthropic");
+      ),
+    ).toThrow("ccr_protocol_unsupported");
   });
 
   it("throws when a run has no resolved model", () => {

@@ -39,6 +39,7 @@ import { buildSettingsToolsRoutes } from "./routes/settings-tools";
 import { createBunSqliteRunStore } from "./agui/store-sqlite";
 import type { AgentProvider } from "./agui/core";
 import { createAgentProviderForRuntime } from "./agui/provider-factory";
+import type { ClaudeProviderOptions } from "./agui/provider-claude";
 import { createOfficialProvider } from "./agui/provider-official/official-provider";
 import { createInterruptBus } from "./agui/provider-claude";
 import { SessionMetadataStore } from "./services/sessionMetadata";
@@ -236,6 +237,13 @@ function providerCacheKey(selection?: { providerId: string; modelId: string } | 
   if (resolved.providerId === "official") {
     return `${resolved.providerId}:${resolved.modelId ?? ""}:${resolved.apiKey}:${resolved.baseUrl}`;
   }
+  if (resolved.customProtocol !== "openai-compatible") {
+    const runtimeUrl =
+      resolved.agentRuntime.protocol === "anthropic"
+        ? resolved.agentRuntime.baseUrl
+        : resolved.baseUrl;
+    return `${resolved.providerId}:direct:${resolved.modelId ?? ""}:${resolved.agentRuntime.protocol}:${runtimeUrl}:${resolved.apiKey}`;
+  }
   const route = resolveCcrRuntimeRoute(resolved, {
     baseUrl: ccrManager.baseUrl(),
   });
@@ -249,75 +257,90 @@ function buildProviderForSelection(
     return createOfficialProvider();
   }
   if (!current.apiKey) throw new Error("api_key_missing");
-  const route = resolveCcrRuntimeRoute(current, { baseUrl: ccrManager.baseUrl() });
-  const ccrConfig = buildAgentStudioCcrConfig([route], ccrConfigOptions);
   const resolveAllowedTools = (threadId: string): string[] => {
     const override = threads.getAllowedTools(threadId);
     return override ?? settingsTools.getDefault();
   };
-  const provider = createAgentProviderForRuntime({
-    runtime: {
-      protocol: "anthropic",
-      baseUrl: route.baseUrl,
-      auth: route.authMode,
-      capabilities: current.agentRuntime.capabilities,
+
+  const common: Omit<
+    ClaudeProviderOptions,
+    "apiKey" | "baseUrl" | "authMode" | "model"
+  > = {
+    resolveAllowedTools,
+    interruptBus,
+    audit,
+    resolveAppendPrompt: () =>
+      composeAppendPrompt(userProfileSettings.current()),
+    onInitMetadata: (threadId, meta) => sessionMetadata.upsert(threadId, meta),
+    // 全局启用集 ∩ 该 agent 的挂载选择。绑 agent 且其 mountedSkills 为数组时收窄；
+    // 为 null（继承）或不绑 agent 时直接用全局启用集。全局禁用/卸载的技能因交集自然掉出。
+    resolveSkillsConfig: (agentWorkspaceId) => {
+      const enabled = skillRegistry.listEnabledIds();
+      const mounted = agentWorkspaceId
+        ? (agentWorkspaces.get(agentWorkspaceId)?.mountedSkills ?? null)
+        : null;
+      const effective =
+        mounted == null ? enabled : enabled.filter((id) => mounted.includes(id));
+      return {
+        enabledSkills: effective,
+        pluginPath: skillRegistry.builtinPluginPath(),
+      };
     },
-    apiKey: route.apiKey,
-    defaultModel: route.model,
-    common: {
-      resolveAllowedTools,
-      interruptBus,
-      audit,
-      resolveAppendPrompt: () =>
-        composeAppendPrompt(userProfileSettings.current()),
-      onInitMetadata: (threadId, meta) => sessionMetadata.upsert(threadId, meta),
-      // 全局启用集 ∩ 该 agent 的挂载选择。绑 agent 且其 mountedSkills 为数组时收窄；
-      // 为 null（继承）或不绑 agent 时直接用全局启用集。全局禁用/卸载的技能因交集自然掉出。
-      resolveSkillsConfig: (agentWorkspaceId) => {
-        const enabled = skillRegistry.listEnabledIds();
-        const mounted = agentWorkspaceId
-          ? (agentWorkspaces.get(agentWorkspaceId)?.mountedSkills ?? null)
-          : null;
-        const effective =
-          mounted == null ? enabled : enabled.filter((id) => mounted.includes(id));
-        return {
-          enabledSkills: effective,
-          pluginPath: skillRegistry.builtinPluginPath(),
-        };
-      },
-      skillInvocationsStore: skillInvocations,
-      // `/schedule` skill → in-process MCP tool persists through the same service
-      // the scheduler reads. Working dir + model are injected by the provider
-      // from the live run; the agent only supplies name/prompt/cadence.
-      onCreateScheduledTask: (input) => {
-        const task = scheduledTasks.create({
-          name: input.name,
-          description: input.description ?? "",
-          prompt: input.prompt,
-          frequency: input.frequency,
-          timeOfDay: input.timeOfDay ?? null,
-          weekday: input.weekday ?? null,
-          workingDir: input.workingDir ?? null,
-          model: input.model ?? null,
-          permissionMode: "ask",
+    skillInvocationsStore: skillInvocations,
+    // `/schedule` skill → in-process MCP tool persists through the same service
+    // the scheduler reads。Working dir + model are injected by the provider
+    // from the live run; the agent only supplies name/prompt/cadence.
+    onCreateScheduledTask: (input) => {
+      const task = scheduledTasks.create({
+        name: input.name,
+        description: input.description ?? "",
+        prompt: input.prompt,
+        frequency: input.frequency,
+        timeOfDay: input.timeOfDay ?? null,
+        weekday: input.weekday ?? null,
+        workingDir: input.workingDir ?? null,
+        model: input.model ?? null,
+        permissionMode: "ask",
+      });
+      return { id: task.id, name: task.name };
+    },
+    // `remember` MCP tool (agent-bound runs) → write that agent's file-based
+    // memory. The MemoryEdit union guarantees save fields are present when
+    // action === "save"; remove needs only `file`.
+    onRemember: (edit, { agentWorkspaceId, threadId }) => {
+      if (edit.action === "save") {
+        return agentMemoryStore.save(agentWorkspaceId, {
+          file: edit.file, title: edit.title, hook: edit.hook, content: edit.content,
+          originThreadId: threadId, type: edit.type,
         });
-        return { id: task.id, name: task.name };
-      },
-      // `remember` MCP tool (agent-bound runs) → write that agent's file-based
-      // memory. The MemoryEdit union guarantees save fields are present when
-      // action === "save"; remove needs only `file`.
-      onRemember: (edit, { agentWorkspaceId, threadId }) => {
-        if (edit.action === "save") {
-          return agentMemoryStore.save(agentWorkspaceId, {
-            file: edit.file, title: edit.title, hook: edit.hook, content: edit.content,
-            originThreadId: threadId, type: edit.type,
-          });
-        }
-        return agentMemoryStore.remove(agentWorkspaceId, edit.file);
-      },
+      }
+      return agentMemoryStore.remove(agentWorkspaceId, edit.file);
     },
+  };
+
+  if (current.customProtocol === "openai-compatible") {
+    const route = resolveCcrRuntimeRoute(current, { baseUrl: ccrManager.baseUrl() });
+    const ccrConfig = buildAgentStudioCcrConfig([route], ccrConfigOptions);
+    const provider = createAgentProviderForRuntime({
+      runtime: {
+        protocol: "anthropic",
+        baseUrl: route.baseUrl,
+        auth: route.authMode,
+        capabilities: current.agentRuntime.capabilities,
+      },
+      apiKey: route.apiKey,
+      defaultModel: route.model,
+      common,
+    });
+    return withCcrReady(provider, () => ccrManager.ensure(ccrConfig));
+  }
+
+  return createAgentProviderForRuntime({
+    runtime: current.agentRuntime,
+    apiKey: current.apiKey,
+    defaultModel: current.modelId ?? undefined,
+    common,
   });
-  return withCcrReady(provider, () => ccrManager.ensure(ccrConfig));
 }
 function getProvider(selection?: { providerId: string; modelId: string } | null) {
   const key = providerCacheKey(selection);
