@@ -621,6 +621,19 @@ export async function* claudeSdkToAgui(
 }
 
 function parseToolResultContent(content: unknown): unknown {
+  if (Array.isArray(content)) {
+    const text = content
+      .map((block) => {
+        if (!block || typeof block !== "object") return "";
+        const record = block as Record<string, unknown>;
+        return record.type === "text" && typeof record.text === "string"
+          ? record.text
+          : "";
+      })
+      .join("");
+    if (text) return parseToolResultContent(text);
+  }
+
   if (typeof content !== "string") return content;
 
   try {

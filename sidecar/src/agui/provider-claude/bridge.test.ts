@@ -432,6 +432,71 @@ describe("bridge — agent task snapshots", () => {
       ],
     });
   });
+
+  it("emits CUSTOM agent.tasks when TaskCreate result is returned as text content block", async () => {
+    const sdkStream = (async function* () {
+      yield { type: "system", subtype: "init", session_id: "s1" };
+      yield {
+        type: "assistant",
+        message: {
+          content: [
+            {
+              type: "tool_use",
+              id: "task_create_block",
+              name: "TaskCreate",
+              input: {
+                subject: "只读检查链路",
+                description: "检查 SDK 到 UI 的任务链路",
+              },
+            },
+          ],
+        },
+      };
+      yield {
+        type: "user",
+        message: {
+          role: "user",
+          content: [
+            {
+              type: "tool_result",
+              tool_use_id: "task_create_block",
+              content: [
+                {
+                  type: "text",
+                  text: JSON.stringify({
+                    task: { id: "task_block_1", subject: "只读检查链路" },
+                  }),
+                },
+              ],
+            },
+          ],
+        },
+      };
+      yield { type: "result", subtype: "success", is_error: false, result: "" };
+    })();
+
+    const events = await drain(
+      claudeSdkToAgui(sdkStream as AsyncIterable<SDKMessage>, {
+        threadId: "t",
+        runId: "r",
+      }),
+    );
+
+    const taskEvent = events.find(
+      (event) => event.type === "CUSTOM" && event.name === "agent.tasks",
+    );
+    expect(taskEvent?.value).toEqual({
+      tasks: [
+        {
+          id: "task_block_1",
+          subject: "只读检查链路",
+          description: "检查 SDK 到 UI 的任务链路",
+          status: "pending",
+          updatedAt: expect.any(Number),
+        },
+      ],
+    });
+  });
 });
 
 describe("bridge — user prompt uuid capture (regenerate checkpoint)", () => {
