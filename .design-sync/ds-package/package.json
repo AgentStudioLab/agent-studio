@@ -1,0 +1,7 @@
+{
+  "name": "agent-studio-ds",
+  "version": "0.1.0",
+  "private": true,
+  "module": "./entry.tsx",
+  "types": "./entry.d.ts"
+}
