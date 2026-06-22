@@ -56,3 +56,14 @@ storybook-static
 .claude/scheduled_tasks.lock
 
 *.bun-build
+
+# design-sync (claude.ai/design) — local build/verify artifacts; durable
+# config/NOTES/previews/overrides ARE committed.
+.design-sync/sb-reference/
+.design-sync/learnings/
+.design-sync/.cache/
+.ds-sync/
+ds-bundle/
+.design-sync/node_modules
+.design-sync/*.log
+.design-sync/chunk-*.json

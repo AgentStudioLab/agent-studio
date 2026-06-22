@@ -1,0 +1,46 @@
+{
+  "shape": "storybook",
+  "pkg": "agent-studio-ds",
+  "globalName": "AgentStudio",
+  "entry": ".design-sync/ds-package/entry.tsx",
+  "tsconfig": "./tsconfig.bundle.json",
+  "storybookConfigDir": ".storybook",
+  "storybookStatic": ".design-sync/sb-reference",
+  "buildCmd": "NODE_PATH=\"$(pwd)/.ds-sync/node_modules\" node .design-sync/gen-ds-package.mjs",
+  "libOverrides": {
+    "css-fallback.mjs": "Always replace _ds_bundle.css with the storybook iframe CSS. This app's synth barrel leaks stray relative .css side-effect imports (office-doc.css etc.) into the esbuild bundle, which the upstream placeholder guard mistakes for real CSS and skips the Tailwind scrape — leaving every component unstyled."
+  },
+  "projectId": "2cba6712-dddf-4e9c-86c5-30ed9d3d27d2",
+  "storyImports": {
+    "shim": ["/src/app/", "/src/features/", "/src/components/", "/src/shared/"]
+  },
+  "titleMap": {
+    "AppShell": null,
+    "Sidebar": null,
+    "ProfileForm": null,
+    "TaskView": null,
+    "NewTaskView": null,
+    "ScheduledListView": null,
+    "ScheduledDetailView": null
+  },
+  "provider": {
+    "component": "QueryClientProvider",
+    "props": { "client": { "$ref": "dsQueryClient" } },
+    "inner": {
+      "component": "MemoryRouter",
+      "inner": {
+        "component": "AuthProvider",
+        "inner": {
+          "component": "AppShellProvider",
+          "inner": {
+            "component": "MessageQueueProvider",
+            "inner": {
+              "component": "TooltipProvider",
+              "props": { "delayDuration": 200 }
+            }
+          }
+        }
+      }
+    }
+  }
+}

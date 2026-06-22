@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "paths": {
+      "@/i18n": ["../../src/i18n/index.ts"],
+      "@/lib/agui/runtime": ["../../src/lib/agui/runtime/index.ts"],
+      "@js-preview/docx": ["./empty-stub.ts"],
+      "@js-preview/docx/lib/index.css": ["./empty-stub.ts"],
+      "@js-preview/excel": ["./empty-stub.ts"],
+      "@js-preview/excel/lib/index.css": ["./empty-stub.ts"],
+      "@js-preview/pdf": ["./empty-stub.ts"],
+      "shiki": ["./shiki-stub.ts"],
+      "@streamdown/code": ["./markdown-stub.ts"],
+      "@streamdown/math": ["./markdown-stub.ts"],
+      "@streamdown/mermaid": ["./markdown-stub.ts"],
+      "@/lib/sidecar-client": ["./sidecar-client-stub.ts"],
+      "tippy.js/dist/tippy.css": ["./empty-stub.ts"],
+      "@/*": ["../../src/*"]
+    }
+  }
+}
