@@ -7,11 +7,13 @@ import { useAppShell } from "@/app/AppShellContext";
 import { TaskHeader } from "@/features/task/TaskHeader";
 import { ChatStream } from "@/features/task/ChatStream";
 import { TaskMessageInput } from "@/features/task/TaskMessageInput";
+import { TaskTodosTrigger } from "@/features/task/TaskTodosTrigger";
 import { TaskRightPanel, type TaskRightTabId } from "@/features/task/TaskRightPanel";
 import { QueuedMessagesPanel } from "@/features/task/QueuedMessagesPanel";
 import { useMessageQueue } from "@/features/task/MessageQueueContext";
 import { PreviewPane } from "@/features/task/PreviewPane";
 import { useChat } from "@/lib/agui/react/useChat";
+import { useThreadTasks } from "@/lib/agui/react/useThreadTasks";
 import { RunInProgressError } from "@/lib/agui/runtime/api";
 import type { TouchedFile } from "@/lib/agui/runtime/derivations";
 import type { MockFile } from "@/lib/mock/types";
@@ -135,6 +137,7 @@ export function TaskView() {
     pendingInterrupts,
     resumeRun,
   } = useChat({ threadId: activeTaskId ?? "" });
+  const { tasks } = useThreadTasks(state);
   const officialRunPendingRef = useRef(false);
 
   const resolveDefaultProviderSelection = useCallback(async () => {
@@ -670,6 +673,7 @@ export function TaskView() {
                   })();
                 }}
               />
+              <TaskTodosTrigger tasks={tasks} />
               <TaskMessageInput
                 threadId={activeTaskId}
                 providerSelection={effectiveProviderSelection}

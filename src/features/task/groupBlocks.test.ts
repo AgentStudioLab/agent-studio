@@ -12,6 +12,7 @@
 
 import { describe, expect, it } from "bun:test";
 import type { MessageBlock, ToolCallView } from "@/lib/agui/runtime";
+import { isTaskTrackingToolName } from "./taskTrackingTools";
 import type { ProcessStep } from "./ProcessGroup";
 
 type GroupedBlock =
@@ -40,6 +41,9 @@ function groupBlocks(blocks: MessageBlock[]): GroupedBlock[] {
       continue;
     }
     if (b.kind === "tool_call") {
+      if (isTaskTrackingToolName(b.toolCall.toolName)) {
+        continue;
+      }
       pending.push({ kind: "tool_call", tool: b.toolCall });
       continue;
     }
@@ -131,6 +135,17 @@ describe("groupBlocks", () => {
     const out = groupBlocks([{ kind: "text", id: "m1", content: "ok" }]);
     expect(out).toHaveLength(1);
     expect(out[0]!.kind).toBe("text");
+  });
+
+  it("hides SDK task tracking tools from the process timeline", () => {
+    const out = groupBlocks([
+      tc("create", "TaskCreate"),
+      tc("update", "TaskUpdate"),
+      tc("list", "TaskList"),
+      tc("get", "TaskGet"),
+      { kind: "text", id: "m1", content: "ok" },
+    ]);
+    expect(out).toEqual([{ kind: "text", id: "m1", content: "ok" }]);
   });
 
   it("handles an empty block list", () => {

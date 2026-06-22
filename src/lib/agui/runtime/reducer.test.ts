@@ -206,3 +206,74 @@ describe("reducer — CUSTOM file.side_effects updates ToolCallView", () => {
     expect(toolBlock.toolCall.sideEffects).toBeUndefined();
   });
 });
+
+describe("reducer — CUSTOM agent.tasks updates task snapshot", () => {
+  it("stores valid tasks and marks snapshot as present", () => {
+    const buf = new Map<string, string>();
+    const next = applyEvent(
+      createInitialState(),
+      {
+        type: "CUSTOM",
+        name: "agent.tasks",
+        value: {
+          tasks: [
+            {
+              id: "task_1",
+              subject: "实现任务面板",
+              description: "输入框上方展示 tasks",
+              activeForm: "实现任务面板",
+              status: "in_progress",
+              updatedAt: 1000,
+            },
+          ],
+        },
+      },
+      buf,
+    );
+    expect(next.hasTaskSnapshot).toBe(true);
+    expect(next.tasks).toEqual([
+      {
+        id: "task_1",
+        subject: "实现任务面板",
+        description: "输入框上方展示 tasks",
+        activeForm: "实现任务面板",
+        status: "in_progress",
+        updatedAt: 1000,
+      },
+    ]);
+  });
+
+  it("ignores malformed tasks but still records explicit empty snapshot", () => {
+    const buf = new Map<string, string>();
+    const next = applyEvent(
+      createInitialState(),
+      {
+        type: "CUSTOM",
+        name: "agent.tasks",
+        value: {
+          tasks: [
+            { id: "missing-status", subject: "bad", description: "", updatedAt: 1 },
+            { id: "ok", subject: "OK", description: "", status: "completed", updatedAt: 2 },
+          ],
+        },
+      },
+      buf,
+    );
+    expect(next.hasTaskSnapshot).toBe(true);
+    expect(next.tasks).toEqual([
+      { id: "ok", subject: "OK", description: "", status: "completed", updatedAt: 2 },
+    ]);
+  });
+
+  it("ignores malformed agent.tasks payload", () => {
+    const buf = new Map<string, string>();
+    const before = createInitialState();
+    const next = applyEvent(
+      before,
+      { type: "CUSTOM", name: "agent.tasks", value: { tasks: "bad" } },
+      buf,
+    );
+    expect(next.tasks).toEqual([]);
+    expect(next.hasTaskSnapshot).toBe(false);
+  });
+});

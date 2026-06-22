@@ -22,6 +22,13 @@ describe("settings-tools routes", () => {
     expect(body.tools).toEqual(DEFAULT_ALLOWED_TOOLS);
   });
 
+  it("default tools include SDK task tracking tools", () => {
+    expect(DEFAULT_ALLOWED_TOOLS).toContain("TaskCreate");
+    expect(DEFAULT_ALLOWED_TOOLS).toContain("TaskGet");
+    expect(DEFAULT_ALLOWED_TOOLS).toContain("TaskUpdate");
+    expect(DEFAULT_ALLOWED_TOOLS).toContain("TaskList");
+  });
+
   it("PUT persists and GET reflects", async () => {
     const app = makeApp();
     const put = await app.request("/settings/allowed-tools", {

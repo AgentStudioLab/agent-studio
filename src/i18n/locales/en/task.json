@@ -229,6 +229,18 @@
     "prevPage": "Previous question",
     "nextPage": "Next question"
   },
+  "todos": {
+    "trigger": "Tasks {{completed}}/{{total}}",
+    "step": "Step {{current}} / {{total}}",
+    "title": "Tasks",
+    "empty": "No active tasks",
+    "activePrefix": "Now",
+    "status": {
+      "pending": "Pending",
+      "in_progress": "In progress",
+      "completed": "Completed"
+    }
+  },
   "timeline": {
     "done": "Done",
     "stepsCount": "{{count}} steps"

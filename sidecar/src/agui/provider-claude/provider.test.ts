@@ -16,7 +16,7 @@ mock.module("@anthropic-ai/claude-agent-sdk", () => ({
   tool: (name: string) => ({ name }),
 }));
 
-const { createClaudeProvider } = await import("./provider");
+const { createClaudeProvider, DEFAULT_TASK_TOOLS } = await import("./provider");
 
 async function drain(iterable: AsyncIterable<unknown>) {
   for await (const _ of iterable) {
@@ -38,6 +38,96 @@ function canUseToolFromCall(callIndex: number) {
 }
 
 describe("provider sandbox config", () => {
+  it("exports SDK task tracking tools", () => {
+    expect(DEFAULT_TASK_TOOLS).toEqual(["TaskCreate", "TaskGet", "TaskUpdate", "TaskList"]);
+  });
+
+  it("adds SDK task tracking tools to every run's allowedTools", async () => {
+    const provider = createClaudeProvider({ apiKey: "k", allowedTools: ["Bash"] });
+    const ac = new AbortController();
+    const before = querySpy.mock.calls.length;
+    await drain(provider.run({
+      runId: "r_task_allowed_tools",
+      threadId: "t_task_allowed_tools",
+      userMessage: { role: "user", content: "hi" },
+      abortSignal: ac.signal,
+      cwd: "/tmp/proj",
+    }));
+
+    const calls = querySpy.mock.calls as unknown[];
+    const callArgs = calls[before] as unknown[];
+    const call = callArgs[0] as Record<string, unknown>;
+    const options = call.options as Record<string, unknown>;
+    expect(options.allowedTools).toEqual(["Bash", ...DEFAULT_TASK_TOOLS]);
+  });
+
+  it("allows SDK task tracking tools before workspace sandbox and HITL approval", async () => {
+    let approvalCalls = 0;
+    const provider = createClaudeProvider({
+      apiKey: "k",
+      interruptBus: {
+        requestApproval: async () => {
+          approvalCalls++;
+          return { behavior: "allow" };
+        },
+        requestAskUser: async () => ({ answers: {} }),
+        resolve: () => true,
+        resolveAskUser: () => true,
+        cancelAll: () => {},
+        seedRules: () => {},
+        addRule: () => {},
+        getRules: () => new Set<string>(),
+      },
+    });
+    const ac = new AbortController();
+    const before = querySpy.mock.calls.length;
+    await drain(provider.run({
+      runId: "r_task_can_use",
+      threadId: "t_task_can_use",
+      userMessage: { role: "user", content: "hi" },
+      abortSignal: ac.signal,
+      cwd: "/tmp/proj",
+    }));
+
+    const result = await canUseToolFromCall(before)(
+      "TaskCreate",
+      { file_path: "/etc/passwd", title: "Plan work" },
+      { toolUseID: "task_1" },
+    );
+    expect(result).toEqual({
+      behavior: "allow",
+      updatedInput: { file_path: "/etc/passwd", title: "Plan work" },
+    });
+    expect(approvalCalls).toBe(0);
+  });
+
+  it("appends SDK task tracking guidance to the Claude Code preset", async () => {
+    const provider = createClaudeProvider({ apiKey: "k" });
+    const ac = new AbortController();
+    await drain(provider.run({
+      runId: "r_task_guidance",
+      threadId: "t_task_guidance",
+      userMessage: { role: "user", content: "do the multi-step work" },
+      abortSignal: ac.signal,
+      cwd: "/tmp/proj",
+    }));
+
+    const calls = querySpy.mock.calls as unknown[];
+    const lastCallArgs = calls[calls.length - 1] as unknown[];
+    const lastCall = lastCallArgs[0] as Record<string, unknown>;
+    const options = lastCall.options as Record<string, unknown>;
+    const systemPrompt = options.systemPrompt as {
+      type?: string;
+      preset?: string;
+      append?: string;
+    };
+    expect(systemPrompt.type).toBe("preset");
+    expect(systemPrompt.preset).toBe("claude_code");
+    expect(systemPrompt.append).toContain("Task tracking guidance:");
+    expect(systemPrompt.append).toContain("TaskCreate and TaskUpdate");
+    expect(systemPrompt.append).toContain("Keep at most one task in_progress at a time.");
+  });
+
   it("passes sandbox.filesystem.allowWrite=[cwd] to sdkQuery", async () => {
     const provider = createClaudeProvider({ apiKey: "k", allowedTools: ["Bash"] });
     const ac = new AbortController();

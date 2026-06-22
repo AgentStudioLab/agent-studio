@@ -24,6 +24,13 @@ import { mapAssistantError, mapResultErrorSubtype } from "./error-map";
 import type { BetaToolUseBlock } from "@anthropic-ai/sdk/resources/beta/messages";
 import type { AGUIEvent } from "../core/types";
 import type { ProviderCallbacks } from "../core/provider-types";
+import {
+  createTaskSnapshot,
+  handleTaskToolCall,
+  handleTaskToolResult,
+  isTaskToolName,
+  taskSnapshotValue,
+} from "./task-normalizer";
 
 export interface BridgeOptions {
   threadId: string;
@@ -121,6 +128,8 @@ export async function* claudeSdkToAgui(
     ended: boolean; // already emitted TOOL_CALL_END + persisted via callback
   };
   const toolById = new Map<string, ToolState>();
+  let taskSnapshot = createTaskSnapshot();
+  let lastTaskSnapshotJson = JSON.stringify(taskSnapshotValue(taskSnapshot));
 
   try {
     for await (const m of sdkStream) {
@@ -393,6 +402,13 @@ export async function* claudeSdkToAgui(
             args: block.input,
             parentMessageId: st.parentMsgId ?? messageId,
           });
+          if (isTaskToolName(block.name)) {
+            taskSnapshot = handleTaskToolCall(taskSnapshot, {
+              toolCallId: block.id,
+              toolName: block.name,
+              input: block.input,
+            });
+          }
         }
         continue;
       }
@@ -459,6 +475,23 @@ export async function* claudeSdkToAgui(
                 : undefined,
               sideEffects: hasEffects ? effects : undefined,
             });
+            const toolState = toolById.get(block.tool_use_id);
+            if (toolState && isTaskToolName(toolState.toolName)) {
+              taskSnapshot = handleTaskToolResult(taskSnapshot, {
+                toolCallId: block.tool_use_id,
+                toolName: toolState.toolName,
+                result: parseToolResultContent(block.content),
+              });
+              const nextTaskSnapshotJson = JSON.stringify(taskSnapshotValue(taskSnapshot));
+              if (nextTaskSnapshotJson !== lastTaskSnapshotJson) {
+                lastTaskSnapshotJson = nextTaskSnapshotJson;
+                yield {
+                  type: EventType.CUSTOM,
+                  name: "agent.tasks",
+                  value: { tasks: taskSnapshotValue(taskSnapshot) },
+                } as AGUIEvent;
+              }
+            }
             if (hasEffects) {
               yield {
                 type: EventType.CUSTOM,
@@ -584,5 +617,28 @@ export async function* claudeSdkToAgui(
       message: err instanceof Error ? err.message : String(err),
       ...(isAbort ? { code: "CANCELLED" } : {}),
     } as AGUIEvent;
+  }
+}
+
+function parseToolResultContent(content: unknown): unknown {
+  if (Array.isArray(content)) {
+    const text = content
+      .map((block) => {
+        if (!block || typeof block !== "object") return "";
+        const record = block as Record<string, unknown>;
+        return record.type === "text" && typeof record.text === "string"
+          ? record.text
+          : "";
+      })
+      .join("");
+    if (text) return parseToolResultContent(text);
+  }
+
+  if (typeof content !== "string") return content;
+
+  try {
+    return JSON.parse(content);
+  } catch {
+    return content;
   }
 }

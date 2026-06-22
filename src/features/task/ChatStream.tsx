@@ -37,6 +37,7 @@ import {
   ConversationScrollButton,
 } from "@/components/ai-elements/conversation";
 import { getWebsiteOrigin } from "@/features/auth/desktop-auth-client";
+import { isTaskTrackingToolName } from "@/features/task/taskTrackingTools";
 
 /* ---------------- artifact helpers ---------------- */
 
@@ -494,6 +495,9 @@ function groupBlocks(blocks: MessageBlock[]): GroupedBlock[] {
       continue;
     }
     if (b.kind === "tool_call") {
+      if (isTaskTrackingToolName(b.toolCall.toolName)) {
+        continue;
+      }
       pending.push({ kind: "tool_call", tool: b.toolCall });
       continue;
     }

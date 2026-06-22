@@ -1,8 +1,9 @@
 import { describe, expect, it } from "bun:test";
 import {
+  deriveAgentTasks,
+  deriveAgentTasksFromMessages,
   deriveInvokedSkills,
   deriveProgressPhases,
-  deriveTodos,
   deriveTouchedFiles,
 } from "./derivations";
 import type { ChatState, MessageView } from "./types";
@@ -12,9 +13,11 @@ function withMessages(messages: MessageView[]): ChatState {
   return { ...createInitialState(), liveMessages: messages };
 }
 
-function todoToolCallBlock(
+function taskToolCallBlock(
   toolCallId: string,
-  todos: Array<{ content: string; activeForm?: string; status: string }>,
+  toolName: string,
+  args: Record<string, unknown>,
+  result: unknown = null,
 ): MessageView {
   return {
     id: `msg_${toolCallId}`,
@@ -24,106 +27,331 @@ function todoToolCallBlock(
         kind: "tool_call",
         toolCall: {
           id: toolCallId,
-          toolName: "TodoWrite",
-          args: { todos },
-          result: null,
-          status: "pending",
+          toolName,
+          args,
+          result,
+          status: result ? "success" : "pending",
         },
       },
     ],
   };
 }
 
-describe("deriveTodos", () => {
-  it("returns empty array when no TodoWrite calls present", () => {
-    expect(deriveTodos(createInitialState())).toEqual([]);
+describe("deriveAgentTasks", () => {
+  it("returns state.tasks when a snapshot has been replayed", () => {
+    const state: ChatState = {
+      ...createInitialState(),
+      hasTaskSnapshot: true,
+      tasks: [
+        {
+          id: "task_1",
+          subject: "from snapshot",
+          description: "",
+          status: "completed",
+          updatedAt: 1000,
+        },
+      ],
+    };
+    expect(deriveAgentTasks(state)).toEqual(state.tasks);
   });
 
-  it("ignores non-TodoWrite tool calls", () => {
-    const state = withMessages([
-      {
-        id: "m1",
-        role: "assistant",
-        blocks: [
-          {
-            kind: "tool_call",
-            toolCall: {
-              id: "t1",
-              toolName: "Read",
-              args: { file_path: "/x" },
-              result: null,
-              status: "pending",
-            },
-          },
-        ],
-      },
-    ]);
-    expect(deriveTodos(state)).toEqual([]);
-  });
-
-  it("returns the todos array from the most recent TodoWrite call", () => {
-    const state = withMessages([
-      todoToolCallBlock("tc1", [
-        { content: "old", status: "completed" },
-      ]),
-      todoToolCallBlock("tc2", [
-        { content: "newest A", activeForm: "Doing A", status: "in_progress" },
-        { content: "newest B", status: "pending" },
-      ]),
-    ]);
-    expect(deriveTodos(state)).toEqual([
-      { content: "newest A", activeForm: "Doing A", status: "in_progress" },
-      { content: "newest B", status: "pending" },
-    ]);
-  });
-
-  it("walks both historicalMessages and liveMessages, latest wins", () => {
+  it("derives tasks from TaskCreate and TaskUpdate tool history when no snapshot exists", () => {
     const state: ChatState = {
       ...createInitialState(),
       historicalMessages: [
-        todoToolCallBlock("tc1", [{ content: "h", status: "completed" }]),
-      ],
-      liveMessages: [
-        todoToolCallBlock("tc2", [{ content: "l", status: "pending" }]),
+        taskToolCallBlock(
+          "tc_create",
+          "TaskCreate",
+          {
+            subject: "写 normalizer",
+            description: "覆盖 create/update",
+            activeForm: "写 normalizer",
+          },
+          JSON.stringify({ task: { id: "task_1", subject: "写 normalizer" } }),
+        ),
+        taskToolCallBlock(
+          "tc_update",
+          "TaskUpdate",
+          { taskId: "task_1", status: "completed" },
+          JSON.stringify({ success: true, taskId: "task_1", updatedFields: ["status"] }),
+        ),
       ],
     };
-    expect(deriveTodos(state)).toEqual([
-      { content: "l", status: "pending" },
+    expect(deriveAgentTasks(state)).toEqual([
+      {
+        id: "task_1",
+        subject: "写 normalizer",
+        description: "覆盖 create/update",
+        activeForm: "写 normalizer",
+        status: "completed",
+        updatedAt: expect.any(Number),
+      },
     ]);
   });
 
-  it("filters out malformed todo entries gracefully", () => {
-    const state = withMessages([
-      todoToolCallBlock("tc", [
-        { content: "valid", status: "pending" },
-        // @ts-expect-error — intentionally malformed
-        { status: "pending" }, // no content
-        // @ts-expect-error — intentionally malformed
-        { content: "bad-status", status: "weird" },
-      ]),
-    ]);
-    expect(deriveTodos(state)).toEqual([
-      { content: "valid", status: "pending" },
+  it("derives fallback tasks from the SDK text result shape", () => {
+    const state: ChatState = {
+      ...createInitialState(),
+      historicalMessages: [
+        taskToolCallBlock(
+          "tc_create",
+          "TaskCreate",
+          {
+            subject: "探索 TaskView UI 接入点",
+            description: "查找 TaskView UI 组件及其数据源",
+            activeForm: "探索 TaskView UI",
+          },
+          "Task #3 created successfully: 探索 TaskView UI 接入点",
+        ),
+        taskToolCallBlock(
+          "tc_update",
+          "TaskUpdate",
+          { taskId: "3", status: "completed" },
+          "Updated task #3 status",
+        ),
+      ],
+    };
+
+    expect(deriveAgentTasks(state)).toEqual([
+      {
+        id: "3",
+        subject: "探索 TaskView UI 接入点",
+        description: "查找 TaskView UI 组件及其数据源",
+        activeForm: "探索 TaskView UI",
+        status: "completed",
+        updatedAt: expect.any(Number),
+      },
     ]);
   });
 
-  it("falls back to previous call when latest TodoWrite has all-malformed entries", () => {
-    const state = withMessages([
-      todoToolCallBlock("tc-good", [
-        { content: "good", status: "pending" },
-      ]),
-      todoToolCallBlock("tc-bad", [
-        // @ts-expect-error — all malformed
-        { status: "pending" },
-        // @ts-expect-error — all malformed
-        { content: "wrong-status", status: "weird" },
-      ]),
+  it("replays task calls from raw historical and live messages without relying on snapshot state", () => {
+    const historicalMessages = [
+      taskToolCallBlock(
+        "tc_create",
+        "TaskCreate",
+        { subject: "跨 run 任务", description: "先创建" },
+        JSON.stringify({ task: { id: "task_1", subject: "跨 run 任务" } }),
+      ),
+    ];
+    const liveMessages = [
+      taskToolCallBlock(
+        "tc_update",
+        "TaskUpdate",
+        { taskId: "task_1", status: "completed" },
+        JSON.stringify({ success: true, taskId: "task_1", updatedFields: ["status"] }),
+      ),
+    ];
+
+    expect(deriveAgentTasksFromMessages(historicalMessages, liveMessages)).toEqual([
+      {
+        id: "task_1",
+        subject: "跨 run 任务",
+        description: "先创建",
+        status: "completed",
+        updatedAt: expect.any(Number),
+      },
     ]);
-    // tc-bad is more recent but produces null from extractTodosFromArgs
-    // (all entries fail isTodoEntry on a non-empty input). The selector
-    // must scan backward and return tc-good's todos.
-    expect(deriveTodos(state)).toEqual([
-      { content: "good", status: "pending" },
+  });
+
+  it("can surface a TaskUpdate-only history when no agent.tasks snapshot was replayed", () => {
+    const tasks = deriveAgentTasksFromMessages([
+      taskToolCallBlock(
+        "tc_update",
+        "TaskUpdate",
+        { taskId: "task_1", subject: "延迟同步任务", status: "in_progress" },
+        JSON.stringify({ success: true, taskId: "task_1", updatedFields: ["subject", "status"] }),
+      ),
+    ]);
+
+    expect(tasks).toEqual([
+      {
+        id: "task_1",
+        subject: "延迟同步任务",
+        description: "",
+        status: "in_progress",
+        updatedAt: expect.any(Number),
+      },
+    ]);
+  });
+
+  it("removes deleted tasks from TaskUpdate tool history when no snapshot exists", () => {
+    const state: ChatState = {
+      ...createInitialState(),
+      historicalMessages: [
+        taskToolCallBlock(
+          "tc_create",
+          "TaskCreate",
+          { subject: "写 normalizer" },
+          JSON.stringify({ task: { id: "task_1", subject: "写 normalizer" } }),
+        ),
+        taskToolCallBlock(
+          "tc_delete",
+          "TaskUpdate",
+          { taskId: "task_1", status: "deleted" },
+          JSON.stringify({ success: true, taskId: "task_1", updatedFields: ["status"] }),
+        ),
+      ],
+    };
+    expect(deriveAgentTasks(state)).toEqual([]);
+  });
+
+  it("ignores TaskUpdate when result reports failure", () => {
+    const state: ChatState = {
+      ...createInitialState(),
+      historicalMessages: [
+        taskToolCallBlock(
+          "tc_create",
+          "TaskCreate",
+          { subject: "保留任务", description: "不能被失败结果修改" },
+          JSON.stringify({ task: { id: "task_1", subject: "保留任务" } }),
+        ),
+        taskToolCallBlock(
+          "tc_update",
+          "TaskUpdate",
+          { taskId: "task_1", status: "completed" },
+          JSON.stringify({ success: false, taskId: "task_1" }),
+        ),
+      ],
+    };
+    expect(deriveAgentTasks(state)[0]).toMatchObject({
+      id: "task_1",
+      status: "pending",
+      description: "不能被失败结果修改",
+    });
+  });
+
+  it("ignores TaskUpdate when result taskId is missing or mismatched", () => {
+    const state: ChatState = {
+      ...createInitialState(),
+      historicalMessages: [
+        taskToolCallBlock(
+          "tc_create",
+          "TaskCreate",
+          { subject: "目标任务", description: "只能被匹配结果修改" },
+          JSON.stringify({ task: { id: "task_1", subject: "目标任务" } }),
+        ),
+        taskToolCallBlock(
+          "tc_missing_id",
+          "TaskUpdate",
+          { taskId: "task_1", status: "completed" },
+          JSON.stringify({ success: true, updatedFields: ["status"] }),
+        ),
+        taskToolCallBlock(
+          "tc_mismatch",
+          "TaskUpdate",
+          { taskId: "task_1", subject: "错误修改" },
+          JSON.stringify({ success: true, taskId: "task_2", updatedFields: ["subject"] }),
+        ),
+      ],
+    };
+    expect(deriveAgentTasks(state)[0]).toMatchObject({
+      id: "task_1",
+      subject: "目标任务",
+      status: "pending",
+      description: "只能被匹配结果修改",
+    });
+  });
+
+  it("applies TaskUpdate when result omits success but taskId matches", () => {
+    const state: ChatState = {
+      ...createInitialState(),
+      historicalMessages: [
+        taskToolCallBlock(
+          "tc_create",
+          "TaskCreate",
+          { subject: "兼容旧结果" },
+          JSON.stringify({ task: { id: "task_1", subject: "兼容旧结果" } }),
+        ),
+        taskToolCallBlock(
+          "tc_update",
+          "TaskUpdate",
+          { taskId: "task_1", status: "completed" },
+          JSON.stringify({ taskId: "task_1", updatedFields: ["status"] }),
+        ),
+      ],
+    };
+    expect(deriveAgentTasks(state)[0]).toMatchObject({
+      id: "task_1",
+      status: "completed",
+    });
+  });
+
+  it("resyncs fallback tasks from TaskList result", () => {
+    const state: ChatState = {
+      ...createInitialState(),
+      historicalMessages: [
+        taskToolCallBlock(
+          "tc_create",
+          "TaskCreate",
+          { subject: "旧任务" },
+          JSON.stringify({ task: { id: "old", subject: "旧任务" } }),
+        ),
+        taskToolCallBlock(
+          "tc_list",
+          "TaskList",
+          {},
+          {
+            tasks: [
+              { id: "task_1", subject: "列表任务 A", status: "running" },
+              { id: "task_2", subject: "列表任务 B", status: "completed" },
+              { id: "task_deleted", subject: "删除任务", status: "deleted" },
+              { id: "task_bad", status: "pending" },
+            ],
+          },
+        ),
+      ],
+    };
+    expect(deriveAgentTasks(state)).toEqual([
+      {
+        id: "task_1",
+        subject: "列表任务 A",
+        description: "",
+        status: "in_progress",
+        updatedAt: expect.any(Number),
+      },
+      {
+        id: "task_2",
+        subject: "列表任务 B",
+        description: "",
+        status: "completed",
+        updatedAt: expect.any(Number),
+      },
+    ]);
+  });
+
+  it("upserts a fallback task from TaskGet result", () => {
+    const state: ChatState = {
+      ...createInitialState(),
+      historicalMessages: [
+        taskToolCallBlock(
+          "tc_create",
+          "TaskCreate",
+          { subject: "旧标题", description: "旧描述" },
+          JSON.stringify({ task: { id: "task_1", subject: "旧标题" } }),
+        ),
+        taskToolCallBlock(
+          "tc_get",
+          "TaskGet",
+          { taskId: "task_1" },
+          {
+            task: {
+              id: "task_1",
+              subject: "读取标题",
+              description: "读取描述",
+              status: "running",
+            },
+          },
+        ),
+      ],
+    };
+    expect(deriveAgentTasks(state)).toEqual([
+      {
+        id: "task_1",
+        subject: "读取标题",
+        description: "读取描述",
+        status: "in_progress",
+        updatedAt: expect.any(Number),
+      },
     ]);
   });
 });
@@ -423,13 +651,13 @@ describe("deriveProgressPhases", () => {
     expect(ctx.lastToolLabel).toBe("Glob *.md");
   });
 
-  it("TodoWrite lands in plan phase", () => {
+  it("Task tools land in plan phase", () => {
     const state: ChatState = {
       ...createInitialState(),
       isRunning: true,
       liveMessages: [
         toolCallMsg("a", "Read", { file_path: "/x/a.md" }),
-        toolCallMsg("b", "TodoWrite", { todos: [] }),
+        toolCallMsg("b", "TaskCreate", { subject: "Plan", description: "Plan work" }),
       ],
     };
     const phases = deriveProgressPhases(state);
@@ -473,7 +701,7 @@ describe("deriveProgressPhases", () => {
     expect(phases.find((p) => p.id === "finish")!.status).toBe("active");
   });
 
-  it("skipped phase still renders completed when later phase is active (e.g. DeepSeek skips TodoWrite)", () => {
+  it("skipped phase still renders completed when later phase is active", () => {
     const state: ChatState = {
       ...createInitialState(),
       isRunning: true,
@@ -484,7 +712,7 @@ describe("deriveProgressPhases", () => {
     };
     const phases = deriveProgressPhases(state);
     expect(phases.find((p) => p.id === "context")!.status).toBe("completed");
-    // No TodoWrite was called, but execute is active → plan still rendered as completed (skipped).
+    // No Task tool was called, but execute is active → plan still renders as completed (skipped).
     expect(phases.find((p) => p.id === "plan")!.status).toBe("completed");
     expect(phases.find((p) => p.id === "plan")!.count).toBe(0);
     expect(phases.find((p) => p.id === "plan")!.lastToolLabel).toBe(null);
