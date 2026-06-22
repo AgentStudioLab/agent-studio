@@ -34,6 +34,34 @@ describe("task normalizer", () => {
     ]);
   });
 
+  it("creates a task from the SDK text result shape", () => {
+    let snapshot = createTaskSnapshot(1000);
+    snapshot = handleTaskToolCall(snapshot, {
+      toolCallId: "tc_create",
+      toolName: "TaskCreate",
+      input: {
+        subject: "探索 TaskView UI 接入点",
+        description: "查找 TaskView UI 组件及其数据源",
+        activeForm: "探索 TaskView UI",
+      },
+    });
+    snapshot = handleTaskToolResult(snapshot, {
+      toolCallId: "tc_create",
+      toolName: "TaskCreate",
+      result: "Task #3 created successfully: 探索 TaskView UI 接入点",
+    });
+    expect(snapshot.tasks).toEqual([
+      {
+        id: "3",
+        subject: "探索 TaskView UI 接入点",
+        description: "查找 TaskView UI 组件及其数据源",
+        activeForm: "探索 TaskView UI",
+        status: "pending",
+        updatedAt: 1000,
+      },
+    ]);
+  });
+
   it("updates status and activeForm from TaskUpdate when result succeeds", () => {
     let snapshot = createTaskSnapshot(1000);
     snapshot = handleTaskToolCall(snapshot, {
@@ -65,6 +93,34 @@ describe("task normalizer", () => {
       status: "in_progress",
       activeForm: "正在写测试",
       updatedAt: 1000,
+    });
+  });
+
+  it("updates a task from the SDK text result shape", () => {
+    let snapshot = createTaskSnapshot(1000);
+    snapshot = handleTaskToolCall(snapshot, {
+      toolCallId: "tc_create",
+      toolName: "TaskCreate",
+      input: { subject: "阅读 CLAUDE.md", description: "了解项目约定" },
+    });
+    snapshot = handleTaskToolResult(snapshot, {
+      toolCallId: "tc_create",
+      toolName: "TaskCreate",
+      result: "Task #1 created successfully: 阅读 CLAUDE.md",
+    });
+    snapshot = handleTaskToolCall(snapshot, {
+      toolCallId: "tc_update",
+      toolName: "TaskUpdate",
+      input: { taskId: "1", status: "completed" },
+    });
+    snapshot = handleTaskToolResult(snapshot, {
+      toolCallId: "tc_update",
+      toolName: "TaskUpdate",
+      result: "Updated task #1 status",
+    });
+    expect(snapshot.tasks[0]).toMatchObject({
+      id: "1",
+      status: "completed",
     });
   });
 

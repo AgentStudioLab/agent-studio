@@ -62,6 +62,18 @@ function booleanField(source: Record<string, unknown> | null, key: string): bool
   return typeof value === "boolean" ? value : undefined;
 }
 
+function parseCreatedTaskId(result: unknown): string | null {
+  if (typeof result !== "string") return null;
+  const match = /^Task #([^ ]+) created successfully:/u.exec(result);
+  return match?.[1] ?? null;
+}
+
+function parseUpdatedTaskId(result: unknown): string | null {
+  if (typeof result !== "string") return null;
+  const match = /^Updated task #([^ ]+) /u.exec(result);
+  return match?.[1] ?? null;
+}
+
 function upsertTask(tasks: Map<string, AgentTask>, task: AgentTask): void {
   tasks.set(task.id, task);
 }
@@ -108,6 +120,7 @@ function taskFromTaskCreate(tc: ToolCallView, now: number): AgentTask | null {
     stringField(resultTask, "id") ??
     stringField(result, "taskId") ??
     stringField(result, "id") ??
+    parseCreatedTaskId(tc.result) ??
     stringField(args, "taskId") ??
     stringField(args, "id");
   const subject = stringField(resultTask, "subject") ?? stringField(args, "subject");
@@ -140,8 +153,9 @@ function applyTaskUpdate(tasks: Map<string, AgentTask>, tc: ToolCallView, now: n
   // 最稳定的变更来源；但必须先确认 result 成功且 taskId 匹配，避免把失败
   // 或串线的工具结果误重放到 fallback 任务列表里。
   const result = asRecord(parseToolResult(tc.result));
-  const resultTaskId = stringField(result, "taskId");
-  if (!result || result.success === false || resultTaskId !== id) return;
+  const textTaskId = parseUpdatedTaskId(tc.result);
+  const resultTaskId = stringField(result, "taskId") ?? textTaskId;
+  if ((!result && !textTaskId) || result?.success === false || resultTaskId !== id) return;
 
   const resultTask = asRecord(result?.task);
   const deleted =

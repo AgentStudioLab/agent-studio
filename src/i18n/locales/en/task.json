@@ -231,6 +231,7 @@
   },
   "todos": {
     "trigger": "Tasks {{completed}}/{{total}}",
+    "step": "Step {{current}} / {{total}}",
     "title": "Tasks",
     "empty": "No active tasks",
     "activePrefix": "Now",

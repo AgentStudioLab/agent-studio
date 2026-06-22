@@ -89,6 +89,41 @@ describe("deriveAgentTasks", () => {
     ]);
   });
 
+  it("derives fallback tasks from the SDK text result shape", () => {
+    const state: ChatState = {
+      ...createInitialState(),
+      historicalMessages: [
+        taskToolCallBlock(
+          "tc_create",
+          "TaskCreate",
+          {
+            subject: "探索 TaskView UI 接入点",
+            description: "查找 TaskView UI 组件及其数据源",
+            activeForm: "探索 TaskView UI",
+          },
+          "Task #3 created successfully: 探索 TaskView UI 接入点",
+        ),
+        taskToolCallBlock(
+          "tc_update",
+          "TaskUpdate",
+          { taskId: "3", status: "completed" },
+          "Updated task #3 status",
+        ),
+      ],
+    };
+
+    expect(deriveAgentTasks(state)).toEqual([
+      {
+        id: "3",
+        subject: "探索 TaskView UI 接入点",
+        description: "查找 TaskView UI 组件及其数据源",
+        activeForm: "探索 TaskView UI",
+        status: "completed",
+        updatedAt: expect.any(Number),
+      },
+    ]);
+  });
+
   it("replays task calls from raw historical and live messages without relying on snapshot state", () => {
     const historicalMessages = [
       taskToolCallBlock(

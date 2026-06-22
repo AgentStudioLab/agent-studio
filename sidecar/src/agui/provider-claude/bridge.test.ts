@@ -497,6 +497,97 @@ describe("bridge — agent task snapshots", () => {
       ],
     });
   });
+
+  it("emits CUSTOM agent.tasks from SDK human-readable Task result text", async () => {
+    const sdkStream = (async function* () {
+      yield { type: "system", subtype: "init", session_id: "s1" };
+      yield {
+        type: "assistant",
+        message: {
+          content: [
+            {
+              type: "tool_use",
+              id: "task_create_text",
+              name: "TaskCreate",
+              input: {
+                subject: "探索 TaskView UI 接入点",
+                description: "查找 TaskView UI 组件及其数据源",
+                activeForm: "探索 TaskView UI",
+              },
+            },
+          ],
+        },
+      };
+      yield {
+        type: "user",
+        message: {
+          role: "user",
+          content: [
+            {
+              type: "tool_result",
+              tool_use_id: "task_create_text",
+              content: [
+                {
+                  type: "text",
+                  text: "Task #3 created successfully: 探索 TaskView UI 接入点",
+                },
+              ],
+            },
+          ],
+        },
+      };
+      yield {
+        type: "assistant",
+        message: {
+          content: [
+            {
+              type: "tool_use",
+              id: "task_update_text",
+              name: "TaskUpdate",
+              input: { taskId: "3", status: "completed" },
+            },
+          ],
+        },
+      };
+      yield {
+        type: "user",
+        message: {
+          role: "user",
+          content: [
+            {
+              type: "tool_result",
+              tool_use_id: "task_update_text",
+              content: "Updated task #3 status",
+            },
+          ],
+        },
+      };
+      yield { type: "result", subtype: "success", is_error: false, result: "" };
+    })();
+
+    const events = await drain(
+      claudeSdkToAgui(sdkStream as AsyncIterable<SDKMessage>, {
+        threadId: "t",
+        runId: "r",
+      }),
+    );
+
+    const taskEvents = events.filter(
+      (event) => event.type === "CUSTOM" && event.name === "agent.tasks",
+    );
+    expect(taskEvents.at(-1)?.value).toEqual({
+      tasks: [
+        {
+          id: "3",
+          subject: "探索 TaskView UI 接入点",
+          description: "查找 TaskView UI 组件及其数据源",
+          activeForm: "探索 TaskView UI",
+          status: "completed",
+          updatedAt: expect.any(Number),
+        },
+      ],
+    });
+  });
 });
 
 describe("bridge — user prompt uuid capture (regenerate checkpoint)", () => {

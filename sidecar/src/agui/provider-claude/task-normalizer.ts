@@ -131,7 +131,7 @@ function applyCreateResult(
   const pending = snapshot.pendingCreates[result.toolCallId];
   const task = readRecord(result.result)?.task;
   const taskRecord = readRecord(task);
-  const id = readString(taskRecord?.id);
+  const id = readString(taskRecord?.id) ?? parseCreatedTaskId(result.result);
   const resultSubject = readString(taskRecord?.subject);
 
   if (!pending || !id) return snapshot;
@@ -161,9 +161,10 @@ function applyUpdateResult(
 ): TaskSnapshot {
   const pending = snapshot.pendingUpdates[result.toolCallId];
   const output = readRecord(result.result);
-  if (!pending || output?.success !== true) return snapshot;
+  const textTaskId = parseUpdatedTaskId(result.result);
+  if (!pending || (output?.success === false && !textTaskId)) return snapshot;
 
-  const resultTaskId = readString(output.taskId);
+  const resultTaskId = readString(output?.taskId) ?? textTaskId;
   if (resultTaskId !== pending.taskId) return snapshot;
 
   const { [result.toolCallId]: _removed, ...pendingUpdates } =
@@ -318,4 +319,18 @@ function readRecord(value: unknown): Record<string, unknown> | null {
 
 function readString(value: unknown): string | null {
   return typeof value === "string" ? value : null;
+}
+
+function parseCreatedTaskId(result: unknown): string | null {
+  const text = readString(result);
+  if (!text) return null;
+  const match = /^Task #([^ ]+) created successfully:/u.exec(text);
+  return match?.[1] ?? null;
+}
+
+function parseUpdatedTaskId(result: unknown): string | null {
+  const text = readString(result);
+  if (!text) return null;
+  const match = /^Updated task #([^ ]+) /u.exec(text);
+  return match?.[1] ?? null;
 }

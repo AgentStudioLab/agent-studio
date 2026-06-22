@@ -231,6 +231,7 @@
   },
   "todos": {
     "trigger": "任务 {{completed}}/{{total}}",
+    "step": "第 {{current}} / {{total}} 步",
     "title": "任务",
     "empty": "暂无任务",
     "activePrefix": "当前",

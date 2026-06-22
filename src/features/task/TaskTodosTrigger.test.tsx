@@ -32,6 +32,7 @@ function makeI18n() {
           task: {
             todos: {
               trigger: "Tasks {{completed}}/{{total}}",
+              step: "Step {{current}} / {{total}}",
               title: "Tasks",
               empty: "No active tasks",
               activePrefix: "Now",
@@ -92,11 +93,13 @@ describe("TaskTodosTrigger", () => {
       },
     ]);
 
-    expect(screen.getByRole("button", { name: /tasks 1\/3/i })).toBeTruthy();
-    expect(screen.getByRole("button").textContent).toContain("Working on B");
+    const trigger = screen.getByRole("button", { name: /step 2 \/ 3/i });
+    expect(trigger).toBeTruthy();
+    expect(trigger.textContent).toContain("Step 2 / 3");
+    expect(trigger.className).not.toContain("w-full");
   });
 
-  it("opens a readonly popover list", async () => {
+  it("opens a readonly hover list", async () => {
     renderTrigger([
       {
         id: "a",
@@ -114,10 +117,9 @@ describe("TaskTodosTrigger", () => {
       },
     ]);
 
-    fireEvent.click(screen.getByRole("button", { name: /tasks 1\/2/i }));
+    fireEvent.pointerEnter(screen.getByRole("button", { name: /step 1 \/ 2/i }));
 
-    await waitFor(() => expect(screen.getByText("Tasks")).toBeTruthy());
-    expect(screen.getByText("A")).toBeTruthy();
+    await waitFor(() => expect(screen.getByText("A")).toBeTruthy());
     expect(screen.getByText("B")).toBeTruthy();
     expect(screen.queryByRole("button", { name: /delete|clear|edit/i })).toBeNull();
   });

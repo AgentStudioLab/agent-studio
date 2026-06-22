@@ -134,6 +134,9 @@ mock.module("react-i18next", () => ({
       if (key === "task.todos.trigger") {
         return `Tasks ${values?.completed ?? 0}/${values?.total ?? 0}`;
       }
+      if (key === "task.todos.step") {
+        return `Step ${values?.current ?? 0} / ${values?.total ?? 0}`;
+      }
       if (key === "task.todos.activePrefix") return "Now";
       return key;
     },
@@ -453,7 +456,7 @@ describe("TaskView conversation model selection", () => {
     renderTaskView();
 
     const queuePanel = await screen.findByTestId("queue-panel");
-    const taskTrigger = await screen.findByRole("button", { name: /tasks 0\/1/i });
+    const taskTrigger = await screen.findByRole("button", { name: /step 1 \/ 1/i });
     const messageInput = screen.getByTestId("message-input");
     const following = document.defaultView!.Node.DOCUMENT_POSITION_FOLLOWING;
 

@@ -1,12 +1,10 @@
-import { CheckCircle2, Circle, ListChecks, Loader2 } from "lucide-react";
+import { CheckCircle2, Circle, Loader2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import {
-  Popover,
-  PopoverContent,
-  PopoverHeader,
-  PopoverTitle,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card";
 import { cn } from "@/lib/utils";
 import type { AgentTask } from "@/lib/agui/runtime/types";
 
@@ -26,6 +24,42 @@ function statusIcon(task: AgentTask) {
   return <Circle className="size-4 text-muted-foreground" />;
 }
 
+function ProgressRing({ completed, total }: { completed: number; total: number }) {
+  const radius = 5;
+  const circumference = 2 * Math.PI * radius;
+  const ratio = total > 0 ? Math.min(Math.max(completed / total, 0), 1) : 0;
+  const dashOffset = circumference * (1 - ratio);
+
+  return (
+    <svg
+      aria-hidden="true"
+      className="size-4 shrink-0 -rotate-90 text-primary"
+      viewBox="0 0 16 16"
+    >
+      <circle
+        cx="8"
+        cy="8"
+        r={radius}
+        fill="none"
+        stroke="currentColor"
+        strokeOpacity="0.18"
+        strokeWidth="2"
+      />
+      <circle
+        cx="8"
+        cy="8"
+        r={radius}
+        fill="none"
+        stroke="currentColor"
+        strokeDasharray={circumference}
+        strokeDashoffset={dashOffset}
+        strokeLinecap="round"
+        strokeWidth="2"
+      />
+    </svg>
+  );
+}
+
 export function TaskTodosTrigger({ tasks }: TaskTodosTriggerProps) {
   const { t } = useTranslation();
 
@@ -34,57 +68,59 @@ export function TaskTodosTrigger({ tasks }: TaskTodosTriggerProps) {
   }
 
   const completed = tasks.filter((task) => task.status === "completed").length;
-  const active = tasks.find((task) => task.status === "in_progress");
-  const activeText = active?.activeForm || active?.subject || null;
+  const active = tasks.some((task) => task.status === "in_progress");
+  const current = Math.min(completed + (active ? 1 : 0), tasks.length);
   const triggerLabel = t("task.todos.trigger", {
     completed,
+    total: tasks.length,
+  });
+  const stepLabel = t("task.todos.step", {
+    current,
     total: tasks.length,
   });
 
   return (
     <div className="mb-2 flex justify-center">
-      <Popover>
-        <PopoverTrigger asChild>
+      <HoverCard openDelay={80} closeDelay={120}>
+        <HoverCardTrigger asChild>
           <button
             type="button"
-            aria-label={triggerLabel}
-            className="flex min-h-8 w-full items-center gap-2 rounded-md border border-border bg-background px-3 py-1.5 text-left text-[12.5px] text-foreground transition hover:bg-muted"
+            aria-label={stepLabel}
+            className="inline-flex h-8 items-center gap-1.5 rounded-full border border-border bg-background px-3 text-[12.5px] text-foreground shadow-sm transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-            <ListChecks className="size-4 shrink-0 text-primary" />
-            <span className="shrink-0 font-medium">{triggerLabel}</span>
-            {activeText && (
-              <span className="min-w-0 truncate text-muted-foreground">
-                {t("task.todos.activePrefix")} · {activeText}
-              </span>
-            )}
+            <ProgressRing completed={completed} total={tasks.length} />
+            <span className="shrink-0 text-muted-foreground">{stepLabel}</span>
+            <span className="sr-only">{triggerLabel}</span>
           </button>
-        </PopoverTrigger>
-        <PopoverContent
-          align="start"
-          className="w-[min(720px,calc(100vw_-_32px))] p-3"
+        </HoverCardTrigger>
+        <HoverCardContent
+          align="center"
+          side="top"
+          sideOffset={8}
+          className="w-[min(320px,calc(100vw_-_32px))] p-1.5"
         >
-          <PopoverHeader>
-            <PopoverTitle>{t("task.todos.title")}</PopoverTitle>
-          </PopoverHeader>
-          <div className="max-h-[320px] overflow-y-auto pr-1">
-            <div className="flex flex-col gap-1">
+          <div className="max-h-[320px] overflow-y-auto">
+            <div className="flex flex-col">
               {tasks.map((task) => (
                 <div
                   key={task.id}
                   className={cn(
-                    "flex gap-2 rounded-md px-2 py-2",
+                    "flex gap-2 rounded-md px-1.5 py-1.5",
                     task.status === "in_progress"
-                      ? "bg-primary/10"
+                      ? "bg-muted/70"
                       : "bg-transparent",
                   )}
                 >
-                  <span className="mt-0.5 shrink-0">{statusIcon(task)}</span>
+                  <span className="mt-0.5 shrink-0 text-muted-foreground">
+                    {statusIcon(task)}
+                  </span>
                   <div className="min-w-0 flex-1">
                     <div
                       className={cn(
-                        "truncate text-[13px] font-medium",
+                        "text-[13px] leading-snug text-muted-foreground",
+                        task.status === "in_progress" && "text-foreground",
                         task.status === "completed" &&
-                          "text-muted-foreground line-through",
+                          "text-muted-foreground",
                       )}
                     >
                       {task.subject}
@@ -94,16 +130,16 @@ export function TaskTodosTrigger({ tasks }: TaskTodosTriggerProps) {
                         {task.description}
                       </div>
                     )}
-                    <div className="mt-1 text-[11px] text-muted-foreground">
+                    <span className="sr-only">
                       {t(`task.todos.status.${task.status}`)}
-                    </div>
+                    </span>
                   </div>
                 </div>
               ))}
             </div>
           </div>
-        </PopoverContent>
-      </Popover>
+        </HoverCardContent>
+      </HoverCard>
     </div>
   );
 }
