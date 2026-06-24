@@ -29,6 +29,16 @@ const DEF_A: BuiltinAgentDef = {
   coverImage: "development",
   instructions: "# Alpha\ninstr A",
   mountedSkills: ["s1", "s2"],
+  pack: {
+    domain: "audio",
+    scenario: "podcast-production",
+    tagline: "Alpha pack",
+    inputTypes: ["audio", "text"],
+    outputTypes: ["script", "shownotes"],
+    optionalTools: ["ffmpeg"],
+    riskTags: ["copyright"],
+    sampleTasks: [{ title: "试跑", prompt: "生成一期播客脚本" }],
+  },
 };
 const DEF_B: BuiltinAgentDef = { slug: "beta", name: "Beta", instructions: "instr B" };
 
@@ -46,6 +56,8 @@ describe("reconcileBuiltinAgents", () => {
     expect(a.category).toBe("development");
     expect(a.coverImage).toBe("development");
     expect(a.mountedSkills).toEqual(["s1", "s2"]);
+    expect(a.catalogMetadata?.tagline).toBe("Alpha pack");
+    expect(a.catalogMetadata?.sampleTasks[0]?.title).toBe("试跑");
     expect(a.homeDir).toBe(join(baseDir, builtinAgentId("alpha")));
     expect(readFileSync(join(a.homeDir, "CLAUDE.md"), "utf8")).toContain("instr A");
     expect(existsSync(join(a.homeDir, "memory", "MEMORY.md"))).toBe(true);
@@ -56,6 +68,7 @@ describe("reconcileBuiltinAgents", () => {
     expect(b.category).toBe("general");
     expect(b.coverImage).toBe("general");
     expect(b.mountedSkills).toBeNull();
+    expect(b.catalogMetadata).toBeNull();
   });
 
   it("is idempotent — a second run keeps a single row", () => {
@@ -76,6 +89,16 @@ describe("reconcileBuiltinAgents", () => {
       coverImage: "research",
       instructions: "new instr",
       mountedSkills: [], // 显式不挂
+      pack: {
+        domain: "audio",
+        scenario: "podcast-production",
+        tagline: "Alpha v2 pack",
+        inputTypes: ["url", "pdf"],
+        outputTypes: ["script", "publish-copy"],
+        optionalTools: ["whisper"],
+        riskTags: ["web-access"],
+        sampleTasks: [{ title: "复跑", prompt: "重新生成播客脚本" }],
+      },
     };
     reconcileBuiltinAgents(db, baseDir, [changed]);
     const a = service.get(builtinAgentId("alpha"))!;
@@ -84,6 +107,7 @@ describe("reconcileBuiltinAgents", () => {
     expect(a.category).toBe("research");
     expect(a.coverImage).toBe("research");
     expect(a.mountedSkills).toEqual([]);
+    expect(a.catalogMetadata?.tagline).toBe("Alpha v2 pack");
     expect(readFileSync(join(a.homeDir, "CLAUDE.md"), "utf8")).toBe("new instr");
   });
 

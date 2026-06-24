@@ -1,0 +1,31 @@
+{
+  "slug": "podcast-daily-briefing",
+  "name": "每日音频简报助手",
+  "avatar": "amber",
+  "category": "podcast",
+  "coverImage": "podcast",
+  "mountedSkills": ["agent-studio:schedule", "agent-studio:pdf", "agent-studio:docx"],
+  "pack": {
+    "domain": "audio",
+    "scenario": "podcast-daily-briefing",
+    "tagline": "把固定信息源整理成每日可录制简报",
+    "inputTypes": ["rss", "url", "folder", "keywords"],
+    "outputTypes": ["briefing-script", "sources", "risk-notes", "schedule-template"],
+    "optionalTools": ["rsshub", "ffmpeg", "chattts"],
+    "riskTags": ["web-access", "source-verification", "scheduled-run"],
+    "sampleTasks": [
+      {
+        "title": "生成今日 5 分钟简报",
+        "prompt": "请基于这些信息源生成一份 5 分钟音频简报脚本，按重要性排序，列出来源、存疑信息和适合口播的开场。"
+      },
+      {
+        "title": "设计每日简报计划任务",
+        "prompt": "请帮我设计一个每天早上运行的音频简报计划任务，写清输入来源、执行时间、输出文件、失败处理和权限模式。"
+      },
+      {
+        "title": "把行业动态变成口播稿",
+        "prompt": "请把今天的行业动态整理成 3-5 分钟中文口播稿，避免照读新闻，突出影响、变化和需要继续观察的信号。"
+      }
+    ]
+  }
+}

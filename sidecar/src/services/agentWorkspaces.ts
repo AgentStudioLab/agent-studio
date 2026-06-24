@@ -9,6 +9,7 @@ export const AGENT_FUNCTION_CATEGORIES = [
   "development",
   "research",
   "writing",
+  "podcast",
   "automation",
   "general",
 ] as const;
@@ -17,10 +18,22 @@ export type AgentFunctionCategory = (typeof AGENT_FUNCTION_CATEGORIES)[number];
 export const AGENT_COVER_IMAGES = AGENT_FUNCTION_CATEGORIES;
 export type AgentCoverImage = (typeof AGENT_COVER_IMAGES)[number];
 
+export interface AgentCatalogMetadata {
+  domain: string;
+  scenario: string;
+  tagline: string;
+  inputTypes: string[];
+  outputTypes: string[];
+  optionalTools: string[];
+  riskTags: string[];
+  sampleTasks: Array<{ title: string; prompt: string }>;
+}
+
 const AGENT_CATEGORY_ALIASES: Record<string, AgentFunctionCategory> = {
   "开发构建": "development",
   "研究分析": "research",
   "内容写作": "writing",
+  "播客音频": "podcast",
   "自动化执行": "automation",
   "通用助手": "general",
 };
@@ -62,6 +75,8 @@ export interface AgentWorkspace {
   category: AgentFunctionCategory;
   /** 前端本地封面资产 id；无效值按 category 回退。 */
   coverImage: AgentCoverImage;
+  /** 智能体广场 pack 元数据；普通用户 agent 为 null。 */
+  catalogMetadata: AgentCatalogMetadata | null;
   createdAt: number;
   updatedAt: number;
 }
@@ -77,6 +92,7 @@ interface AgentWorkspaceRow {
   source: string;
   category: string | null;
   cover_image: string | null;
+  catalog_json: string | null;
   created_at: number;
   updated_at: number;
 }
@@ -94,6 +110,39 @@ function parseMountedSkills(raw: string | null): string[] | null {
   return null;
 }
 
+/** 安全解析智能体广场 pack metadata；损坏或结构不完整时不展示增强卡片。 */
+function parseCatalogMetadata(raw: string | null): AgentCatalogMetadata | null {
+  if (raw == null) return null;
+  try {
+    const v = JSON.parse(raw) as Partial<AgentCatalogMetadata>;
+    if (
+      typeof v.domain === "string" &&
+      typeof v.scenario === "string" &&
+      typeof v.tagline === "string" &&
+      Array.isArray(v.inputTypes) &&
+      Array.isArray(v.outputTypes) &&
+      Array.isArray(v.optionalTools) &&
+      Array.isArray(v.riskTags) &&
+      Array.isArray(v.sampleTasks) &&
+      v.inputTypes.every((x) => typeof x === "string") &&
+      v.outputTypes.every((x) => typeof x === "string") &&
+      v.optionalTools.every((x) => typeof x === "string") &&
+      v.riskTags.every((x) => typeof x === "string") &&
+      v.sampleTasks.every(
+        (x) =>
+          x &&
+          typeof (x as { title?: unknown }).title === "string" &&
+          typeof (x as { prompt?: unknown }).prompt === "string",
+      )
+    ) {
+      return v as AgentCatalogMetadata;
+    }
+  } catch {
+    // 损坏数据 → 不展示 pack metadata。
+  }
+  return null;
+}
+
 function rowToAgent(r: AgentWorkspaceRow): AgentWorkspace {
   const category = normalizeAgentCategory(r.category);
   return {
@@ -107,6 +156,7 @@ function rowToAgent(r: AgentWorkspaceRow): AgentWorkspace {
     source: r.source === "builtin" ? "builtin" : "user",
     category,
     coverImage: normalizeAgentCoverImage(r.cover_image, category),
+    catalogMetadata: parseCatalogMetadata(r.catalog_json),
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };

@@ -1,0 +1,31 @@
+{
+  "slug": "podcast-brand-keeper",
+  "name": "声音品牌管家",
+  "avatar": "purple",
+  "category": "podcast",
+  "coverImage": "podcast",
+  "mountedSkills": ["agent-studio:docx"],
+  "pack": {
+    "domain": "audio",
+    "scenario": "podcast-brand-voice",
+    "tagline": "沉淀栏目口吻、结构和长期风格记忆",
+    "inputTypes": ["brand-notes", "past-scripts", "shownotes", "style-guide"],
+    "outputTypes": ["brand-voice", "episode-template", "title-rules", "shownotes-template"],
+    "optionalTools": ["memory", "docx"],
+    "riskTags": ["memory", "brand-consistency", "file-read"],
+    "sampleTasks": [
+      {
+        "title": "提炼栏目声音手册",
+        "prompt": "请基于这些历史节目文案提炼栏目声音手册，包含受众、语气、固定结构、标题偏好、禁用词和 shownotes 模板。"
+      },
+      {
+        "title": "检查脚本是否符合栏目风格",
+        "prompt": "请审查这份播客脚本是否符合我的栏目风格，指出语气偏差、结构问题、标题风险和需要统一的表达。"
+      },
+      {
+        "title": "更新栏目长期记忆",
+        "prompt": "请把这次确认下来的栏目定位、主持人口吻、固定开场、禁用词和标题规则整理成可长期复用的记忆。"
+      }
+    ]
+  }
+}

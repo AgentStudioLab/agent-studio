@@ -1,0 +1,31 @@
+{
+  "slug": "podcast-localization",
+  "name": "播客本地化助手",
+  "avatar": "green",
+  "category": "podcast",
+  "coverImage": "podcast",
+  "mountedSkills": ["agent-studio:docx"],
+  "pack": {
+    "domain": "audio",
+    "scenario": "podcast-localization",
+    "tagline": "把外语播客转成中文可发布资产",
+    "inputTypes": ["audio", "transcript", "srt", "shownotes"],
+    "outputTypes": ["localized-script", "glossary", "bilingual-shownotes", "subtitles"],
+    "optionalTools": ["whisper", "whisperx", "ffmpeg", "tts"],
+    "riskTags": ["copyright", "translation-accuracy", "voice-consent"],
+    "sampleTasks": [
+      {
+        "title": "英文转写稿本地化",
+        "prompt": "请把这份英文播客转写稿本地化成中文口播稿，建立术语表，保留人物和机构名对照，并输出 bilingual-shownotes.md。"
+      },
+      {
+        "title": "生成双语字幕",
+        "prompt": "请基于这份 SRT 或转写稿生成中英双语字幕，保证中文表达自然，专有名词一致，并列出需要人工复核的段落。"
+      },
+      {
+        "title": "改写中文发布文案",
+        "prompt": "请把这期外语播客改写成面向中文听众的标题、摘要、shownotes 和社媒发布文案，不夸大嘉宾观点。"
+      }
+    ]
+  }
+}

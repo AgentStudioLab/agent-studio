@@ -160,6 +160,7 @@ CREATE TABLE IF NOT EXISTS agent_workspaces (
   source      TEXT NOT NULL DEFAULT 'user',
   category    TEXT NOT NULL DEFAULT 'general',
   cover_image TEXT NOT NULL DEFAULT 'general',
+  catalog_json TEXT,
   created_at  INTEGER NOT NULL,
   updated_at  INTEGER NOT NULL
 );
@@ -376,6 +377,8 @@ export function migrate(db: Database): void {
   // 功能分类与封面图标识：前端按 category 生成 tab，cover_image 映射到本地封面资产。
   ensureColumn(db, "agent_workspaces", "category", "TEXT NOT NULL DEFAULT 'general'");
   ensureColumn(db, "agent_workspaces", "cover_image", "TEXT NOT NULL DEFAULT 'general'");
+  // 智能体广场 pack 元数据：仅用于展示输入/输出/工具/示例任务，不参与 run 核心逻辑。
+  ensureColumn(db, "agent_workspaces", "catalog_json", "TEXT");
   ensureColumn(db, "channel_connections", "type", "TEXT NOT NULL DEFAULT 'fake'");
   ensureColumn(db, "channel_connections", "name", "TEXT NOT NULL DEFAULT ''");
   ensureColumn(db, "channel_connections", "enabled", "INTEGER NOT NULL DEFAULT 0");

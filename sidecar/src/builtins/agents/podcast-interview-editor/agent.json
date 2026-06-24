@@ -1,0 +1,31 @@
+{
+  "slug": "podcast-interview-editor",
+  "name": "访谈剪辑助理",
+  "avatar": "stone",
+  "category": "podcast",
+  "coverImage": "podcast",
+  "mountedSkills": ["agent-studio:docx"],
+  "pack": {
+    "domain": "audio",
+    "scenario": "podcast-interview-editing",
+    "tagline": "把长访谈整理成章节、金句和剪辑点",
+    "inputTypes": ["audio", "transcript", "srt", "text"],
+    "outputTypes": ["transcript", "chapters", "highlights", "edit-decisions"],
+    "optionalTools": ["ffmpeg", "whisper", "whisperx", "pyannote"],
+    "riskTags": ["copyright", "voice-consent", "file-read"],
+    "sampleTasks": [
+      {
+        "title": "整理访谈转写稿",
+        "prompt": "请把这份访谈转写稿整理成 transcript-clean.md、chapters.md、highlights.md 和 edit-decisions.csv，保留嘉宾原意并标出可剪辑片段。"
+      },
+      {
+        "title": "提取嘉宾金句",
+        "prompt": "请从这期访谈中提取适合传播的嘉宾金句，按主题分组，说明每条金句适合放在节目标题、短视频开头还是 shownotes。"
+      },
+      {
+        "title": "生成后期剪辑清单",
+        "prompt": "请基于音频或转写稿生成后期剪辑清单，包含建议保留段落、可删减口癖、章节标题和每段的剪辑目的。"
+      }
+    ]
+  }
+}

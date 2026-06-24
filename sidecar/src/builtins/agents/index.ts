@@ -22,6 +22,19 @@ import spreadsheetMeta from "./spreadsheet-analyst/agent.json";
 import spreadsheetMd from "./spreadsheet-analyst/AGENT.md" with { type: "text" };
 import automationMeta from "./automation-assistant/agent.json";
 import automationMd from "./automation-assistant/AGENT.md" with { type: "text" };
+import podcastResearchProducerMeta from "./podcast-research-producer/agent.json";
+import podcastResearchProducerMd from "./podcast-research-producer/AGENT.md" with { type: "text" };
+import podcastInterviewEditorMeta from "./podcast-interview-editor/agent.json";
+import podcastInterviewEditorMd from "./podcast-interview-editor/AGENT.md" with { type: "text" };
+import podcastGrowthClipsMeta from "./podcast-growth-clips/agent.json";
+import podcastGrowthClipsMd from "./podcast-growth-clips/AGENT.md" with { type: "text" };
+import podcastDailyBriefingMeta from "./podcast-daily-briefing/agent.json";
+import podcastDailyBriefingMd from "./podcast-daily-briefing/AGENT.md" with { type: "text" };
+import podcastLocalizationMeta from "./podcast-localization/agent.json";
+import podcastLocalizationMd from "./podcast-localization/AGENT.md" with { type: "text" };
+import podcastBrandKeeperMeta from "./podcast-brand-keeper/agent.json";
+import podcastBrandKeeperMd from "./podcast-brand-keeper/AGENT.md" with { type: "text" };
+import type { AgentCatalogMetadata } from "../../services/agentWorkspaces";
 
 export interface BuiltinAgentDef {
   /** 稳定标识，决定 id = `agw_builtin_<slug>`。改 slug 等于换一个 agent（旧的会被软下架）。 */
@@ -35,6 +48,8 @@ export interface BuiltinAgentDef {
   coverImage?: string | null;
   /** 三态：省略/null=继承全部启用技能；[]=显式不挂；数组=显式子集。 */
   mountedSkills?: string[] | null;
+  /** 智能体广场 pack 元数据。普通内置 agent 可省略。 */
+  pack?: AgentCatalogMetadata | null;
   /** 来自同目录 AGENT.md 的指令正文（编译期注入），reconcile 时落成 homeDir/CLAUDE.md。 */
   instructions: string;
 }
@@ -47,4 +62,10 @@ export const BUILTIN_AGENT_DEFS: BuiltinAgentDef[] = [
   { ...presentationMeta, instructions: presentationMd },
   { ...spreadsheetMeta, instructions: spreadsheetMd },
   { ...automationMeta, instructions: automationMd },
+  { ...podcastResearchProducerMeta, instructions: podcastResearchProducerMd },
+  { ...podcastInterviewEditorMeta, instructions: podcastInterviewEditorMd },
+  { ...podcastGrowthClipsMeta, instructions: podcastGrowthClipsMd },
+  { ...podcastDailyBriefingMeta, instructions: podcastDailyBriefingMd },
+  { ...podcastLocalizationMeta, instructions: podcastLocalizationMd },
+  { ...podcastBrandKeeperMeta, instructions: podcastBrandKeeperMd },
 ];

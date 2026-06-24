@@ -15,6 +15,11 @@ function serializeMountedSkills(mounted: string[] | null | undefined): string | 
   return mounted == null ? null : JSON.stringify(mounted);
 }
 
+/** catalog_json 的写入值：undefined/null → NULL；对象 → 序列化。 */
+function serializeCatalogMetadata(pack: BuiltinAgentDef["pack"]): string | null {
+  return pack == null ? null : JSON.stringify(pack);
+}
+
 /**
  * 把仓库内打包的内置 agent 定义 reconcile 进 DB —— 在 sidecar 启动、构造
  * AgentWorkspaceService 之后调用一次（与 store.reconcileOrphans 同一 boot 阶段）。
@@ -56,6 +61,7 @@ export function reconcileBuiltinAgents(
     const category = normalizeAgentCategory(def.category);
     const coverImage = normalizeAgentCoverImage(def.coverImage, category);
     const mounted = serializeMountedSkills(def.mountedSkills);
+    const catalog = serializeCatalogMetadata(def.pack);
     const now = Date.now();
     const exists = db
       .prepare("SELECT id FROM agent_workspaces WHERE id = ?")
@@ -64,17 +70,17 @@ export function reconcileBuiltinAgents(
       db.prepare(
         `INSERT INTO agent_workspaces
            (id, name, avatar, home_dir, archived, pinned, source, category, cover_image,
-            mounted_skills_json, created_at, updated_at)
-         VALUES (?, ?, ?, ?, 0, 0, 'builtin', ?, ?, ?, ?, ?)`,
-      ).run(id, def.name, avatar, homeDir, category, coverImage, mounted, now, now);
+            mounted_skills_json, catalog_json, created_at, updated_at)
+         VALUES (?, ?, ?, ?, 0, 0, 'builtin', ?, ?, ?, ?, ?, ?)`,
+      ).run(id, def.name, avatar, homeDir, category, coverImage, mounted, catalog, now, now);
     } else {
       db.prepare(
         `UPDATE agent_workspaces
             SET name = ?, avatar = ?, category = ?, cover_image = ?,
-                mounted_skills_json = ?, archived = 0,
+                mounted_skills_json = ?, catalog_json = ?, archived = 0,
                 source = 'builtin', updated_at = ?
           WHERE id = ?`,
-      ).run(def.name, avatar, category, coverImage, mounted, now, id);
+      ).run(def.name, avatar, category, coverImage, mounted, catalog, now, id);
     }
     upserted.push(id);
   }

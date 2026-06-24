@@ -1,0 +1,31 @@
+{
+  "slug": "podcast-research-producer",
+  "name": "资料播客制作人",
+  "avatar": "orange",
+  "category": "podcast",
+  "coverImage": "podcast",
+  "mountedSkills": ["agent-studio:pdf", "agent-studio:docx"],
+  "pack": {
+    "domain": "audio",
+    "scenario": "podcast-production",
+    "tagline": "把资料变成可录制的一期播客",
+    "inputTypes": ["url", "pdf", "markdown", "text"],
+    "outputTypes": ["script", "shownotes", "chapters", "publish-copy"],
+    "optionalTools": ["ffmpeg", "whisper", "whisperx", "chattts"],
+    "riskTags": ["copyright", "web-access", "file-read"],
+    "sampleTasks": [
+      {
+        "title": "资料生成双人播客脚本",
+        "prompt": "请基于我提供的资料，生成一期 20 分钟双人对谈播客脚本，并输出 episode-outline.md、script-dialogue.md、shownotes.md 和 publish-copy.md。"
+      },
+      {
+        "title": "研究笔记整理成节目大纲",
+        "prompt": "请把这些研究笔记整理成一期播客的节目大纲，标出核心冲突、事实来源、适合展开的故事点和需要核验的信息。"
+      },
+      {
+        "title": "生成单人口播版本",
+        "prompt": "请把当前资料改写成 8 分钟单人口播稿，保留引用来源，并在结尾列出本期 shownotes。"
+      }
+    ]
+  }
+}

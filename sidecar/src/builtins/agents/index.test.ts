@@ -9,9 +9,24 @@ const EXPECTED_SLUGS = [
   "presentation-assistant",
   "spreadsheet-analyst",
   "automation-assistant",
+  "podcast-research-producer",
+  "podcast-interview-editor",
+  "podcast-growth-clips",
+  "podcast-daily-briefing",
+  "podcast-localization",
+  "podcast-brand-keeper",
 ];
 
-const VALID_CATEGORIES = new Set(["development", "research", "writing", "automation", "general"]);
+const EXPECTED_PODCAST_SLUGS = [
+  "podcast-research-producer",
+  "podcast-interview-editor",
+  "podcast-growth-clips",
+  "podcast-daily-briefing",
+  "podcast-localization",
+  "podcast-brand-keeper",
+];
+
+const VALID_CATEGORIES = new Set(["development", "research", "writing", "podcast", "automation", "general"]);
 const VALID_COVERS = VALID_CATEGORIES;
 const VALID_MOUNTED_SKILLS = new Set([
   "agent-studio:doc-coauthoring",
@@ -28,6 +43,21 @@ const VALID_MOUNTED_SKILLS = new Set([
 describe("BUILTIN_AGENT_DEFS", () => {
   it("ships the approved seven common builtin agents in a stable order", () => {
     expect(BUILTIN_AGENT_DEFS.map((agent) => agent.slug)).toEqual(EXPECTED_SLUGS);
+  });
+
+  it("ships the first podcast studio packs with complete catalog metadata", () => {
+    const podcast = BUILTIN_AGENT_DEFS.filter((agent) => agent.category === "podcast");
+    expect(podcast.map((agent) => agent.slug)).toEqual(EXPECTED_PODCAST_SLUGS);
+
+    for (const agent of podcast) {
+      expect(agent.pack?.domain).toBe("audio");
+      expect(agent.pack?.scenario).toBeTruthy();
+      expect(agent.pack?.tagline.trim().length).toBeGreaterThan(0);
+      expect(agent.pack?.inputTypes.length).toBeGreaterThanOrEqual(2);
+      expect(agent.pack?.outputTypes.length).toBeGreaterThanOrEqual(3);
+      expect(agent.pack?.riskTags.length).toBeGreaterThanOrEqual(1);
+      expect(agent.pack?.sampleTasks.length).toBeGreaterThanOrEqual(3);
+    }
   });
 
   it("keeps each bundled agent definition complete and valid", () => {
