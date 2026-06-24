@@ -36,6 +36,7 @@ import { AuditService } from "./services/audit";
 import { UsageService } from "./services/usage";
 import { SettingsToolsService } from "./services/settings-tools";
 import { buildSettingsToolsRoutes } from "./routes/settings-tools";
+import { buildAudioToolRoutes } from "./routes/audioTools";
 import { createBunSqliteRunStore } from "./agui/store-sqlite";
 import type { AgentProvider } from "./agui/core";
 import { createAgentProviderForRuntime } from "./agui/provider-factory";
@@ -523,6 +524,7 @@ app.route(
 app.route("/", buildAuditRoutes(audit));
 app.route("/", buildUsageRoutes(usage));
 app.route("/", buildSettingsToolsRoutes(settingsTools));
+app.route("/", buildAudioToolRoutes());
 app.route("/", buildModelsRoutes(providerSettings));
 app.route("/", buildThreadContextRoutes(sessionMetadata, skillInvocations, skillRegistry));
 app.route("/", buildFileContentRoutes());
