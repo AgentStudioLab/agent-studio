@@ -71,6 +71,27 @@ const TASK_TOOL_PROMPT_GUIDANCE = [
   "- Use TaskList or TaskGet only when you need to inspect or resync current task state.",
 ].join("\n");
 
+function buildSkillReminderPrompt(
+  enabledSkills: string[],
+  skillDescriptions: Record<string, string> | undefined,
+): string | null {
+  const lines = enabledSkills
+    .map((id) => {
+      const description = skillDescriptions?.[id]?.trim();
+      return description ? `- ${id}: ${description}` : null;
+    })
+    .filter((line): line is string => line !== null);
+  if (lines.length === 0) return null;
+
+  return [
+    "<system-reminder>",
+    "The following skills are available for use with the Skill tool:",
+    "",
+    ...lines,
+    "</system-reminder>",
+  ].join("\n");
+}
+
 export interface ClaudeProviderOptions {
   /**
    * API key required by claude-agent-sdk. Forwarded through `options.env`
@@ -133,8 +154,15 @@ export interface ClaudeProviderOptions {
    */
   resolveSkillsConfig?: (agentWorkspaceId?: string) => {
     enabledSkills: string[];
+    skillDescriptions?: Record<string, string>;
     pluginPath: string | null;
   };
+  /**
+   * SDK 0.3.154 起把 skill 列表移到独立 system message；经 CCR 转 OpenAI
+   * Chat Completions 时，部分上游不会稳定把后置 system 当作当前 turn 的前置约束。
+   * 仅 CCR provider 开启此兼容注入，恢复 0.3.153 风格的前置可见列表。
+   */
+  ccrSkillReminderCompat?: boolean;
   /**
    * App-level store of skills the agent invoked at runtime via the built-in
    * `Skill` tool, keyed by threadId. When provided, runTurn installs a
@@ -377,8 +405,23 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
     // it reads as a trailing default; phrased to defer to explicit user
     // instructions, so a user who asked for another language still wins.
     const localeDirective = languageDirective(ctxRun.locale);
+    // Skill/plugin config — resolved per turn so a toggle from Customize >
+    // Skills takes effect on the very next /runs without provider rebuild.
+    // Always passes an explicit array (never 'all') so we don't get surprised
+    // by future SDK default-discovery changes. 传入本 run 绑定的 agentWorkspaceId，
+    // host 端据此与该 agent 的挂载选择取交集（绑 agent 时才会收窄）。
+    const skillsConfig =
+      opts.resolveSkillsConfig?.(ctxRun.agentWorkspaceId) ?? null;
+    const skillReminderPrompt =
+      opts.ccrSkillReminderCompat && skillsConfig
+        ? buildSkillReminderPrompt(
+            skillsConfig.enabledSkills,
+            skillsConfig.skillDescriptions,
+          )
+        : null;
     const combinedAppend =
       [
+        skillReminderPrompt,
         appendPrompt,
         ctxRun.appendContext,
         ASK_USER_PROMPT_GUIDANCE,
@@ -387,14 +430,6 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
       ]
         .filter((s): s is string => typeof s === "string" && s.trim().length > 0)
         .join("\n\n") || null;
-
-    // Skill/plugin config — resolved per turn so a toggle from Customize >
-    // Skills takes effect on the very next /runs without provider rebuild.
-    // Always passes an explicit array (never 'all') so we don't get surprised
-    // by future SDK default-discovery changes. 传入本 run 绑定的 agentWorkspaceId，
-    // host 端据此与该 agent 的挂载选择取交集（绑 agent 时才会收窄）。
-    const skillsConfig =
-      opts.resolveSkillsConfig?.(ctxRun.agentWorkspaceId) ?? null;
 
     // In-process `agent_studio` MCP server. Built per-run with whichever tools
     // apply: `create_scheduled_task` (always, for the /schedule skill) and

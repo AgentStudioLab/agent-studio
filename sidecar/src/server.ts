@@ -290,14 +290,21 @@ function buildProviderForSelection(
     // 全局启用集 ∩ 该 agent 的挂载选择。绑 agent 且其 mountedSkills 为数组时收窄；
     // 为 null（继承）或不绑 agent 时直接用全局启用集。全局禁用/卸载的技能因交集自然掉出。
     resolveSkillsConfig: (agentWorkspaceId) => {
-      const enabled = skillRegistry.listEnabledIds();
+      const allSkills = skillRegistry.listSkills();
+      const enabled = allSkills.filter((skill) => skill.enabled).map((skill) => skill.id);
       const mounted = agentWorkspaceId
         ? (agentWorkspaces.get(agentWorkspaceId)?.mountedSkills ?? null)
         : null;
       const effective =
         mounted == null ? enabled : enabled.filter((id) => mounted.includes(id));
+      const enabledSet = new Set(effective);
       return {
         enabledSkills: effective,
+        skillDescriptions: Object.fromEntries(
+          allSkills
+            .filter((skill) => enabledSet.has(skill.id))
+            .map((skill) => [skill.id, skill.description]),
+        ),
         pluginPath: skillRegistry.builtinPluginPath(),
       };
     },
@@ -344,7 +351,7 @@ function buildProviderForSelection(
       },
       apiKey: route.apiKey,
       defaultModel: route.model,
-      common,
+      common: { ...common, ccrSkillReminderCompat: true },
     });
     return withCcrReady(provider, () => ccrRuntime.ensureReadyForRoute(route));
   }

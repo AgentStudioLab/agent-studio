@@ -128,6 +128,75 @@ describe("provider sandbox config", () => {
     expect(systemPrompt.append).toContain("Keep at most one task in_progress at a time.");
   });
 
+  it("can prepend a CCR-compatible skill reminder to systemPrompt.append", async () => {
+    const provider = createClaudeProvider({
+      apiKey: "k",
+      ccrSkillReminderCompat: true,
+      resolveSkillsConfig: () => ({
+        enabledSkills: ["agent-studio:using-superpowers"],
+        skillDescriptions: {
+          "agent-studio:using-superpowers": "Load required instructions before answering.",
+        },
+        pluginPath: "/tmp/built-in",
+      }),
+    });
+    const ac = new AbortController();
+    await drain(provider.run({
+      runId: "r_skill_compat",
+      threadId: "t_skill_compat",
+      userMessage: { role: "user", content: "hi" },
+      abortSignal: ac.signal,
+      cwd: "/tmp/proj",
+    }));
+
+    const calls = querySpy.mock.calls as unknown[];
+    const lastCallArgs = calls[calls.length - 1] as unknown[];
+    const lastCall = lastCallArgs[0] as Record<string, unknown>;
+    const options = lastCall.options as Record<string, unknown>;
+    const systemPrompt = options.systemPrompt as {
+      type?: string;
+      preset?: string;
+      append?: string;
+    };
+    expect(systemPrompt.append).toStartWith(
+      "<system-reminder>\nThe following skills are available for use with the Skill tool:",
+    );
+    expect(systemPrompt.append).toContain(
+      "- agent-studio:using-superpowers: Load required instructions before answering.",
+    );
+    expect(systemPrompt.append).toContain("AskUserQuestion guidance:");
+  });
+
+  it("does not inject the skill reminder compatibility prompt by default", async () => {
+    const provider = createClaudeProvider({
+      apiKey: "k",
+      resolveSkillsConfig: () => ({
+        enabledSkills: ["agent-studio:using-superpowers"],
+        skillDescriptions: {
+          "agent-studio:using-superpowers": "Load required instructions before answering.",
+        },
+        pluginPath: "/tmp/built-in",
+      }),
+    });
+    const ac = new AbortController();
+    await drain(provider.run({
+      runId: "r_skill_no_compat",
+      threadId: "t_skill_no_compat",
+      userMessage: { role: "user", content: "hi" },
+      abortSignal: ac.signal,
+      cwd: "/tmp/proj",
+    }));
+
+    const calls = querySpy.mock.calls as unknown[];
+    const lastCallArgs = calls[calls.length - 1] as unknown[];
+    const lastCall = lastCallArgs[0] as Record<string, unknown>;
+    const options = lastCall.options as Record<string, unknown>;
+    const systemPrompt = options.systemPrompt as { append?: string };
+    expect(systemPrompt.append).not.toContain(
+      "The following skills are available for use with the Skill tool:",
+    );
+  });
+
   it("passes sandbox.filesystem.allowWrite=[cwd] to sdkQuery", async () => {
     const provider = createClaudeProvider({ apiKey: "k", allowedTools: ["Bash"] });
     const ac = new AbortController();
