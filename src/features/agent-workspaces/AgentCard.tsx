@@ -19,7 +19,11 @@ export function AgentCard({ agent, onClick }: AgentCardProps) {
   const { t } = useTranslation();
   const category = normalizeAgentCategory(agent.category);
   const coverImage = coverImageForAgent(agent);
+  const metadata = agent.catalogMetadata;
   const updatedAt = new Date(agent.updatedAt).toLocaleDateString();
+  const description = metadata?.tagline ?? t(AGENT_CATEGORY_META[category].descriptionKey);
+  const inputTypes = metadata?.inputTypes.slice(0, 3) ?? [];
+  const outputTypes = metadata?.outputTypes.slice(0, 3) ?? [];
 
   return (
     <button
@@ -61,8 +65,34 @@ export function AgentCard({ agent, onClick }: AgentCardProps) {
         </span>
 
         <span className="mt-3 line-clamp-2 block text-[13px] leading-5 text-muted-foreground">
-          {t(AGENT_CATEGORY_META[category].descriptionKey)}
+          {description}
         </span>
+
+        {metadata && (
+          <span className="mt-3 flex min-w-0 flex-col gap-2">
+            <span className="flex flex-wrap gap-1.5">
+              {inputTypes.map((input) => (
+                <span
+                  key={`input-${input}`}
+                  className="rounded-md border border-border bg-background px-1.5 py-0.5 text-[11px] font-medium leading-4 text-muted-foreground"
+                >
+                  {input}
+                </span>
+              ))}
+              {outputTypes.map((output) => (
+                <span
+                  key={`output-${output}`}
+                  className="rounded-md bg-muted px-1.5 py-0.5 text-[11px] font-medium leading-4 text-foreground"
+                >
+                  {output}
+                </span>
+              ))}
+            </span>
+            <span className="text-[11.5px] leading-4 text-muted-foreground">
+              {t("agents.pack.riskCount", { count: String(metadata.riskTags.length) })}
+            </span>
+          </span>
+        )}
       </span>
     </button>
   );

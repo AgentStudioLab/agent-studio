@@ -40,6 +40,10 @@ interface SlashEditorProps {
   onKeyDown?: (event: KeyboardEvent) => void;
   /** Disabled state — relays to ProseMirror's `editable: false`. */
   disabled?: boolean;
+  /** Optional plain-text seed used by agent pack sample tasks. */
+  value?: string;
+  /** Bump when the same value should be re-applied. */
+  valueVersion?: number;
   className?: string;
 }
 
@@ -65,6 +69,8 @@ export function SlashEditor({
   rows = 2,
   onKeyDown,
   disabled,
+  value,
+  valueVersion,
   className,
 }: SlashEditorProps) {
   const { t } = useTranslation();
@@ -197,6 +203,29 @@ export function SlashEditor({
     form.addEventListener("reset", onReset);
     return () => form.removeEventListener("reset", onReset);
   }, [editor]);
+
+  // Sample tasks in Agent Space can seed a prompt without taking over normal
+  // editing. We only apply when the parent value/version changes, then Tiptap
+  // remains the source of truth for user edits.
+  useEffect(() => {
+    if (!editor || value === undefined) return;
+    if (editor.getText({ blockSeparator: "\n" }) !== value) {
+      editor.commands.setContent(
+        value.length > 0
+          ? {
+              type: "doc",
+              content: [
+                {
+                  type: "paragraph",
+                  content: [{ type: "text", text: value }],
+                },
+              ],
+            }
+          : "",
+      );
+    }
+    if (hiddenInputRef.current) hiddenInputRef.current.value = value;
+  }, [editor, value, valueVersion]);
 
   return (
     <div

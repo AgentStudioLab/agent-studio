@@ -22,6 +22,7 @@ import {
 import { SlashEditor } from "@/features/composer/SlashEditor";
 import { ModelPicker } from "@/features/task/ModelPicker";
 import { AgentSpaceHeader } from "@/features/agent-workspaces/AgentSpaceHeader";
+import { AgentPackOverview } from "@/features/agent-workspaces/AgentPackOverview";
 import { AgentRecents } from "@/features/agent-workspaces/AgentRecents";
 import { InstructionsCard } from "@/features/agent-workspaces/InstructionsCard";
 import { ScheduledRailCard } from "@/features/agent-workspaces/ScheduledRailCard";
@@ -40,6 +41,8 @@ export function AgentSpaceView() {
   const { data: agent } = useAgentWorkspace(agentId ?? null);
   const [model, setModel] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [draftPrompt, setDraftPrompt] = useState("");
+  const [draftPromptVersion, setDraftPromptVersion] = useState(0);
   // File preview opened from a Context folder tree. workingDir = the mounted
   // folder's path (the /files/content sandbox cwd) so files under it resolve.
   const [preview, setPreview] = useState<{ file: MockFile; workingDir: string } | null>(null);
@@ -84,6 +87,11 @@ export function AgentSpaceView() {
     }
   };
 
+  const handleUseSampleTask = (prompt: string) => {
+    setDraftPrompt(prompt);
+    setDraftPromptVersion((version) => version + 1);
+  };
+
   return (
     <AppShell
       main={
@@ -116,9 +124,21 @@ export function AgentSpaceView() {
             </div>
             <div className="px-4 pb-8 sm:px-8 lg:px-12">
               <PageColumn className="max-w-[860px]">
+                {agent?.catalogMetadata && (
+                  <div className="mb-4">
+                    <AgentPackOverview
+                      metadata={agent.catalogMetadata}
+                      onUseSampleTask={handleUseSampleTask}
+                    />
+                  </div>
+                )}
                 <div className="rounded-2xl bg-background">
                   <PromptInput onSubmit={handleSubmit}>
-                    <SlashEditor placeholder={t("agentSpace.promptPlaceholder")} />
+                    <SlashEditor
+                      placeholder={t("agentSpace.promptPlaceholder")}
+                      value={draftPrompt}
+                      valueVersion={draftPromptVersion}
+                    />
                     <PromptInputFooter className="px-4 pb-3">
                       <PromptInputTools />
                       <PromptInputTools>

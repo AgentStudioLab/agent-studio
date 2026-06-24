@@ -30,6 +30,9 @@
     "automation": "Recurring work, workflow orchestration, and ops",
     "general": "Everyday work and open-ended collaboration"
   },
+  "pack": {
+    "riskCount": "{{count}} risks"
+  },
   "modal": {
     "title": "New agent",
     "editTitle": "Edit agent",

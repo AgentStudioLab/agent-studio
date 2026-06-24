@@ -14,6 +14,14 @@
     "clone": "克隆为我的智能体",
     "moreActions": "更多操作"
   },
+  "pack": {
+    "title": "能力概览",
+    "inputs": "适合输入",
+    "outputs": "预计产出",
+    "tools": "可选工具",
+    "risks": "权限与风险",
+    "sampleTasks": "示例任务"
+  },
   "context": {
     "title": "上下文",
     "onYourComputer": "本机文件夹",

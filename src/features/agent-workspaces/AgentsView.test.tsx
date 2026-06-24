@@ -22,6 +22,7 @@ function agent(
     source: "user",
     category,
     coverImage: category,
+    catalogMetadata: null,
     createdAt: 1,
     updatedAt: 1,
     ...overrides,
@@ -70,14 +71,17 @@ mock.module("react-i18next", () => ({
         "agents.categories.development": "开发构建",
         "agents.categories.research": "研究分析",
         "agents.categories.writing": "内容写作",
+        "agents.categories.podcast": "播客音频",
         "agents.categories.automation": "自动化执行",
         "agents.categories.general": "通用助手",
         "agents.categoryDescriptions.all": "全部智能体",
         "agents.categoryDescriptions.development": "代码实现、重构、调试与交付",
         "agents.categoryDescriptions.research": "资料搜集、分析归纳与判断",
         "agents.categoryDescriptions.writing": "内容规划、写作与润色",
+        "agents.categoryDescriptions.podcast": "播客节目、音频脚本与发布资产",
         "agents.categoryDescriptions.automation": "重复任务、流程编排与运维",
         "agents.categoryDescriptions.general": "日常任务与开放式协作",
+        "agents.pack.riskCount": `${values?.count ?? ""} risks`,
         "agents.updated": `更新于 ${values?.date ?? ""}`,
       };
       return translations[key] ?? key;
@@ -87,6 +91,7 @@ mock.module("react-i18next", () => ({
 
 mock.module("react-router-dom", () => ({
   useNavigate: () => navigate,
+  useParams: () => ({}),
 }));
 
 mock.module("@/app/AppShell", () => ({
@@ -111,7 +116,10 @@ mock.module("@/lib/data/agent-queries", () => ({
   useAgentWorkspaces: () => ({
     data: currentAgents,
   }),
+  useAgentWorkspace: () => ({ data: null }),
   useCreateAgentWorkspaceMutation: () => ({ mutate }),
+  useUpdateAgentWorkspaceMutation: () => ({ mutate }),
+  useCloneAgentWorkspaceMutation: () => ({ mutate }),
 }));
 
 const { AgentsView } = require("./AgentsView") as typeof import("./AgentsView");
@@ -176,6 +184,38 @@ describe("AgentsView", () => {
     });
 
     expect(screen.getByText("没有匹配的智能体。")).toBeTruthy();
+  });
+
+  it("shows podcast pack metadata on official pack cards", () => {
+    currentAgents = [
+      agent("podcast-research-producer", "podcast", {
+        name: "资料播客制作人",
+        source: "builtin",
+        catalogMetadata: {
+          domain: "audio",
+          scenario: "podcast-production",
+          tagline: "把资料变成可录制的一期播客",
+          inputTypes: ["PDF", "链接", "音频"],
+          outputTypes: ["script", "shownotes", "SRT"],
+          optionalTools: ["ffmpeg", "whisper"],
+          riskTags: ["copyright", "file-read"],
+          sampleTasks: [
+            {
+              title: "资料生成双人播客脚本",
+              prompt: "请生成一期播客脚本。",
+            },
+          ],
+        },
+      }),
+    ];
+
+    render(<AgentsView />);
+
+    expect(screen.getByRole("button", { name: /资料播客制作人/ })).toBeTruthy();
+    expect(screen.getByText("把资料变成可录制的一期播客")).toBeTruthy();
+    expect(screen.getByText("PDF")).toBeTruthy();
+    expect(screen.getByText("shownotes")).toBeTruthy();
+    expect(screen.getByText("2 risks")).toBeTruthy();
   });
 
   it("toggles latest update sorting between newest first and oldest first", () => {

@@ -14,6 +14,14 @@
     "clone": "Clone to my agents",
     "moreActions": "More actions"
   },
+  "pack": {
+    "title": "Pack overview",
+    "inputs": "Best inputs",
+    "outputs": "Expected outputs",
+    "tools": "Optional tools",
+    "risks": "Permissions and risks",
+    "sampleTasks": "Sample tasks"
+  },
   "context": {
     "title": "Context",
     "onYourComputer": "On your computer",

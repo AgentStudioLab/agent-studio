@@ -30,6 +30,9 @@
     "automation": "重复任务、流程编排与运维",
     "general": "日常任务与开放式协作"
   },
+  "pack": {
+    "riskCount": "{{count}} 个风险标签"
+  },
   "modal": {
     "title": "新建智能体",
     "editTitle": "编辑智能体",
