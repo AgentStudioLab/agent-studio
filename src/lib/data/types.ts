@@ -73,10 +73,22 @@ export type AgentFunctionCategory =
   | "development"
   | "research"
   | "writing"
+  | "podcast"
   | "automation"
   | "general";
 
 export type AgentCoverImage = AgentFunctionCategory;
+
+export interface AgentCatalogMetadata {
+  domain: string;
+  scenario: string;
+  tagline: string;
+  inputTypes: string[];
+  outputTypes: string[];
+  optionalTools: string[];
+  riskTags: string[];
+  sampleTasks: Array<{ title: string; prompt: string }>;
+}
 
 /** A persistent Agent (智能体) — its own home dir + (P2/P3) folders, CLAUDE.md, memory. */
 export interface AgentWorkspace {
@@ -98,6 +110,8 @@ export interface AgentWorkspace {
   category: AgentFunctionCategory | string | null;
   /** 本地封面资产 id。旧数据/非法值在前端按 category 回退。 */
   coverImage: AgentCoverImage | string | null;
+  /** 智能体广场 pack 元数据；用户自建 agent 通常为 null。 */
+  catalogMetadata: AgentCatalogMetadata | null;
   createdAt: number;
   updatedAt: number;
 }

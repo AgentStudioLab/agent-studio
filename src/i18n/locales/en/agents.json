@@ -17,6 +17,7 @@
     "development": "Development",
     "research": "Research",
     "writing": "Writing",
+    "podcast": "Podcast",
     "automation": "Automation",
     "general": "General"
   },
@@ -25,6 +26,7 @@
     "development": "Implementation, refactors, debugging, and delivery",
     "research": "Research, synthesis, analysis, and judgment",
     "writing": "Content planning, writing, and editing",
+    "podcast": "Podcast episodes, audio scripts, and publishing assets",
     "automation": "Recurring work, workflow orchestration, and ops",
     "general": "Everyday work and open-ended collaboration"
   },

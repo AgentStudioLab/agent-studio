@@ -17,6 +17,7 @@
     "development": "开发构建",
     "research": "研究分析",
     "writing": "内容写作",
+    "podcast": "播客音频",
     "automation": "自动化执行",
     "general": "通用助手"
   },
@@ -25,6 +26,7 @@
     "development": "代码实现、重构、调试与交付",
     "research": "资料搜集、分析归纳与判断",
     "writing": "内容规划、写作与润色",
+    "podcast": "播客节目、音频脚本与发布资产",
     "automation": "重复任务、流程编排与运维",
     "general": "日常任务与开放式协作"
   },

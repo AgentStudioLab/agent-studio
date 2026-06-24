@@ -24,6 +24,7 @@ function agent(
     source: "user",
     category: category ?? null,
     coverImage: coverImage ?? null,
+    catalogMetadata: null,
     createdAt: 1,
     updatedAt: 1,
   };
@@ -51,6 +52,7 @@ describe("agent catalog helpers", () => {
       ["development", 1],
       ["research", 1],
       ["writing", 1],
+      ["podcast", 0],
       ["automation", 0],
       ["general", 1],
     ]);
@@ -75,5 +77,18 @@ describe("agent catalog helpers", () => {
     );
     expect(coverImageForAgent(agent("fallback", "writing", "broken"))).toBe("writing");
     expect(coverImageForAgent(agent("general"))).toBe("general");
+  });
+
+  it("includes podcast category tabs and filters podcast packs", () => {
+    const agents = [
+      agent("episode-producer", "podcast", "podcast"),
+      agent("writer", "writing", "writing"),
+    ];
+
+    expect(buildAgentCategoryTabs(agents).some((tab) => tab.id === "podcast")).toBe(true);
+    expect(filterAgentsByCategory(agents, "podcast").map((a) => a.id)).toEqual([
+      "episode-producer",
+    ]);
+    expect(coverImageForAgent(agents[0]!)).toBe("podcast");
   });
 });

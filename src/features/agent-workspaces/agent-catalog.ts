@@ -8,6 +8,7 @@ export const AGENT_CATEGORY_ORDER = [
   "development",
   "research",
   "writing",
+  "podcast",
   "automation",
   "general",
 ] as const satisfies readonly AgentFunctionCategory[];
@@ -18,6 +19,7 @@ const CATEGORY_ALIASES: Record<string, AgentFunctionCategory> = {
   "开发构建": "development",
   "研究分析": "research",
   "内容写作": "writing",
+  "播客音频": "podcast",
   "自动化执行": "automation",
   "通用助手": "general",
 };
@@ -54,6 +56,10 @@ export const AGENT_CATEGORY_META: Record<AgentFunctionCategory, AgentCategoryMet
   writing: {
     labelKey: "agents.categories.writing",
     descriptionKey: "agents.categoryDescriptions.writing",
+  },
+  podcast: {
+    labelKey: "agents.categories.podcast",
+    descriptionKey: "agents.categoryDescriptions.podcast",
   },
   automation: {
     labelKey: "agents.categories.automation",
