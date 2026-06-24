@@ -68,6 +68,29 @@ describe("buildAgentStudioCcrConfig", () => {
     expect(config.Providers[0]?.api_key).toBe("sk-new");
   });
 
+  it("keeps every enabled OpenAI-compatible route in one stable config", () => {
+    const secondRoute: CcrRuntimeRoute = {
+      ...openaiRoute,
+      model: "agentstudio/conn_openai/claude-opus-4-7",
+      upstream: {
+        ...openaiRoute.upstream,
+        modelId: "claude-opus-4-7",
+      },
+    };
+
+    const config = buildAgentStudioCcrConfig([openaiRoute, secondRoute]);
+
+    expect(config.Providers.map((provider) => provider.name)).toEqual([
+      "agentstudio_conn_openai_gpt-5.1",
+      "agentstudio_conn_openai_claude-opus-4-7",
+    ]);
+    expect(config.Providers.map((provider) => provider.models)).toEqual([
+      ["gpt-5.1"],
+      ["claude-opus-4-7"],
+    ]);
+    expect(config.Router.default).toBe("agentstudio_conn_openai_gpt-5.1,gpt-5.1");
+  });
+
   it("redacts API keys for logs", () => {
     const config = buildAgentStudioCcrConfig([openaiRoute]);
     const redacted = redactAgentStudioCcrConfig(config);

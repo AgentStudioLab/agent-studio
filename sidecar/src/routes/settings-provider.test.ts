@@ -6,8 +6,15 @@ import { createProviderSettings } from "../services/providerSettings";
 import { createUserProfileSettings } from "../services/userProfileSettings";
 import { buildSettingsRoutes } from "./settings";
 import type { ModelFetchImpl } from "../services/modelCatalog";
+import type { CcrRuntimeStatus } from "../ccr";
 
-function makeApp(options: { fetchImpl?: ModelFetchImpl } = {}) {
+function makeApp(options: {
+  fetchImpl?: ModelFetchImpl;
+  ccrRuntime?: {
+    status: () => CcrRuntimeStatus;
+    refreshFromSettings: (reason: string) => Promise<void>;
+  };
+} = {}) {
   const db = new Database(":memory:");
   migrate(db);
   const provider = createProviderSettings(db, {});
@@ -70,6 +77,65 @@ describe("settings provider routes", () => {
     expect(body.enabledModels).toContainEqual(
       expect.objectContaining(body.defaultSelection),
     );
+  });
+
+  it("GET /settings/provider includes CCR runtime status when available", async () => {
+    const { app } = makeApp({
+      ccrRuntime: {
+        status: () => ({
+          enabled: true,
+          phase: "ready",
+          baseUrl: "http://127.0.0.1:3456",
+          routeCount: 2,
+          routeKeys: [
+            "agentstudio/conn-openai/gpt-5.1",
+            "agentstudio/conn-openai/claude-opus-4-7",
+          ],
+        }),
+        refreshFromSettings: async () => {},
+      },
+    });
+
+    const res = await app.request("/settings/provider");
+    const body = (await res.json()) as { ccrStatus: CcrRuntimeStatus };
+
+    expect(res.status).toBe(200);
+    expect(body.ccrStatus).toMatchObject({
+      enabled: true,
+      phase: "ready",
+      routeCount: 2,
+      routeKeys: [
+        "agentstudio/conn-openai/gpt-5.1",
+        "agentstudio/conn-openai/claude-opus-4-7",
+      ],
+    });
+  });
+
+  it("POST /settings/ccr/apply reapplies CCR routes from settings", async () => {
+    const reasons: string[] = [];
+    const { app } = makeApp({
+      ccrRuntime: {
+        status: () => ({
+          enabled: true,
+          phase: "ready",
+          baseUrl: "http://127.0.0.1:3456",
+          routeCount: 1,
+          routeKeys: ["agentstudio/conn-openai/gpt-5.1"],
+        }),
+        refreshFromSettings: async (reason) => {
+          reasons.push(reason);
+        },
+      },
+    });
+
+    const res = await app.request("/settings/ccr/apply", {
+      method: "POST",
+    });
+    const body = (await res.json()) as { ccrStatus: CcrRuntimeStatus };
+
+    expect(res.status).toBe(200);
+    expect(reasons).toEqual(["manual_apply"]);
+    expect(body.ccrStatus.phase).toBe("ready");
   });
 
   it("POST /settings/provider accepts OpenAI, api key, and selected model id", async () => {

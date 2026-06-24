@@ -12,6 +12,7 @@ import {
 } from "@/lib/data/settings";
 import { ProviderConnectionDialog } from "./ProviderConnectionDialog";
 import { ProviderConnectionList } from "./ProviderConnectionList";
+import { CcrRuntimeStatus } from "./CcrRuntimeStatus";
 
 export function ModelSection() {
   const { t } = useTranslation();
@@ -20,6 +21,8 @@ export function ModelSection() {
     queryKey: ["provider"],
     queryFn: getProvider,
     staleTime: 60 * 1000,
+    refetchInterval: (query) =>
+      query.state.data?.ccrStatus?.phase === "applying" ? 1_000 : false,
   });
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<"create" | "edit">("create");
@@ -113,6 +116,8 @@ export function ModelSection() {
           {t("settings.provider.description")}
         </p>
       </div>
+
+      <CcrRuntimeStatus status={data.ccrStatus} />
 
       <ProviderConnectionList
         connections={data.connections ?? []}

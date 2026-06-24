@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import type { Context } from "hono";
 import type {
   CreateProviderPresetInput,
   CreateProviderConnectionInput,
@@ -20,10 +21,15 @@ import {
   type ModelFetchImpl,
 } from "../services/modelCatalog";
 import type { CustomProviderProtocol } from "../services/providerSettings";
+import type { CcrRuntimeStatus } from "../ccr";
 
 interface SettingsRouteDeps {
   fetchImpl?: ModelFetchImpl;
   officialService?: OfficialServiceState;
+  ccrRuntime?: {
+    status: () => CcrRuntimeStatus;
+    refreshFromSettings: (reason: string) => Promise<void>;
+  };
 }
 
 function isValidProfileId(v: unknown): v is ProviderProfileId {
@@ -40,7 +46,10 @@ function sanitizePresetName(value: unknown): string | null {
   return trimmed === "" ? null : trimmed;
 }
 
-function providerEnvelope(provider: ProviderSettingsState) {
+function providerEnvelope(
+  provider: ProviderSettingsState,
+  ccrRuntime?: SettingsRouteDeps["ccrRuntime"],
+) {
   const current = provider.current();
   return {
     version: provider.currentStoreVersion(),
@@ -50,6 +59,7 @@ function providerEnvelope(provider: ProviderSettingsState) {
     defaultSelection: provider.getDefaultSelection(),
     connections: provider.listConnections(),
     enabledModels: provider.listEnabledModelSelections(),
+    ...(ccrRuntime ? { ccrStatus: ccrRuntime.status() } : {}),
   };
 }
 
@@ -255,10 +265,31 @@ export function buildSettingsRoutes(
   // this on Settings page load + on the model picker open.
   app.get("/settings/provider", (c) => {
     return c.json({
-      ...providerEnvelope(provider),
+      ...providerEnvelope(provider, deps.ccrRuntime),
       builtIn: BUILT_IN_PROFILES,
     });
   });
+
+  async function applyCcrRuntime(c: Context) {
+    if (!deps.ccrRuntime) {
+      return c.json({ error: "ccr_runtime_unavailable" }, 404);
+    }
+    try {
+      await deps.ccrRuntime.refreshFromSettings("manual_apply");
+      return c.json({ ccrStatus: deps.ccrRuntime.status() });
+    } catch (err) {
+      return c.json(
+        {
+          ccrStatus: deps.ccrRuntime.status(),
+          error: err instanceof Error ? err.message : String(err),
+        },
+        500,
+      );
+    }
+  }
+
+  app.post("/settings/ccr/apply", applyCcrRuntime);
+  app.post("/settings/ccr/restart", applyCcrRuntime);
 
   // PATCH-style update. Caller sends only the fields they want to change;
   // omitted fields keep prior value. apiKey is intentionally writable here

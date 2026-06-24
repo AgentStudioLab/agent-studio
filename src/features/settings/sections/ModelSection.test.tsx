@@ -16,6 +16,7 @@ import i18n from "i18next";
 import { I18nextProvider, initReactI18next } from "react-i18next";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import type {
+  CcrRuntimeApplyError as CcrRuntimeApplyErrorType,
   ProviderConnectionConfig,
   ProviderState,
 } from "@/lib/data/settings";
@@ -52,6 +53,15 @@ const setProviderConnectionEnabledModelsMock = mock(async (id: string) => ({
   },
 }));
 const setDefaultProviderSelectionMock = mock(async () => providerState);
+const applyCcrRuntimeRoutesMock = mock(async () => providerState.ccrStatus!);
+class CcrRuntimeApplyErrorMock extends Error {
+  constructor(
+    message: string,
+    public readonly ccrStatus?: ProviderState["ccrStatus"],
+  ) {
+    super(message);
+  }
+}
 
 let providerState: ProviderState;
 let providerConnections: Record<string, ProviderConnectionConfig>;
@@ -65,6 +75,8 @@ mock.module("@/lib/data/settings", () => ({
   refreshProviderConnectionModels: refreshProviderConnectionModelsMock,
   setProviderConnectionEnabledModels: setProviderConnectionEnabledModelsMock,
   setDefaultProviderSelection: setDefaultProviderSelectionMock,
+  applyCcrRuntimeRoutes: applyCcrRuntimeRoutesMock,
+  CcrRuntimeApplyError: CcrRuntimeApplyErrorMock as unknown as typeof CcrRuntimeApplyErrorType,
 }));
 
 mock.module("@/components/ui/dialog", () => ({
@@ -272,6 +284,12 @@ void testI18n.use(initReactI18next).init({
             modelSearch: "Search models",
             modelEmpty: "No models found",
             defaultModelLabel: "Default model",
+            ccrReady: "CCR ready, {{count}} model routes applied",
+            ccrApplying:
+              "Applying model routes. OpenAI-compatible conversations are temporarily unavailable.",
+            ccrError: "CCR failed to start: {{message}}",
+            ccrDisabled: "CCR disabled",
+            ccrRetry: "Retry",
           },
         },
       },
@@ -573,6 +591,7 @@ afterEach(() => {
   refreshProviderConnectionModelsMock.mockClear();
   setProviderConnectionEnabledModelsMock.mockClear();
   setDefaultProviderSelectionMock.mockClear();
+  applyCcrRuntimeRoutesMock.mockClear();
 });
 
 import { ModelSection } from "./ModelSection";
@@ -619,6 +638,117 @@ describe("ModelSection", () => {
       screen.queryByRole("button", { name: "Delete 官方服务商" }),
     ).toBeNull();
     expect(screen.queryByText("Missing key")).toBeNull();
+  });
+
+  it("shows CCR ready status for OpenAI-compatible routes", async () => {
+    const provider = providerFixture();
+    provider.ccrStatus = {
+      enabled: true,
+      phase: "ready",
+      baseUrl: "http://127.0.0.1:3456",
+      routeCount: 2,
+      routeKeys: [
+        "agentstudio/conn-openai/gpt-5.1",
+        "agentstudio/conn-openai/gpt-5.1-mini",
+      ],
+    };
+
+    renderModelSection(provider);
+
+    expect(
+      await screen.findByText("CCR ready, 2 model routes applied"),
+    ).toBeDefined();
+  });
+
+  it("can retry CCR when the runtime status is an error", async () => {
+    const provider = providerFixture();
+    provider.ccrStatus = {
+      enabled: true,
+      phase: "error",
+      baseUrl: "http://127.0.0.1:3456",
+      routeCount: 1,
+      routeKeys: ["agentstudio/conn-openai/gpt-5.1"],
+      lastError: "ccr_port_still_open",
+    };
+    const { invalidateQueries } = renderModelSection(provider);
+
+    expect(
+      await screen.findByText("CCR failed to start: ccr_port_still_open"),
+    ).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+
+    await waitFor(() => expect(applyCcrRuntimeRoutesMock).toHaveBeenCalled());
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ["provider"] });
+  });
+
+  it("updates the visible CCR error when retry returns a newer failed status", async () => {
+    const provider = providerFixture();
+    provider.ccrStatus = {
+      enabled: true,
+      phase: "error",
+      baseUrl: "http://127.0.0.1:3456",
+      routeCount: 1,
+      routeKeys: ["agentstudio/conn-openai/gpt-5.1"],
+      lastError: "ccr_port_still_open",
+    };
+    applyCcrRuntimeRoutesMock.mockImplementationOnce(async () => {
+      const status = {
+        enabled: true,
+        phase: "error" as const,
+        baseUrl: "http://127.0.0.1:3456",
+        routeCount: 1,
+        routeKeys: ["agentstudio/conn-openai/gpt-5.1"],
+        lastError: "ccr_not_ready:timeout",
+      };
+      throw new CcrRuntimeApplyErrorMock("ccr_not_ready:timeout", status);
+    });
+
+    renderModelSection(provider);
+
+    expect(
+      await screen.findByText("CCR failed to start: ccr_port_still_open"),
+    ).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+
+    expect(
+      await screen.findByText("CCR failed to start: ccr_not_ready:timeout"),
+    ).toBeDefined();
+  });
+
+  it("polls provider settings while CCR routes are applying", async () => {
+    let calls = 0;
+    getProviderMock.mockImplementation(async () => {
+      calls += 1;
+      const next = providerFixture();
+      next.ccrStatus =
+        calls === 1
+          ? {
+              enabled: true,
+              phase: "applying",
+              baseUrl: "http://127.0.0.1:3456",
+              routeCount: 1,
+              routeKeys: ["agentstudio/conn-openai/gpt-5.1"],
+            }
+          : {
+              enabled: true,
+              phase: "ready",
+              baseUrl: "http://127.0.0.1:3456",
+              routeCount: 1,
+              routeKeys: ["agentstudio/conn-openai/gpt-5.1"],
+            };
+      providerState = next;
+      return next;
+    });
+
+    renderModelSection(providerFixture());
+
+    expect(
+      await screen.findByText(
+        "Applying model routes. OpenAI-compatible conversations are temporarily unavailable.",
+      ),
+    ).toBeDefined();
+    await waitFor(() => expect(calls).toBeGreaterThan(1), { timeout: 2_500 });
+    expect(await screen.findByText("CCR ready, 1 model routes applied")).toBeDefined();
   });
 
   it("opens the add model dialog", async () => {

@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "bun:test";
@@ -6,6 +6,7 @@ import type { AgentStudioCcrConfig } from "./config";
 import {
   ccrPrivateConfigPath,
   ccrPrivateHome,
+  ccrPrivatePidPath,
   spawnManagedCcr,
   prepareCcrRuntimeAssets,
   writeCcrPrivateConfig,
@@ -50,7 +51,7 @@ describe("CCR spawn adapter", () => {
     }
   });
 
-  it("starts ccr in an isolated Worker instead of re-executing the sidecar binary", async () => {
+  it("starts CCR through the same sidecar binary runner mode", async () => {
     const dir = await mkdtemp(path.join(os.tmpdir(), "agent-studio-ccr-"));
     const calls: unknown[] = [];
     try {
@@ -61,21 +62,33 @@ describe("CCR spawn adapter", () => {
           config: config(),
         },
         {
-          cliPath: "/private/ccr/dist/cli.js",
-          workerFactory: (script, options) => {
-            calls.push({ script, options });
+          sidecarPath: "/private/agent-studio-sidecar",
+          cliPath: "/private/ccr/runtime/ccr-cli.js",
+          spawnProcess: async (command, args, options) => {
+            calls.push({ command, args, options });
             return {
-              terminate: () => Promise.resolve(),
+              pid: 4242,
+              exited: Promise.resolve(0),
+              kill: () => true,
             };
           },
         },
       );
 
+      expect(handle.pid).toBe(4242);
       expect(calls).toEqual([
         {
-          script: "/private/ccr/dist/bootstrap.js",
+          command: "/private/agent-studio-sidecar",
+          args: [
+            "--ccr-runner",
+            "--config-dir",
+            dir,
+            "--cli",
+            "/private/ccr/runtime/ccr-cli.js",
+            "--port",
+            "4567",
+          ],
           options: expect.objectContaining({
-            argv: ["/private/ccr/dist/cli.js", "start"],
             env: expect.objectContaining({
               HOME: dir,
               USERPROFILE: dir,
@@ -86,7 +99,112 @@ describe("CCR spawn adapter", () => {
           }),
         },
       ]);
-      expect(handle.kill()).toBe(true);
+      await handle.stop();
+      expect(calls).toHaveLength(1);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("removes stale Worker pid files without killing the current sidecar process", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), "agent-studio-ccr-"));
+    const killed: number[] = [];
+    try {
+      await mkdir(path.dirname(ccrPrivatePidPath(dir)), { recursive: true });
+      await Bun.write(ccrPrivatePidPath(dir), `${process.pid}\n`);
+
+      const handle = await spawnManagedCcr(
+        {
+          port: 4567,
+          configDir: dir,
+          config: config(),
+        },
+        {
+          sidecarPath: "/private/agent-studio-sidecar",
+          cliPath: "/private/ccr/runtime/ccr-cli.js",
+          stopExistingPid: async (pid) => {
+            killed.push(pid);
+          },
+          spawnProcess: async () => {
+            return {
+              pid: 4242,
+              exited: Promise.resolve(0),
+              kill: () => true,
+            };
+          },
+        },
+      );
+
+      expect(killed).toEqual([]);
+      expect(await Bun.file(ccrPrivatePidPath(dir)).exists()).toBe(false);
+      await handle.stop();
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("stops a previous runner-mode sidecar child before starting a new one", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), "agent-studio-ccr-"));
+    const stopped: number[] = [];
+    try {
+      await mkdir(path.dirname(ccrPrivatePidPath(dir)), { recursive: true });
+      await Bun.write(ccrPrivatePidPath(dir), "4241\n");
+
+      const handle = await spawnManagedCcr(
+        {
+          port: 4567,
+          configDir: dir,
+          config: config(),
+        },
+        {
+          sidecarPath: "/private/agent-studio-sidecar",
+          cliPath: "/private/ccr/runtime/ccr-cli.js",
+          isPidAlive: async (pid) => pid === 4241,
+          stopExistingPid: async (pid) => {
+            stopped.push(pid);
+          },
+          spawnProcess: async () => ({
+            pid: 4242,
+            exited: Promise.resolve(0),
+            kill: () => true,
+          }),
+        },
+      );
+
+      expect(stopped).toEqual([4241]);
+      expect(await Bun.file(ccrPrivatePidPath(dir)).exists()).toBe(false);
+      await handle.stop();
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("waits for child process exit when stopping CCR", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), "agent-studio-ccr-"));
+    let releaseExit: (() => void) | undefined;
+    let killed = false;
+    try {
+      const handle = await spawnManagedCcr(
+        { port: 4567, configDir: dir, config: config() },
+        {
+          sidecarPath: "/private/agent-studio-sidecar",
+          cliPath: "/private/ccr/runtime/ccr-cli.js",
+          spawnProcess: async () => ({
+            pid: 4242,
+            kill: () => {
+              killed = true;
+              releaseExit?.();
+              return true;
+            },
+            exited: new Promise<number>((resolve) => {
+              releaseExit = () => resolve(0);
+            }),
+          }),
+        },
+      );
+
+      await handle.stop();
+      expect(killed).toBe(true);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
@@ -107,16 +225,8 @@ describe("CCR spawn adapter", () => {
       });
 
       expect(runtime.cliPath).toBe(path.join(dir, "runtime", "ccr-cli.js"));
-      expect(runtime.bootstrapPath).toBe(
-        path.join(dir, "runtime", "ccr-bootstrap.js"),
-      );
+      expect(runtime.wasmPath).toBe(path.join(dir, "runtime", "tiktoken_bg.wasm"));
       expect(await readFile(runtime.cliPath, "utf8")).toBe("console.log('ccr')");
-      expect(await readFile(runtime.bootstrapPath, "utf8")).toContain(
-        "CCR_PRIVATE_HOME",
-      );
-      expect(await readFile(runtime.bootstrapPath, "utf8")).toContain(
-        "process.argv = [process.argv[0], cliPath, ...args]",
-      );
       expect(await readFile(path.join(dir, "runtime", "tiktoken_bg.wasm"), "utf8")).toBe(
         "wasm",
       );

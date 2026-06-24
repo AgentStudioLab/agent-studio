@@ -168,6 +168,26 @@ export interface EnabledModelOption {
   compatibilityNote?: string;
 }
 
+export type CcrRuntimePhase =
+  | "disabled"
+  | "empty"
+  | "applying"
+  | "ready"
+  | "error";
+
+export interface CcrRuntimeStatus {
+  enabled: boolean;
+  phase: CcrRuntimePhase;
+  baseUrl: string;
+  routeCount: number;
+  routeKeys: string[];
+  configSignature?: string;
+  pid?: number;
+  applyingSince?: string;
+  lastAppliedAt?: string;
+  lastError?: string;
+}
+
 export interface ProviderState {
   version?: 3;
   current: ProviderConfig;
@@ -176,7 +196,18 @@ export interface ProviderState {
   defaultSelection?: ProviderModelSelection | null;
   connections?: ProviderConnectionSummary[];
   enabledModels?: EnabledModelOption[];
+  ccrStatus?: CcrRuntimeStatus;
   builtIn: BuiltInProfile[];
+}
+
+export class CcrRuntimeApplyError extends Error {
+  constructor(
+    message: string,
+    public readonly ccrStatus?: CcrRuntimeStatus,
+  ) {
+    super(message);
+    this.name = "CcrRuntimeApplyError";
+  }
 }
 
 export interface ProviderConnectionState extends ProviderState {
@@ -239,6 +270,21 @@ export async function getProvider(): Promise<ProviderState> {
   const res = await fetchSidecar("/settings/provider");
   if (!res.ok) throw new Error(`provider_get_${res.status}`);
   return (await res.json()) as ProviderState;
+}
+
+export async function applyCcrRuntimeRoutes(): Promise<CcrRuntimeStatus> {
+  const res = await fetchSidecar("/settings/ccr/apply", { method: "POST" });
+  const json = (await res.json().catch(() => null)) as
+    | { ccrStatus?: CcrRuntimeStatus; error?: string }
+    | null;
+  if (!res.ok) {
+    throw new CcrRuntimeApplyError(
+      json?.error ?? `ccr_apply_${res.status}`,
+      json?.ccrStatus,
+    );
+  }
+  if (!json?.ccrStatus) throw new Error("ccr_status_missing");
+  return json.ccrStatus;
 }
 
 /**

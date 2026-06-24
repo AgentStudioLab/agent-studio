@@ -61,15 +61,21 @@ import { buildChannelConnectionRoutes } from "./channels/routes/channelConnectio
 import { buildRemoteTaskRoutes } from "./channels/routes/remoteTasks";
 import { runWorker } from "./agent/runWorker";
 import {
-  buildAgentStudioCcrConfig,
   type AgentStudioCcrConfigOptions,
   CcrManager,
   CCR_SPAWN_MANAGED,
+  CcrRuntimeService,
+  prepareManagedCcrConfig,
   resolveCcrRuntimeRoute,
+  isCcrRunnerMode,
+  runCcrRunnerMode,
   withCcrReady,
 } from "./ccr";
 
 type Args = { port: number; token: string; db: string };
+
+const startupArgs = process.argv.slice(2);
+const ccrRunnerMode = isCcrRunnerMode(startupArgs);
 
 function parseArgs(argv: string[]): Args {
   const get = (key: string) => {
@@ -92,7 +98,10 @@ function parseArgs(argv: string[]): Args {
   return { port, token, db: dbArg };
 }
 
-const args = parseArgs(process.argv.slice(2));
+if (ccrRunnerMode) {
+  runCcrRunnerMode(startupArgs);
+} else {
+const args = parseArgs(startupArgs);
 
 const dbAbs = path.resolve(args.db);
 if (!dbAbs.endsWith(".db")) {
@@ -137,11 +146,17 @@ const ccrManager = new CcrManager({
   port: Number.parseInt(process.env.AGENT_STUDIO_CCR_PORT ?? "3456", 10),
   configDir: path.join(path.dirname(dbAbs), "ccr"),
   spawn: CCR_SPAWN_MANAGED,
+  prepareConfig: prepareManagedCcrConfig,
 });
 const ccrConfigOptions: AgentStudioCcrConfigOptions = {
   log: process.env.AGENT_STUDIO_CCR_LOG === "1",
   logLevel: parseCcrLogLevel(process.env.AGENT_STUDIO_CCR_LOG_LEVEL),
 };
+const ccrRuntime = new CcrRuntimeService({
+  providerSettings,
+  manager: ccrManager,
+  configOptions: ccrConfigOptions,
+});
 const userProfileSettings = createUserProfileSettings(db);
 
 const threads = new ThreadService(db);
@@ -198,7 +213,7 @@ if (totalOrphans > 0) {
   );
 }
 
-export const app = new Hono();
+const app = new Hono();
 
 // CORS must run before auth — preflight OPTIONS sends no Authorization,
 // auth would 401 it and the browser drops the real request.
@@ -319,8 +334,7 @@ function buildProviderForSelection(
   };
 
   if (current.customProtocol === "openai-compatible") {
-    const route = resolveCcrRuntimeRoute(current, { baseUrl: ccrManager.baseUrl() });
-    const ccrConfig = buildAgentStudioCcrConfig([route], ccrConfigOptions);
+    const route = ccrRuntime.resolveRouteForSelection(selection);
     const provider = createAgentProviderForRuntime({
       runtime: {
         protocol: "anthropic",
@@ -332,7 +346,7 @@ function buildProviderForSelection(
       defaultModel: route.model,
       common,
     });
-    return withCcrReady(provider, () => ccrManager.ensure(ccrConfig));
+    return withCcrReady(provider, () => ccrRuntime.ensureReadyForRoute(route));
   }
 
   return createAgentProviderForRuntime({
@@ -356,7 +370,13 @@ function getProvider(selection?: { providerId: string; modelId: string } | null)
 // the old instance — that's intentional, we don't yank a running session.
 providerSettings.onChange(() => {
   providerInstances.clear();
+  void ccrRuntime
+    .refreshFromSettings("provider_settings_changed")
+    .catch((err) => console.warn("[ccr] refresh after provider settings change failed:", err));
 });
+void ccrRuntime
+  .refreshFromSettings("boot")
+  .catch((err) => console.warn("[ccr] boot refresh failed:", err));
 // Lazy proxy so routes can wire it as a stable reference.
 const providerProxy: AgentProvider = {
   get name() { return getProvider().name; },
@@ -455,6 +475,7 @@ app.route(
   "/",
   buildSettingsRoutes(providerSettings, userProfileSettings, {
     officialService,
+    ccrRuntime,
   }),
 );
 app.route(
@@ -526,8 +547,9 @@ console.log(`[sidecar] listening on http://127.0.0.1:${args.port} (db=${dbAbs})`
   );
 }
 
-export default {
+Bun.serve({
   port: args.port,
   hostname: "127.0.0.1",
   fetch: app.fetch,
-};
+});
+}

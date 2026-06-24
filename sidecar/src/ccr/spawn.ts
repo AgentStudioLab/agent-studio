@@ -4,22 +4,24 @@ import ccrCliAssetPath from "../../node_modules/@musistudio/claude-code-router/d
 import ccrWasmAssetPath from "../../node_modules/@musistudio/claude-code-router/dist/tiktoken_bg.wasm" with { type: "file" };
 import type { AgentStudioCcrConfig } from "./config";
 import type { CcrProcessHandle, CcrSpawn, CcrSpawnInput } from "./manager";
+import { stopPidFromFile } from "./process";
+export { ccrPrivatePidPath } from "./process";
 
-interface CcrWorkerLike {
-  terminate(): Promise<number | void> | number | void;
-  addEventListener?: (
-    type: "error",
-    listener: (event: ErrorEvent) => void,
-  ) => void;
+interface CcrChildProcessLike {
+  pid?: number;
+  exited: Promise<number>;
+  kill: (signal?: NodeJS.Signals) => boolean | void;
 }
 
-type CcrWorkerFactory = (
-  script: string,
+type CcrProcessSpawner = (
+  command: string,
+  args: string[],
   options: {
-    argv: string[];
     env: Record<string, string>;
+    stdout: "inherit" | "pipe" | "ignore";
+    stderr: "inherit" | "pipe" | "ignore";
   },
-) => CcrWorkerLike;
+) => Promise<CcrChildProcessLike>;
 
 function compactEnv(env: Record<string, string | undefined>): Record<string, string> {
   return Object.fromEntries(
@@ -55,40 +57,100 @@ export async function prepareCcrRuntimeAssets(input: {
   configDir: string;
   cliAssetPath?: string;
   wasmAssetPath?: string;
-}): Promise<{ cliPath: string; bootstrapPath: string }> {
+}): Promise<{ cliPath: string; wasmPath: string }> {
   const runtimeDir = path.join(input.configDir, "runtime");
   await mkdir(runtimeDir, { recursive: true });
 
   const cliPath = path.join(runtimeDir, "ccr-cli.js");
-  const bootstrapPath = path.join(runtimeDir, "ccr-bootstrap.js");
   const wasmPath = path.join(runtimeDir, "tiktoken_bg.wasm");
 
   await Bun.write(cliPath, await Bun.file(input.cliAssetPath ?? ccrCliAssetPath).arrayBuffer());
-  await Bun.write(
-    bootstrapPath,
-    [
-      "const os = require('node:os');",
-      "const privateHome = process.env.CCR_PRIVATE_HOME;",
-      "if (privateHome) os.homedir = () => privateHome;",
-      "const [, , cliPath, ...args] = process.argv;",
-      "if (!cliPath) throw new Error('ccr_cli_path_missing');",
-      "process.argv = [process.argv[0], cliPath, ...args];",
-      "require(cliPath);",
-      "",
-    ].join("\n"),
-  );
   await Bun.write(wasmPath, await Bun.file(input.wasmAssetPath ?? ccrWasmAssetPath).arrayBuffer());
 
-  return { cliPath, bootstrapPath };
+  return { cliPath, wasmPath };
+}
+
+function defaultSidecarPath(): string {
+  return process.env.AGENT_STUDIO_SIDECAR_PATH ?? process.execPath;
+}
+
+async function defaultSpawnProcess(
+  command: string,
+  args: string[],
+  options: Parameters<CcrProcessSpawner>[2],
+): Promise<CcrChildProcessLike> {
+  const proc = Bun.spawn([command, ...args], options);
+  return {
+    pid: proc.pid,
+    exited: proc.exited,
+    kill: (signal) => proc.kill(signal),
+  };
 }
 
 export async function spawnManagedCcr(
   input: CcrSpawnInput,
   options: {
     cliPath?: string;
-    workerFactory?: CcrWorkerFactory;
+    sidecarPath?: string;
+    spawnProcess?: CcrProcessSpawner;
+    currentPid?: number;
+    isPidAlive?: (pid: number) => Promise<boolean>;
+    stopExistingPid?: (pid: number, signal?: NodeJS.Signals) => Promise<void>;
   } = {},
 ): Promise<CcrProcessHandle> {
+  const runtimeAssets =
+    options.cliPath === undefined
+      ? await prepareCcrRuntimeAssets({ configDir: input.configDir })
+      : {
+          cliPath: options.cliPath,
+          wasmPath: path.join(path.dirname(options.cliPath), "tiktoken_bg.wasm"),
+        };
+  const home = ccrPrivateHome(input.configDir);
+  await stopPidFromFile(input.configDir, {
+    currentPid: options.currentPid,
+    isPidAlive: options.isPidAlive,
+    killPid: options.stopExistingPid,
+  });
+
+  const sidecarPath = options.sidecarPath ?? defaultSidecarPath();
+  const env = compactEnv({
+    ...process.env,
+    HOME: home,
+    USERPROFILE: home,
+    CCR_PRIVATE_HOME: home,
+    CI: "true",
+    FORCE_COLOR: "0",
+  });
+  const proc = await (options.spawnProcess ?? defaultSpawnProcess)(
+    sidecarPath,
+    [
+      "--ccr-runner",
+      "--config-dir",
+      input.configDir,
+      "--cli",
+      runtimeAssets.cliPath,
+      "--port",
+      String(input.port),
+    ],
+    {
+      env,
+      stdout: "inherit",
+      stderr: "inherit",
+    },
+  );
+
+  return {
+    pid: proc.pid,
+    stop: async (signal = "SIGTERM") => {
+      proc.kill(signal);
+      await proc.exited.catch(() => {});
+    },
+  };
+}
+
+export const CCR_SPAWN_MANAGED: CcrSpawn = spawnManagedCcr;
+
+export async function prepareManagedCcrConfig(input: CcrSpawnInput): Promise<void> {
   await writeCcrPrivateConfig({
     configDir: input.configDir,
     config: {
@@ -98,47 +160,4 @@ export async function spawnManagedCcr(
       NON_INTERACTIVE_MODE: true,
     },
   });
-
-  const runtimeAssets =
-    options.cliPath === undefined
-      ? await prepareCcrRuntimeAssets({ configDir: input.configDir })
-      : {
-          cliPath: options.cliPath,
-          bootstrapPath: path.join(path.dirname(options.cliPath), "bootstrap.js"),
-        };
-  const cliPath = runtimeAssets.cliPath;
-  const bootstrapPath = runtimeAssets.bootstrapPath;
-  const workerFactory =
-    options.workerFactory ??
-    ((script, workerOptions) => new Worker(script, workerOptions));
-  const home = ccrPrivateHome(input.configDir);
-  const workerEnv = compactEnv({
-    ...process.env,
-    HOME: home,
-    USERPROFILE: home,
-    CCR_PRIVATE_HOME: home,
-    CI: "true",
-    FORCE_COLOR: "0",
-  });
-  const worker = workerFactory(bootstrapPath, {
-    argv: [cliPath, "start"],
-    env: workerEnv,
-  });
-
-  worker.addEventListener?.("error", (event) => {
-    const message =
-      "message" in event && typeof event.message === "string"
-        ? event.message
-        : String(event);
-    console.error("[ccr] worker error:", message);
-  });
-
-  return {
-    kill: () => {
-      void worker.terminate();
-      return true;
-    },
-  };
 }
-
-export const CCR_SPAWN_MANAGED: CcrSpawn = spawnManagedCcr;
