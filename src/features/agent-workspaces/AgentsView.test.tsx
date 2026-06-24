@@ -101,11 +101,17 @@ mock.module("@/app/AppShell", () => ({
 mock.module("@/components/ui/dialog", () => ({
   Dialog: ({ children, open }: { children: ReactNode; open?: boolean }) =>
     open ? <>{children}</> : null,
+  DialogClose: ({ children }: { children: ReactNode }) => <>{children}</>,
   DialogContent: ({ children }: { children: ReactNode }) => (
     <div role="dialog">{children}</div>
   ),
+  DialogDescription: ({ children }: { children: ReactNode }) => <p>{children}</p>,
+  DialogFooter: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   DialogHeader: ({ children }: { children: ReactNode }) => <>{children}</>,
+  DialogOverlay: ({ children }: { children?: ReactNode }) => <>{children}</>,
+  DialogPortal: ({ children }: { children: ReactNode }) => <>{children}</>,
   DialogTitle: ({ children }: { children: ReactNode }) => <h2>{children}</h2>,
+  DialogTrigger: ({ children }: { children: ReactNode }) => <>{children}</>,
 }));
 
 mock.module("@/shared/layout/PageColumn", () => ({
