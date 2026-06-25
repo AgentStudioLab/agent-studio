@@ -23,6 +23,7 @@ import { SlashEditor } from "@/features/composer/SlashEditor";
 import { ModelPicker } from "@/features/task/ModelPicker";
 import { AgentSpaceHeader } from "@/features/agent-workspaces/AgentSpaceHeader";
 import { AgentPackOverview } from "@/features/agent-workspaces/AgentPackOverview";
+import { DailyBriefingSetup } from "@/features/agent-workspaces/DailyBriefingSetup";
 import { AgentRecents } from "@/features/agent-workspaces/AgentRecents";
 import { InstructionsCard } from "@/features/agent-workspaces/InstructionsCard";
 import { ScheduledRailCard } from "@/features/agent-workspaces/ScheduledRailCard";
@@ -64,7 +65,7 @@ export function AgentSpaceView() {
     return () => window.removeEventListener("focus", refresh);
   }, [agentId, qc]);
 
-  const handleSubmit = async ({ text }: PromptInputMessage) => {
+  const startAgentRun = async (text: string) => {
     if (!agentId || !agent || text.trim().length === 0 || submitting) return;
     setSubmitting(true);
     try {
@@ -87,10 +88,17 @@ export function AgentSpaceView() {
     }
   };
 
+  const handleSubmit = async ({ text }: PromptInputMessage) => {
+    await startAgentRun(text);
+  };
+
   const handleUseSampleTask = (prompt: string) => {
     setDraftPrompt(prompt);
     setDraftPromptVersion((version) => version + 1);
   };
+
+  const isDailyBriefingPack =
+    agent?.catalogMetadata?.scenario === "podcast-daily-briefing";
 
   return (
     <AppShell
@@ -129,6 +137,14 @@ export function AgentSpaceView() {
                     <AgentPackOverview
                       metadata={agent.catalogMetadata}
                       onUseSampleTask={handleUseSampleTask}
+                    />
+                  </div>
+                )}
+                {agentId && isDailyBriefingPack && (
+                  <div className="mb-4">
+                    <DailyBriefingSetup
+                      agentId={agentId}
+                      onRunPrompt={startAgentRun}
                     />
                   </div>
                 )}
