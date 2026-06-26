@@ -31,12 +31,15 @@ function joinUrl(baseUrl: string, path: string): string {
   return `${trimmedBase}${normalizedPath}`;
 }
 
-function openAICompatibleBaseUrl(baseUrl: string): string {
+function openAICompatibleBaseUrl(
+  baseUrl: string,
+  options: { preserveBaseUrl?: boolean } = {},
+): string {
   const trimmed = baseUrl.trim();
   try {
     const url = new URL(trimmed);
     const path = url.pathname.replace(/\/+$/, "");
-    if (path === "") {
+    if (path === "" && !options.preserveBaseUrl) {
       url.pathname = "/v1";
     }
     url.search = "";
@@ -166,9 +169,13 @@ export async function listModelsForProvider(
   }
 
   if (strategy === "anthropic") {
+    const catalogBaseUrl = input.profile.modelList.baseUrl ?? input.baseUrl;
     const response = await fetchJson(
       fetchImpl,
-      joinUrl(input.baseUrl, input.profile.modelList.path?.trim() || "/v1/models"),
+      joinUrl(
+        catalogBaseUrl,
+        input.profile.modelList.path?.trim() || "/v1/models",
+      ),
       {
         headers: {
           "anthropic-version": "2023-06-01",
@@ -180,10 +187,13 @@ export async function listModelsForProvider(
     return success(normalizeAnthropic(response.value));
   }
 
+  const catalogBaseUrl = input.profile.modelList.baseUrl ?? input.baseUrl;
   const response = await fetchJson(
     fetchImpl,
     joinUrl(
-      openAICompatibleBaseUrl(input.baseUrl),
+      openAICompatibleBaseUrl(catalogBaseUrl, {
+        preserveBaseUrl: input.profile.modelList.preserveBaseUrl,
+      }),
       input.profile.modelList.path?.trim() || "/models",
     ),
     { headers: { Authorization: `Bearer ${apiKey}` } },

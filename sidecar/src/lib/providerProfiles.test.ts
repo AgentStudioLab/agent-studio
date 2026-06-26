@@ -87,6 +87,29 @@ describe("providerProfiles", () => {
     });
   });
 
+  it("keeps DeepSeek runtime on Anthropic while refreshing models from its OpenAI catalog", () => {
+    const profile = getBuiltInProfile("deepseek");
+
+    expect(profile?.baseUrl).toBe("https://api.deepseek.com/anthropic");
+    expect(profile?.agentRuntime).toEqual({
+      protocol: "anthropic",
+      baseUrl: "https://api.deepseek.com/anthropic",
+      auth: "x-api-key",
+      capabilities: {
+        text: true,
+        tools: true,
+        fileCheckpoint: true,
+      },
+    });
+    expect(profile?.modelList).toEqual({
+      strategy: "openai-compatible",
+      baseUrl: "https://api.deepseek.com",
+      path: "/models",
+      preserveBaseUrl: true,
+    });
+    expect(profile?.supportsRemoteModels).toBe(true);
+  });
+
   it("configures SiliconFlow model list and upstream protocol as OpenAI-compatible", () => {
     const cn = getBuiltInProfile("siliconflow-cn");
     const global = getBuiltInProfile("siliconflow");

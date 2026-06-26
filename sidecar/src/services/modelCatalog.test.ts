@@ -125,6 +125,49 @@ describe("modelCatalog", () => {
     expect(calls[0]?.[0]).toBe("https://api.openai.test/v1/models");
   });
 
+  it("refreshes DeepSeek models from the OpenAI catalog while preserving its Anthropic runtime base URL", async () => {
+    const calls: Parameters<ModelFetchImpl>[] = [];
+    const fetchImpl: ModelFetchImpl = async (url, init) => {
+      calls.push([url, init]);
+      return new Response(
+        JSON.stringify({
+          data: [{ id: "deepseek-chat" }, { id: "deepseek-reasoner" }],
+        }),
+      );
+    };
+    const profile = getBuiltInProfile("deepseek");
+    expect(profile).toBeDefined();
+    if (!profile) throw new Error("missing DeepSeek profile");
+
+    const result = await listModelsForProvider({
+      profile,
+      baseUrl: "https://api.deepseek.com/anthropic",
+      apiKey: "deepseek-key",
+      fetchImpl,
+    });
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.[0]).toBe("https://api.deepseek.com/models");
+    expect(calls[0]?.[1]?.headers).toEqual({
+      Authorization: "Bearer deepseek-key",
+    });
+    expect(result).toMatchObject({
+      ok: true,
+      models: [
+        {
+          id: "deepseek-chat",
+          displayName: "deepseek-chat",
+          description: "Remote model",
+        },
+        {
+          id: "deepseek-reasoner",
+          displayName: "deepseek-reasoner",
+          description: "Remote model",
+        },
+      ],
+    });
+  });
+
   it("returns missing_api_key before fetch for blank keys", async () => {
     let fetchCalled = false;
     const fetchImpl: ModelFetchImpl = async () => {

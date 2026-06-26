@@ -32,8 +32,13 @@ export interface ProfileModel {
 
 export type ModelListStrategy =
   | { strategy: "static" }
-  | { strategy: "anthropic"; path?: string }
-  | { strategy: "openai-compatible"; path?: string }
+  | { strategy: "anthropic"; baseUrl?: string; path?: string }
+  | {
+      strategy: "openai-compatible";
+      baseUrl?: string;
+      path?: string;
+      preserveBaseUrl?: boolean;
+    }
   | { strategy: "gemini" }
   | { strategy: "bedrock" };
 
@@ -178,7 +183,12 @@ export const DEEPSEEK_PROFILE: ProviderProfile = defineProfile({
   label: "深度求索",
   region: "Global",
   baseUrl: "https://api.deepseek.com/anthropic",
-  modelList: { strategy: "static" },
+  modelList: {
+    strategy: "openai-compatible",
+    baseUrl: "https://api.deepseek.com",
+    path: "/models",
+    preserveBaseUrl: true,
+  },
   agentRuntime: anthropicRuntime(
     "https://api.deepseek.com/anthropic",
     "x-api-key",
