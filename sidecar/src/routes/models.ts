@@ -18,7 +18,7 @@ interface ModelsRouteDeps {
 
 function customProfile(
   baseUrl: string,
-  customProtocol: CustomProviderProtocol = "openai-compatible",
+  customProtocol: CustomProviderProtocol = "openai-chat-completions",
 ): ProviderProfile {
   if (customProtocol === "anthropic") {
     return {

@@ -32,10 +32,19 @@ function ccrProviderNameForRoute(route: CcrRuntimeRoute): string {
   return route.model.replace(/[^A-Za-z0-9._-]+/g, "_");
 }
 
+function normalizeOpenAIBaseUrl(baseUrl: string): string {
+  return baseUrl
+    .replace(/\/+$/, "")
+    .replace(/\/chat\/completions$/, "")
+    .replace(/\/responses$/, "");
+}
+
 function openAIChatCompletionsUrl(baseUrl: string): string {
-  const normalized = baseUrl.replace(/\/+$/, "");
-  if (normalized.endsWith("/chat/completions")) return normalized;
-  return `${normalized}/chat/completions`;
+  return `${normalizeOpenAIBaseUrl(baseUrl)}/chat/completions`;
+}
+
+function openAIResponsesUrl(baseUrl: string): string {
+  return `${normalizeOpenAIBaseUrl(baseUrl)}/responses`;
 }
 
 function providerForRoute(route: CcrRuntimeRoute): AgentStudioCcrProvider {
@@ -44,13 +53,19 @@ function providerForRoute(route: CcrRuntimeRoute): AgentStudioCcrProvider {
     api_base_url:
       route.upstream.protocol === "anthropic"
         ? route.upstream.baseUrl.replace(/\/+$/, "")
-        : openAIChatCompletionsUrl(route.upstream.baseUrl),
+        : route.upstream.protocol === "openai-responses"
+          ? openAIResponsesUrl(route.upstream.baseUrl)
+          : openAIChatCompletionsUrl(route.upstream.baseUrl),
     api_key: route.upstream.apiKey,
     models: [route.upstream.modelId],
   };
 
   if (route.upstream.protocol === "anthropic") {
     provider.transformer = { use: ["Anthropic"] };
+  } else if (route.upstream.protocol === "openai-responses") {
+    provider.transformer = { use: ["openai-responses"] };
+  } else {
+    provider.transformer = { use: ["reasoning"] };
   }
 
   return provider;

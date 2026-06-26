@@ -45,7 +45,8 @@ export interface CcrRuntimeServiceOptions {
 function isOpenAICompatible(option: EnabledModelOption): boolean {
   if (option.managed) return false;
   return (
-    option.customProtocol === "openai-compatible" ||
+    option.customProtocol === "openai-chat-completions" ||
+    option.customProtocol === "openai-responses" ||
     option.agentRuntime.protocol === "openai-compatible"
   );
 }

@@ -247,12 +247,19 @@ app.use("*", async (c, next) => {
 // Sessions live inside the provider, so we cache. When provider settings change
 // we invalidate the cache so the next run picks up the new endpoint/selection.
 const providerInstances = new Map<string, AgentProvider>();
+function isOpenAICcrProtocol(protocol: string | undefined): boolean {
+  return (
+    protocol === "openai-chat-completions" ||
+    protocol === "openai-responses"
+  );
+}
+
 function providerCacheKey(selection?: { providerId: string; modelId: string } | null) {
   const resolved = providerSettings.resolveSelection(selection);
   if (resolved.providerId === "official") {
     return `${resolved.providerId}:${resolved.modelId ?? ""}:${resolved.apiKey}:${resolved.baseUrl}`;
   }
-  if (resolved.customProtocol !== "openai-compatible") {
+  if (!isOpenAICcrProtocol(resolved.customProtocol)) {
     const runtimeUrl =
       resolved.agentRuntime.protocol === "anthropic"
         ? resolved.agentRuntime.baseUrl
@@ -340,8 +347,15 @@ function buildProviderForSelection(
     },
   };
 
-  if (current.customProtocol === "openai-compatible") {
+  if (isOpenAICcrProtocol(current.customProtocol)) {
     const route = ccrRuntime.resolveRouteForSelection(selection);
+    const ccrCommon: typeof common = {
+      ...common,
+      ccrSkillReminderCompat: true,
+      ...(current.customProtocol === "openai-responses"
+        ? { thinking: { type: "adaptive", display: "summarized" } }
+        : {}),
+    };
     const provider = createAgentProviderForRuntime({
       runtime: {
         protocol: "anthropic",
@@ -351,7 +365,7 @@ function buildProviderForSelection(
       },
       apiKey: route.apiKey,
       defaultModel: route.model,
-      common: { ...common, ccrSkillReminderCompat: true },
+      common: ccrCommon,
     });
     return withCcrReady(provider, () => ccrRuntime.ensureReadyForRoute(route));
   }

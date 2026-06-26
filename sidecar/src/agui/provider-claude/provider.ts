@@ -11,7 +11,11 @@
 // because session_id is captured on the next successful turn's init.
 
 import { query as sdkQuery, createSdkMcpServer } from "@anthropic-ai/claude-agent-sdk";
-import type { CanUseTool, HookCallback } from "@anthropic-ai/claude-agent-sdk";
+import type {
+  CanUseTool,
+  HookCallback,
+  ThinkingConfig,
+} from "@anthropic-ai/claude-agent-sdk";
 import { claudeSdkToAgui } from "./bridge";
 import { getResumeSessionId, tagThreadSession } from "./session-tag";
 import { rewindSessionFiles } from "./file-rewind";
@@ -163,6 +167,12 @@ export interface ClaudeProviderOptions {
    * 仅 CCR provider 开启此兼容注入，恢复 0.3.153 风格的前置可见列表。
    */
   ccrSkillReminderCompat?: boolean;
+  /**
+   * 透传给 claude-agent-sdk 的 extended thinking 配置。CCR Responses 路径需要
+   * `display: "summarized"`，否则上游 reasoning summary 会被 SDK/CLI 省略，
+   * 最终 Anthropic-compatible stream 里不会出现可渲染的 `thinking` block。
+   */
+  thinking?: ThinkingConfig;
   /**
    * App-level store of skills the agent invoked at runtime via the built-in
    * `Skill` tool, keyed by threadId. When provided, runTurn installs a
@@ -483,6 +493,7 @@ export function createClaudeProvider(opts: ClaudeProviderOptions): AgentProvider
           ? { mcpServers: { [SCHEDULED_MCP_SERVER]: agentStudioMcp } }
           : {}),
         ...(effectiveModel ? { model: effectiveModel } : {}),
+        ...(opts.thinking ? { thinking: opts.thinking } : {}),
         ...(skillsConfig
           ? {
               skills: skillsConfig.enabledSkills,

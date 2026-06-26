@@ -6,14 +6,14 @@ import {
 } from "./smoke";
 
 describe("CCR runtime smoke helpers", () => {
-  it("builds a redacted smoke plan from OpenAI-compatible env", () => {
+  it("builds a redacted smoke plan from OpenAI Chat Completions env", () => {
     const input = buildCcrSmokeInputFromEnv({
       AGENT_STUDIO_CCR_POC_BASE_URL: "https://api.openai.com/v1",
       AGENT_STUDIO_CCR_POC_API_KEY: "sk-openai-secret",
       AGENT_STUDIO_CCR_POC_MODEL: "gpt-5.1",
       AGENT_STUDIO_CCR_POC_PROVIDER_ID: "conn_openai",
       AGENT_STUDIO_CCR_POC_PROVIDER_NAME: "OpenAI Main",
-      AGENT_STUDIO_CCR_POC_PROTOCOL: "openai-compatible",
+      AGENT_STUDIO_CCR_POC_PROTOCOL: "openai-chat-completions",
       AGENT_STUDIO_CCR_POC_ROUTER_API_KEY: "router-secret",
       AGENT_STUDIO_CCR_POC_ROUTER_PORT: "4555",
     });
@@ -25,7 +25,7 @@ describe("CCR runtime smoke helpers", () => {
       apiKey: "router-secret",
       model: "agentstudio/conn_openai/gpt-5.1",
       upstream: {
-        protocol: "openai-compatible",
+        protocol: "openai-chat-completions",
         baseUrl: "https://api.openai.com/v1",
         apiKey: "sk-openai-secret",
       },
@@ -47,7 +47,7 @@ describe("CCR runtime smoke helpers", () => {
     ]);
   });
 
-  it("defaults to OpenAI-compatible protocol and stable provider metadata", () => {
+  it("defaults to OpenAI Chat Completions protocol and stable provider metadata", () => {
     const input = buildCcrSmokeInputFromEnv({
       AGENT_STUDIO_CCR_POC_BASE_URL: "https://openrouter.ai/api/v1",
       AGENT_STUDIO_CCR_POC_API_KEY: "sk-openrouter",
@@ -59,7 +59,7 @@ describe("CCR runtime smoke helpers", () => {
     expect(plan.route.model).toBe("agentstudio/ccr_poc/openai%2Fgpt-5.1");
     expect(plan.route.upstream.providerId).toBe("ccr_poc");
     expect(plan.route.upstream.providerName).toBe("CCR PoC Provider");
-    expect(plan.route.upstream.protocol).toBe("openai-compatible");
+    expect(plan.route.upstream.protocol).toBe("openai-chat-completions");
   });
 
   it("reads diagnostic logging and allowed tool env for PoC runs", () => {

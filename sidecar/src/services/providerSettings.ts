@@ -8,7 +8,10 @@ import {
   type ProviderProfileId,
 } from "../lib/providerProfiles";
 
-export type CustomProviderProtocol = "openai-compatible" | "anthropic";
+export type CustomProviderProtocol =
+  | "openai-chat-completions"
+  | "openai-responses"
+  | "anthropic";
 export const OFFICIAL_PROVIDER_ID = "official";
 
 // Persisted shape — JSON-encoded into settings.value under key "provider".
@@ -319,10 +322,19 @@ function ccrRoutedRuntime(): AgentRuntime {
 }
 
 function runtimeForResolvedProvider(resolved: ResolvedProvider): AgentRuntime {
-  return resolved.customProtocol === "openai-compatible" ||
+  return isOpenAIWireProtocol(resolved.customProtocol) ||
     resolved.agentRuntime.protocol === "openai-compatible"
     ? ccrRoutedRuntime()
     : resolved.agentRuntime;
+}
+
+function isOpenAIWireProtocol(
+  protocol: CustomProviderProtocol | undefined,
+): protocol is "openai-chat-completions" | "openai-responses" {
+  return (
+    protocol === "openai-chat-completions" ||
+    protocol === "openai-responses"
+  );
 }
 
 function isProviderProfileId(value: string): value is ProviderProfileId {
@@ -343,7 +355,14 @@ function sanitizeRemoteModelsProviderId(
 }
 
 function sanitizeCustomProviderProtocol(value: unknown): CustomProviderProtocol {
-  return value === "anthropic" ? "anthropic" : "openai-compatible";
+  if (
+    value === "openai-chat-completions" ||
+    value === "openai-responses" ||
+    value === "anthropic"
+  ) {
+    return value;
+  }
+  return "openai-chat-completions";
 }
 
 function sanitizeModels(value: unknown): ProfileModel[] {
@@ -377,7 +396,7 @@ function defaultPersistedProvider(envFallback: {
     profileId: DEFAULT_PROFILE_ID,
     baseUrl: envFallback.baseUrl ?? "",
     apiKey: envFallback.apiKey ?? "",
-    customProtocol: "openai-compatible",
+    customProtocol: "openai-chat-completions",
     remoteModels: [],
     remoteModelsProviderId: "",
     remoteModelsBaseUrl: "",
@@ -759,7 +778,7 @@ function resolve(persisted: ProviderPreset): ResolvedProvider {
     apiKey: persisted.apiKey,
     customProtocol:
       builtIn.agentRuntime.protocol === "openai-compatible"
-        ? "openai-compatible"
+        ? "openai-chat-completions"
         : undefined,
     models: activeRemoteModels.length > 0 ? activeRemoteModels : builtIn.models,
     remoteModelsFetchedAt,
@@ -819,7 +838,7 @@ function resolveOfficialConnection(
     label: OFFICIAL_PROVIDER_NAME,
     baseUrl: "",
     apiKey: "",
-    customProtocol: "openai-compatible",
+    customProtocol: "openai-chat-completions",
     models,
     remoteModelsFetchedAt: officialFetchedAt(source),
     selectedModelId: defaultModelId,
@@ -852,7 +871,7 @@ function summarizeOfficialConnection(
     enabledModelCount: resolved.enabledModelIds.length,
     defaultModelId: resolved.defaultModelId,
     remoteModelsFetchedAt: resolved.remoteModelsFetchedAt,
-    customProtocol: "openai-compatible",
+    customProtocol: "openai-chat-completions",
     agentRuntime: resolved.agentRuntime,
     supportsRemoteModels: true,
   };
@@ -871,7 +890,7 @@ function officialEnabledModelOptions(
     modelId: model.id,
     modelLabel: model.displayName,
     modelDescription: model.description,
-    customProtocol: "openai-compatible",
+    customProtocol: "openai-chat-completions",
     agentRuntime: resolved.agentRuntime,
   }));
 }

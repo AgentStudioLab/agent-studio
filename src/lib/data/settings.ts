@@ -44,7 +44,10 @@ export type ProfileId =
   | "hunyuan"
   | "custom";
 
-export type CustomProviderProtocol = "openai-compatible" | "anthropic";
+export type CustomProviderProtocol =
+  | "openai-chat-completions"
+  | "openai-responses"
+  | "anthropic";
 
 export interface ProfileModel {
   id: string;

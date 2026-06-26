@@ -262,7 +262,8 @@ void testI18n.use(initReactI18next).init({
             profileLabel: "Provider",
             profile: { custom: "Custom" },
             customProtocolLabel: "Protocol",
-            customProtocolOpenAI: "OpenAI-compatible",
+            customProtocolOpenAIChat: "OpenAI Chat Completions",
+            customProtocolOpenAIResponses: "OpenAI Responses",
             customProtocolAnthropic: "Anthropic Messages-compatible",
             baseUrlLabel: "Base URL",
             baseUrlPlaceholder: "https://api.example.com",
@@ -494,7 +495,7 @@ function officialConnectionSummary() {
     enabledModelCount: 1,
     defaultModelId: "gpt-5.1",
     remoteModelsFetchedAt: "",
-    customProtocol: "openai-compatible",
+    customProtocol: "openai-chat-completions",
     supportsRemoteModels: true,
     agentRuntime: {
       protocol: "openai-compatible",
@@ -514,7 +515,7 @@ function officialEnabledModel() {
     modelId: "gpt-5.1",
     modelLabel: "GPT-5.1",
     modelDescription: "Official model",
-    customProtocol: "openai-compatible",
+    customProtocol: "openai-chat-completions",
     agentRuntime: {
       protocol: "openai-compatible",
       baseUrl: "",
@@ -535,7 +536,7 @@ function connectionFixture(id: string): ProviderConnectionConfig {
       label: "官方服务商",
       baseUrl: "",
       apiKey: "",
-      customProtocol: "openai-compatible",
+      customProtocol: "openai-chat-completions",
       enabled: true,
       managed: true,
       models: [
@@ -924,7 +925,7 @@ describe("ModelSection", () => {
       target: { value: "Custom Anthropic" },
     });
     const protocolActions = screen.getAllByTestId("select-actions")[1]!;
-    fireEvent.click(protocolActions.querySelectorAll("button")[1]!);
+    fireEvent.click(protocolActions.querySelectorAll("button")[2]!);
     fireEvent.change(screen.getByPlaceholderText("https://api.example.com"), {
       target: { value: "https://gateway.example" },
     });

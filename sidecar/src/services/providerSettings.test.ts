@@ -495,13 +495,31 @@ describe("providerSettings", () => {
     expect(resolved.agentRuntime.protocol).toBe("anthropic");
   });
 
+  it("persists custom OpenAI Responses providers as CCR-routed runtime", () => {
+    const settings = createProviderSettings(makeDb(), {});
+    const connection = settings.createConnection({
+      name: "sub2api",
+      profileId: "custom",
+      baseUrl: "https://aiproxy.cloud-ip.cc/v1",
+      apiKey: "gateway-key",
+      customProtocol: "openai-responses",
+    });
+
+    expect(connection.customProtocol).toBe("openai-responses");
+    expect(connection.agentRuntime).toMatchObject({
+      protocol: "anthropic",
+      baseUrl: "ccr://agent-studio",
+      auth: "x-api-key",
+    });
+  });
+
   it("clears custom model cache when custom protocol changes", () => {
     const settings = createProviderSettings(makeDb(), {});
     const connection = settings.createConnection({
       profileId: "custom",
       baseUrl: "https://gateway.example",
       apiKey: "gateway-key",
-      customProtocol: "openai-compatible",
+      customProtocol: "openai-chat-completions",
     });
     const refreshed = settings.updateConnection(connection.providerId, {
       remoteModels: [
@@ -913,7 +931,7 @@ describe("providerSettings", () => {
       baseUrl: "ccr://agent-studio",
       auth: "x-api-key",
     });
-    expect(current.customProtocol).toBe("openai-compatible");
+    expect(current.customProtocol).toBe("openai-chat-completions");
   });
 
   it("resolves OpenAI-compatible runtime through CCR for OpenAI providers", () => {
@@ -930,7 +948,7 @@ describe("providerSettings", () => {
       baseUrl: "ccr://agent-studio",
       auth: "x-api-key",
     });
-    expect(settings.current().customProtocol).toBe("openai-compatible");
+    expect(settings.current().customProtocol).toBe("openai-chat-completions");
   });
 
   it("resolves custom OpenAI-compatible providers through CCR", () => {
@@ -989,6 +1007,6 @@ describe("providerSettings", () => {
     expect(resolved.agentRuntime.baseUrl).toBe("ccr://agent-studio");
     expect(resolved.agentRuntime.auth).toBe("x-api-key");
     expect(resolved.modelId).toBe("gpt-5.1");
-    expect(resolved.customProtocol).toBe("openai-compatible");
+    expect(resolved.customProtocol).toBe("openai-chat-completions");
   });
 });

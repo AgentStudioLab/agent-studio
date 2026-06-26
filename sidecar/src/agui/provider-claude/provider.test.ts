@@ -197,6 +197,30 @@ describe("provider sandbox config", () => {
     );
   });
 
+  it("passes configured thinking options to sdkQuery", async () => {
+    const provider = createClaudeProvider({
+      apiKey: "k",
+      thinking: { type: "adaptive", display: "summarized" },
+    });
+    const ac = new AbortController();
+    await drain(provider.run({
+      runId: "r_thinking",
+      threadId: "t_thinking",
+      userMessage: { role: "user", content: "hi" },
+      abortSignal: ac.signal,
+      cwd: "/tmp/proj",
+    }));
+
+    const calls = querySpy.mock.calls as unknown[];
+    const lastCallArgs = calls[calls.length - 1] as unknown[];
+    const lastCall = lastCallArgs[0] as Record<string, unknown>;
+    const options = lastCall.options as Record<string, unknown>;
+    expect(options.thinking).toEqual({
+      type: "adaptive",
+      display: "summarized",
+    });
+  });
+
   it("passes sandbox.filesystem.allowWrite=[cwd] to sdkQuery", async () => {
     const provider = createClaudeProvider({ apiKey: "k", allowedTools: ["Bash"] });
     const ac = new AbortController();

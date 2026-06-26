@@ -7,6 +7,7 @@ import {
   ccrPrivateConfigPath,
   ccrPrivateHome,
   ccrPrivatePidPath,
+  resolveCcrCliPath,
   spawnManagedCcr,
   prepareCcrRuntimeAssets,
   writeCcrPrivateConfig,
@@ -233,5 +234,11 @@ describe("CCR spawn adapter", () => {
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
+  });
+
+  it("bundled CCR CLI includes the OpenAI Responses transformer", async () => {
+    const cli = await readFile(resolveCcrCliPath(), "utf8");
+
+    expect(cli).toContain("openai-responses");
   });
 });

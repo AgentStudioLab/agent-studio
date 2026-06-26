@@ -11,7 +11,10 @@ import {
 import type { CcrRuntimeRoute } from "./routes";
 import { resolveCcrRuntimeRoute } from "./routes";
 
-export type CcrSmokeProtocol = "openai-compatible" | "anthropic";
+export type CcrSmokeProtocol =
+  | "openai-chat-completions"
+  | "openai-responses"
+  | "anthropic";
 
 export interface CcrSmokeInput {
   upstreamBaseUrl?: string;
@@ -109,7 +112,9 @@ export function buildCcrSmokeInputFromEnv(env: EnvLike): CcrSmokeInput {
     upstreamApiKey: envString(env, "AGENT_STUDIO_CCR_POC_API_KEY"),
     upstreamModel: envString(env, "AGENT_STUDIO_CCR_POC_MODEL"),
     upstreamProtocol:
-      protocol === "anthropic" ? "anthropic" : "openai-compatible",
+      protocol === "anthropic" || protocol === "openai-responses"
+        ? protocol
+        : "openai-chat-completions",
     upstreamProviderId:
       envString(env, "AGENT_STUDIO_CCR_POC_PROVIDER_ID") ?? "ccr_poc",
     upstreamProviderName:

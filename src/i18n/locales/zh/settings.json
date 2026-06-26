@@ -69,7 +69,8 @@
       "custom": "自定义"
     },
     "customProtocolLabel": "协议",
-    "customProtocolOpenAI": "OpenAI-compatible",
+    "customProtocolOpenAIChat": "OpenAI Chat Completions",
+    "customProtocolOpenAIResponses": "OpenAI Responses",
     "customProtocolAnthropic": "Anthropic Messages-compatible",
     "baseUrlLabel": "Base URL",
     "baseUrlPlaceholder": "https://api.example.com",

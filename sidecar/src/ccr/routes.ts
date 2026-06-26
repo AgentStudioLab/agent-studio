@@ -35,12 +35,14 @@ export function resolveCcrRuntimeRoute(
   }
 
   const protocol =
-    provider.customProtocol === "openai-compatible" ||
-    provider.agentRuntime.protocol === "openai-compatible"
-      ? "openai-compatible"
-      : undefined;
+    provider.customProtocol === "openai-responses"
+      ? "openai-responses"
+      : provider.customProtocol === "openai-chat-completions" ||
+          provider.agentRuntime.protocol === "openai-compatible"
+        ? "openai-chat-completions"
+        : undefined;
 
-  if (protocol !== "openai-compatible") {
+  if (!protocol) {
     throw new Error("ccr_protocol_unsupported");
   }
 

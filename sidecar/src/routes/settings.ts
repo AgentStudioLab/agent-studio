@@ -111,10 +111,7 @@ function validateConnectionPatch(
     patch.defaultModelId = body.defaultModelId;
   }
   if (body.customProtocol !== undefined) {
-    if (
-      body.customProtocol !== "openai-compatible" &&
-      body.customProtocol !== "anthropic"
-    ) {
+    if (!isCustomProviderProtocol(body.customProtocol)) {
       return { ok: false, error: "invalid_custom_protocol" };
     }
     patch.customProtocol = body.customProtocol;
@@ -130,13 +127,23 @@ function validateSelection(value: unknown): ProviderModelSelection | null {
   return { providerId: value.providerId, modelId: value.modelId };
 }
 
+function isCustomProviderProtocol(
+  value: unknown,
+): value is CustomProviderProtocol {
+  return (
+    value === "openai-chat-completions" ||
+    value === "openai-responses" ||
+    value === "anthropic"
+  );
+}
+
 function sanitizeCustomProtocol(value: unknown): CustomProviderProtocol {
-  return value === "anthropic" ? "anthropic" : "openai-compatible";
+  return isCustomProviderProtocol(value) ? value : "openai-chat-completions";
 }
 
 function customProfile(
   baseUrl: string,
-  customProtocol: CustomProviderProtocol = "openai-compatible",
+  customProtocol: CustomProviderProtocol = "openai-chat-completions",
 ) {
   if (customProtocol === "anthropic") {
     return {
@@ -378,10 +385,7 @@ export function buildSettingsRoutes(
       input.apiKey = body.apiKey;
     }
     if (body.customProtocol !== undefined) {
-      if (
-        body.customProtocol !== "openai-compatible" &&
-        body.customProtocol !== "anthropic"
-      ) {
+      if (!isCustomProviderProtocol(body.customProtocol)) {
         return c.json({ error: "invalid_custom_protocol" }, 400);
       }
       input.customProtocol = body.customProtocol;
@@ -613,8 +617,7 @@ export function buildSettingsRoutes(
     }
     if (
       body.customProtocol !== undefined &&
-      body.customProtocol !== "openai-compatible" &&
-      body.customProtocol !== "anthropic"
+      !isCustomProviderProtocol(body.customProtocol)
     ) {
       return c.json({ error: "invalid_custom_protocol" }, 400);
     }

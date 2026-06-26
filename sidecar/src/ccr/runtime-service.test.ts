@@ -23,7 +23,7 @@ function resolvedProvider(
     label: overrides.label ?? "OpenAI",
     baseUrl: overrides.baseUrl ?? "https://relay.example/v1",
     apiKey: overrides.apiKey ?? "sk-relay",
-    customProtocol: overrides.customProtocol ?? "openai-compatible",
+    customProtocol: overrides.customProtocol ?? "openai-chat-completions",
     models: [
       {
         id: modelId ?? "gpt-5.1",
@@ -58,7 +58,7 @@ function option(
     modelId,
     modelLabel: modelId,
     modelDescription: "",
-    customProtocol: "openai-compatible",
+    customProtocol: "openai-chat-completions",
     agentRuntime: {
       protocol: "openai-compatible",
       baseUrl: "https://relay.example/v1",

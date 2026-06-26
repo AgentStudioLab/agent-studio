@@ -69,7 +69,8 @@
       "custom": "Custom"
     },
     "customProtocolLabel": "Protocol",
-    "customProtocolOpenAI": "OpenAI-compatible",
+    "customProtocolOpenAIChat": "OpenAI Chat Completions",
+    "customProtocolOpenAIResponses": "OpenAI Responses",
     "customProtocolAnthropic": "Anthropic Messages-compatible",
     "baseUrlLabel": "Base URL",
     "baseUrlPlaceholder": "https://api.example.com",

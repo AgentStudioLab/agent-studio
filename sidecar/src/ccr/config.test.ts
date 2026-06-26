@@ -12,10 +12,10 @@ const openaiRoute: CcrRuntimeRoute = {
   authMode: "x-api-key",
   apiKey: "router-key",
   model: "agentstudio/conn_openai/gpt-5.1",
-  upstream: {
-    providerId: "conn_openai",
-    providerName: "OpenAI Main",
-    protocol: "openai-compatible",
+    upstream: {
+      providerId: "conn_openai",
+      providerName: "OpenAI Main",
+    protocol: "openai-chat-completions",
     baseUrl: "https://api.openai.com/v1",
     apiKey: "sk-openai",
     modelId: "gpt-5.1",
@@ -42,8 +42,29 @@ describe("buildAgentStudioCcrConfig", () => {
         api_base_url: "https://api.openai.com/v1/chat/completions",
         api_key: "sk-openai",
         models: ["gpt-5.1"],
+        transformer: { use: ["reasoning"] },
       },
     ]);
+  });
+
+  it("routes OpenAI Responses providers to /responses with openai-responses transformer", () => {
+    const responsesRoute: CcrRuntimeRoute = {
+      ...openaiRoute,
+      upstream: {
+        ...openaiRoute.upstream,
+        protocol: "openai-responses",
+        baseUrl: "https://aiproxy.cloud-ip.cc/v1",
+        modelId: "gpt-5.5",
+      },
+    };
+
+    const config = buildAgentStudioCcrConfig([responsesRoute]);
+
+    expect(config.Providers[0]).toMatchObject({
+      api_base_url: "https://aiproxy.cloud-ip.cc/v1/responses",
+      models: ["gpt-5.5"],
+      transformer: { use: ["openai-responses"] },
+    });
   });
 
   it("can enable CCR trace logs for diagnosis without changing route output", () => {

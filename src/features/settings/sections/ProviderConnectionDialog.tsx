@@ -50,7 +50,8 @@ interface ProviderConnectionDialogProps {
     provider: string;
     custom: string;
     protocol: string;
-    protocolOpenAI: string;
+    protocolOpenAIChat: string;
+    protocolOpenAIResponses: string;
     protocolAnthropic: string;
     baseUrl: string;
     baseUrlPlaceholder: string;
@@ -93,7 +94,7 @@ function defaultForm(builtIn: BuiltInProfile[]): FormState {
   return {
     name: "",
     profileId: profile?.id ?? "anthropic",
-    customProtocol: "openai-compatible",
+    customProtocol: "openai-chat-completions",
     baseUrl: profile?.baseUrl ?? "",
     apiKey: "",
     enabled: true,
@@ -106,7 +107,7 @@ function formFromConnection(connection: ProviderConnectionConfig): FormState {
   return {
     name: connection.providerName,
     profileId: connection.profileId,
-    customProtocol: connection.customProtocol ?? "openai-compatible",
+    customProtocol: connection.customProtocol ?? "openai-chat-completions",
     baseUrl: connection.baseUrl,
     apiKey: connection.apiKey,
     enabled: connection.enabled,
@@ -161,7 +162,7 @@ export function ProviderConnectionDialog({
       name: profile?.label || "Custom",
       baseUrl: profile?.baseUrl ?? current.baseUrl,
       customProtocol:
-        profileId === "custom" ? current.customProtocol : "openai-compatible",
+        profileId === "custom" ? current.customProtocol : "openai-chat-completions",
       enabledModelIds: [],
       defaultModelId: null,
     }));
@@ -318,8 +319,11 @@ export function ProviderConnectionDialog({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent align="start" side="bottom" position="popper">
-                    <SelectItem value="openai-compatible">
-                      {labels.protocolOpenAI}
+                    <SelectItem value="openai-chat-completions">
+                      {labels.protocolOpenAIChat}
+                    </SelectItem>
+                    <SelectItem value="openai-responses">
+                      {labels.protocolOpenAIResponses}
                     </SelectItem>
                     <SelectItem value="anthropic">
                       {labels.protocolAnthropic}

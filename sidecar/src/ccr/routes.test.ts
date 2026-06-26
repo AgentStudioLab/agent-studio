@@ -15,7 +15,7 @@ function provider(
     label: "OpenAI",
     baseUrl: "https://api.openai.com/v1",
     apiKey: "sk-openai",
-    customProtocol: "openai-compatible",
+    customProtocol: "openai-chat-completions",
     models: [{ id: "gpt-5.1", displayName: "GPT-5.1", description: "Remote model" }],
     remoteModelsFetchedAt: "",
     selectedModelId: null,
@@ -45,11 +45,27 @@ describe("resolveCcrRuntimeRoute", () => {
       upstream: {
         providerId: "conn_1",
         providerName: "OpenAI",
-        protocol: "openai-compatible",
+        protocol: "openai-chat-completions",
         baseUrl: "https://api.openai.com/v1",
         apiKey: "sk-openai",
         modelId: "gpt-5.1",
       },
+    });
+  });
+
+  it("preserves OpenAI Responses protocol for CCR config generation", () => {
+    const route = resolveCcrRuntimeRoute(
+      provider({
+        customProtocol: "openai-responses",
+        baseUrl: "https://aiproxy.cloud-ip.cc/v1",
+        modelId: "gpt-5.5",
+      }),
+    );
+
+    expect(route.upstream).toMatchObject({
+      protocol: "openai-responses",
+      baseUrl: "https://aiproxy.cloud-ip.cc/v1",
+      modelId: "gpt-5.5",
     });
   });
 
