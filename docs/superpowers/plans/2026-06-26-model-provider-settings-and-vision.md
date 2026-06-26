@@ -38,7 +38,7 @@
 - Modify: `sidecar/src/ccr/config.ts`
   - 生成 Chat Completions / Responses 的不同上游地址和 transformer。
 - Modify: `sidecar/src/server.ts`
-  - OpenAI Responses 路由给 SDK provider 传 `thinking: { type: "adaptive", display: "summarized" }`。
+  - OpenAI Responses 路由给 SDK provider 传 `thinking: { type: "enabled", budgetTokens: 1024, display: "summarized" }`。
 - Modify: `sidecar/src/agui/provider-claude/provider.ts`
   - `ClaudeProviderOptions` 增加 `thinking` 透传。
 - Modify: `sidecar/src/routes/settings.ts`
@@ -273,7 +273,7 @@ Expected: 所有 CCR 配置与运行时资产测试通过。
 expect(mockSdkQuery).toHaveBeenCalledWith(
   expect.objectContaining({
     options: expect.objectContaining({
-      thinking: { type: "adaptive", display: "summarized" },
+      thinking: { type: "enabled", budgetTokens: 1024, display: "summarized" },
     }),
   }),
 );
@@ -307,7 +307,7 @@ const commonForCcr =
     ? {
         ...common,
         ccrSkillReminderCompat: true,
-        thinking: { type: "adaptive" as const, display: "summarized" as const },
+        thinking: { type: "enabled" as const, budgetTokens: 1024, display: "summarized" as const },
       }
     : { ...common, ccrSkillReminderCompat: true };
 ```

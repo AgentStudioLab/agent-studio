@@ -200,7 +200,7 @@ describe("provider sandbox config", () => {
   it("passes configured thinking options to sdkQuery", async () => {
     const provider = createClaudeProvider({
       apiKey: "k",
-      thinking: { type: "adaptive", display: "summarized" },
+      thinking: { type: "enabled", budgetTokens: 1024, display: "summarized" },
     });
     const ac = new AbortController();
     await drain(provider.run({
@@ -216,7 +216,8 @@ describe("provider sandbox config", () => {
     const lastCall = lastCallArgs[0] as Record<string, unknown>;
     const options = lastCall.options as Record<string, unknown>;
     expect(options.thinking).toEqual({
-      type: "adaptive",
+      type: "enabled",
+      budgetTokens: 1024,
       display: "summarized",
     });
   });

@@ -206,7 +206,7 @@ Anthropic：
 仅当 Provider 协议为 OpenAI Responses 时，对 CCR runtime 的 Claude Agent SDK provider 传：
 
 ```ts
-thinking: { type: "adaptive", display: "summarized" }
+thinking: { type: "enabled", budgetTokens: 1024, display: "summarized" }
 ```
 
 不对所有 Provider 全局启用，避免增加不必要的成本、延迟和兼容风险。

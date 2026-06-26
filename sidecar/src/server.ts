@@ -71,6 +71,7 @@ import {
   runCcrRunnerMode,
   withCcrReady,
 } from "./ccr";
+import { thinkingConfigForCcrProtocol } from "./ccr/thinking";
 
 type Args = { port: number; token: string; db: string };
 
@@ -349,12 +350,11 @@ function buildProviderForSelection(
 
   if (isOpenAICcrProtocol(current.customProtocol)) {
     const route = ccrRuntime.resolveRouteForSelection(selection);
+    const thinking = thinkingConfigForCcrProtocol(current.customProtocol);
     const ccrCommon: typeof common = {
       ...common,
       ccrSkillReminderCompat: true,
-      ...(current.customProtocol === "openai-responses"
-        ? { thinking: { type: "adaptive", display: "summarized" } }
-        : {}),
+      ...(thinking ? { thinking } : {}),
     };
     const provider = createAgentProviderForRuntime({
       runtime: {

@@ -40,7 +40,7 @@
 - [x] 增加 CCR runtime asset 测试，确保 bundled runtime 包含 `openai-responses` transformer。
 - [x] `ClaudeProviderOptions` 增加 `thinking`。
 - [x] `createClaudeProvider` 把 `thinking` 传入 `sdkQuery({ options })`。
-- [x] `server.ts` 仅对 OpenAI Responses 的 CCR provider 传 `thinking: { type: "adaptive", display: "summarized" }`。
+- [x] `server.ts` 仅对 OpenAI Responses 的 CCR provider 传 `thinking: { type: "enabled", budgetTokens: 1024, display: "summarized" }`。
 
 ## 关键测试
 
@@ -71,3 +71,6 @@ cd sidecar && bunx tsc --noEmit
 
 - 2026-06-26: 已完成协议拆分、CCR Responses 路由、Chat Completions reasoning transformer、SDK thinking 透传和最小 UI 协议选项。
 - 自动验证已通过 focused tests、相邻 settings/UI tests、前端 tsc、sidecar tsc。
+- 2026-06-26: 实机复查发现 SDK `adaptive` thinking 对 CCR model key
+  `agentstudio/<provider>/<model>` 不会稳定启用 thinking；已改为
+  `thinking: { type: "enabled", budgetTokens: 1024, display: "summarized" }`。

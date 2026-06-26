@@ -41,7 +41,7 @@ flowchart TD
 
 - Provider 协议拆分为 `openai-chat-completions`、`openai-responses`、`anthropic`。
 - OpenAI Responses 由用户配置显式选择，不用模型名推断。
-- Responses 路径需要 CCR `openai-responses` transformer 与 SDK `thinking: { type: "adaptive", display: "summarized" }`。
+- Responses 路径需要 CCR `openai-responses` transformer 与 SDK `thinking: { type: "enabled", budgetTokens: 1024, display: "summarized" }`。
 - 设置页展示完整上游请求地址，不展示 CCR 本地地址。
 - 模型能力标签允许系统探测和用户手动覆盖。
 - 不做默认图片识别模型，不做自动切换视觉模型。
