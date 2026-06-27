@@ -7,8 +7,9 @@ const navigate = mock((_path: string | number) => {});
 const invalidateQueries = mock((_args: unknown) => {});
 const setPendingFirstPrompt = mock((_args: unknown) => {});
 const createScheduledTaskMutate = mock(
-  (_args: unknown, _options?: { onSuccess?: () => void }) => {},
+  (_args: unknown, _options?: { onSuccess?: () => void; onError?: () => void }) => {},
 );
+const createConversationMock = mock(async () => ({ id: "thread-1" }));
 
 const baseAgent: AgentWorkspace = {
   id: "coder",
@@ -57,6 +58,8 @@ mock.module("react-i18next", () => ({
         "agentSpace.dailyBriefing.createSchedule": "创建定时简报",
         "agentSpace.dailyBriefing.sourcesRequired": "先添加至少一个信息源。",
         "agentSpace.dailyBriefing.created": "定时简报已创建，可在右侧定时任务或计划任务页查看。",
+        "agentSpace.dailyBriefing.runFailed": "生成今日简报失败，请确认本地服务已启动后重试。",
+        "agentSpace.dailyBriefing.scheduleFailed": "创建定时简报失败，请稍后重试。",
       };
       return translations[key] ?? key;
     },
@@ -95,7 +98,7 @@ mock.module("@/lib/data/agent-queries", () => ({
 }));
 
 mock.module("@/lib/data/conversations", () => ({
-  createConversation: mock(async () => ({ id: "thread-1" })),
+  createConversation: createConversationMock,
 }));
 
 mock.module("@/lib/data/scheduled-queries", () => ({
@@ -172,6 +175,7 @@ afterEach(() => {
   invalidateQueries.mockClear();
   setPendingFirstPrompt.mockClear();
   createScheduledTaskMutate.mockClear();
+  createConversationMock.mockClear();
 });
 
 describe("AgentSpaceView", () => {
@@ -291,5 +295,50 @@ describe("AgentSpaceView", () => {
     expect(
       screen.getByText("定时简报已创建，可在右侧定时任务或计划任务页查看。"),
     ).toBeTruthy();
+  });
+
+  it("shows visible errors when daily briefing actions fail", async () => {
+    currentAgent = {
+      ...baseAgent,
+      id: "podcast-daily-briefing",
+      name: "每日音频简报助手",
+      source: "builtin",
+      category: "podcast",
+      coverImage: "podcast",
+      catalogMetadata: {
+        domain: "audio",
+        scenario: "podcast-daily-briefing",
+        tagline: "把固定信息源整理成每日可录制简报",
+        inputTypes: ["rss", "url"],
+        outputTypes: ["briefing-script", "sources"],
+        optionalTools: ["rsshub"],
+        riskTags: ["web-access"],
+        sampleTasks: [],
+      },
+    };
+    createConversationMock.mockImplementationOnce(async () => {
+      throw new Error("sidecar_unavailable");
+    });
+
+    render(<AgentSpaceView />);
+
+    fireEvent.change(screen.getByLabelText("信息源"), {
+      target: { value: "https://news.example/rss" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "生成今日简报" }));
+
+    expect(
+      await screen.findByText("生成今日简报失败，请确认本地服务已启动后重试。"),
+    ).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "创建定时简报" }));
+    const createOptions = createScheduledTaskMutate.mock.calls[0]?.[1] as
+      | { onError?: () => void }
+      | undefined;
+    act(() => {
+      createOptions?.onError?.();
+    });
+
+    expect(screen.getByText("创建定时简报失败，请稍后重试。")).toBeTruthy();
   });
 });

@@ -47,7 +47,13 @@
     "readyHint": "已添加 {{count}} 个信息源。",
     "sourcesRequired": "先添加至少一个信息源。",
     "runNow": "生成今日简报",
+    "runningNow": "正在创建今日简报对话…",
+    "runningNowButton": "生成中…",
+    "runFailed": "生成今日简报失败，请确认本地服务已启动后重试。",
     "createSchedule": "创建定时简报",
+    "creatingSchedule": "正在创建定时简报…",
+    "creatingScheduleButton": "创建中…",
+    "scheduleFailed": "创建定时简报失败，请稍后重试。",
     "created": "定时简报已创建，可在右侧定时任务或计划任务页查看。",
     "taskName": "每日音频简报",
     "taskDescription": "按固定信息源生成每日可录制音频简报"

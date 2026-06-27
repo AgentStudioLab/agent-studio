@@ -47,7 +47,13 @@
     "readyHint": "{{count}} sources added.",
     "sourcesRequired": "Add at least one source first.",
     "runNow": "Generate today",
+    "runningNow": "Creating today’s briefing conversation…",
+    "runningNowButton": "Generating…",
+    "runFailed": "Failed to generate today’s briefing. Make sure the local service is running and try again.",
     "createSchedule": "Create schedule",
+    "creatingSchedule": "Creating scheduled briefing…",
+    "creatingScheduleButton": "Creating…",
+    "scheduleFailed": "Failed to create the scheduled briefing. Please try again.",
     "created": "Scheduled briefing created. You can find it in the right rail or Scheduled page.",
     "taskName": "Daily audio briefing",
     "taskDescription": "Generate a recordable daily audio briefing from fixed sources"

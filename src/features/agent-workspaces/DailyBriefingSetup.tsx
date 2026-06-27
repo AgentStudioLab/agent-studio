@@ -14,6 +14,11 @@ interface DailyBriefingSetupProps {
 
 const AUTO_APPROVED_WEB_TOOLS = ["WebFetch", "WebSearch"];
 
+type Notice = {
+  tone: "error" | "success" | "info";
+  message: string;
+};
+
 function linesFromSources(raw: string): string[] {
   return raw
     .split(/\r?\n/)
@@ -72,7 +77,8 @@ export function DailyBriefingSetup({
   const [language, setLanguage] = useState("中文");
   const [frequency, setFrequency] = useState<Frequency>("daily");
   const [timeOfDay, setTimeOfDay] = useState("08:30");
-  const [created, setCreated] = useState(false);
+  const [notice, setNotice] = useState<Notice | null>(null);
+  const [isRunningNow, setIsRunningNow] = useState(false);
 
   const parsedSources = useMemo(() => linesFromSources(sources), [sources]);
   const canUse = parsedSources.length > 0;
@@ -90,14 +96,45 @@ export function DailyBriefingSetup({
     [audience, duration, language, parsedSources, topic],
   );
 
-  const handleRunNow = () => {
-    if (!canUse) return;
-    void onRunPrompt(prompt);
+  const handleRunNow = async () => {
+    setNotice(null);
+    if (!canUse) {
+      setNotice({
+        tone: "error",
+        message: t("agentSpace.dailyBriefing.sourcesRequired"),
+      });
+      return;
+    }
+    setIsRunningNow(true);
+    setNotice({
+      tone: "info",
+      message: t("agentSpace.dailyBriefing.runningNow"),
+    });
+    try {
+      await onRunPrompt(prompt);
+    } catch {
+      setNotice({
+        tone: "error",
+        message: t("agentSpace.dailyBriefing.runFailed"),
+      });
+    } finally {
+      setIsRunningNow(false);
+    }
   };
 
   const handleCreateSchedule = () => {
-    if (!canUse) return;
-    setCreated(false);
+    setNotice(null);
+    if (!canUse) {
+      setNotice({
+        tone: "error",
+        message: t("agentSpace.dailyBriefing.sourcesRequired"),
+      });
+      return;
+    }
+    setNotice({
+      tone: "info",
+      message: t("agentSpace.dailyBriefing.creatingSchedule"),
+    });
     createTask.mutate(
       {
         name: t("agentSpace.dailyBriefing.taskName"),
@@ -116,10 +153,26 @@ export function DailyBriefingSetup({
       },
       {
         // 等后端确认创建成功后再提示，避免网络失败时给用户误导反馈。
-        onSuccess: () => setCreated(true),
+        onSuccess: () =>
+          setNotice({
+            tone: "success",
+            message: t("agentSpace.dailyBriefing.created"),
+          }),
+        onError: () =>
+          setNotice({
+            tone: "error",
+            message: t("agentSpace.dailyBriefing.scheduleFailed"),
+          }),
       },
     );
   };
+
+  const noticeClassName =
+    notice?.tone === "error"
+      ? "text-destructive"
+      : notice?.tone === "success"
+        ? "text-primary"
+        : "text-muted-foreground";
 
   return (
     <section className="rounded-lg border border-border bg-card p-4">
@@ -231,24 +284,35 @@ export function DailyBriefingSetup({
               : t("agentSpace.dailyBriefing.sourcesRequired")}
           </p>
           <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="outline" onClick={handleRunNow} disabled={!canUse}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                void handleRunNow();
+              }}
+              disabled={isRunningNow || isCreatingSchedule}
+            >
               <Play className="size-4" />
-              {t("agentSpace.dailyBriefing.runNow")}
+              {isRunningNow
+                ? t("agentSpace.dailyBriefing.runningNowButton")
+                : t("agentSpace.dailyBriefing.runNow")}
             </Button>
             <Button
               type="button"
               onClick={handleCreateSchedule}
-              disabled={!canUse || isCreatingSchedule}
+              disabled={isRunningNow || isCreatingSchedule}
             >
               <CalendarPlus className="size-4" />
-              {t("agentSpace.dailyBriefing.createSchedule")}
+              {isCreatingSchedule
+                ? t("agentSpace.dailyBriefing.creatingScheduleButton")
+                : t("agentSpace.dailyBriefing.createSchedule")}
             </Button>
           </div>
         </div>
 
-        {created && (
-          <p className="text-xs font-medium text-primary">
-            {t("agentSpace.dailyBriefing.created")}
+        {notice && (
+          <p className={`rounded-md bg-muted px-3 py-2 text-xs font-medium ${noticeClassName}`}>
+            {notice.message}
           </p>
         )}
       </div>
